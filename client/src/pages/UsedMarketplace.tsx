@@ -1,25 +1,40 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { trpc } from "@/lib/trpc";
-import { Search, Star, ShoppingCart, ArrowLeft, Flame } from "lucide-react";
-import { useState } from "react";
+import { Search, Star, ShoppingCart, ArrowLeft, Flame, User, Check, Package } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { db } from "@/lib/firebase";
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 
 export default function UsedMarketplace() {
   const { isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCondition, setSelectedCondition] = useState<string | null>(null);
+  const [products, setProducts] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
-  const { data: products, isLoading } = trpc.usedProducts.list.useQuery();
+  useEffect(() => {
+    const q = query(collection(db, "used_products"), orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setProducts(data);
+      setIsLoading(false);
+    });
 
-  const filteredProducts = products?.filter(p => {
+    return () => unsubscribe();
+  }, []);
+
+  const filteredProducts = products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.description?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCondition = !selectedCondition || p.condition === selectedCondition;
     return matchesSearch && matchesCondition;
-  }) || [];
+  });
 
   const conditions = [
     { value: "novo", label: "Novo" },
@@ -59,8 +74,9 @@ export default function UsedMarketplace() {
               />
             </div>
             {isAuthenticated && (
-              <Button className="bg-green-600 hover:bg-green-700 text-white font-bold">
-                + Anunciar Produto
+              <Button onClick={() => navigate("/vendedor")} className="bg-red-600 hover:bg-red-700 text-white font-black btn-neon">
+                <Package className="w-5 h-5 mr-2" />
+                Vender meu Produto
               </Button>
             )}
           </div>
@@ -113,42 +129,75 @@ export default function UsedMarketplace() {
             {filteredProducts.map((product) => (
               <div
                 key={product.id}
-                className="card-neon p-6 hover:scale-105 transition-transform"
+                className="group relative bg-slate-900/40 rounded-3xl border border-red-600/10 overflow-hidden hover:border-red-600/40 transition-all duration-500 hover:shadow-[0_20px_50px_rgba(220,38,38,0.15)] flex flex-col h-full"
               >
-                <div className="bg-gradient-to-br from-green-600 to-green-700 h-40 flex items-center justify-center relative rounded-lg mb-4">
-                  <ShoppingCart className="w-12 h-12 text-white opacity-50" />
-                  <span className="absolute top-2 right-2 bg-red-600 text-white text-xs px-2 py-1 rounded font-bold">
-                    {product.condition === "novo" && "Novo"}
-                    {product.condition === "como_novo" && "Como Novo"}
-                    {product.condition === "bom" && "Bom"}
-                    {product.condition === "aceitavel" && "Aceitável"}
-                  </span>
-                </div>
-                <h3 className="font-semibold text-white mb-2 line-clamp-2">
-                  {product.name}
-                </h3>
-                <p className="text-sm text-slate-400 mb-4 line-clamp-2">
-                  {product.description}
-                </p>
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="flex">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className="w-4 h-4 fill-red-500 text-red-500"
-                      />
-                    ))}
+                {/* Image Section */}
+                <div className="relative h-48 overflow-hidden bg-slate-950">
+                  {product.imageUrl ? (
+                    <img 
+                      src={product.imageUrl} 
+                      alt={product.name} 
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-800">
+                      <ShoppingCart className="w-16 h-16" />
+                    </div>
+                  )}
+                  
+                  {/* Badge */}
+                  <div className="absolute top-4 right-4 z-10">
+                    <span className="bg-red-600 text-white text-[10px] px-3 py-1.5 rounded-full font-black uppercase tracking-wider shadow-xl border border-white/10">
+                      USADO
+                    </span>
                   </div>
-                  <span className="text-xs text-slate-400">(0 avaliações)</span>
+
+                  <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-slate-950 to-transparent" />
                 </div>
-                <div className="flex justify-between items-center mb-4">
-                  <span className="text-2xl font-bold text-red-500">
-                    R$ {parseFloat(product.price).toFixed(2)}
-                  </span>
+
+                {/* Content */}
+                <div className="p-6 flex-1 flex flex-col">
+                  <div className="mb-4">
+                    <h3 className="text-xl font-black text-white line-clamp-1 mb-1">{product.name}</h3>
+                    <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">{product.category || "JOGO USADO"}</p>
+                  </div>
+
+                  <div className="flex items-center gap-2 mb-6 p-2 rounded-xl bg-slate-950/50 border border-red-600/5">
+                    <div className="w-8 h-8 rounded-full bg-red-600/10 flex items-center justify-center border border-red-600/20">
+                      <User className="w-4 h-4 text-red-500" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Vendido por:</span>
+                      <span className="text-xs font-black text-white">{product.sellerName || "Usuário Verificado"}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-auto space-y-4">
+                    <div className="flex justify-between items-center">
+                      <div className="flex flex-col">
+                        <span className="text-2xl font-black text-red-500 tracking-tighter">
+                          R$ {parseFloat(product.pricePS4 || product.pricePS5 || 0).toFixed(2).replace('.', ',')}
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-bold italic">Valor Unitário</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 text-green-500 text-[10px] font-black uppercase tracking-wider border border-green-500/20">
+                        <Check className="w-3 h-3" strokeWidth={4} />
+                        Disponível
+                      </div>
+                    </div>
+
+                    <Button 
+                      onClick={() => {
+                        const message = `Olá! Tenho interesse no jogo USADO: ${product.name} anunciado por ${product.sellerName}. Ainda está disponível?`;
+                        window.open(`https://wa.me/5543984253691?text=${encodeURIComponent(message)}`, "_blank");
+                      }}
+                      className="w-full bg-red-600 hover:bg-red-700 text-white font-black text-lg h-12 rounded-2xl transition-all active:scale-95 shadow-lg border-b-4 border-red-800 flex items-center justify-center gap-3"
+                    >
+                      <ShoppingCart className="w-5 h-5" strokeWidth={3} />
+                      Comprar Agora
+                    </Button>
+                  </div>
                 </div>
-                <Button className="w-full bg-green-600 hover:bg-green-700 text-white font-bold">
-                  Comprar
-                </Button>
               </div>
             ))}
           </div>
