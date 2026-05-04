@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
-import { Search, ShoppingCart, ArrowLeft, Flame, Package } from "lucide-react";
+import { Search, ShoppingCart, ArrowLeft, Flame, Package, Check, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import {
@@ -166,19 +166,20 @@ export default function Store() {
                       </div>
 
                       <div className="flex flex-col items-end gap-2">
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-green-500/30 bg-green-500/10 text-green-500 text-[10px] font-black uppercase tracking-wider">
-                          <Check className="w-3 h-3" strokeWidth={4} />
-                          Estoque
+                        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${product.stock > 0 ? 'border-green-500/30 bg-green-500/10 text-green-500' : 'border-red-500/30 bg-red-500/10 text-red-500'} text-[10px] font-black uppercase tracking-wider`}>
+                          {product.stock > 0 ? <Check className="w-3 h-3" strokeWidth={4} /> : <X className="w-3 h-3" strokeWidth={4} />}
+                          {product.stock > 0 ? `Estoque: ${product.stock}` : "Esgotado"}
                         </div>
                       </div>
                     </div>
 
                     <Button 
                       onClick={() => handleBuyClick(product)}
-                      className="w-full bg-red-600 hover:bg-red-700 text-white font-black text-xl h-14 rounded-2xl mt-2 transition-all active:scale-[0.95] shadow-[0_8px_20px_rgba(220,38,38,0.3)] border-b-4 border-red-800 flex items-center justify-center gap-3 group/btn"
+                      disabled={product.stock <= 0}
+                      className={`w-full ${product.stock > 0 ? 'bg-red-600 hover:bg-red-700 shadow-[0_8px_20px_rgba(220,38,38,0.3)]' : 'bg-slate-800 cursor-not-allowed opacity-50'} text-white font-black text-xl h-14 rounded-2xl mt-2 transition-all active:scale-[0.95] border-b-4 border-red-800 flex items-center justify-center gap-3 group/btn`}
                     >
                       <ShoppingCart className="w-5 h-5 transition-transform group-hover/btn:scale-110" strokeWidth={3} />
-                      Comprar
+                      {product.stock > 0 ? "Comprar" : "Indisponível"}
                     </Button>
                   </div>
                 </div>

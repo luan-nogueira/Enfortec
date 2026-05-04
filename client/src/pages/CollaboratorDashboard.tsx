@@ -19,6 +19,7 @@ interface Product {
   pricePS5?: number;
   category: string;
   imageUrl: string;
+  stock: number;
 }
 
 export default function CollaboratorDashboard() {
@@ -33,6 +34,7 @@ export default function CollaboratorDashboard() {
   const [pricePS5, setPricePS5] = useState("");
   const [category, setCategory] = useState("Jogos (Mídia Digital)");
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [stock, setStock] = useState("1"); // Padrão 1
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -91,6 +93,7 @@ export default function CollaboratorDashboard() {
         pricePS4: pricePS4 ? parseFloat(pricePS4) : null,
         pricePS5: pricePS5 ? parseFloat(pricePS5) : null,
         category,
+        stock: parseInt(stock) || 0,
         collaboratorId: user?.id,
         collaboratorName: user?.name || user?.email,
       };
@@ -127,6 +130,7 @@ export default function CollaboratorDashboard() {
     setPricePS4(product.pricePS4 ? product.pricePS4.toString() : "");
     setPricePS5(product.pricePS5 ? product.pricePS5.toString() : "");
     setCategory(product.category);
+    setStock(product.stock ? product.stock.toString() : "0");
     setImageFile(null); // obriga a não mexer na imagem a não ser que escolha outra
   };
 
@@ -136,6 +140,7 @@ export default function CollaboratorDashboard() {
     setDescription("");
     setPricePS4("");
     setPricePS5("");
+    setStock("1");
     setImageFile(null);
     const fileInput = document.getElementById("imageUpload") as HTMLInputElement;
     if (fileInput) fileInput.value = "";
@@ -206,6 +211,10 @@ export default function CollaboratorDashboard() {
               </select>
             </div>
             <div>
+              <Label className="text-slate-300">Quantidade em Estoque</Label>
+              <Input type="number" required value={stock} onChange={e => setStock(e.target.value)} className="bg-slate-950 border-red-600/30 text-white" placeholder="0" />
+            </div>
+            <div>
               <Label className="text-slate-300">Foto do Produto do seu PC {editingId && "(Opcional para não alterar)"}</Label>
               <Input 
                 id="imageUpload"
@@ -251,6 +260,7 @@ export default function CollaboratorDashboard() {
                   <th className="pb-3 pl-2">Foto</th>
                   <th className="pb-3">Nome</th>
                   <th className="pb-3">Categoria</th>
+                  <th className="pb-3">Estoque</th>
                   <th className="pb-3">Preço</th>
                   <th className="pb-3">Ações</th>
                 </tr>
@@ -270,6 +280,11 @@ export default function CollaboratorDashboard() {
                       </td>
                       <td className="py-3 font-medium text-white">{product.name}</td>
                       <td className="py-3 text-slate-400">{product.category}</td>
+                      <td className="py-3">
+                        <span className={`px-2 py-1 rounded text-[10px] font-black uppercase ${product.stock > 0 ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                          {product.stock || 0} Unid.
+                        </span>
+                      </td>
                       <td className="py-3 text-red-400 font-bold text-sm">
                         {product.pricePS4 ? <div>PS4: R$ {product.pricePS4.toFixed(2)}</div> : null}
                         {product.pricePS5 ? <div>PS5: R$ {product.pricePS5.toFixed(2)}</div> : null}
