@@ -25,6 +25,9 @@ export default function Home() {
             {isAuthenticated ? (
               <div className="flex items-center gap-3">
                 <span className="text-sm text-slate-400">{user?.name}</span>
+                <Button variant="outline" size="sm" onClick={() => navigate("/colaborador")} className="border-red-700/50 hover:border-red-600 bg-slate-900 text-white">
+                  Portal do Colaborador
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => navigate("/vendedor")} className="border-red-700/50 hover:border-red-600">
                   Meu Painel
                 </Button>

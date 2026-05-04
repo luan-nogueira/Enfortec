@@ -1,0 +1,208 @@
+import { useAuth } from "@/_core/hooks/useAuth";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, getDocs, deleteDoc, doc, onSnapshot } from "firebase/firestore";
+import { Plus, Trash2, Edit2, Store, Package } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
+
+interface Product {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  imageUrl: string;
+}
+
+export default function CollaboratorDashboard() {
+  const { user, isAuthenticated } = useAuth();
+  const [, navigate] = useLocation();
+  const [products, setProducts] = useState<Product[]>([]);
+  
+  // Formulário
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [price, setPrice] = useState("");
+  const [category, setCategory] = useState("Eletrônicos");
+  const [imageUrl, setImageUrl] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  // Escutar produtos do Firestore em tempo real
+  useEffect(() => {
+    const productsRef = collection(db, "store_products");
+    const unsubscribe = onSnapshot(productsRef, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Product[];
+      setProducts(data);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950 p-4">
+        <div className="text-center card-neon bg-slate-900 p-8 rounded-xl max-w-md w-full border border-red-600/30">
+          <h1 className="text-2xl font-bold text-neon mb-4">Acesso Negado</h1>
+          <p className="text-slate-400 mb-6">Você precisa estar logado para acessar o portal do colaborador.</p>
+          <Button onClick={() => navigate("/login")} className="w-full bg-red-600 hover:bg-red-700">Fazer Login</Button>
+        </div>
+      </div>
+    );
+  }
+
+  const handleAddProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await addDoc(collection(db, "store_products"), {
+        name,
+        description,
+        price: parseFloat(price),
+        category,
+        imageUrl,
+        collaboratorId: user?.id,
+        collaboratorName: user?.name || user?.email,
+        createdAt: new Date().toISOString()
+      });
+      // Limpar form
+      setName("");
+      setDescription("");
+      setPrice("");
+      setImageUrl("");
+      alert("Produto adicionado com sucesso!");
+    } catch (error) {
+      console.error("Erro ao adicionar produto:", error);
+      alert("Erro ao adicionar produto. Verifique as permissões do Firestore.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteProduct = async (id: string) => {
+    if (confirm("Tem certeza que deseja excluir este produto?")) {
+      try {
+        await deleteDoc(doc(db, "store_products", id));
+      } catch (error) {
+        console.error("Erro ao deletar:", error);
+        alert("Erro ao deletar produto.");
+      }
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-950">
+      <div className="bg-slate-900 border-b border-red-600/20 py-4 px-6 flex justify-between items-center">
+        <div className="flex items-center gap-3">
+          <Store className="text-red-500 w-6 h-6" />
+          <h1 className="text-xl font-bold text-neon">Portal do Colaborador</h1>
+        </div>
+        <div className="flex items-center gap-4">
+          <span className="text-slate-400 text-sm hidden md:block">Colaborador: {user?.email}</span>
+          <Button variant="outline" size="sm" className="border-red-600/50 hover:bg-red-900/20" onClick={() => navigate("/")}>Sair do Portal</Button>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {/* Formulário de Adição */}
+        <Card className="p-6 bg-slate-900 border-red-600/30 card-neon lg:col-span-1 h-fit">
+          <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+            <Plus className="w-5 h-5 text-red-500" />
+            Adicionar Novo Produto
+          </h2>
+          <form onSubmit={handleAddProduct} className="space-y-4">
+            <div>
+              <Label className="text-slate-300">Nome do Produto</Label>
+              <Input required value={name} onChange={e => setName(e.target.value)} className="bg-slate-950 border-red-600/30" placeholder="Ex: Teclado Mecânico" />
+            </div>
+            <div>
+              <Label className="text-slate-300">Preço (R$)</Label>
+              <Input required type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} className="bg-slate-950 border-red-600/30" placeholder="0.00" />
+            </div>
+            <div>
+              <Label className="text-slate-300">Categoria</Label>
+              <select 
+                required 
+                value={category} 
+                onChange={e => setCategory(e.target.value)}
+                className="w-full flex h-10 items-center justify-between rounded-md border border-red-600/30 bg-slate-950 px-3 py-2 text-sm text-slate-300"
+              >
+                <option value="Eletrônicos">Eletrônicos</option>
+                <option value="Periféricos">Periféricos</option>
+                <option value="Hardware">Hardware</option>
+                <option value="Consoles">Consoles</option>
+                <option value="Acessórios">Acessórios</option>
+              </select>
+            </div>
+            <div>
+              <Label className="text-slate-300">URL da Imagem</Label>
+              <Input required type="url" value={imageUrl} onChange={e => setImageUrl(e.target.value)} className="bg-slate-950 border-red-600/30" placeholder="https://link-da-imagem.com/foto.jpg" />
+            </div>
+            <div>
+              <Label className="text-slate-300">Descrição Curta</Label>
+              <Input required value={description} onChange={e => setDescription(e.target.value)} className="bg-slate-950 border-red-600/30" placeholder="Detalhes do produto..." />
+            </div>
+            <Button type="submit" disabled={loading} className="w-full bg-red-600 hover:bg-red-700 btn-neon mt-4">
+              {loading ? "Salvando..." : "Salvar Produto na Loja"}
+            </Button>
+          </form>
+        </Card>
+
+        {/* Lista de Produtos Adicionados */}
+        <Card className="p-6 bg-slate-900 border-red-600/30 card-neon lg:col-span-2">
+          <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+            <Package className="w-5 h-5 text-red-500" />
+            Produtos da Loja ({products.length})
+          </h2>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-red-600/20 text-slate-400">
+                  <th className="pb-3 pl-2">Foto</th>
+                  <th className="pb-3">Nome</th>
+                  <th className="pb-3">Categoria</th>
+                  <th className="pb-3">Preço</th>
+                  <th className="pb-3">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {products.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-slate-500">
+                      Nenhum produto cadastrado na loja ainda.
+                    </td>
+                  </tr>
+                ) : (
+                  products.map(product => (
+                    <tr key={product.id} className="border-b border-red-600/10 hover:bg-slate-800/50 transition">
+                      <td className="py-3 pl-2">
+                        <img src={product.imageUrl} alt={product.name} className="w-12 h-12 object-cover rounded bg-slate-800" />
+                      </td>
+                      <td className="py-3 font-medium text-white">{product.name}</td>
+                      <td className="py-3 text-slate-400">{product.category}</td>
+                      <td className="py-3 text-red-400 font-bold">R$ {product.price.toFixed(2)}</td>
+                      <td className="py-3">
+                        <Button variant="ghost" size="icon" className="text-slate-400 hover:text-red-500" onClick={() => handleDeleteProduct(product.id)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+
+      </div>
+    </div>
+  );
+}

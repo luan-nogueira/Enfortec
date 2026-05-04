@@ -14,6 +14,7 @@ import BecomeSellerForm from "./pages/BecomeSellerForm";
 import AddUsedProduct from "./pages/AddUsedProduct";
 import SellDigitalProduct from "./pages/SellDigitalProduct";
 import Login from "./pages/Login";
+import CollaboratorDashboard from "./pages/CollaboratorDashboard";
 
 function Router() {
   return (
@@ -30,6 +31,7 @@ function Router() {
         <Route path={"/vendedor/novo-produto-usado"} component={AddUsedProduct} />
         <Route path={"/digital/vender"} component={SellDigitalProduct} />
         <Route path={"/login"} component={Login} />
+        <Route path={"/colaborador"} component={CollaboratorDashboard} />
         <Route path={"/404"} component={NotFound} />
         {/* Final fallback route */}
         <Route component={NotFound} />
