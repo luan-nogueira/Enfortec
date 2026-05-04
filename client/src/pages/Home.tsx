@@ -5,7 +5,7 @@ import { Zap, Gamepad2, Users, TrendingUp, ShoppingCart, Flame } from "lucide-re
 import { getLoginUrl } from "@/const";
 
 export default function Home() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isAdmin, isCollaborator } = useAuth();
   const [, navigate] = useLocation();
 
   return (
@@ -25,9 +25,17 @@ export default function Home() {
             {isAuthenticated ? (
               <div className="flex items-center gap-3">
                 <span className="text-sm text-slate-400">{user?.name}</span>
-                <Button variant="outline" size="sm" onClick={() => navigate("/colaborador")} className="border-red-700/50 hover:border-red-600 bg-slate-900 text-white">
-                  Portal do Colaborador
-                </Button>
+                {isAdmin && (
+                  <Button variant="outline" size="sm" onClick={() => navigate("/admin")} className="border-red-600 bg-red-600/10 text-red-500 font-black flex items-center gap-2">
+                    <Shield className="w-4 h-4" />
+                    Gestão
+                  </Button>
+                )}
+                {isCollaborator && (
+                  <Button variant="outline" size="sm" onClick={() => navigate("/colaborador")} className="border-red-700/50 hover:border-red-600 bg-slate-900 text-white">
+                    Portal do Colaborador
+                  </Button>
+                )}
                 <Button variant="outline" size="sm" onClick={() => navigate("/vendedor")} className="border-red-700/50 hover:border-red-600">
                   Meu Painel
                 </Button>
@@ -213,12 +221,21 @@ export default function Home() {
               </ul>
             </div>
             <div>
-              <h4 className="font-bold text-white mb-4">Contato</h4>
-              <p className="text-slate-400 text-sm">
-                <span className="text-red-500 font-bold">+55 43 8425-3691</span>
-                <br />
-                <span className="text-red-500">~Efortegames</span>
-              </p>
+              <h4 className="font-bold text-white mb-4 italic uppercase tracking-widest text-sm">Contato</h4>
+              <div className="space-y-4">
+                <Button 
+                  onClick={() => window.open("https://wa.me/5543984253691", "_blank")}
+                  className="w-full bg-[#25D366] hover:bg-[#20ba56] text-white font-black rounded-xl h-12 flex items-center justify-center gap-3 shadow-[0_0_15px_rgba(37,211,102,0.3)] transition-all active:scale-95"
+                >
+                  <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.246 2.248 3.484 5.232 3.484 8.412-.003 6.557-5.338 11.892-11.893 11.892-1.997-.001-3.951-.5-5.688-1.448l-6.309 1.656zm6.29-4.143c1.589.943 3.383 1.44 5.212 1.441l.001.001c5.441 0 9.868-4.427 9.871-9.869.001-2.637-1.03-5.112-2.905-6.987-1.875-1.875-4.35-2.907-6.991-2.908-5.442 0-9.87 4.427-9.872 9.869-.001 1.93.539 3.813 1.562 5.443l-.1.524-1.031 3.761 3.854-1.011.514-.103zm10.274-13.31c-.19-.424-.385-.433-.564-.441l-.485-.009c-.167 0-.44.063-.67.319-.23.256-.88.859-.88 2.098 0 1.239.902 2.434 1.028 2.603.126.169 1.774 2.709 4.3 3.803.601.26 1.07.415 1.435.531.603.192 1.152.165 1.587.1.485-.072 1.492-.61 1.701-1.2.209-.59.209-1.096.146-1.2-.063-.103-.23-.167-.485-.295-.256-.126-1.492-.736-1.722-.819-.23-.083-.398-.126-.564.126-.167.256-.648.819-.795.987-.147.169-.294.188-.55.063-.256-.126-1.08-.398-2.055-1.268-.758-.677-1.27-1.512-1.417-1.769-.147-.256-.015-.395.112-.522.115-.113.256-.295.385-.441.129-.147.172-.25.256-.415.083-.167.042-.314-.021-.441-.063-.126-.564-1.36-.773-1.867z"/>
+                  </svg>
+                  Chamar no WhatsApp
+                </Button>
+                <div className="flex flex-col items-center">
+                   <p className="text-slate-500 text-[10px] uppercase font-bold tracking-[0.3em]">~Efortegames</p>
+                </div>
+              </div>
             </div>
           </div>
           <div className="border-t border-slate-800 pt-8 text-center text-slate-500 text-sm">

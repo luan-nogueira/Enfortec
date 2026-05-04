@@ -22,7 +22,7 @@ interface Product {
 }
 
 export default function CollaboratorDashboard() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isCollaborator, loading: authLoading } = useAuth();
   const [, navigate] = useLocation();
   const [products, setProducts] = useState<Product[]>([]);
   
@@ -50,13 +50,19 @@ export default function CollaboratorDashboard() {
     return () => unsubscribe();
   }, []);
 
-  if (!isAuthenticated) {
+  if (authLoading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">Carregando permissões...</div>;
+
+  if (!isAuthenticated || !isCollaborator) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950 p-4">
         <div className="text-center card-neon bg-slate-900 p-8 rounded-xl max-w-md w-full border border-red-600/30">
-          <h1 className="text-2xl font-bold text-neon mb-4">Acesso Negado</h1>
-          <p className="text-slate-400 mb-6">Você precisa estar logado para acessar o portal do colaborador.</p>
-          <Button onClick={() => navigate("/login")} className="w-full bg-red-600 hover:bg-red-700">Fazer Login</Button>
+          <Package className="w-16 h-16 text-red-600 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Acesso Restrito</h2>
+          <p className="text-slate-400 mb-6">
+            Você não tem permissão para acessar o Portal do Colaborador. 
+            Entre em contato com o gestor para solicitar acesso.
+          </p>
+          <Button onClick={() => navigate("/")} className="w-full bg-red-600 hover:bg-red-700 btn-neon">Voltar para a Loja</Button>
         </div>
       </div>
     );
