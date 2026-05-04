@@ -1,0 +1,166 @@
+import { eq, and, desc } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/mysql2";
+import { InsertUser, users, sellers, products, usedProducts, digitalProducts, orders, reviews, coupons } from "../drizzle/schema";
+import { ENV } from './_core/env';
+
+let _db: ReturnType<typeof drizzle> | null = null;
+
+// Lazily create the drizzle instance so local tooling can run without a DB.
+export async function getDb() {
+  if (!_db && process.env.DATABASE_URL) {
+    try {
+      _db = drizzle(process.env.DATABASE_URL);
+    } catch (error) {
+      console.warn("[Database] Failed to connect:", error);
+      _db = null;
+    }
+  }
+  return _db;
+}
+
+export async function upsertUser(user: InsertUser): Promise<void> {
+  if (!user.openId) {
+    throw new Error("User openId is required for upsert");
+  }
+
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot upsert user: database not available");
+    return;
+  }
+
+  try {
+    const values: InsertUser = {
+      openId: user.openId,
+    };
+    const updateSet: Record<string, unknown> = {};
+
+    const textFields = ["name", "email", "loginMethod"] as const;
+    type TextField = (typeof textFields)[number];
+
+    const assignNullable = (field: TextField) => {
+      const value = user[field];
+      if (value === undefined) return;
+      const normalized = value ?? null;
+      values[field] = normalized;
+      updateSet[field] = normalized;
+    };
+
+    textFields.forEach(assignNullable);
+
+    if (user.lastSignedIn !== undefined) {
+      values.lastSignedIn = user.lastSignedIn;
+      updateSet.lastSignedIn = user.lastSignedIn;
+    }
+    if (user.role !== undefined) {
+      values.role = user.role;
+      updateSet.role = user.role;
+    } else if (user.openId === ENV.ownerOpenId) {
+      values.role = 'admin';
+      updateSet.role = 'admin';
+    }
+
+    if (!values.lastSignedIn) {
+      values.lastSignedIn = new Date();
+    }
+
+    if (Object.keys(updateSet).length === 0) {
+      updateSet.lastSignedIn = new Date();
+    }
+
+    await db.insert(users).values(values).onDuplicateKeyUpdate({
+      set: updateSet,
+    });
+  } catch (error) {
+    console.error("[Database] Failed to upsert user:", error);
+    throw error;
+  }
+}
+
+export async function getUserByOpenId(openId: string) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get user: database not available");
+    return undefined;
+  }
+
+  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+
+  return result.length > 0 ? result[0] : undefined;
+}
+
+// Products queries
+export async function getActiveProducts() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(products).where(eq(products.isActive, true)).orderBy(desc(products.createdAt));
+}
+
+export async function getProductById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(products).where(eq(products.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+// Sellers queries
+export async function getSellerByUserId(userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(sellers).where(eq(sellers.userId, userId)).limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function getActiveSellers() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(sellers).where(eq(sellers.isActive, true)).orderBy(desc(sellers.rating));
+}
+
+// Used Products queries
+export async function getApprovedUsedProducts() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(usedProducts).where(eq(usedProducts.status, 'aprovado')).orderBy(desc(usedProducts.createdAt));
+}
+
+export async function getUsedProductsBySellerId(sellerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(usedProducts).where(eq(usedProducts.sellerId, sellerId)).orderBy(desc(usedProducts.createdAt));
+}
+
+// Digital Products queries
+export async function getActiveDigitalProducts() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(digitalProducts).where(eq(digitalProducts.isActive, true)).orderBy(desc(digitalProducts.createdAt));
+}
+
+// Orders queries
+export async function getOrdersByBuyerId(buyerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(orders).where(eq(orders.buyerId, buyerId)).orderBy(desc(orders.createdAt));
+}
+
+export async function getOrdersBySellerId(sellerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(orders).where(eq(orders.sellerId, sellerId)).orderBy(desc(orders.createdAt));
+}
+
+// Coupons queries
+export async function getCouponByCode(code: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(coupons).where(and(eq(coupons.code, code), eq(coupons.isActive, true))).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+// Reviews queries
+export async function getReviewsBySellerId(sellerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(reviews).where(eq(reviews.sellerId, sellerId)).orderBy(desc(reviews.createdAt));
+}

@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1777897755636,
+      "tag": "0000_grey_skrulls",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1777897867456,
+      "tag": "0001_aspiring_thena",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1777898104846,
+      "tag": "0002_fuzzy_zarda",
+      "breakpoints": true
+    }
+  ]
+}
