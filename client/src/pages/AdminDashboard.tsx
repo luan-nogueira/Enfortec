@@ -5,10 +5,10 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, doc, updateDoc, setDoc, deleteDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, setDoc, deleteDoc, query, orderBy, serverTimestamp, addDoc } from "firebase/firestore";
 import { useLocation } from "wouter";
-import { Shield, User, UserCheck, UserPlus, ArrowLeft, Plus, X, Lock, Mail, Trash2 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Shield, User, UserCheck, UserPlus, ArrowLeft, Plus, X, Lock, Mail, Trash2, MessageCircle, Send } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -19,13 +19,22 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function AdminDashboard() {
   const { user, isAuthenticated, isAdmin, loading: authLoading } = useAuth();
   const [, navigate] = useLocation();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  
+  const [activeTab, setActiveTab] = useState("usuarios");
+
+  // Atendimento
+  const [chats, setChats] = useState<any[]>([]);
+  const [selectedChat, setSelectedChat] = useState<any>(null);
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [adminMessage, setAdminMessage] = useState("");
+  const scrollRef = useRef<HTMLDivElement>(null);
+
   // Modal de criação
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newUserName, setNewUserName] = useState("");
@@ -49,6 +58,76 @@ export default function AdminDashboard() {
 
     return () => unsubscribe();
   }, [isAuthenticated, isAdmin]);
+
+  // Escutar Chats (Atendimento)
+  useEffect(() => {
+    if (!isAuthenticated || !isAdmin) return;
+
+    const q = query(collection(db, "chats"), orderBy("updatedAt", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setChats(data);
+    });
+
+    return () => unsubscribe();
+  }, [isAuthenticated, isAdmin]);
+
+  // Escutar Mensagens do Chat Selecionado
+  useEffect(() => {
+    if (!selectedChat?.id) return;
+
+    const q = query(
+      collection(db, "chats", selectedChat.id, "messages"),
+      orderBy("timestamp", "asc")
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setChatMessages(data);
+    });
+
+    return () => unsubscribe();
+  }, [selectedChat]);
+
+  // Scroll ao receber mensagem
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [chatMessages]);
+
+  const handleSendAdminMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminMessage.trim() || !selectedChat?.id) return;
+
+    const msg = adminMessage;
+    setAdminMessage("");
+
+    try {
+      // 1. Atualiza documento do chat (marca que admin respondeu)
+      await updateDoc(doc(db, "chats", selectedChat.id), {
+        lastMessage: msg,
+        updatedAt: serverTimestamp(),
+        unreadByAdmin: false
+      });
+
+      // 2. Adiciona a mensagem
+      await addDoc(collection(db, "chats", selectedChat.id, "messages"), {
+        text: msg,
+        senderId: user.id,
+        senderName: "Gestor Eforte",
+        timestamp: serverTimestamp()
+      });
+    } catch (error) {
+      console.error("Erro ao enviar resposta:", error);
+    }
+  };
 
   const handleToggleCollaborator = async (userId: string, currentRole: string) => {
     const newRole = currentRole === "collaborator" ? "user" : "collaborator";
@@ -168,66 +247,175 @@ export default function AdminDashboard() {
       </div>
 
       <main className="container mx-auto py-12 px-4">
-        <h2 className="text-xl font-bold text-white mb-8 border-l-4 border-red-600 pl-4">Gerenciar Colaboradores</h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {users.map((u) => (
-            <Card key={u.id} className="bg-slate-900 border-red-600/10 p-6 hover:border-red-600/30 transition-all card-neon">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center border border-red-600/20">
-                    <User className="w-6 h-6 text-red-500" />
-                  </div>
-                  <div>
-                    <p className="font-bold text-white">{u.name || "Sem Nome"}</p>
-                    <p className="text-xs text-slate-500">{u.email}</p>
-                  </div>
-                </div>
-                <div className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-tighter ${u.role === 'admin' ? 'bg-red-600 text-white' : u.role === 'collaborator' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
-                  {u.role}
-                </div>
-                {u.email !== 'luanmnogueira@gmail.com' && (
-                  <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(u.id, u.email)} className="text-slate-600 hover:text-red-500 -mt-2 -mr-2">
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                )}
-              </div>
+        <Tabs defaultValue="usuarios" className="w-full" onValueChange={setActiveTab}>
+          <TabsList className="bg-slate-900 border border-red-600/20 mb-8">
+            <TabsTrigger value="usuarios" className="data-[state=active]:bg-red-600 font-bold">Gerenciar Acessos</TabsTrigger>
+            <TabsTrigger value="atendimento" className="data-[state=active]:bg-red-600 font-bold flex items-center gap-2">
+              Central de Atendimento
+              {chats.some(c => c.unreadByAdmin) && (
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              )}
+            </TabsTrigger>
+          </TabsList>
 
-              <div className="space-y-3 mt-6">
-                {u.email !== 'luanmnogueira@gmail.com' && (
+          <TabsContent value="usuarios">
+            <h2 className="text-xl font-bold text-white mb-8 border-l-4 border-red-600 pl-4 uppercase tracking-widest text-sm italic">Gestão de Equipe</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {users.map((u) => (
+                <Card key={u.id} className="bg-slate-900 border-red-600/10 p-6 hover:border-red-600/30 transition-all card-neon">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center border border-red-600/20">
+                        <User className="w-6 h-6 text-red-500" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-white">{u.name || "Sem Nome"}</p>
+                        <p className="text-xs text-slate-500">{u.email}</p>
+                      </div>
+                    </div>
+                    <div className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-tighter ${u.role === 'admin' ? 'bg-red-600 text-white' : u.role === 'collaborator' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                      {u.role}
+                    </div>
+                    {u.email !== 'luanmnogueira@gmail.com' && (
+                      <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(u.id, u.email)} className="text-slate-600 hover:text-red-500 -mt-2 -mr-2">
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="space-y-3 mt-6">
+                    {u.email !== 'luanmnogueira@gmail.com' && (
+                      <>
+                        <Button 
+                          onClick={() => handleToggleCollaborator(u.id, u.role)}
+                          className={`w-full flex items-center justify-center gap-2 font-bold h-10 ${
+                            u.role === 'collaborator' 
+                            ? "bg-blue-600/20 hover:bg-blue-600/30 text-blue-400" 
+                            : "bg-slate-800 hover:bg-slate-700 text-white"
+                          }`}
+                        >
+                          {u.role === 'collaborator' ? <UserCheck className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
+                          {u.role === 'collaborator' ? "Remover Colaborador" : "Tornar Colaborador"}
+                        </Button>
+                        
+                        <Button 
+                          onClick={() => handleToggleAdmin(u.id, u.role)}
+                          className={`w-full flex items-center justify-center gap-2 font-bold h-10 ${
+                            u.role === 'admin' 
+                            ? "bg-red-600 hover:bg-red-700 text-white" 
+                            : "bg-slate-800 hover:bg-slate-700 text-slate-300"
+                          }`}
+                        >
+                          <Shield className="w-4 h-4" />
+                          {u.role === 'admin' ? "Remover Gestor" : "Tornar Gestor"}
+                        </Button>
+                      </>
+                    )}
+                    {u.email === 'luanmnogueira@gmail.com' && (
+                      <p className="text-center text-xs text-red-500 font-bold bg-red-500/10 py-2 rounded">Gestor Principal</p>
+                    )}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="atendimento">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[600px]">
+              {/* Lista de Chats */}
+              <Card className="bg-slate-900 border-red-600/10 flex flex-col overflow-hidden">
+                <div className="p-4 border-b border-red-600/20 bg-slate-950/50">
+                  <h3 className="font-black text-white text-sm uppercase tracking-widest italic">Conversas Recentes</h3>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  {chats.length === 0 && (
+                    <div className="p-8 text-center text-slate-600 italic text-sm">Nenhuma conversa ativa no momento.</div>
+                  )}
+                  {chats.map(chat => (
+                    <div 
+                      key={chat.id}
+                      onClick={() => setSelectedChat(chat)}
+                      className={`p-4 border-b border-red-600/5 cursor-pointer transition flex items-center gap-3 ${
+                        selectedChat?.id === chat.id ? "bg-red-600/10" : "hover:bg-slate-800"
+                      }`}
+                    >
+                      <div className="relative">
+                        <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center border border-red-600/20">
+                          <User className="w-5 h-5 text-slate-400" />
+                        </div>
+                        {chat.unreadByAdmin && (
+                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-slate-900" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-white text-sm truncate">{chat.userName}</p>
+                        <p className="text-xs text-slate-500 truncate italic">"{chat.lastMessage}"</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+
+              {/* Janela de Chat */}
+              <Card className="lg:col-span-2 bg-slate-900 border-red-600/10 flex flex-col overflow-hidden relative">
+                {selectedChat ? (
                   <>
-                    <Button 
-                      onClick={() => handleToggleCollaborator(u.id, u.role)}
-                      className={`w-full flex items-center justify-center gap-2 font-bold h-10 ${
-                        u.role === 'collaborator' 
-                        ? "bg-blue-600/20 hover:bg-blue-600/30 text-blue-400" 
-                        : "bg-slate-800 hover:bg-slate-700 text-white"
-                      }`}
+                    <div className="p-4 border-b border-red-600/20 bg-slate-950 flex justify-between items-center">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-red-600/10 flex items-center justify-center border border-red-600/20">
+                          <User className="w-5 h-5 text-red-500" />
+                        </div>
+                        <div>
+                          <p className="font-black text-white">{selectedChat.userName}</p>
+                          <p className="text-[10px] text-slate-500">{selectedChat.userEmail}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div 
+                      ref={scrollRef}
+                      className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-950/20"
                     >
-                      {u.role === 'collaborator' ? <UserCheck className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
-                      {u.role === 'collaborator' ? "Remover Colaborador" : "Tornar Colaborador"}
-                    </Button>
-                    
-                    <Button 
-                      onClick={() => handleToggleAdmin(u.id, u.role)}
-                      className={`w-full flex items-center justify-center gap-2 font-bold h-10 ${
-                        u.role === 'admin' 
-                        ? "bg-red-600 hover:bg-red-700 text-white" 
-                        : "bg-slate-800 hover:bg-slate-700 text-slate-300"
-                      }`}
-                    >
-                      <Shield className="w-4 h-4" />
-                      {u.role === 'admin' ? "Remover Gestor" : "Tornar Gestor"}
-                    </Button>
+                      {chatMessages.map(msg => (
+                        <div 
+                          key={msg.id}
+                          className={`flex ${msg.senderId === user.id ? "justify-end" : "justify-start"}`}
+                        >
+                          <div className={`max-w-[70%] p-3 rounded-2xl text-sm font-medium ${
+                            msg.senderId === user.id 
+                              ? "bg-red-600 text-white rounded-br-none shadow-lg" 
+                              : "bg-slate-800 text-slate-200 rounded-bl-none border border-red-600/10"
+                          }`}>
+                            <p className="text-[10px] opacity-50 mb-1">{msg.senderName}</p>
+                            {msg.text}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <form onSubmit={handleSendAdminMessage} className="p-4 bg-slate-950 border-t border-red-600/20 flex gap-4">
+                      <Input 
+                        value={adminMessage}
+                        onChange={e => setAdminMessage(e.target.value)}
+                        placeholder="Responda ao cliente..."
+                        className="bg-slate-900 border-red-600/30 text-white"
+                      />
+                      <Button type="submit" className="bg-red-600 hover:bg-red-700 px-6 font-bold">
+                        <Send className="w-4 h-4 mr-2" />
+                        Enviar
+                      </Button>
+                    </form>
                   </>
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center text-slate-600 opacity-30">
+                    <MessageCircle className="w-24 h-24 mb-4" />
+                    <p className="text-xl font-black italic uppercase tracking-widest">Selecione uma conversa</p>
+                  </div>
                 )}
-                {u.email === 'luanmnogueira@gmail.com' && (
-                  <p className="text-center text-xs text-red-500 font-bold bg-red-500/10 py-2 rounded">Gestor Principal</p>
-                )}
-              </div>
-            </Card>
-          ))}
-        </div>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
       </main>
 
       {/* Modal de Criação de Usuário */}

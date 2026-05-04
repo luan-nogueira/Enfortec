@@ -15,6 +15,7 @@ import AddUsedProduct from "./pages/AddUsedProduct";
 import SellDigitalProduct from "./pages/SellDigitalProduct";
 import Login from "./pages/Login";
 import CollaboratorDashboard from "./pages/CollaboratorDashboard";
+import FloatingChat from "./components/FloatingChat";
 
 function Router() {
   return (
@@ -49,6 +50,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Router />
+          <FloatingChat />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
