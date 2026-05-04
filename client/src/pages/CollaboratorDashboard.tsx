@@ -28,6 +28,7 @@ export default function CollaboratorDashboard() {
   
   // Formulário
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [pricePS4, setPricePS4] = useState("");
   const [pricePS5, setPricePS5] = useState("");
   const [category, setCategory] = useState("Jogos (Mídia Digital)");
