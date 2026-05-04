@@ -110,33 +110,73 @@ export default function Store() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {filteredProducts.map((product) => (
-              <div key={product.id} className="card-neon p-0 overflow-hidden hover:scale-105 transition-transform cursor-pointer border-red-600/30">
-                <div className="bg-slate-900 border-b border-red-600/20 h-48 flex items-center justify-center">
+              <div key={product.id} className="relative bg-slate-950 rounded-[2rem] overflow-hidden border border-red-600/20 shadow-2xl group transition-all hover:border-red-600/50">
+                {/* Image Container with Logo Overlay */}
+                <div className="relative h-80 overflow-hidden">
                   {product.imageUrl ? (
-                    <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                    <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
                   ) : (
-                    <Package className="w-12 h-12 text-slate-600" />
-                  )}
-                </div>
-                <div className="p-6">
-                  <h3 className="text-lg font-bold text-white mb-2 line-clamp-2">{product.name}</h3>
-                  <p className="text-slate-400 text-sm mb-4 line-clamp-2 min-h-[40px]">{product.description}</p>
-                  
-                  <div className="flex justify-between items-center mb-4 min-h-[48px]">
-                    <div className="flex flex-col text-red-500 font-bold">
-                      {product.pricePS4 ? <span>PS4: R$ {product.pricePS4.toFixed(2)}</span> : null}
-                      {product.pricePS5 ? <span>PS5: R$ {product.pricePS5.toFixed(2)}</span> : null}
-                      {!product.pricePS4 && !product.pricePS5 && <span>Sob Consulta</span>}
+                    <div className="w-full h-full bg-slate-900 flex items-center justify-center">
+                      <Package className="w-16 h-16 text-slate-800" />
                     </div>
-                    <span className="text-xs bg-red-600/20 text-red-400 px-2 py-1 rounded">
-                      Em estoque
-                    </span>
+                  )}
+                  {/* Overlay Gradient */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-60" />
+                  
+                  {/* Logo Overlay */}
+                  <div className="absolute top-6 left-6 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                    <div className="flex flex-col items-center">
+                      <span className="text-white font-black text-2xl tracking-tight leading-none italic uppercase">EFORTE</span>
+                      <span className="text-red-600 font-bold text-[8px] tracking-[0.4em] leading-none -mt-0.5 ml-1">GAMES</span>
+                    </div>
                   </div>
+                </div>
+
+                {/* Content Area */}
+                <div className="p-8 pt-4">
+                  <h3 className="text-3xl font-black text-white mb-1 tracking-tight">{product.name}</h3>
+                  <p className="text-slate-500 text-sm font-bold uppercase tracking-widest mb-6">
+                    {product.category || "JOGO DIGITAL"}
+                  </p>
+                  
+                  <div className="h-[1px] bg-slate-800/50 w-full mb-8" />
+
+                  <div className="flex justify-between items-end gap-4">
+                    <div className="space-y-4 flex-1">
+                      {product.pricePS4 && (
+                        <div className="flex items-center gap-4">
+                          <div className="bg-[#003791] px-3 py-1.5 rounded-md flex items-center justify-center min-w-[75px] shadow-lg">
+                            <span className="text-white text-xs font-black italic tracking-tighter">PS4</span>
+                          </div>
+                          <span className="text-2xl font-black text-red-600 tracking-tight">R$ {product.pricePS4.toFixed(2).replace('.', ',')}</span>
+                        </div>
+                      )}
+                      {product.pricePS5 && (
+                        <div className="flex items-center gap-4">
+                          <div className="bg-white px-3 py-1.5 rounded-md flex items-center justify-center min-w-[75px] shadow-lg">
+                            <span className="text-black text-xs font-black italic tracking-tighter">PS5</span>
+                          </div>
+                          <span className="text-2xl font-black text-red-600 tracking-tight">R$ {product.pricePS5.toFixed(2).replace('.', ',')}</span>
+                        </div>
+                      )}
+                      {!product.pricePS4 && !product.pricePS5 && (
+                         <span className="text-xl font-black text-slate-500">Sob Consulta</span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 px-4 py-2 rounded-xl border border-green-500/30 bg-green-500/5 text-green-500 text-xs font-black whitespace-nowrap mb-1">
+                      <div className="w-4 h-4 rounded-full border border-green-500 flex items-center justify-center bg-green-500/20">
+                        <Check className="w-2.5 h-2.5" strokeWidth={4} />
+                      </div>
+                      Em estoque
+                    </div>
+                  </div>
+
                   <Button 
                     onClick={() => handleBuyClick(product)}
-                    className="w-full bg-red-600 hover:bg-red-700 text-white font-bold btn-neon"
+                    className="w-full bg-red-600 hover:bg-red-700 text-white font-black text-2xl h-16 rounded-2xl mt-10 transition-all active:scale-[0.98] shadow-[0_10px_30px_rgba(220,38,38,0.3)] hover:shadow-[0_15px_40px_rgba(220,38,38,0.4)] flex items-center justify-center gap-4 border-b-4 border-red-800"
                   >
-                    <ShoppingCart className="w-4 h-4 mr-2" />
+                    <ShoppingCart className="w-7 h-7" strokeWidth={3} />
                     Comprar
                   </Button>
                 </div>
