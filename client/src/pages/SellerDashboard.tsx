@@ -11,11 +11,12 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { Plus, TrendingUp, ShoppingCart, Star, Flame, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
 
+// Mock data removido ou mantido apenas como exemplo vazio
 const mockEarningsData = [
-  { name: "Semana 1", ganho: 1200 },
-  { name: "Semana 2", ganho: 1900 },
-  { name: "Semana 3", ganho: 1500 },
-  { name: "Semana 4", ganho: 2200 },
+  { name: "Semana 1", ganho: 0 },
+  { name: "Semana 2", ganho: 0 },
+  { name: "Semana 3", ganho: 0 },
+  { name: "Semana 4", ganho: 0 },
 ];
 
 export default function SellerDashboard() {
@@ -123,8 +124,8 @@ export default function SellerDashboard() {
           <div className="flex items-center gap-4">
             <Flame className="w-8 h-8 text-red-500" />
             <div>
-              <h1 className="text-3xl font-bold text-neon">Painel do Vendedor</h1>
-              <p className="text-slate-400 text-sm">Bem-vindo, {user?.name}</p>
+              <h1 className="text-3xl font-bold text-neon">Portal de Desapego</h1>
+              <p className="text-slate-400 text-sm">Venda seus itens usados para a comunidade</p>
             </div>
           </div>
         </div>
@@ -137,8 +138,10 @@ export default function SellerDashboard() {
           <Card className="p-6 card-neon">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-slate-400 text-sm mb-2">Ganho Total</p>
-                <p className="text-3xl font-bold text-white">R$ 5.320</p>
+                <p className="text-slate-400 text-sm mb-2">Total em Anúncios</p>
+                <p className="text-3xl font-bold text-white">
+                  R$ {usedProducts.reduce((acc, p) => acc + (p.pricePS4 || p.pricePS5 || 0), 0).toFixed(2)}
+                </p>
               </div>
               <TrendingUp className="w-8 h-8 text-green-500" />
             </div>
@@ -155,8 +158,8 @@ export default function SellerDashboard() {
           <Card className="p-6 card-neon">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-slate-400 text-sm mb-2">Avaliação</p>
-                <p className="text-3xl font-bold text-white">4.8 ⭐</p>
+                <p className="text-slate-400 text-sm mb-2">Reputação</p>
+                <p className="text-3xl font-bold text-white">Novo Vendedor</p>
               </div>
               <Star className="w-8 h-8 text-red-500" />
             </div>
@@ -218,12 +221,9 @@ export default function SellerDashboard() {
             <Card className="p-6 card-neon">
               <h2 className="text-lg font-semibold text-white mb-4">Últimas Vendas</h2>
               <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="p-3 bg-slate-800/50 rounded-lg border border-red-600/20">
-                    <p className="text-white font-medium">Venda #{i}</p>
-                    <p className="text-sm text-slate-400">R$ {(1000 * i).toFixed(2)}</p>
-                  </div>
-                ))}
+                <div className="p-8 text-center bg-slate-800/30 rounded-lg border border-dashed border-slate-700">
+                  <p className="text-slate-500 text-sm italic">Nenhuma venda registrada ainda.</p>
+                </div>
               </div>
             </Card>
           </div>
@@ -330,15 +330,9 @@ export default function SellerDashboard() {
           <Card className="p-6 card-neon">
             <h2 className="text-lg font-semibold text-white mb-4">Avaliações dos Clientes</h2>
             <div className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="p-4 bg-slate-800/50 rounded-lg border border-red-600/20">
-                  <div className="flex justify-between items-start mb-2">
-                    <p className="text-white font-medium">Cliente #{i}</p>
-                    <span className="text-red-500">{"⭐".repeat(5)}</span>
-                  </div>
-                  <p className="text-slate-400 text-sm">Excelente produto! Recomendo.</p>
-                </div>
-              ))}
+              <div className="p-8 text-center bg-slate-800/30 rounded-lg border border-dashed border-slate-700">
+                <p className="text-slate-500 text-sm italic">Você ainda não recebeu avaliações.</p>
+              </div>
             </div>
           </Card>
         )}
