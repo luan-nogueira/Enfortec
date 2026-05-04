@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, getDocs, deleteDoc, doc, onSnapshot } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storage } from "@/lib/firebase";
 import { Plus, Trash2, Edit2, Store, Package } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
@@ -28,7 +30,7 @@ export default function CollaboratorDashboard() {
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [category, setCategory] = useState("Eletrônicos");
-  const [imageUrl, setImageUrl] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
   // Escutar produtos do Firestore em tempo real
@@ -59,14 +61,25 @@ export default function CollaboratorDashboard() {
 
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!imageFile) {
+      alert("Por favor, selecione uma imagem.");
+      return;
+    }
+    
     setLoading(true);
     try {
+      // 1. Upload da imagem
+      const imageRef = ref(storage, `store_products/${Date.now()}_${imageFile.name}`);
+      const uploadResult = await uploadBytes(imageRef, imageFile);
+      const downloadUrl = await getDownloadURL(uploadResult.ref);
+
+      // 2. Salvar no Firestore
       await addDoc(collection(db, "store_products"), {
         name,
         description,
         price: parseFloat(price),
         category,
-        imageUrl,
+        imageUrl: downloadUrl,
         collaboratorId: user?.id,
         collaboratorName: user?.name || user?.email,
         createdAt: new Date().toISOString()
@@ -75,11 +88,15 @@ export default function CollaboratorDashboard() {
       setName("");
       setDescription("");
       setPrice("");
-      setImageUrl("");
+      setImageFile(null);
+      
+      const fileInput = document.getElementById("imageUpload") as HTMLInputElement;
+      if (fileInput) fileInput.value = "";
+      
       alert("Produto adicionado com sucesso!");
     } catch (error) {
       console.error("Erro ao adicionar produto:", error);
-      alert("Erro ao adicionar produto. Verifique as permissões do Firestore.");
+      alert("Erro ao adicionar produto. Verifique as permissões do Firestore/Storage.");
     } finally {
       setLoading(false);
     }
@@ -142,8 +159,19 @@ export default function CollaboratorDashboard() {
               </select>
             </div>
             <div>
-              <Label className="text-slate-300">URL da Imagem</Label>
-              <Input required type="url" value={imageUrl} onChange={e => setImageUrl(e.target.value)} className="bg-slate-950 border-red-600/30" placeholder="https://link-da-imagem.com/foto.jpg" />
+              <Label className="text-slate-300">Foto do Produto do seu PC</Label>
+              <Input 
+                id="imageUpload"
+                required 
+                type="file" 
+                accept="image/*"
+                onChange={e => {
+                  if (e.target.files && e.target.files[0]) {
+                    setImageFile(e.target.files[0]);
+                  }
+                }} 
+                className="bg-slate-950 border-red-600/30 file:text-red-500 file:bg-slate-900 file:border-0 file:mr-4 file:py-2 file:px-4 file:rounded-md cursor-pointer" 
+              />
             </div>
             <div>
               <Label className="text-slate-300">Descrição Curta</Label>

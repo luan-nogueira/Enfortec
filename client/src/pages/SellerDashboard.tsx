@@ -3,8 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useLocation } from "wouter";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Plus, TrendingUp, ShoppingCart, Star, Flame, Trash2 } from "lucide-react";
@@ -29,6 +30,7 @@ export default function SellerDashboard() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -49,12 +51,24 @@ export default function SellerDashboard() {
 
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!imageFile) {
+      alert("Por favor, selecione uma foto do produto.");
+      return;
+    }
+
     setLoading(true);
     try {
+      // 1. Upload da Imagem
+      const imageRef = ref(storage, `used_products/${Date.now()}_${imageFile.name}`);
+      const uploadResult = await uploadBytes(imageRef, imageFile);
+      const downloadUrl = await getDownloadURL(uploadResult.ref);
+
+      // 2. Salvar Documento
       await addDoc(collection(db, "used_products"), {
         name,
         description,
         price: parseFloat(price),
+        imageUrl: downloadUrl,
         sellerId: user?.id,
         sellerName: user?.name || user?.email,
         status: "Ativo",
@@ -63,11 +77,16 @@ export default function SellerDashboard() {
       setName("");
       setDescription("");
       setPrice("");
+      setImageFile(null);
       setShowAddForm(false);
+      
+      const fileInput = document.getElementById("sellerImageUpload") as HTMLInputElement;
+      if (fileInput) fileInput.value = "";
+      
       alert("Produto anunciado com sucesso!");
     } catch (error) {
       console.error(error);
-      alert("Erro ao anunciar produto.");
+      alert("Erro ao anunciar produto. Verifique as permissões de Storage e Firestore.");
     } finally {
       setLoading(false);
     }
@@ -232,9 +251,24 @@ export default function SellerDashboard() {
                     <Label className="text-slate-300">Preço (R$)</Label>
                     <Input required type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} className="bg-slate-900 border-red-600/30 text-white" />
                   </div>
-                  <div className="flex items-end">
-                    <Button type="submit" disabled={loading} className="w-full bg-red-600 hover:bg-red-700">
-                      {loading ? "Salvando..." : "Salvar Anúncio"}
+                  <div>
+                    <Label className="text-slate-300">Foto do Produto</Label>
+                    <Input 
+                      id="sellerImageUpload"
+                      required 
+                      type="file" 
+                      accept="image/*"
+                      onChange={e => {
+                        if (e.target.files && e.target.files[0]) {
+                          setImageFile(e.target.files[0]);
+                        }
+                      }} 
+                      className="bg-slate-900 border-red-600/30 file:text-red-500 file:bg-slate-950 file:border-0 file:mr-4 file:py-2 file:px-4 file:rounded-md cursor-pointer text-slate-300" 
+                    />
+                  </div>
+                  <div className="flex items-end md:col-span-2">
+                    <Button type="submit" disabled={loading} className="w-full bg-red-600 hover:bg-red-700 py-6 text-lg font-bold">
+                      {loading ? "Salvando e Enviando Imagem..." : "Salvar Anúncio"}
                     </Button>
                   </div>
                 </form>
@@ -248,19 +282,30 @@ export default function SellerDashboard() {
                 </div>
               )}
               {usedProducts.map((product) => (
-                <Card key={product.id} className="p-6 card-neon">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="text-lg font-bold text-white">{product.name}</h3>
-                    <Button variant="ghost" size="icon" className="text-slate-500 hover:text-red-500" onClick={() => handleDeleteProduct(product.id)}>
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                <Card key={product.id} className="p-0 card-neon overflow-hidden border-red-600/30">
+                  <div className="h-48 w-full bg-slate-900 border-b border-red-600/20">
+                    {product.imageUrl ? (
+                      <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-slate-600">
+                        <ShoppingCart className="w-12 h-12" />
+                      </div>
+                    )}
                   </div>
-                  <p className="text-slate-400 text-sm mb-4">{product.description}</p>
-                  <div className="flex justify-between items-center">
-                    <span className="text-2xl font-bold text-red-500">R$ {product.price.toFixed(2)}</span>
-                    <span className="text-xs bg-red-600/20 text-red-400 px-2 py-1 rounded">
-                      {product.status}
-                    </span>
+                  <div className="p-6">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="text-lg font-bold text-white line-clamp-1">{product.name}</h3>
+                      <Button variant="ghost" size="icon" className="text-slate-500 hover:text-red-500 -mt-2 -mr-2" onClick={() => handleDeleteProduct(product.id)}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <p className="text-slate-400 text-sm mb-4 line-clamp-2 min-h-[40px]">{product.description}</p>
+                    <div className="flex justify-between items-center pt-4 border-t border-red-600/10">
+                      <span className="text-2xl font-bold text-red-500">R$ {product.price.toFixed(2)}</span>
+                      <span className="text-xs bg-red-600/20 text-red-400 px-3 py-1 rounded-full font-medium">
+                        {product.status}
+                      </span>
+                    </div>
                   </div>
                 </Card>
               ))}
