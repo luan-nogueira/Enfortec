@@ -2,11 +2,13 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { trpc } from "@/lib/trpc";
+import { Label } from "@/components/ui/label";
+import { db } from "@/lib/firebase";
+import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc } from "firebase/firestore";
 import { useLocation } from "wouter";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { Plus, TrendingUp, ShoppingCart, Star, Flame } from "lucide-react";
-import { useState } from "react";
+import { Plus, TrendingUp, ShoppingCart, Star, Flame, Trash2 } from "lucide-react";
+import { useState, useEffect } from "react";
 
 const mockEarningsData = [
   { name: "Semana 1", ganho: 1200 },
@@ -19,18 +21,63 @@ export default function SellerDashboard() {
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<"vendas" | "produtos" | "avaliacoes">("vendas");
+  
+  const [usedProducts, setUsedProducts] = useState<any[]>([]);
+  const [showAddForm, setShowAddForm] = useState(false);
+  
+  // Form para novo produto
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [price, setPrice] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const { data: seller } = trpc.sellers.getByUserId.useQuery(undefined, {
-    enabled: isAuthenticated,
-  });
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) return;
+    
+    // Consulta apenas os produtos deste vendedor
+    const q = query(collection(db, "used_products"), where("sellerId", "==", user.id));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setUsedProducts(data);
+    });
 
-  const { data: usedProducts } = trpc.usedProducts.getByUserId.useQuery(undefined, {
-    enabled: isAuthenticated,
-  });
+    return () => unsubscribe();
+  }, [isAuthenticated, user?.id]);
 
-  const { data: orders } = trpc.orders.getBySellerId.useQuery(undefined, {
-    enabled: isAuthenticated,
-  });
+  const handleAddProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await addDoc(collection(db, "used_products"), {
+        name,
+        description,
+        price: parseFloat(price),
+        sellerId: user?.id,
+        sellerName: user?.name || user?.email,
+        status: "Ativo",
+        createdAt: new Date().toISOString()
+      });
+      setName("");
+      setDescription("");
+      setPrice("");
+      setShowAddForm(false);
+      alert("Produto anunciado com sucesso!");
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao anunciar produto.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteProduct = async (id: string) => {
+    if (confirm("Deletar este anúncio?")) {
+      await deleteDoc(doc(db, "used_products", id));
+    }
+  };
 
   if (!isAuthenticated) {
     return (
@@ -44,20 +91,7 @@ export default function SellerDashboard() {
     );
   }
 
-  if (!seller) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-950 to-slate-900">
-        <div className="text-center card-neon p-8 max-w-md">
-          <h1 className="text-2xl font-bold text-white mb-4">Torne-se um Vendedor</h1>
-          <p className="text-slate-400 mb-6">Você ainda não é um vendedor. Clique abaixo para se cadastrar.</p>
-          <Button onClick={() => navigate("/virar-vendedor")} className="bg-red-600 hover:bg-red-700 btn-neon w-full">
-            <Plus className="w-4 h-4 mr-2" />
-            Cadastrar como Vendedor
-          </Button>
-        </div>
-      </div>
-    );
-  }
+
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900">
@@ -176,19 +210,54 @@ export default function SellerDashboard() {
         {activeTab === "produtos" && (
           <div>
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-white">Meus Produtos</h2>
-              <Button className="bg-red-600 hover:bg-red-700 btn-neon">
-                <Plus className="w-4 h-4 mr-2" />
-                Novo Produto
+              <h2 className="text-2xl font-bold text-white">Meus Produtos Anunciados</h2>
+              <Button onClick={() => setShowAddForm(!showAddForm)} className="bg-red-600 hover:bg-red-700 btn-neon">
+                {showAddForm ? "Cancelar" : <><Plus className="w-4 h-4 mr-2" /> Novo Produto</>}
               </Button>
             </div>
+            
+            {showAddForm && (
+              <Card className="p-6 card-neon mb-8">
+                <h3 className="text-lg font-bold text-white mb-4">Anunciar Produto</h3>
+                <form onSubmit={handleAddProduct} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <Label className="text-slate-300">Nome do Produto</Label>
+                    <Input required value={name} onChange={e => setName(e.target.value)} className="bg-slate-900 border-red-600/30 text-white" />
+                  </div>
+                  <div className="md:col-span-2">
+                    <Label className="text-slate-300">Descrição</Label>
+                    <Input required value={description} onChange={e => setDescription(e.target.value)} className="bg-slate-900 border-red-600/30 text-white" />
+                  </div>
+                  <div>
+                    <Label className="text-slate-300">Preço (R$)</Label>
+                    <Input required type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} className="bg-slate-900 border-red-600/30 text-white" />
+                  </div>
+                  <div className="flex items-end">
+                    <Button type="submit" disabled={loading} className="w-full bg-red-600 hover:bg-red-700">
+                      {loading ? "Salvando..." : "Salvar Anúncio"}
+                    </Button>
+                  </div>
+                </form>
+              </Card>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {usedProducts?.map((product) => (
+              {usedProducts.length === 0 && !showAddForm && (
+                <div className="col-span-full py-8 text-center text-slate-500">
+                  Você ainda não tem nenhum produto anunciado.
+                </div>
+              )}
+              {usedProducts.map((product) => (
                 <Card key={product.id} className="p-6 card-neon">
-                  <h3 className="text-lg font-bold text-white mb-2">{product.name}</h3>
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="text-lg font-bold text-white">{product.name}</h3>
+                    <Button variant="ghost" size="icon" className="text-slate-500 hover:text-red-500" onClick={() => handleDeleteProduct(product.id)}>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                   <p className="text-slate-400 text-sm mb-4">{product.description}</p>
                   <div className="flex justify-between items-center">
-                    <span className="text-2xl font-bold text-red-500">R$ {product.price}</span>
+                    <span className="text-2xl font-bold text-red-500">R$ {product.price.toFixed(2)}</span>
                     <span className="text-xs bg-red-600/20 text-red-400 px-2 py-1 rounded">
                       {product.status}
                     </span>
