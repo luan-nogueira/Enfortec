@@ -1,17 +1,38 @@
+import { initializeApp, deleteApp } from "firebase/app";
+import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
+import { firebaseConfig } from "@/lib/firebase";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, doc, updateDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, setDoc, deleteDoc } from "firebase/firestore";
 import { useLocation } from "wouter";
-import { Shield, User, UserCheck, UserPlus, ArrowLeft } from "lucide-react";
+import { Shield, User, UserCheck, UserPlus, ArrowLeft, Plus, X, Lock, Mail, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default function AdminDashboard() {
   const { user, isAuthenticated, isAdmin, loading: authLoading } = useAuth();
   const [, navigate] = useLocation();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Modal de criação
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newUserName, setNewUserName] = useState("");
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserPassword, setNewUserPassword] = useState("");
+  const [newUserRole, setNewUserRole] = useState("collaborator");
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated || !isAdmin) return;
@@ -57,6 +78,60 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newUserPassword.length < 6) {
+      alert("A senha deve ter no mínimo 6 caracteres.");
+      return;
+    }
+
+    setCreating(true);
+    let secondaryApp;
+    try {
+      // Técnica da instância secundária para não deslogar o Admin
+      secondaryApp = initializeApp(firebaseConfig, `Secondary-${Date.now()}`);
+      const secondaryAuth = getAuth(secondaryApp);
+      
+      // 1. Criar no Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, newUserEmail, newUserPassword);
+      const uid = userCredential.user.uid;
+
+      // 2. Criar documento no Firestore
+      await setDoc(doc(db, "users", uid), {
+        uid,
+        email: newUserEmail,
+        name: newUserName,
+        role: newUserRole,
+        createdAt: new Date().toISOString()
+      });
+
+      alert(`Usuário ${newUserName} criado com sucesso como ${newUserRole}!`);
+      setShowCreateModal(false);
+      
+      // Limpar campos
+      setNewUserName("");
+      setNewUserEmail("");
+      setNewUserPassword("");
+    } catch (error: any) {
+      console.error("Erro ao criar usuário:", error);
+      alert("Erro ao criar usuário: " + (error.message || "Erro desconhecido"));
+    } finally {
+      if (secondaryApp) await deleteApp(secondaryApp);
+      setCreating(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, email: string) => {
+    if (email === "luanmnogueira@gmail.com") return;
+    if (confirm(`Tem certeza que deseja remover o acesso de ${email}? (Isso removerá as permissões no Firestore)`)) {
+      try {
+        await deleteDoc(doc(db, "users", userId));
+      } catch (error) {
+        alert("Erro ao deletar usuário.");
+      }
+    }
+  };
+
   if (authLoading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white font-bold">Verificando Credenciais...</div>;
 
   if (!isAuthenticated || !isAdmin) {
@@ -85,10 +160,10 @@ export default function AdminDashboard() {
               Painel do Gestor
             </h1>
           </div>
-          <div className="text-right">
-            <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">Logado como</p>
-            <p className="text-sm font-bold text-white">{user?.email}</p>
-          </div>
+          <Button onClick={() => setShowCreateModal(true)} className="bg-red-600 hover:bg-red-700 font-bold btn-neon flex items-center gap-2">
+            <Plus className="w-5 h-5" />
+            Criar Novo Acesso
+          </Button>
         </div>
       </div>
 
@@ -111,6 +186,11 @@ export default function AdminDashboard() {
                 <div className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-tighter ${u.role === 'admin' ? 'bg-red-600 text-white' : u.role === 'collaborator' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
                   {u.role}
                 </div>
+                {u.email !== 'luanmnogueira@gmail.com' && (
+                  <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(u.id, u.email)} className="text-slate-600 hover:text-red-500 -mt-2 -mr-2">
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                )}
               </div>
 
               <div className="space-y-3 mt-6">
@@ -149,6 +229,67 @@ export default function AdminDashboard() {
           ))}
         </div>
       </main>
+
+      {/* Modal de Criação de Usuário */}
+      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+        <DialogContent className="bg-slate-900 border-red-600/30 text-white sm:max-w-[425px] card-neon">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black text-neon flex items-center gap-2">
+              <UserPlus className="w-6 h-6" />
+              Criar Novo Acesso
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Cadastre um novo colaborador ou gestor diretamente aqui.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleCreateUser} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-slate-300">Nome Completo</Label>
+              <div className="relative">
+                <User className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
+                <Input required value={newUserName} onChange={e => setNewUserName(e.target.value)} className="bg-slate-950 border-red-600/20 pl-10" placeholder="Ex: João Silva" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-slate-300">E-mail</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
+                <Input required type="email" value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} className="bg-slate-950 border-red-600/20 pl-10" placeholder="email@exemplo.com" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-slate-300">Senha Inicial</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
+                <Input required type="password" value={newUserPassword} onChange={e => setNewUserPassword(e.target.value)} className="bg-slate-950 border-red-600/20 pl-10" placeholder="Mínimo 6 caracteres" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-slate-300">Cargo / Permissão</Label>
+              <select 
+                value={newUserRole} 
+                onChange={e => setNewUserRole(e.target.value)}
+                className="w-full bg-slate-950 border border-red-600/20 rounded-md h-10 px-3 text-sm"
+              >
+                <option value="collaborator">Colaborador (Gerencia Produtos)</option>
+                <option value="admin">Gestor (Acesso Total)</option>
+                <option value="user">Usuário Comum</option>
+              </select>
+            </div>
+
+            <DialogFooter className="pt-6">
+              <Button type="button" variant="ghost" onClick={() => setShowCreateModal(false)} className="text-slate-400">Cancelar</Button>
+              <Button type="submit" disabled={creating} className="bg-red-600 hover:bg-red-700 btn-neon min-w-[120px]">
+                {creating ? "Criando..." : "Criar Usuário"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

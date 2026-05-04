@@ -4,7 +4,7 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getAuth } from "firebase/auth";
 
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: "AIzaSyAcLEUhYrt5tWQIpLkb-pWnk5Ffqw1JBUM",
   authDomain: "enfortec-c9b78.firebaseapp.com",
   projectId: "enfortec-c9b78",
