@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, getDocs, deleteDoc, doc, onSnapshot } from "firebase/firestore";
+import { collection, addDoc, getDocs, deleteDoc, doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 import { Plus, Trash2, Edit2, Store, Package } from "lucide-react";
@@ -28,12 +28,12 @@ export default function CollaboratorDashboard() {
   
   // Formulário
   const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
   const [pricePS4, setPricePS4] = useState("");
   const [pricePS5, setPricePS5] = useState("");
   const [category, setCategory] = useState("Jogos (Mídia Digital)");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   // Escutar produtos do Firestore em tempo real
   useEffect(() => {
@@ -61,49 +61,77 @@ export default function CollaboratorDashboard() {
     );
   }
 
-  const handleAddProduct = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!imageFile) {
+    if (!editingId && !imageFile) {
       alert("Por favor, selecione uma imagem.");
       return;
     }
     
     setLoading(true);
     try {
-      // 1. Upload da imagem
-      const imageRef = ref(storage, `store_products/${Date.now()}_${imageFile.name}`);
-      const uploadResult = await uploadBytes(imageRef, imageFile);
-      const downloadUrl = await getDownloadURL(uploadResult.ref);
+      let downloadUrl = "";
+      if (imageFile) {
+        // Upload nova imagem se foi selecionada
+        const imageRef = ref(storage, `store_products/${Date.now()}_${imageFile.name}`);
+        const uploadResult = await uploadBytes(imageRef, imageFile);
+        downloadUrl = await getDownloadURL(uploadResult.ref);
+      }
 
-      // 2. Salvar no Firestore
-      await addDoc(collection(db, "store_products"), {
+      const productData: any = {
         name,
         description,
         pricePS4: pricePS4 ? parseFloat(pricePS4) : null,
         pricePS5: pricePS5 ? parseFloat(pricePS5) : null,
         category,
-        imageUrl: downloadUrl,
         collaboratorId: user?.id,
         collaboratorName: user?.name || user?.email,
-        createdAt: new Date().toISOString()
-      });
+      };
+
+      if (downloadUrl) {
+        productData.imageUrl = downloadUrl;
+      }
+
+      if (editingId) {
+        // Atualizar existente
+        await updateDoc(doc(db, "store_products", editingId), productData);
+        alert("Produto atualizado com sucesso!");
+      } else {
+        // Criar novo
+        productData.createdAt = new Date().toISOString();
+        await addDoc(collection(db, "store_products"), productData);
+        alert("Produto adicionado com sucesso!");
+      }
+
       // Limpar form
-      setName("");
-      setDescription("");
-      setPricePS4("");
-      setPricePS5("");
-      setImageFile(null);
-      
-      const fileInput = document.getElementById("imageUpload") as HTMLInputElement;
-      if (fileInput) fileInput.value = "";
-      
-      alert("Produto adicionado com sucesso!");
+      cancelEdit();
     } catch (error) {
-      console.error("Erro ao adicionar produto:", error);
-      alert("Erro ao adicionar produto. Verifique as permissões do Firestore/Storage.");
+      console.error("Erro ao salvar produto:", error);
+      alert("Erro ao salvar produto. Verifique as permissões do Firestore/Storage.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const startEditing = (product: Product) => {
+    setEditingId(product.id);
+    setName(product.name);
+    setDescription(product.description);
+    setPricePS4(product.pricePS4 ? product.pricePS4.toString() : "");
+    setPricePS5(product.pricePS5 ? product.pricePS5.toString() : "");
+    setCategory(product.category);
+    setImageFile(null); // obriga a não mexer na imagem a não ser que escolha outra
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setName("");
+    setDescription("");
+    setPricePS4("");
+    setPricePS5("");
+    setImageFile(null);
+    const fileInput = document.getElementById("imageUpload") as HTMLInputElement;
+    if (fileInput) fileInput.value = "";
   };
 
   const handleDeleteProduct = async (id: string) => {
@@ -135,10 +163,10 @@ export default function CollaboratorDashboard() {
         {/* Formulário de Adição */}
         <Card className="p-6 bg-slate-900 border-red-600/30 card-neon lg:col-span-1 h-fit">
           <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-            <Plus className="w-5 h-5 text-red-500" />
-            Adicionar Novo Produto
+            {editingId ? <Edit2 className="w-5 h-5 text-red-500" /> : <Plus className="w-5 h-5 text-red-500" />}
+            {editingId ? "Editar Produto" : "Adicionar Novo Produto"}
           </h2>
-          <form onSubmit={handleAddProduct} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Label className="text-slate-300">Nome do Produto</Label>
               <Input required value={name} onChange={e => setName(e.target.value)} className="bg-slate-950 border-red-600/30" placeholder="Ex: Teclado Mecânico" />
@@ -171,10 +199,10 @@ export default function CollaboratorDashboard() {
               </select>
             </div>
             <div>
-              <Label className="text-slate-300">Foto do Produto do seu PC</Label>
+              <Label className="text-slate-300">Foto do Produto do seu PC {editingId && "(Opcional para não alterar)"}</Label>
               <Input 
                 id="imageUpload"
-                required 
+                required={!editingId}
                 type="file" 
                 accept="image/*"
                 onChange={e => {
@@ -189,9 +217,16 @@ export default function CollaboratorDashboard() {
               <Label className="text-slate-300">Descrição Curta</Label>
               <Input required value={description} onChange={e => setDescription(e.target.value)} className="bg-slate-950 border-red-600/30" placeholder="Detalhes do produto..." />
             </div>
-            <Button type="submit" disabled={loading} className="w-full bg-red-600 hover:bg-red-700 btn-neon mt-4">
-              {loading ? "Salvando..." : "Salvar Produto na Loja"}
-            </Button>
+            <div className="flex gap-2 mt-4">
+              <Button type="submit" disabled={loading} className="w-full bg-red-600 hover:bg-red-700 btn-neon">
+                {loading ? "Salvando..." : editingId ? "Atualizar Produto" : "Salvar na Loja"}
+              </Button>
+              {editingId && (
+                <Button type="button" variant="outline" onClick={cancelEdit} className="border-red-600/30 text-slate-300 hover:text-white">
+                  Cancelar
+                </Button>
+              )}
+            </div>
           </form>
         </Card>
 
@@ -234,6 +269,9 @@ export default function CollaboratorDashboard() {
                         {!product.pricePS4 && !product.pricePS5 && "Sob Consulta"}
                       </td>
                       <td className="py-3">
+                        <Button variant="ghost" size="icon" className="text-slate-400 hover:text-blue-500 mr-1" onClick={() => startEditing(product)}>
+                          <Edit2 className="w-4 h-4" />
+                        </Button>
                         <Button variant="ghost" size="icon" className="text-slate-400 hover:text-red-500" onClick={() => handleDeleteProduct(product.id)}>
                           <Trash2 className="w-4 h-4" />
                         </Button>

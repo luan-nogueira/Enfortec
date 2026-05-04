@@ -1,21 +1,38 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { trpc } from "@/lib/trpc";
-import { Search, ShoppingCart, ArrowLeft, Flame } from "lucide-react";
-import { useState } from "react";
+import { db } from "@/lib/firebase";
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { Search, ShoppingCart, ArrowLeft, Flame, Package } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 
 export default function Store() {
   const { isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
-  const { data: products, isLoading } = trpc.products.list.useQuery();
+  const [products, setProducts] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const filteredProducts = products?.filter(p =>
+  useEffect(() => {
+    const q = query(collection(db, "store_products"), orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setProducts(data);
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const filteredProducts = products.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+    p.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.category?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900">
@@ -64,22 +81,33 @@ export default function Store() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {filteredProducts.map((product) => (
-              <div key={product.id} className="card-neon p-6 hover:scale-105 transition-transform cursor-pointer">
-                <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg h-40 mb-4 flex items-center justify-center">
-                  <ShoppingCart className="w-12 h-12 text-white opacity-50" />
+              <div key={product.id} className="card-neon p-0 overflow-hidden hover:scale-105 transition-transform cursor-pointer border-red-600/30">
+                <div className="bg-slate-900 border-b border-red-600/20 h-48 flex items-center justify-center">
+                  {product.imageUrl ? (
+                    <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <Package className="w-12 h-12 text-slate-600" />
+                  )}
                 </div>
-                <h3 className="text-lg font-bold text-white mb-2 line-clamp-2">{product.name}</h3>
-                <p className="text-slate-400 text-sm mb-4 line-clamp-2">{product.description}</p>
-                <div className="flex justify-between items-center mb-4">
-                  <span className="text-2xl font-bold text-red-500">R$ {product.price}</span>
-                  <span className="text-xs bg-red-600/20 text-red-400 px-2 py-1 rounded">
-                    {product.stock} em estoque
-                  </span>
+                <div className="p-6">
+                  <h3 className="text-lg font-bold text-white mb-2 line-clamp-2">{product.name}</h3>
+                  <p className="text-slate-400 text-sm mb-4 line-clamp-2 min-h-[40px]">{product.description}</p>
+                  
+                  <div className="flex justify-between items-center mb-4 min-h-[48px]">
+                    <div className="flex flex-col text-red-500 font-bold">
+                      {product.pricePS4 ? <span>PS4: R$ {product.pricePS4.toFixed(2)}</span> : null}
+                      {product.pricePS5 ? <span>PS5: R$ {product.pricePS5.toFixed(2)}</span> : null}
+                      {!product.pricePS4 && !product.pricePS5 && <span>Sob Consulta</span>}
+                    </div>
+                    <span className="text-xs bg-red-600/20 text-red-400 px-2 py-1 rounded">
+                      Em estoque
+                    </span>
+                  </div>
+                  <Button className="w-full bg-red-600 hover:bg-red-700 text-white font-bold btn-neon">
+                    <ShoppingCart className="w-4 h-4 mr-2" />
+                    Comprar
+                  </Button>
                 </div>
-                <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold">
-                  <ShoppingCart className="w-4 h-4 mr-2" />
-                  Comprar
-                </Button>
               </div>
             ))}
           </div>
