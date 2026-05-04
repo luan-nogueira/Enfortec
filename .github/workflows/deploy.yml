@@ -29,7 +29,7 @@ jobs:
         run: pnpm install
 
       - name: Build Project
-        run: pnpm run build
+        run: npx vite build
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
