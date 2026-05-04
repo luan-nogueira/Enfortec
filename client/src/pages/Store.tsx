@@ -58,7 +58,7 @@ export default function Store() {
     
     const price = chosenVersion === "PS4" ? selectedProduct.pricePS4 : selectedProduct.pricePS5;
     const message = `Olá! Quero comprar o produto: ${selectedProduct.name} (${chosenVersion}) no valor de R$ ${price.toFixed(2)}`;
-    const phone = "5511910609384"; // Número padrão para o site
+    const phone = "5543984253691"; // Número atualizado
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
     setSelectedProduct(null);
   };
