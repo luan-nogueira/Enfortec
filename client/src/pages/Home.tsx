@@ -1,7 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
-import { Zap, Gamepad2, Users, TrendingUp, ShoppingCart, Flame } from "lucide-react";
+import { Zap, Gamepad2, Users, TrendingUp, ShoppingCart, Flame, Shield, Check } from "lucide-react";
 import { getLoginUrl } from "@/const";
 
 export default function Home() {
