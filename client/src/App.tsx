@@ -13,6 +13,7 @@ import SellerDashboard from "./pages/SellerDashboard";
 import BecomeSellerForm from "./pages/BecomeSellerForm";
 import AddUsedProduct from "./pages/AddUsedProduct";
 import SellDigitalProduct from "./pages/SellDigitalProduct";
+import Login from "./pages/Login";
 
 function Router() {
   return (
@@ -28,6 +29,7 @@ function Router() {
         <Route path={"/vendedor/cadastro"} component={BecomeSellerForm} />
         <Route path={"/vendedor/novo-produto-usado"} component={AddUsedProduct} />
         <Route path={"/digital/vender"} component={SellDigitalProduct} />
+        <Route path={"/login"} component={Login} />
         <Route path={"/404"} component={NotFound} />
         {/* Final fallback route */}
         <Route component={NotFound} />

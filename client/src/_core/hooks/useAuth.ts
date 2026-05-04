@@ -1,7 +1,7 @@
-import { getLoginUrl } from "@/const";
-import { trpc } from "@/lib/trpc";
-import { TRPCClientError } from "@trpc/client";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { auth } from "@/lib/firebase";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { useLocation } from "wouter";
 
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
@@ -9,76 +9,60 @@ type UseAuthOptions = {
 };
 
 export function useAuth(options?: UseAuthOptions) {
-  const { redirectOnUnauthenticated = false, redirectPath = getLoginUrl() } =
-    options ?? {};
-  const utils = trpc.useUtils();
+  const { redirectOnUnauthenticated = false, redirectPath = "/login" } = options ?? {};
+  const [, navigate] = useLocation();
 
-  const meQuery = trpc.auth.me.useQuery(undefined, {
-    retry: false,
-    refetchOnWindowFocus: false,
+  const [state, setState] = useState<{
+    user: any;
+    loading: boolean;
+    error: Error | null;
+    isAuthenticated: boolean;
+  }>({
+    user: null,
+    loading: true,
+    error: null,
+    isAuthenticated: false,
   });
 
-  const logoutMutation = trpc.auth.logout.useMutation({
-    onSuccess: () => {
-      utils.auth.me.setData(undefined, null);
-    },
-  });
-
-  const logout = useCallback(async () => {
-    try {
-      await logoutMutation.mutateAsync();
-    } catch (error: unknown) {
-      if (
-        error instanceof TRPCClientError &&
-        error.data?.code === "UNAUTHORIZED"
-      ) {
-        return;
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      (user) => {
+        setState({
+          user: user ? { id: user.uid, name: user.displayName || user.email, email: user.email } : null,
+          loading: false,
+          error: null,
+          isAuthenticated: !!user,
+        });
+      },
+      (error) => {
+        setState((prev) => ({ ...prev, loading: false, error }));
       }
-      throw error;
-    } finally {
-      utils.auth.me.setData(undefined, null);
-      await utils.auth.me.invalidate();
-    }
-  }, [logoutMutation, utils]);
-
-  const state = useMemo(() => {
-    localStorage.setItem(
-      "manus-runtime-user-info",
-      JSON.stringify(meQuery.data)
     );
-    return {
-      user: meQuery.data ?? null,
-      loading: meQuery.isLoading || logoutMutation.isPending,
-      error: meQuery.error ?? logoutMutation.error ?? null,
-      isAuthenticated: Boolean(meQuery.data),
-    };
-  }, [
-    meQuery.data,
-    meQuery.error,
-    meQuery.isLoading,
-    logoutMutation.error,
-    logoutMutation.isPending,
-  ]);
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (!redirectOnUnauthenticated) return;
-    if (meQuery.isLoading || logoutMutation.isPending) return;
-    if (state.user) return;
-    if (typeof window === "undefined") return;
-    if (window.location.pathname === redirectPath) return;
+    if (state.loading) return;
+    if (!state.isAuthenticated) {
+      navigate(redirectPath);
+    }
+  }, [redirectOnUnauthenticated, redirectPath, state.loading, state.isAuthenticated, navigate]);
 
-    window.location.href = redirectPath
-  }, [
-    redirectOnUnauthenticated,
-    redirectPath,
-    logoutMutation.isPending,
-    meQuery.isLoading,
-    state.user,
-  ]);
+  const logout = useCallback(async () => {
+    try {
+      await signOut(auth);
+      navigate(redirectPath);
+    } catch (error) {
+      console.error("Logout failed", error);
+    }
+  }, [navigate, redirectPath]);
 
   return {
     ...state,
-    refresh: () => meQuery.refetch(),
+    refresh: () => {}, // Firebase auto-updates
     logout,
   };
 }

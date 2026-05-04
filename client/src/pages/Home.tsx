@@ -30,7 +30,7 @@ export default function Home() {
                 </Button>
               </div>
             ) : (
-              <Button size="sm" className="bg-red-700 hover:bg-red-800 btn-neon" onClick={() => window.location.href = getLoginUrl()}>
+              <Button size="sm" className="bg-red-700 hover:bg-red-800 btn-neon" onClick={() => navigate("/login")}>
                 <Zap className="w-5 h-5 mr-2" />
                 Entrar
               </Button>
@@ -57,7 +57,7 @@ export default function Home() {
               <ShoppingCart className="w-5 h-5 mr-2" />
               Começar a Comprar
             </Button>
-            <Button size="lg" variant="outline" className="border-red-700/50 hover:border-red-600 text-red-500" onClick={() => window.location.href = getLoginUrl()}>
+            <Button size="lg" variant="outline" className="border-red-700/50 hover:border-red-600 text-red-500" onClick={() => navigate("/login")}>
               <Zap className="w-5 h-5 mr-2" />
               Virar Vendedor
             </Button>
@@ -174,7 +174,7 @@ export default function Home() {
           <Button 
             size="lg" 
             className="bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white font-bold btn-neon"
-            onClick={() => window.location.href = getLoginUrl()}
+            onClick={() => navigate("/login")}
           >
             <Zap className="w-5 h-5 mr-2" />
             Começar Agora
