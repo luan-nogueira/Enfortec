@@ -15,7 +15,8 @@ interface Product {
   id: string;
   name: string;
   description: string;
-  price: number;
+  pricePS4?: number;
+  pricePS5?: number;
   category: string;
   imageUrl: string;
 }
@@ -28,8 +29,9 @@ export default function CollaboratorDashboard() {
   // Formulário
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [price, setPrice] = useState("");
-  const [category, setCategory] = useState("Eletrônicos");
+  const [pricePS4, setPricePS4] = useState("");
+  const [pricePS5, setPricePS5] = useState("");
+  const [category, setCategory] = useState("Jogos (Mídia Digital)");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -77,7 +79,8 @@ export default function CollaboratorDashboard() {
       await addDoc(collection(db, "store_products"), {
         name,
         description,
-        price: parseFloat(price),
+        pricePS4: pricePS4 ? parseFloat(pricePS4) : null,
+        pricePS5: pricePS5 ? parseFloat(pricePS5) : null,
         category,
         imageUrl: downloadUrl,
         collaboratorId: user?.id,
@@ -87,7 +90,8 @@ export default function CollaboratorDashboard() {
       // Limpar form
       setName("");
       setDescription("");
-      setPrice("");
+      setPricePS4("");
+      setPricePS5("");
       setImageFile(null);
       
       const fileInput = document.getElementById("imageUpload") as HTMLInputElement;
@@ -139,9 +143,15 @@ export default function CollaboratorDashboard() {
               <Label className="text-slate-300">Nome do Produto</Label>
               <Input required value={name} onChange={e => setName(e.target.value)} className="bg-slate-950 border-red-600/30" placeholder="Ex: Teclado Mecânico" />
             </div>
-            <div>
-              <Label className="text-slate-300">Preço (R$)</Label>
-              <Input required type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} className="bg-slate-950 border-red-600/30" placeholder="0.00" />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-slate-300">Preço PS4 (R$)</Label>
+                <Input type="number" step="0.01" value={pricePS4} onChange={e => setPricePS4(e.target.value)} className="bg-slate-950 border-red-600/30" placeholder="0.00" />
+              </div>
+              <div>
+                <Label className="text-slate-300">Preço PS5 (R$)</Label>
+                <Input type="number" step="0.01" value={pricePS5} onChange={e => setPricePS5(e.target.value)} className="bg-slate-950 border-red-600/30" placeholder="0.00" />
+              </div>
             </div>
             <div>
               <Label className="text-slate-300">Categoria</Label>
@@ -151,6 +161,8 @@ export default function CollaboratorDashboard() {
                 onChange={e => setCategory(e.target.value)}
                 className="w-full flex h-10 items-center justify-between rounded-md border border-red-600/30 bg-slate-950 px-3 py-2 text-sm text-slate-300"
               >
+                <option value="Jogos (Mídia Digital)">Jogos (Mídia Digital)</option>
+                <option value="Jogos (Físico)">Jogos (Físico)</option>
                 <option value="Eletrônicos">Eletrônicos</option>
                 <option value="Periféricos">Periféricos</option>
                 <option value="Hardware">Hardware</option>
@@ -216,7 +228,11 @@ export default function CollaboratorDashboard() {
                       </td>
                       <td className="py-3 font-medium text-white">{product.name}</td>
                       <td className="py-3 text-slate-400">{product.category}</td>
-                      <td className="py-3 text-red-400 font-bold">R$ {product.price.toFixed(2)}</td>
+                      <td className="py-3 text-red-400 font-bold text-sm">
+                        {product.pricePS4 ? <div>PS4: R$ {product.pricePS4.toFixed(2)}</div> : null}
+                        {product.pricePS5 ? <div>PS5: R$ {product.pricePS5.toFixed(2)}</div> : null}
+                        {!product.pricePS4 && !product.pricePS5 && "Sob Consulta"}
+                      </td>
                       <td className="py-3">
                         <Button variant="ghost" size="icon" className="text-slate-400 hover:text-red-500" onClick={() => handleDeleteProduct(product.id)}>
                           <Trash2 className="w-4 h-4" />

@@ -29,7 +29,8 @@ export default function SellerDashboard() {
   // Form para novo produto
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [price, setPrice] = useState("");
+  const [pricePS4, setPricePS4] = useState("");
+  const [pricePS5, setPricePS5] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -67,7 +68,8 @@ export default function SellerDashboard() {
       await addDoc(collection(db, "used_products"), {
         name,
         description,
-        price: parseFloat(price),
+        pricePS4: pricePS4 ? parseFloat(pricePS4) : null,
+        pricePS5: pricePS5 ? parseFloat(pricePS5) : null,
         imageUrl: downloadUrl,
         sellerId: user?.id,
         sellerName: user?.name || user?.email,
@@ -76,7 +78,8 @@ export default function SellerDashboard() {
       });
       setName("");
       setDescription("");
-      setPrice("");
+      setPricePS4("");
+      setPricePS5("");
       setImageFile(null);
       setShowAddForm(false);
       
@@ -247,9 +250,15 @@ export default function SellerDashboard() {
                     <Label className="text-slate-300">Descrição</Label>
                     <Input required value={description} onChange={e => setDescription(e.target.value)} className="bg-slate-900 border-red-600/30 text-white" />
                   </div>
-                  <div>
-                    <Label className="text-slate-300">Preço (R$)</Label>
-                    <Input required type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} className="bg-slate-900 border-red-600/30 text-white" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-slate-300">Preço PS4 (R$)</Label>
+                      <Input type="number" step="0.01" value={pricePS4} onChange={e => setPricePS4(e.target.value)} className="bg-slate-900 border-red-600/30 text-white" placeholder="0.00" />
+                    </div>
+                    <div>
+                      <Label className="text-slate-300">Preço PS5 (R$)</Label>
+                      <Input type="number" step="0.01" value={pricePS5} onChange={e => setPricePS5(e.target.value)} className="bg-slate-900 border-red-600/30 text-white" placeholder="0.00" />
+                    </div>
                   </div>
                   <div>
                     <Label className="text-slate-300">Foto do Produto</Label>
@@ -301,7 +310,11 @@ export default function SellerDashboard() {
                     </div>
                     <p className="text-slate-400 text-sm mb-4 line-clamp-2 min-h-[40px]">{product.description}</p>
                     <div className="flex justify-between items-center pt-4 border-t border-red-600/10">
-                      <span className="text-2xl font-bold text-red-500">R$ {product.price.toFixed(2)}</span>
+                      <div className="flex flex-col text-red-500 font-bold text-sm">
+                        {product.pricePS4 ? <span>PS4: R$ {product.pricePS4.toFixed(2)}</span> : null}
+                        {product.pricePS5 ? <span>PS5: R$ {product.pricePS5.toFixed(2)}</span> : null}
+                        {!product.pricePS4 && !product.pricePS5 && <span>Sob Consulta</span>}
+                      </div>
                       <span className="text-xs bg-red-600/20 text-red-400 px-3 py-1 rounded-full font-medium">
                         {product.status}
                       </span>
