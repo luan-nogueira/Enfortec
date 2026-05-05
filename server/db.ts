@@ -184,28 +184,67 @@ export async function updatePlatformSettings(commissionPercentage: string) {
   await db.update(platformSettings).set({ commissionPercentage }).where(eq(platformSettings.id, 1));
 }
 
-// Balance and Order Confirmation
-export async function confirmOrderReceipt(orderId: number) {
+// Balance, Order Confirmation, and Reviews (Escrow System)
+export async function confirmOrderAndReview(orderId: number, buyerId: number, rating: number, comment?: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
   const result = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
   const order = result[0];
-  if (!order || order.status !== 'pago') {
-    throw new Error("Order not found or not in a valid state for confirmation");
+  
+  if (!order) {
+    throw new Error("Pedido não encontrado");
   }
+  
+  if (order.buyerId !== buyerId) {
+    throw new Error("Apenas o comprador pode confirmar o recebimento");
+  }
+
+  if (order.status !== 'pago' && order.status !== 'enviado') {
+    throw new Error("Pedido não está em um estado válido para confirmação");
+  }
+
+  if (!order.sellerId) {
+    throw new Error("Pedido não possui um vendedor associado");
+  }
+
+  // Get seller profile to update their rating stats
+  const sellerProfileResult = await db.select().from(sellers).where(eq(sellers.userId, order.sellerId)).limit(1);
+  const sellerProfile = sellerProfileResult[0];
 
   // Update order status
   await db.update(orders).set({ status: 'entregue' }).where(eq(orders.id, orderId));
 
-  // Add funds to seller balance
-  if (order.sellerId) {
-    const sellerUserResult = await db.select().from(users).where(eq(users.id, order.sellerId)).limit(1);
-    const sellerUser = sellerUserResult[0];
-    if (sellerUser) {
-      const newBalance = (parseFloat(sellerUser.balance) + parseFloat(order.sellerAmount)).toString();
-      await db.update(users).set({ balance: newBalance }).where(eq(users.id, order.sellerId));
-    }
+  // Insert Review
+  await db.insert(reviews).values({
+    orderId: order.id,
+    sellerId: sellerProfile?.id ?? order.sellerId, // Fallback to user ID if no specific seller profile
+    buyerId: buyerId,
+    rating: rating,
+    comment: comment || null,
+  });
+
+  // Update Seller Rating if profile exists
+  if (sellerProfile) {
+    const currentTotalReviews = sellerProfile.totalReviews || 0;
+    const currentRating = parseFloat(sellerProfile.rating || "0");
+    const newTotalReviews = currentTotalReviews + 1;
+    const newRating = ((currentRating * currentTotalReviews) + rating) / newTotalReviews;
+    
+    await db.update(sellers)
+      .set({ 
+        totalReviews: newTotalReviews, 
+        rating: newRating.toFixed(2) 
+      })
+      .where(eq(sellers.id, sellerProfile.id));
+  }
+
+  // Add funds to seller balance (Escrow Release)
+  const sellerUserResult = await db.select().from(users).where(eq(users.id, order.sellerId)).limit(1);
+  const sellerUser = sellerUserResult[0];
+  if (sellerUser) {
+    const newBalance = (parseFloat(sellerUser.balance) + parseFloat(order.sellerAmount)).toString();
+    await db.update(users).set({ balance: newBalance }).where(eq(users.id, order.sellerId));
   }
 
   return { success: true };

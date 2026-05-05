@@ -15,6 +15,7 @@ import AddUsedProduct from "./pages/AddUsedProduct";
 import SellDigitalProduct from "./pages/SellDigitalProduct";
 import Login from "./pages/Login";
 import CollaboratorDashboard from "./pages/CollaboratorDashboard";
+import MyPurchases from "./pages/MyPurchases";
 import FloatingChat from "./components/FloatingChat";
 
 function Router() {
@@ -33,6 +34,7 @@ function Router() {
         <Route path={"/digital/vender"} component={SellDigitalProduct} />
         <Route path={"/login"} component={Login} />
         <Route path={"/colaborador"} component={CollaboratorDashboard} />
+        <Route path={"/minhas-compras"} component={MyPurchases} />
         <Route path={"/404"} component={NotFound} />
         {/* Final fallback route */}
         <Route component={NotFound} />

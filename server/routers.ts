@@ -121,10 +121,14 @@ export const appRouter = router({
       const seller = await db.getSellerByUserId(ctx.user.id);
       return seller ? db.getOrdersBySellerId(seller.id) : [];
     }),
-    confirmReceipt: protectedProcedure
-      .input(z.number())
-      .mutation(async ({ input }) => {
-        return db.confirmOrderReceipt(input);
+    confirmAndReview: protectedProcedure
+      .input(z.object({
+        orderId: z.number(),
+        rating: z.number().min(1).max(5),
+        comment: z.string().optional()
+      }))
+      .mutation(async ({ ctx, input }) => {
+        return db.confirmOrderAndReview(input.orderId, ctx.user.id, input.rating, input.comment);
       }),
   }),
 
