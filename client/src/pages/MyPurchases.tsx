@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { useLocation } from "wouter";
 
 export default function MyPurchases() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
   const [, navigate] = useLocation();
 
   const { data: orders, isLoading, refetch } = trpc.orders.getByBuyerId.useQuery(undefined, {
@@ -43,8 +43,16 @@ export default function MyPurchases() {
   const [rating, setRating] = useState<number>(5);
   const [comment, setComment] = useState("");
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-slate-400">Verificando autenticação...</div>
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
-    window.location.href = getLoginUrl();
+    navigate("/login");
     return null;
   }
 
