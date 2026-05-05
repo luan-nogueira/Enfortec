@@ -1,6 +1,7 @@
-# Dependencies
-**/node_modules
-.pnpm-store/
+.vercel
+dist
+node_modules
+.env
 
 # Build outputs
 dist/

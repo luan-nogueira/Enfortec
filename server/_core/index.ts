@@ -1,4 +1,5 @@
 import "dotenv/config";
+process.env.NODE_ENV = process.env.NODE_ENV || "development";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
@@ -7,7 +8,6 @@ import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
-import { serveStatic, setupVite } from "./vite";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -28,8 +28,9 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
+export const app = express();
+
 async function startServer() {
-  const app = express();
   const server = createServer(app);
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
@@ -44,10 +45,15 @@ async function startServer() {
       createContext,
     })
   );
+  
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
+    const viteModule = "./vite";
+    const { setupVite } = await import(viteModule);
     await setupVite(app, server);
-  } else {
+  } else if (process.env.VERCEL !== "1") {
+    const viteModule = "./vite";
+    const { serveStatic } = await import(viteModule);
     serveStatic(app);
   }
 
@@ -63,4 +69,9 @@ async function startServer() {
   });
 }
 
-startServer().catch(console.error);
+// Only start the server directly if it's not being imported as a module (e.g. by Vercel)
+if (process.env.NODE_ENV !== "production" || process.env.VERCEL !== "1") {
+  startServer().catch(console.error);
+}
+
+export default app;

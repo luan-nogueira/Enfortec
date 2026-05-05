@@ -21,6 +21,7 @@ export const users = mysqlTable("users", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+  balance: decimal("balance", { precision: 12, scale: 2 }).default("0").notNull(),
 });
 
 export type User = typeof users.$inferSelect;
@@ -162,6 +163,16 @@ export const messages = mysqlTable("messages", {
 
 export type Message = typeof messages.$inferSelect;
 export type InsertMessage = typeof messages.$inferInsert;
+
+// Global Settings table - for commission and other platform configs
+export const platformSettings = mysqlTable("platform_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  commissionPercentage: decimal("commissionPercentage", { precision: 5, scale: 2 }).default("10"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PlatformSettings = typeof platformSettings.$inferSelect;
+export type InsertPlatformSettings = typeof platformSettings.$inferInsert;
 
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({

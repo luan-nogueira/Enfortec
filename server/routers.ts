@@ -121,6 +121,24 @@ export const appRouter = router({
       const seller = await db.getSellerByUserId(ctx.user.id);
       return seller ? db.getOrdersBySellerId(seller.id) : [];
     }),
+    confirmReceipt: protectedProcedure
+      .input(z.number())
+      .mutation(async ({ input }) => {
+        return db.confirmOrderReceipt(input);
+      }),
+  }),
+
+  // Settings Router - for admin only
+  settings: router({
+    get: publicProcedure.query(() => db.getPlatformSettings()),
+    update: protectedProcedure
+      .input(z.object({
+        commissionPercentage: z.string(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') throw new Error("Unauthorized");
+        return db.updatePlatformSettings(input.commissionPercentage);
+      }),
   }),
 
   // Reviews Router

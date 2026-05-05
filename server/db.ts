@@ -1,6 +1,6 @@
 import { eq, and, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, sellers, products, usedProducts, digitalProducts, orders, reviews, coupons } from "../drizzle/schema";
+import { InsertUser, users, sellers, products, usedProducts, digitalProducts, orders, reviews, coupons, platformSettings } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -163,4 +163,50 @@ export async function getReviewsBySellerId(sellerId: number) {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(reviews).where(eq(reviews.sellerId, sellerId)).orderBy(desc(reviews.createdAt));
+}
+
+// Platform Settings queries
+export async function getPlatformSettings() {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(platformSettings).where(eq(platformSettings.id, 1)).limit(1);
+  if (result.length === 0) {
+    // Initialize if not exists
+    await db.insert(platformSettings).values({ id: 1, commissionPercentage: "10" });
+    return { id: 1, commissionPercentage: "10" };
+  }
+  return result[0];
+}
+
+export async function updatePlatformSettings(commissionPercentage: string) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(platformSettings).set({ commissionPercentage }).where(eq(platformSettings.id, 1));
+}
+
+// Balance and Order Confirmation
+export async function confirmOrderReceipt(orderId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+  const order = result[0];
+  if (!order || order.status !== 'pago') {
+    throw new Error("Order not found or not in a valid state for confirmation");
+  }
+
+  // Update order status
+  await db.update(orders).set({ status: 'entregue' }).where(eq(orders.id, orderId));
+
+  // Add funds to seller balance
+  if (order.sellerId) {
+    const sellerUserResult = await db.select().from(users).where(eq(users.id, order.sellerId)).limit(1);
+    const sellerUser = sellerUserResult[0];
+    if (sellerUser) {
+      const newBalance = (parseFloat(sellerUser.balance) + parseFloat(order.sellerAmount)).toString();
+      await db.update(users).set({ balance: newBalance }).where(eq(users.id, order.sellerId));
+    }
+  }
+
+  return { success: true };
 }
