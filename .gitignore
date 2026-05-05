@@ -1,10 +1,12 @@
 .vercel
 dist
+docs
 node_modules
 .env
 
 # Build outputs
 dist/
+docs/
 build/
 *.dist
 
