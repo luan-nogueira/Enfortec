@@ -19,7 +19,7 @@ import FloatingChat from "./components/FloatingChat";
 
 function Router() {
   return (
-    <WouterRouter base="/Enfortec">
+    <WouterRouter>
       <Switch>
         <Route path={"/"} component={Home} />
         <Route path={"/loja"} component={Store} />
