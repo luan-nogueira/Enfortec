@@ -14,7 +14,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Check } from "lucide-react";
 
 export default function Store() {
   const { isAuthenticated } = useAuth();

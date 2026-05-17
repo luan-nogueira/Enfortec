@@ -165,10 +165,16 @@ export default function Home() {
                   </h3>
                   <div className="mt-auto flex items-end justify-between pt-4 border-t border-slate-800">
                     <span className="text-2xl font-black text-white">
-                      <span className="text-sm text-slate-500 font-normal">R$</span> {Number(listing.price).toFixed(2)}
+                      {Number(listing.price) === 0 ? (
+                        <span className="text-lg font-bold text-red-500">A definir</span>
+                      ) : (
+                        <>
+                          <span className="text-sm text-slate-500 font-normal">R$</span> {Number(listing.price).toFixed(2).replace('.', ',')}
+                        </>
+                      )}
                     </span>
                     <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white rounded-lg px-4">
-                      Comprar
+                      {Number(listing.price) === 0 ? "Contatar" : "Comprar"}
                     </Button>
                   </div>
                 </div>

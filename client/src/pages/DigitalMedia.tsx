@@ -130,15 +130,34 @@ export default function DigitalMedia() {
                 </div>
                 <p className="text-slate-400 text-sm mb-4 line-clamp-2">{product.description}</p>
                 <div className="flex justify-between items-center mb-4">
-                  <span className="text-2xl font-bold text-red-500">R$ {product.price}</span>
+                  <span className="text-2xl font-bold text-red-500">
+                    {parseFloat(product.price) === 0 
+                      ? "A definir com ADM" 
+                      : `R$ ${parseFloat(product.price).toFixed(2).replace('.', ',')}`}
+                  </span>
                   <span className="text-xs text-slate-400">
-                    {product.stock} disponíveis
+                    {parseFloat(product.price) === 0 ? "Sob consulta" : `${product.stock} disponíveis`}
                   </span>
                 </div>
-                <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold">
-                  <Download className="w-4 h-4 mr-2" />
-                  Comprar & Baixar
-                </Button>
+                {parseFloat(product.price) === 0 ? (
+                  <Button 
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold btn-neon flex items-center justify-center gap-2"
+                    onClick={() => {
+                      const message = encodeURIComponent(`Olá! Tenho interesse no jogo "${product.name}" da Eforte Games. Como funciona para adquirir?`);
+                      window.open(`https://wa.me/554384253691?text=${message}`, '_blank');
+                    }}
+                  >
+                    <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                      <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.42 9.864-9.864.002-2.637-1.03-5.118-2.905-6.993C16.257 1.874 13.78 1.84 11.14 1.84 5.704 1.84 1.28 6.261 1.277 11.705c-.001 1.714.453 3.39 1.317 4.873L1.576 22.25l5.071-1.328zM17.18 14.39c-.3-.15-1.782-.88-2.062-.98-.28-.1-.48-.15-.68.15-.2.3-.77.98-.94 1.18-.17.2-.34.22-.64.07-1.3-.65-2.28-1.15-3.18-2.7-.24-.41-.24-.26.17-.68.18-.18.39-.46.59-.69.2-.23.27-.39.41-.65.13-.26.07-.49-.03-.69-.1-.2-.8-1.92-1.1-2.63-.29-.7-.59-.6-.81-.61-.21-.01-.45-.01-.69-.01-.24 0-.63.09-.96.45-.33.36-1.27 1.24-1.27 3.03 0 1.8 1.31 3.53 1.49 3.77.18.24 2.58 3.94 6.25 5.53.87.38 1.56.6 2.09.77.88.28 1.68.24 2.3.15.7-.1 2.06-.84 2.35-1.65.29-.82.29-1.51.2-1.65-.08-.15-.3-.23-.6-.38z"/>
+                    </svg>
+                    Contatar ADM
+                  </Button>
+                ) : (
+                  <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold">
+                    <Download className="w-4 h-4 mr-2" />
+                    Comprar & Baixar
+                  </Button>
+                )}
               </div>
             ))}
           </div>
