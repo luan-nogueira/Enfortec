@@ -89,6 +89,7 @@ export const digitalProducts = mysqlTable("digitalProducts", {
   type: mysqlEnum("type", ["jogo", "gift_card", "licenca", "outro"]).notNull(),
   keyOrCode: text("keyOrCode"),
   downloadUrl: varchar("downloadUrl", { length: 500 }),
+  imageUrl: varchar("imageUrl", { length: 500 }),
   stock: int("stock").notNull().default(1),
   isActive: boolean("isActive").default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

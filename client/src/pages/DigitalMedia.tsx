@@ -119,8 +119,16 @@ export default function DigitalMedia() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {filteredProducts.map((product) => (
               <div key={product.id} className="card-neon p-6 hover:scale-105 transition-transform">
-                <div className="bg-gradient-to-br from-purple-600 to-purple-700 h-40 flex items-center justify-center relative rounded-lg mb-4">
-                  {getTypeIcon(product.type)}
+                <div className="bg-gradient-to-br from-purple-600 to-purple-700 h-40 flex items-center justify-center relative rounded-lg mb-4 overflow-hidden border border-purple-500/20">
+                  {product.imageUrl ? (
+                    <img 
+                      src={product.imageUrl} 
+                      alt={product.name} 
+                      className="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
+                    />
+                  ) : (
+                    getTypeIcon(product.type)
+                  )}
                 </div>
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="text-lg font-bold text-white line-clamp-2 flex-1">{product.name}</h3>
