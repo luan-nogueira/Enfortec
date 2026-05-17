@@ -148,8 +148,12 @@ export default function Home() {
                 onClick={() => navigate(listing._type === 'digital' ? '/digital' : '/usados')}
               >
                 <div className="h-40 bg-slate-800 relative overflow-hidden">
-                  {listing.images && listing.images.length > 0 ? (
-                    <img src={listing.images[0]} alt={listing.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  {listing.imageUrl || (listing.images && listing.images.length > 0) ? (
+                    <img 
+                      src={listing.imageUrl || listing.images[0]} 
+                      alt={listing.name} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                    />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-slate-600 bg-slate-800/50">
                       <Gamepad2 className="w-12 h-12 opacity-50" />
