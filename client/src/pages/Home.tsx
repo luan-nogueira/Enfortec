@@ -2,7 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocation } from "wouter";
-import { Zap, Gamepad2, Search, Shield, Package, LayoutGrid, Tag } from "lucide-react";
+import { Zap, Gamepad2, Search, Shield, Package, LayoutGrid, Tag, Coins } from "lucide-react";
 import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 
@@ -47,6 +47,9 @@ export default function Home() {
             
             {isAuthenticated ? (
               <div className="flex items-center gap-3">
+                <Button variant="ghost" className="text-slate-300 hover:text-white hover:bg-slate-900" onClick={() => navigate("/fortecoins")}>
+                  <Coins className="w-4 h-4 mr-2 text-red-500" /> {user?.forteCoins ?? 0} FC
+                </Button>
                 <Button variant="ghost" className="text-slate-300 hover:text-white hover:bg-slate-900" onClick={() => navigate("/minhas-compras")}>
                   <Package className="w-4 h-4 mr-2" /> Minhas Compras
                 </Button>
@@ -83,7 +86,7 @@ export default function Home() {
             O Maior Marketplace Gamer
           </h1>
           <p className="text-lg md:text-xl text-slate-400 mb-10 max-w-2xl mx-auto">
-            Compre e venda contas, itens, serviços e gift cards. 
+            Compre e venda jogos, gift cards e produtos físicos. 
             <strong className="text-red-400 font-semibold ml-1">Pagamento 100% Seguro.</strong>
           </p>
           
@@ -92,7 +95,7 @@ export default function Home() {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-slate-500" />
               <Input 
                 type="text" 
-                placeholder="Busque por jogos, contas, gift cards..." 
+                placeholder="Busque por jogos, gift cards, produtos físicos..." 
                 className="w-full h-16 pl-14 pr-4 bg-slate-900/80 border-slate-700 text-white text-lg rounded-xl focus:border-red-500 focus:ring-red-500/20 shadow-xl"
               />
             </div>
@@ -205,7 +208,7 @@ export default function Home() {
             <span className="text-xl font-bold text-white">EFORTE<span className="text-red-500">GAMES</span></span>
           </div>
           <p className="text-slate-500 mb-6 max-w-md mx-auto">
-            Plataforma segura para negociações de contas, itens e jogos. O dinheiro só é liberado após a confirmação do comprador.
+            Plataforma segura para negociações de jogos, gift cards e produtos físicos. O dinheiro só é liberado após a confirmação do comprador.
           </p>
           <div className="text-slate-600 text-sm">
             <p>&copy; 2026 EFORTE GAMES. Todos os direitos reservados.</p>

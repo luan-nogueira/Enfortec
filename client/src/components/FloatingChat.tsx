@@ -17,6 +17,69 @@ import {
 } from "firebase/firestore";
 import { MessageCircle, X, Send, User } from "lucide-react";
 
+function parseBold(text: string) {
+  const parts = text.split(/\*\*([^*]+)\*\*/g);
+  return parts.map((part, idx) => {
+    if (idx % 2 === 1) {
+      return <strong key={idx} className="font-extrabold text-white">{part}</strong>;
+    }
+    return part;
+  });
+}
+
+function renderMessageText(text: string) {
+  if (!text) return null;
+
+  const lines = text.split("\n");
+  return lines.map((line, lineIdx) => {
+    const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+    const matches: { index: number; length: number; element: any }[] = [];
+    let match;
+    
+    while ((match = linkRegex.exec(line)) !== null) {
+      const [full, linkText, url] = match;
+      matches.push({
+        index: match.index,
+        length: full.length,
+        element: (
+          <a
+            key={`link-${match.index}`}
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-red-400 hover:text-red-300 underline font-bold"
+          >
+            {linkText}
+          </a>
+        )
+      });
+    }
+
+    let currentPos = 0;
+    const lineParts: any[] = [];
+    
+    for (const m of matches) {
+      if (m.index > currentPos) {
+        const segment = line.substring(currentPos, m.index);
+        lineParts.push(...parseBold(segment));
+      }
+      lineParts.push(m.element);
+      currentPos = m.index + m.length;
+    }
+    
+    if (currentPos < line.length) {
+      const segment = line.substring(currentPos);
+      lineParts.push(...parseBold(segment));
+    }
+
+    return (
+      <div key={lineIdx} className={lineIdx > 0 ? "mt-1.5" : ""}>
+        {lineParts.length > 0 ? lineParts : line}
+      </div>
+    );
+  });
+}
+
 export default function FloatingChat() {
   const { user, isAuthenticated } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
@@ -70,13 +133,35 @@ export default function FloatingChat() {
         unreadByAdmin: true
       }, { merge: true });
 
-      // 2. Adiciona a mensagem na subcoleção
+      // 2. Adiciona a mensagem do usuário na subcoleção
       await addDoc(collection(db, "chats", user.id, "messages"), {
         text: msg,
         senderId: user.id,
         senderName: user.name,
         timestamp: serverTimestamp()
       });
+
+      // 3. Consulta a nossa rota de IA com a mensagem do usuário
+      const response = await fetch(`/api/ai?q=${encodeURIComponent(msg)}`);
+      if (response.ok) {
+        const data = await response.json();
+        const aiAnswer = data.answer;
+
+        // 4. Adiciona a resposta da IA na subcoleção do Firestore
+        await addDoc(collection(db, "chats", user.id, "messages"), {
+          text: aiAnswer,
+          senderId: "ai-support",
+          senderName: "Suporte Eforte (IA)",
+          timestamp: serverTimestamp()
+        });
+
+        // 5. Atualiza o documento principal do chat com a última resposta da IA
+        await setDoc(chatRef, {
+          lastMessage: aiAnswer,
+          updatedAt: serverTimestamp(),
+          unreadByAdmin: false // Respondido pela IA!
+        }, { merge: true });
+      }
     } catch (error) {
       console.error("Erro ao enviar mensagem:", error);
     }
@@ -122,9 +207,13 @@ export default function FloatingChat() {
             className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-900/50"
           >
             {messages.length === 0 && (
-              <div className="text-center py-10 opacity-40">
-                <MessageCircle className="w-12 h-12 mx-auto mb-2" />
-                <p className="text-xs">Olá, {user.name}! Como podemos ajudar você hoje?</p>
+              <div className="flex justify-start">
+                <div className="max-w-[85%] p-3.5 rounded-2xl text-sm font-medium bg-slate-800 text-slate-200 rounded-bl-none border border-red-600/20 shadow-lg">
+                  <span className="block text-[9px] text-red-500 font-bold uppercase tracking-wider mb-1">Assistente Virtual 🤖</span>
+                  Olá, <b>{user.name}</b>! Sou o assistente virtual da Eforte Games.
+                  <br /><br />
+                  Você pode me perguntar se temos algum jogo disponível (ex: <i>"Tem A Way Out?"</i>) ou tirar dúvidas sobre pagamentos, envio e suporte!
+                </div>
               </div>
             )}
             {messages.map((msg) => (
@@ -132,12 +221,15 @@ export default function FloatingChat() {
                 key={msg.id} 
                 className={`flex ${msg.senderId === user.id ? "justify-end" : "justify-start"}`}
               >
-                <div className={`max-w-[80%] p-3 rounded-2xl text-sm font-medium ${
+                <div className={`max-w-[85%] p-3.5 rounded-2xl text-sm font-medium ${
                   msg.senderId === user.id 
                     ? "bg-red-600 text-white rounded-br-none shadow-lg" 
                     : "bg-slate-800 text-slate-200 rounded-bl-none border border-red-600/10"
                 }`}>
-                  {msg.text}
+                  {msg.senderId === "ai-support" && (
+                    <span className="block text-[9px] text-red-500 font-bold uppercase tracking-wider mb-1">Assistente Virtual 🤖</span>
+                  )}
+                  {renderMessageText(msg.text)}
                 </div>
               </div>
             ))}

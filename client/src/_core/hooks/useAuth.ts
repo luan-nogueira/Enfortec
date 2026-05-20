@@ -41,24 +41,70 @@ export function useAuth(options?: UseAuthOptions) {
             const userRef = doc(db, "users", user.uid);
             let userDoc = await getDoc(userRef);
             
+            const isGoogleUser = user.providerData.some(p => p.providerId === "google.com");
+            
             if (!userDoc.exists()) {
+              const referredBy = localStorage.getItem("forte_referred_by");
+              const validReferrer = (referredBy && referredBy !== user.uid) ? referredBy : null;
+              
               // Se não existe, cria com role padrão
               const initialData = {
                 uid: user.uid,
                 email: user.email,
                 name: user.displayName || user.email?.split('@')[0],
                 role: "user", // Default role
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                forteCoins: 0,
+                referredBy: validReferrer,
+                loginMethod: isGoogleUser ? "google.com" : "email/password"
               };
               await setDoc(userRef, initialData);
+              
+              if (validReferrer) {
+                const referralRef = doc(db, "referrals", user.uid);
+                await setDoc(referralRef, {
+                  id: user.uid,
+                  referrerId: validReferrer,
+                  inviteeName: initialData.name,
+                  inviteeEmail: initialData.email,
+                  status: "pendente",
+                  createdAt: new Date().toISOString()
+                });
+                localStorage.removeItem("forte_referred_by");
+              }
               userDoc = await getDoc(userRef);
             }
 
             const userData = userDoc.data();
+            let needsUpdate = false;
+            const updateFields: any = {};
+            
+            if (userData?.forteCoins === undefined) {
+              updateFields.forteCoins = 0;
+              needsUpdate = true;
+            }
+            if (userData?.loginMethod === undefined) {
+              updateFields.loginMethod = isGoogleUser ? "google.com" : "email/password";
+              needsUpdate = true;
+            }
+            
+            if (needsUpdate) {
+              await setDoc(userRef, updateFields, { merge: true });
+            }
+
             const role = userData?.role || (user.email === "luanmnogueira@gmail.com" ? "admin" : "user");
+            const finalForteCoins = userData?.forteCoins ?? (updateFields.forteCoins ?? 0);
+            const finalLoginMethod = userData?.loginMethod ?? (updateFields.loginMethod ?? (isGoogleUser ? "google.com" : "email/password"));
 
             setState({
-              user: { id: user.uid, name: userData?.name || user.email, email: user.email },
+              user: { 
+                id: user.uid, 
+                name: userData?.name || user.email, 
+                email: user.email,
+                forteCoins: finalForteCoins,
+                referredBy: userData?.referredBy || null,
+                loginMethod: finalLoginMethod
+              },
               role: role,
               loading: false,
               error: null,
@@ -69,7 +115,7 @@ export function useAuth(options?: UseAuthOptions) {
           } catch (err) {
             console.error("Erro ao buscar dados do usuário:", err);
             setState({
-              user: { id: user.uid, name: user.displayName || user.email, email: user.email },
+              user: { id: user.uid, name: user.displayName || user.email, email: user.email, forteCoins: 0, referredBy: null, loginMethod: "email/password" },
               role: "user",
               loading: false,
               error: null,

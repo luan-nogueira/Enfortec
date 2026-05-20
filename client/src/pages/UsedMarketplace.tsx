@@ -1,14 +1,14 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Star, ShoppingCart, ArrowLeft, Flame, User, Check, Package } from "lucide-react";
+import { Search, Star, ShoppingCart, ArrowLeft, Flame, User, Check, Package, Coins } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 
 export default function UsedMarketplace() {
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCondition, setSelectedCondition] = useState<string | null>(null);
@@ -48,20 +48,32 @@ export default function UsedMarketplace() {
       {/* Header */}
       <div className="bg-slate-950/80 backdrop-blur-md border-b border-red-600/20 sticky top-0 z-40">
         <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center gap-4 mb-6">
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={() => navigate("/")}
-              className="text-slate-300 hover:text-red-500"
-            >
-              <ArrowLeft className="w-5 h-5 mr-2" />
-              Voltar
-            </Button>
-            <div className="flex items-center gap-2">
-              <Flame className="w-6 h-6 text-red-500" />
-              <h1 className="text-3xl font-bold text-neon">Marketplace de Usados</h1>
+          <div className="flex items-center justify-between gap-4 mb-6">
+            <div className="flex items-center gap-4">
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => navigate("/")}
+                className="text-slate-300 hover:text-red-500"
+              >
+                <ArrowLeft className="w-5 h-5 mr-2" />
+                Voltar
+              </Button>
+              <div className="flex items-center gap-2">
+                <Flame className="w-6 h-6 text-red-500" />
+                <h1 className="text-3xl font-bold text-neon">Marketplace de Usados</h1>
+              </div>
             </div>
+            {isAuthenticated && (
+              <Button 
+                variant="ghost" 
+                className="text-slate-300 hover:text-white hover:bg-slate-900 flex items-center gap-2"
+                onClick={() => navigate("/fortecoins")}
+              >
+                <Coins className="w-4 h-4 text-red-500" />
+                <span>{user?.forteCoins ?? 0} FC</span>
+              </Button>
+            )}
           </div>
           <div className="flex gap-4 flex-col md:flex-row">
             <div className="flex-1 relative">

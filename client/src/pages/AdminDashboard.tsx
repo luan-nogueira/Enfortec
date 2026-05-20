@@ -5,9 +5,9 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, doc, updateDoc, setDoc, deleteDoc, query, orderBy, serverTimestamp, addDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, setDoc, deleteDoc, query, orderBy, serverTimestamp, addDoc, getDoc } from "firebase/firestore";
 import { useLocation } from "wouter";
-import { Shield, User, UserCheck, UserPlus, ArrowLeft, Plus, X, Lock, Mail, Trash2, MessageCircle, Send } from "lucide-react";
+import { Shield, User, UserCheck, UserPlus, ArrowLeft, Plus, X, Lock, Mail, Trash2, MessageCircle, Send, Coins, Gift, Check, Clock } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import {
   Dialog,
@@ -35,6 +35,10 @@ export default function AdminDashboard() {
   const [adminMessage, setAdminMessage] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Indicações & Prêmios
+  const [allReferrals, setAllReferrals] = useState<any[]>([]);
+  const [allRedemptions, setAllRedemptions] = useState<any[]>([]);
+
   // Modal de criação
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newUserName, setNewUserName] = useState("");
@@ -54,6 +58,38 @@ export default function AdminDashboard() {
       }));
       setUsers(data);
       setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [isAuthenticated, isAdmin]);
+
+  // Escutar todas as Indicações
+  useEffect(() => {
+    if (!isAuthenticated || !isAdmin) return;
+
+    const q = collection(db, "referrals");
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })).sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setAllReferrals(data);
+    });
+
+    return () => unsubscribe();
+  }, [isAuthenticated, isAdmin]);
+
+  // Escutar todas as Reivindicações de Prêmios
+  useEffect(() => {
+    if (!isAuthenticated || !isAdmin) return;
+
+    const q = collection(db, "redemptions");
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })).sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setAllRedemptions(data);
     });
 
     return () => unsubscribe();
@@ -211,6 +247,59 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleConfirmPurchase = async (referral: any) => {
+    if (referral.status === "pago") return;
+    
+    if (confirm(`Confirmar que o usuário indicado (${referral.inviteeName}) efetuou a compra de um jogo? Isso creditará +100 Fortecoins ao padrinho.`)) {
+      try {
+        // 1. Atualizar status da indicação
+        await updateDoc(doc(db, "referrals", referral.id), {
+          status: "pago",
+          confirmedAt: new Date().toISOString()
+        });
+
+        // 2. Incrementar moedas do indicador
+        const referrerRef = doc(db, "users", referral.referrerId);
+        const referrerSnap = await getDoc(referrerRef);
+        
+        if (referrerSnap.exists()) {
+          const currentCoins = referrerSnap.data()?.forteCoins ?? 0;
+          await updateDoc(referrerRef, {
+            forteCoins: currentCoins + 100
+          });
+          alert(`Sucesso! Compra de jogo confirmada e 100 Fortecoins adicionados ao saldo do padrinho.`);
+        } else {
+          alert(`A indicação foi marcada como paga, mas o padrinho correspondente (${referral.referrerId}) não foi localizado no Firestore.`);
+        }
+      } catch (error) {
+        console.error("Erro ao confirmar compra da indicação:", error);
+        alert("Erro ao processar confirmação. Tente novamente.");
+      }
+    }
+  };
+
+  const handleDeliverPrize = async (redemptionId: string, prizeName: string) => {
+    const code = prompt(`Digite o código do Gift Card ou a chave do jogo para entregar o prêmio "${prizeName}":`);
+    if (code === null) return; // Cancelou
+    
+    if (!code.trim()) {
+      alert("O código ou mensagem de entrega é obrigatório.");
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, "redemptions", redemptionId), {
+        status: "entregue",
+        code: code.trim(),
+        deliveredAt: new Date().toISOString()
+      });
+      alert("Prêmio entregue com sucesso! O usuário receberá o código em seu painel de Fortecoins.");
+    } catch (error) {
+      console.error("Erro ao entregar prêmio:", error);
+      alert("Erro ao registrar a entrega do prêmio.");
+    }
+  };
+
   if (authLoading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white font-bold">Verificando Credenciais...</div>;
 
   if (!isAuthenticated || !isAdmin) {
@@ -254,6 +343,12 @@ export default function AdminDashboard() {
               Central de Atendimento
               {chats.some(c => c.unreadByAdmin) && (
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="referrals" className="data-[state=active]:bg-red-600 font-bold flex items-center gap-2">
+              Indicações & Prêmios
+              {(allRedemptions.some(r => r.status === "pendente") || allReferrals.some(r => r.status === "pendente")) && (
+                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
               )}
             </TabsTrigger>
           </TabsList>
@@ -412,6 +507,117 @@ export default function AdminDashboard() {
                     <p className="text-xl font-black italic uppercase tracking-widest">Selecione uma conversa</p>
                   </div>
                 )}
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="referrals">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Solicitações de Resgate */}
+              <Card className="bg-slate-900 border-red-600/10 p-6 flex flex-col h-[600px] card-neon">
+                <h3 className="text-lg font-bold text-white mb-6 border-l-4 border-red-600 pl-3 uppercase tracking-wider text-sm italic flex items-center gap-2">
+                  <Gift className="w-5 h-5 text-red-500" />
+                  Solicitações de Prêmios ({allRedemptions.length})
+                </h3>
+                <div className="flex-1 overflow-y-auto pr-2 space-y-4">
+                  {allRedemptions.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-600 italic text-sm">
+                      Nenhuma solicitação de prêmio encontrada.
+                    </div>
+                  ) : (
+                    allRedemptions.map((red) => (
+                      <div key={red.id} className="bg-slate-950/80 border border-slate-850 p-4 rounded-xl space-y-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-bold text-white text-sm">{red.prizeName}</p>
+                            <p className="text-xs text-slate-400">Solicitado por: <span className="font-semibold text-slate-200">{red.userName}</span></p>
+                            <p className="text-[10px] text-slate-500">{red.userEmail}</p>
+                            <p className="text-[10px] text-slate-500 mt-1">Data: {new Date(red.createdAt).toLocaleString("pt-BR")}</p>
+                          </div>
+                          <div className="text-right flex flex-col items-end">
+                            <span className="flex items-center gap-1 text-[10px] text-red-500 font-bold mb-2">
+                              <Coins className="w-3.5 h-3.5" />
+                              {red.cost} FC
+                            </span>
+                            {red.status === "pendente" ? (
+                              <span className="inline-block text-[10px] bg-yellow-500/10 text-yellow-500 px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider border border-yellow-500/20">
+                                Pendente
+                              </span>
+                            ) : (
+                              <span className="inline-block text-[10px] bg-green-500/10 text-green-500 px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider border border-green-500/20">
+                                Entregue
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {red.status === "pendente" ? (
+                          <Button 
+                            onClick={() => handleDeliverPrize(red.id, red.prizeName)}
+                            className="w-full bg-red-600 hover:bg-red-700 font-bold h-9 text-xs rounded-lg"
+                          >
+                            Entregar Prêmio (Enviar Código)
+                          </Button>
+                        ) : (
+                          <div className="bg-slate-900/60 p-2 rounded text-xs font-mono text-green-400 border border-green-500/10 select-all truncate">
+                            Código: {red.code}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </Card>
+
+              {/* Registro de Indicações */}
+              <Card className="bg-slate-900 border-red-600/10 p-6 flex flex-col h-[600px] card-neon">
+                <h3 className="text-lg font-bold text-white mb-6 border-l-4 border-red-600 pl-3 uppercase tracking-wider text-sm italic flex items-center gap-2">
+                  <User className="w-5 h-5 text-red-500" />
+                  Registro de Indicações ({allReferrals.length})
+                </h3>
+                <div className="flex-1 overflow-y-auto pr-2 space-y-4">
+                  {allReferrals.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-600 italic text-sm">
+                      Nenhuma indicação registrada.
+                    </div>
+                  ) : (
+                    allReferrals.map((ref) => (
+                      <div key={ref.id} className="bg-slate-950/80 border border-slate-850 p-4 rounded-xl space-y-2">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="text-xs text-slate-400">Padrinho (UID): <span className="font-semibold text-slate-300 font-mono text-[10px]">{ref.referrerId}</span></p>
+                            <p className="font-bold text-white text-sm mt-1">Convidado: {ref.inviteeName}</p>
+                            <p className="text-[10px] text-slate-500">{ref.inviteeEmail}</p>
+                            <p className="text-[10px] text-slate-500 mt-1">Cadastro: {new Date(ref.createdAt).toLocaleString("pt-BR")}</p>
+                          </div>
+                          <div>
+                            {ref.status === "pendente" ? (
+                              <span className="flex items-center gap-1 text-[10px] bg-yellow-500/10 text-yellow-500 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider border border-yellow-500/20">
+                                <Clock className="w-3 h-3" />
+                                Pendente
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1 text-[10px] bg-green-500/10 text-green-500 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider border border-green-500/20">
+                                <Check className="w-3 h-3" />
+                                Compra Paga
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {ref.status === "pendente" && (
+                          <Button 
+                            onClick={() => handleConfirmPurchase(ref)}
+                            className="w-full bg-green-600 hover:bg-green-700 font-bold h-9 text-xs rounded-lg flex items-center justify-center gap-2"
+                          >
+                            <Check className="w-4 h-4" />
+                            Confirmar Compra (Dar +100 FC)
+                          </Button>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
               </Card>
             </div>
           </TabsContent>

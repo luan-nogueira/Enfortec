@@ -18,6 +18,9 @@ import CollaboratorDashboard from "./pages/CollaboratorDashboard";
 import MyPurchases from "./pages/MyPurchases";
 import FloatingChat from "./components/FloatingChat";
 
+import { useEffect } from "react";
+import FortecoinsPage from "./pages/FortecoinsPage";
+
 function Router() {
   return (
     <WouterRouter>
@@ -35,6 +38,7 @@ function Router() {
         <Route path={"/login"} component={Login} />
         <Route path={"/colaborador"} component={CollaboratorDashboard} />
         <Route path={"/minhas-compras"} component={MyPurchases} />
+        <Route path={"/fortecoins"} component={FortecoinsPage} />
         <Route path={"/404"} component={NotFound} />
         {/* Final fallback route */}
         <Route component={NotFound} />
@@ -44,6 +48,15 @@ function Router() {
 }
 
 function App() {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (ref) {
+      localStorage.setItem("forte_referred_by", ref);
+      console.log("[Referral] Referrer captured:", ref);
+    }
+  }, []);
+
   return (
     <ErrorBoundary>
       <ThemeProvider
