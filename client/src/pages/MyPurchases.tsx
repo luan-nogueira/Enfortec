@@ -98,7 +98,7 @@ export default function MyPurchases() {
           </div>
         ) : (
           <div className="space-y-4">
-            {orders.map((order) => (
+            {orders.map((order: any) => (
               <div key={order.id} className="bg-slate-900 border border-slate-800 rounded-xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all hover:border-red-900/50">
                 <div>
                   <div className="flex items-center gap-3 mb-2">

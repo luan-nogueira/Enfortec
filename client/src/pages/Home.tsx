@@ -16,8 +16,8 @@ export default function Home() {
 
   // Combine and sort by newest
   const allListings = [
-    ...(usedProducts?.map(p => ({ ...p, _type: 'used' })) || []),
-    ...(digitalProducts?.map(p => ({ ...p, _type: 'digital' })) || [])
+    ...(usedProducts?.map((p: any) => ({ ...p, _type: 'used' })) || []),
+    ...(digitalProducts?.map((p: any) => ({ ...p, _type: 'digital' })) || [])
   ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 12);
 
   const categories = [

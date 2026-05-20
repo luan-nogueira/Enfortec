@@ -14,7 +14,7 @@ export default function DigitalMedia() {
   
   const { data: products, isLoading } = trpc.digitalProducts.list.useQuery();
 
-  const filteredProducts = products?.filter(p => {
+  const filteredProducts = products?.filter((p: any) => {
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.description?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = !selectedType || p.type === selectedType;
@@ -117,7 +117,7 @@ export default function DigitalMedia() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {filteredProducts.map((product) => (
+            {filteredProducts.map((product: any) => (
               <div key={product.id} className="card-neon p-6 hover:scale-105 transition-transform">
                 <div className="bg-gradient-to-br from-purple-600 to-purple-700 h-40 flex items-center justify-center relative rounded-lg mb-4 overflow-hidden border border-purple-500/20">
                   {product.imageUrl ? (
