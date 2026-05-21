@@ -39,6 +39,22 @@ registerStorageProxy(app);
 registerOAuthRoutes(app);
 registerSeedRoute(app);
 registerAiRoute(app);
+
+app.get("/api/test-db", async (req, res) => {
+  try {
+    const { getDb } = await import("../db");
+    const db = await getDb();
+    if (!db) {
+      return res.status(500).json({ success: false, error: "Database instance is null (DATABASE_URL missing?)" });
+    }
+    // Run a raw query using the underlying pool or execute
+    const result = await db.execute("SELECT 1");
+    return res.json({ success: true, result });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message, stack: err.stack });
+  }
+});
+
 // tRPC API
 app.use(
   "/api/trpc",
