@@ -87,9 +87,9 @@ export default function FloatingChat() {
   const [messages, setMessages] = useState<any[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Escutar mensagens em tempo real
+  // Escutar mensagens em tempo real (apenas para usuários logados)
   useEffect(() => {
-    if (!isOpen || !user?.id) return;
+    if (!isOpen || !user?.id || !isAuthenticated) return;
 
     const q = query(
       collection(db, "chats", user.id, "messages"),
@@ -105,7 +105,7 @@ export default function FloatingChat() {
     });
 
     return () => unsubscribe();
-  }, [isOpen, user?.id]);
+  }, [isOpen, user?.id, isAuthenticated]);
 
   // Scroll para o fim ao receber nova mensagem
   useEffect(() => {
@@ -116,18 +116,51 @@ export default function FloatingChat() {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim() || !user?.id) return;
+    if (!message.trim()) return;
 
-    const chatRef = doc(db, "chats", user.id);
     const msg = message;
     setMessage("");
 
+    // Flow for guest user
+    if (!isAuthenticated || !user?.id) {
+      const userMsg = {
+        id: `user-${Date.now()}`,
+        text: msg,
+        senderId: "guest",
+        senderName: "Visitante",
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, userMsg]);
+
+      try {
+        const response = await fetch(`/api/ai?q=${encodeURIComponent(msg)}`);
+        if (response.ok) {
+          const data = await response.json();
+          const aiAnswer = data.answer;
+
+          const aiMsg = {
+            id: `ai-${Date.now()}`,
+            text: aiAnswer,
+            senderId: "ai-support",
+            senderName: "Suporte Eforte (IA)",
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, aiMsg]);
+        }
+      } catch (error) {
+        console.error("Erro ao obter resposta da IA:", error);
+      }
+      return;
+    }
+
+    // Flow for authenticated user
+    const chatRef = doc(db, "chats", user.id);
     try {
       // 1. Atualiza/Cria o documento principal do chat para o Gestor ver
       await setDoc(chatRef, {
         userId: user.id,
         userName: user.name,
-        userEmail: user.email,
+        userEmail: user.email || "",
         lastMessage: msg,
         updatedAt: serverTimestamp(),
         unreadByAdmin: true
@@ -167,7 +200,8 @@ export default function FloatingChat() {
     }
   };
 
-  if (!isAuthenticated) return null; // Só mostra chat para logados
+  const currentUserId = isAuthenticated && user?.id ? user.id : "guest";
+  const currentUserName = isAuthenticated && user?.name ? user.name : "Visitante";
 
   return (
     <div className="fixed bottom-6 right-6 z-[100]">
@@ -210,7 +244,7 @@ export default function FloatingChat() {
               <div className="flex justify-start">
                 <div className="max-w-[85%] p-3.5 rounded-2xl text-sm font-medium bg-slate-800 text-slate-200 rounded-bl-none border border-red-600/20 shadow-lg">
                   <span className="block text-[9px] text-red-500 font-bold uppercase tracking-wider mb-1">Assistente Virtual 🤖</span>
-                  Olá, <b>{user.name}</b>! Sou o assistente virtual da Eforte Games.
+                  Olá, <b>{currentUserName}</b>! Sou o assistente virtual da Eforte Games.
                   <br /><br />
                   Você pode me perguntar se temos algum jogo disponível (ex: <i>"Tem A Way Out?"</i>) ou tirar dúvidas sobre pagamentos, envio e suporte!
                 </div>
@@ -219,10 +253,10 @@ export default function FloatingChat() {
             {messages.map((msg) => (
               <div 
                 key={msg.id} 
-                className={`flex ${msg.senderId === user.id ? "justify-end" : "justify-start"}`}
+                className={`flex ${msg.senderId === currentUserId ? "justify-end" : "justify-start"}`}
               >
                 <div className={`max-w-[85%] p-3.5 rounded-2xl text-sm font-medium ${
-                  msg.senderId === user.id 
+                  msg.senderId === currentUserId 
                     ? "bg-red-600 text-white rounded-br-none shadow-lg" 
                     : "bg-slate-800 text-slate-200 rounded-bl-none border border-red-600/10"
                 }`}>

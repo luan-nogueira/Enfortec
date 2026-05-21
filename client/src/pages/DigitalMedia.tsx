@@ -1,11 +1,11 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Gamepad2, Gift, Lock, ArrowLeft, Flame, Download } from "lucide-react";
+import { Search, Gamepad2, Gift, Lock, ArrowLeft, Flame } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, query, orderBy, where } from "firebase/firestore";
+import { collection, onSnapshot } from "firebase/firestore";
 
 export default function DigitalMedia() {
   const { isAuthenticated } = useAuth();
@@ -19,13 +19,12 @@ export default function DigitalMedia() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(
-      collection(db, "digital_products"),
-      where("isActive", "==", true),
-      orderBy("name", "asc")
-    );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    // Simple collection fetch — no composite index needed
+    const unsubscribe = onSnapshot(collection(db, "digital_products"), (snapshot) => {
+      const data = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter((p: any) => p.isActive !== false)
+        .sort((a: any, b: any) => a.name.localeCompare(b.name));
       setProducts(data);
       setIsLoading(false);
     });
