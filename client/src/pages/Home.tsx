@@ -21,12 +21,12 @@ export default function Home() {
   ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 12);
 
   const categories = [
-    { name: "Valorant", icon: "🎮", color: "from-red-500 to-red-600" },
-    { name: "League of Legends", icon: "⚔️", color: "from-blue-500 to-blue-600" },
-    { name: "Roblox", icon: "🧱", color: "from-slate-500 to-slate-600" },
-    { name: "Free Fire", icon: "🔥", color: "from-orange-500 to-orange-600" },
-    { name: "Steam", icon: "🚂", color: "from-slate-700 to-slate-800" },
-    { name: "Gift Cards", icon: "💳", color: "from-green-500 to-green-600" },
+    { name: "Ação", icon: "💥", color: "from-red-500 to-red-600" },
+    { name: "Aventura", icon: "🗺️", color: "from-blue-500 to-blue-600" },
+    { name: "RPG", icon: "🛡️", color: "from-purple-500 to-purple-600" },
+    { name: "Esportes", icon: "⚽", color: "from-green-500 to-green-600" },
+    { name: "Corrida", icon: "🏎️", color: "from-orange-500 to-orange-600" },
+    { name: "Tiro / FPS", icon: "🎯", color: "from-slate-700 to-slate-800" },
   ];
 
   return (
@@ -116,6 +116,7 @@ export default function Home() {
             {categories.map((cat) => (
               <div 
                 key={cat.name}
+                onClick={() => navigate(`/digital?search=${encodeURIComponent(cat.name)}`)}
                 className="bg-slate-900 border border-slate-800 hover:border-red-500/50 rounded-xl p-6 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all hover:bg-slate-800/50 group"
               >
                 <div className={`w-14 h-14 rounded-full bg-gradient-to-br ${cat.color} flex items-center justify-center text-2xl shadow-lg group-hover:scale-110 transition-transform`}>

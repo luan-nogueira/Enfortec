@@ -9,7 +9,10 @@ import { useLocation } from "wouter";
 export default function DigitalMedia() {
   const { isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("search") || "";
+  });
   const [selectedType, setSelectedType] = useState<string | null>(null);
   
   const { data: products, isLoading } = trpc.digitalProducts.list.useQuery();
