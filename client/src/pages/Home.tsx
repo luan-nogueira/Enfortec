@@ -4,21 +4,62 @@ import { Input } from "@/components/ui/input";
 import { useLocation } from "wouter";
 import { Zap, Gamepad2, Search, Shield, Package, LayoutGrid, Tag, Coins } from "lucide-react";
 import { getLoginUrl } from "@/const";
-import { trpc } from "@/lib/trpc";
+import { useState, useEffect } from "react";
+import { db } from "@/lib/firebase";
+import { collection, onSnapshot, query, orderBy, limit } from "firebase/firestore";
 
 export default function Home() {
   const { user, isAuthenticated, isAdmin, isCollaborator } = useAuth();
   const [, navigate] = useLocation();
 
-  // Fetching data for the unified feed
-  const { data: usedProducts } = trpc.usedProducts.list.useQuery();
-  const { data: digitalProducts } = trpc.digitalProducts.list.useQuery();
+  const [usedProducts, setUsedProducts] = useState<any[]>([]);
+  const [digitalProducts, setDigitalProducts] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Buscar usados
+    const qUsed = query(collection(db, "used_products"), orderBy("createdAt", "desc"), limit(12));
+    const unsubUsed = onSnapshot(qUsed, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setUsedProducts(data);
+      setIsLoading(false);
+    }, (error) => {
+      console.error("Erro ao buscar usados na Home:", error);
+    });
+
+    // Buscar digitais
+    const qDigital = query(collection(db, "digital_products"), limit(50));
+    const unsubDigital = onSnapshot(qDigital, (snapshot) => {
+      const data = snapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+        .filter((p: any) => p.isActive !== false);
+      setDigitalProducts(data);
+      setIsLoading(false);
+    }, (error) => {
+      console.error("Erro ao buscar digitais na Home:", error);
+    });
+
+    return () => {
+      unsubUsed();
+      unsubDigital();
+    };
+  }, []);
 
   // Combine and sort by newest
   const allListings = [
-    ...(usedProducts?.map((p: any) => ({ ...p, _type: 'used' })) || []),
-    ...(digitalProducts?.map((p: any) => ({ ...p, _type: 'digital' })) || [])
-  ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 12);
+    ...usedProducts.map((p: any) => ({ ...p, _type: 'used' })),
+    ...digitalProducts.map((p: any) => ({ ...p, _type: 'digital' }))
+  ].sort((a, b) => {
+    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return timeB - timeA;
+  }).slice(0, 12);
 
   const categories = [
     { name: "Ação", icon: "💥", color: "from-red-500 to-red-600" },
@@ -145,49 +186,54 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {allListings.length > 0 ? allListings.map((listing: any) => (
-              <div 
-                key={`${listing._type}-${listing.id}`}
-                className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-red-500/40 transition-all group flex flex-col h-full cursor-pointer"
-                onClick={() => navigate(listing._type === 'digital' ? '/digital' : '/usados')}
-              >
-                <div className="h-40 bg-slate-800 relative overflow-hidden">
-                  {listing.imageUrl || (listing.images && listing.images.length > 0) ? (
-                    <img 
-                      src={listing.imageUrl || listing.images[0]} 
-                      alt={listing.name} 
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-slate-600 bg-slate-800/50">
-                      <Gamepad2 className="w-12 h-12 opacity-50" />
+            {allListings.length > 0 ? allListings.map((listing: any) => {
+              const priceValue = listing._type === 'used'
+                ? (listing.pricePS4 || listing.pricePS5 || 0)
+                : (listing.price || 0);
+              return (
+                <div 
+                  key={`${listing._type}-${listing.id}`}
+                  className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-red-500/40 transition-all group flex flex-col h-full cursor-pointer"
+                  onClick={() => navigate(listing._type === 'digital' ? '/digital' : '/usados')}
+                >
+                  <div className="h-40 bg-slate-800 relative overflow-hidden">
+                    {listing.imageUrl || (listing.images && listing.images.length > 0) ? (
+                      <img 
+                        src={listing.imageUrl || listing.images[0]} 
+                        alt={listing.name} 
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-slate-600 bg-slate-800/50">
+                        <Gamepad2 className="w-12 h-12 opacity-50" />
+                      </div>
+                    )}
+                    <div className="absolute top-2 left-2 px-2 py-1 bg-slate-950/80 backdrop-blur-md text-[10px] uppercase font-bold text-white rounded">
+                      {listing._type === 'digital' ? 'Mídia Digital' : 'Usado'}
                     </div>
-                  )}
-                  <div className="absolute top-2 left-2 px-2 py-1 bg-slate-950/80 backdrop-blur-md text-[10px] uppercase font-bold text-white rounded">
-                    {listing._type === 'digital' ? 'Mídia Digital' : 'Usado'}
+                  </div>
+                  <div className="p-4 flex flex-col flex-grow">
+                    <h3 className="text-white font-medium line-clamp-2 mb-2 group-hover:text-red-400 transition-colors">
+                      {listing.name}
+                    </h3>
+                    <div className="mt-auto flex items-end justify-between pt-4 border-t border-slate-800">
+                      <span className="text-2xl font-black text-white">
+                        {Number(priceValue) === 0 ? (
+                          <span className="text-lg font-bold text-red-500">A definir</span>
+                        ) : (
+                          <>
+                            <span className="text-sm text-slate-500 font-normal">R$</span> {Number(priceValue).toFixed(2).replace('.', ',')}
+                          </>
+                        )}
+                      </span>
+                      <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white rounded-lg px-4">
+                        {Number(priceValue) === 0 ? "Contatar" : "Comprar"}
+                      </Button>
+                    </div>
                   </div>
                 </div>
-                <div className="p-4 flex flex-col flex-grow">
-                  <h3 className="text-white font-medium line-clamp-2 mb-2 group-hover:text-red-400 transition-colors">
-                    {listing.name}
-                  </h3>
-                  <div className="mt-auto flex items-end justify-between pt-4 border-t border-slate-800">
-                    <span className="text-2xl font-black text-white">
-                      {Number(listing.price) === 0 ? (
-                        <span className="text-lg font-bold text-red-500">A definir</span>
-                      ) : (
-                        <>
-                          <span className="text-sm text-slate-500 font-normal">R$</span> {Number(listing.price).toFixed(2).replace('.', ',')}
-                        </>
-                      )}
-                    </span>
-                    <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white rounded-lg px-4">
-                      {Number(listing.price) === 0 ? "Contatar" : "Comprar"}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )) : (
+              );
+            }) : (
               <div className="col-span-full py-20 text-center">
                 <Tag className="w-16 h-16 text-slate-700 mx-auto mb-4" />
                 <h3 className="text-xl text-slate-400">Nenhum anúncio encontrado ainda.</h3>
