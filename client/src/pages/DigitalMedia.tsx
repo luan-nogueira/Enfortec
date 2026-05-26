@@ -17,16 +17,40 @@ const GENRE_MAP: Record<string, string[]> = {
   "Tiro / FPS": ["call of duty", "cod", "battlefield", "doom", "wolfenstein", "ghost recon", "sniper", "far cry", "halo", "borderlands"],
 };
 
+// Jogos com badge especial (novos lançamentos / oferta)
+const GAME_BADGES: Record<string, { label: string; color: string }> = {
+  "COD BLACK OPS 7": { label: "🔥 Lançamento", color: "bg-red-600" },
+  "NBA 2K26": { label: "🔥 Lançamento", color: "bg-red-600" },
+  "WWE 2K26": { label: "🔥 Lançamento", color: "bg-red-600" },
+  "DOOM DARK AGES": { label: "🔥 Lançamento", color: "bg-red-600" },
+  "DRAGON BALL SPARKING ZERO": { label: "⭐ Popular", color: "bg-orange-500" },
+  "GTA V": { label: "⭐ Popular", color: "bg-orange-500" },
+  "HOGWARTS LEGACY": { label: "💰 Oferta", color: "bg-green-600" },
+  "DYING LIGHT": { label: "💰 Oferta", color: "bg-green-600" },
+  "MAFIA 3": { label: "💰 Oferta", color: "bg-green-600" },
+  "WOLFENSTEIN": { label: "💰 Oferta", color: "bg-green-600" },
+  "SHADOW OF MORDOR": { label: "💰 Oferta", color: "bg-green-600" },
+};
+
+function getGameBadge(name: string) {
+  const key = Object.keys(GAME_BADGES).find(k => name.toUpperCase().includes(k));
+  return key ? GAME_BADGES[key] : null;
+}
+
 export default function DigitalMedia() {
   const { isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("search") || "";
+  });
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
   const [selectedGenre, setSelectedGenre] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get("genre") || null;
   });
+  const [sortOrder, setSortOrder] = useState<"az" | "za" | "asc" | "desc">("az");
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -66,6 +90,12 @@ export default function DigitalMedia() {
     }
 
     return matchesSearch && matchesType && matchesPlatform && matchesGenre;
+  }).sort((a: any, b: any) => {
+    if (sortOrder === "az") return a.name.localeCompare(b.name);
+    if (sortOrder === "za") return b.name.localeCompare(a.name);
+    if (sortOrder === "asc") return parseFloat(a.price) - parseFloat(b.price);
+    if (sortOrder === "desc") return parseFloat(b.price) - parseFloat(a.price);
+    return 0;
   });
 
   const types = [
@@ -232,7 +262,31 @@ export default function DigitalMedia() {
           </div>
         ) : (
           <>
-            <p className="text-slate-400 text-sm mb-6">{filteredProducts.length} jogos encontrados</p>
+            {/* Sort bar */}
+            <div className="flex flex-wrap justify-between items-center mb-6 gap-3">
+              <p className="text-slate-400 text-sm">{filteredProducts.length} jogos encontrados</p>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Ordenar:</span>
+                {([
+                  { val: "az", label: "A→Z" },
+                  { val: "za", label: "Z→A" },
+                  { val: "asc", label: "Menor Preço" },
+                  { val: "desc", label: "Maior Preço" },
+                ] as const).map(opt => (
+                  <button
+                    key={opt.val}
+                    onClick={() => setSortOrder(opt.val)}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
+                      sortOrder === opt.val
+                        ? "bg-red-600 text-white"
+                        : "bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {filteredProducts.map((product: any) => (
                 <div key={product.id} className="card-neon overflow-hidden group hover:scale-105 transition-transform duration-200 flex flex-col">
@@ -251,6 +305,15 @@ export default function DigitalMedia() {
                         {getTypeIcon(product.type)}
                       </div>
                     )}
+                    {/* Game badge (Lançamento / Oferta / Popular) */}
+                    {(() => {
+                      const badge = getGameBadge(product.name);
+                      return badge ? (
+                        <div className={`absolute top-2 right-2 z-10 ${badge.color} text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-lg`}>
+                          {badge.label}
+                        </div>
+                      ) : null;
+                    })()}
                     <div className="absolute bottom-2 left-2 z-10">
                       <span 
                         onClick={(e) => {

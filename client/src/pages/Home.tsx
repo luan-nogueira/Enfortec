@@ -2,7 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocation } from "wouter";
-import { Zap, Gamepad2, Search, Shield, Package, LayoutGrid, Tag, Coins, LogOut } from "lucide-react";
+import { Zap, Gamepad2, Search, Shield, Package, LayoutGrid, Tag, Coins, LogOut, HelpCircle } from "lucide-react";
 import { getLoginUrl } from "@/const";
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
@@ -15,6 +15,7 @@ export default function Home() {
   const [usedProducts, setUsedProducts] = useState<any[]>([]);
   const [digitalProducts, setDigitalProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [heroSearch, setHeroSearch] = useState("");
 
   useEffect(() => {
     // Buscar usados
@@ -84,6 +85,7 @@ export default function Home() {
           <div className="hidden lg:flex items-center gap-8">
             <a href="#categorias" className="text-slate-300 hover:text-white font-medium transition flex items-center gap-2"><LayoutGrid className="w-4 h-4" /> Categorias</a>
             <a href="#anuncios" className="text-slate-300 hover:text-white font-medium transition flex items-center gap-2"><Tag className="w-4 h-4" /> Anúncios</a>
+            <a href="/faq" className="text-slate-300 hover:text-white font-medium transition flex items-center gap-2"><HelpCircle className="w-4 h-4" /> FAQ</a>
             <span className="w-px h-6 bg-slate-800"></span>
             
             {isAuthenticated ? (
@@ -163,10 +165,16 @@ export default function Home() {
               <Input 
                 type="text" 
                 placeholder="Busque por jogos, gift cards, produtos físicos..." 
+                value={heroSearch}
+                onChange={(e) => setHeroSearch(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && heroSearch.trim()) navigate(`/digital?search=${encodeURIComponent(heroSearch.trim())}`); }}
                 className="w-full h-16 pl-14 pr-4 bg-slate-900/80 border-slate-700 text-white text-lg rounded-xl focus:border-red-500 focus:ring-red-500/20 shadow-xl"
               />
             </div>
-            <Button className="h-16 px-8 bg-red-600 hover:bg-red-700 text-white rounded-xl text-lg font-bold shrink-0 shadow-[0_0_20px_rgba(220,38,38,0.4)]">
+            <Button
+              className="h-16 px-8 bg-red-600 hover:bg-red-700 text-white rounded-xl text-lg font-bold shrink-0 shadow-[0_0_20px_rgba(220,38,38,0.4)]"
+              onClick={() => { if (heroSearch.trim()) navigate(`/digital?search=${encodeURIComponent(heroSearch.trim())}`); }}
+            >
               Buscar
             </Button>
           </div>
