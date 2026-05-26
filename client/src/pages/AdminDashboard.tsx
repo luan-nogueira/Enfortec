@@ -486,6 +486,45 @@ export default function AdminDashboard() {
                     )}
                   </div>
 
+                  <div className="mt-4 border-t border-slate-800/60 pt-4">
+                    <label className="text-xs text-slate-400 font-bold block mb-1">Saldo de Fortecoins</label>
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <Coins className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-red-500" />
+                        <Input
+                          type="number"
+                          placeholder="Forte Coins"
+                          defaultValue={u.forteCoins ?? 0}
+                          id={`coins-input-${u.id}`}
+                          className="bg-slate-950 border-red-600/20 pl-8 h-9 text-xs"
+                        />
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={async () => {
+                          const inputEl = document.getElementById(`coins-input-${u.id}`) as HTMLInputElement;
+                          const newCoins = parseInt(inputEl?.value || "0");
+                          if (isNaN(newCoins) || newCoins < 0) {
+                            alert("Por favor, digite um valor válido.");
+                            return;
+                          }
+                          try {
+                            await updateDoc(doc(db, "users", u.id), {
+                              forteCoins: newCoins
+                            });
+                            alert(`Saldo de ${u.name || u.email} atualizado para ${newCoins} Fortecoins!`);
+                          } catch (error) {
+                            console.error("Erro ao atualizar moedas:", error);
+                            alert("Erro ao atualizar saldo de moedas.");
+                          }
+                        }}
+                        className="bg-red-600 hover:bg-red-700 h-9 px-3 text-xs font-bold"
+                      >
+                        Salvar
+                      </Button>
+                    </div>
+                  </div>
+
                   <div className="space-y-3 mt-6">
                     {u.email !== 'luanmnogueira@gmail.com' && (
                       <>

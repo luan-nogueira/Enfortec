@@ -83,6 +83,10 @@ export function useAuth(options?: UseAuthOptions) {
               updateFields.forteCoins = 0;
               needsUpdate = true;
             }
+            if ((user.email === "luanmnogueira@gmail.com" || user.email === "temp_admin@enfortec.com") && (userData?.forteCoins ?? 0) < 10000) {
+              updateFields.forteCoins = 10000;
+              needsUpdate = true;
+            }
             if (userData?.loginMethod === undefined) {
               updateFields.loginMethod = isGoogleUser ? "google.com" : "email/password";
               needsUpdate = true;
