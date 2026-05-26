@@ -15,6 +15,7 @@ export default function DigitalMedia() {
     return params.get("search") || "";
   });
   const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -35,7 +36,19 @@ export default function DigitalMedia() {
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.description?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = !selectedType || p.type === selectedType;
-    return matchesSearch && matchesType;
+    
+    let matchesPlatform = true;
+    if (selectedPlatform) {
+      if (selectedPlatform === "PS5") {
+        matchesPlatform = p.platform === "PS5" || p.platform === "PS4/PS5" || p.name.toLowerCase().includes("ps5");
+      } else if (selectedPlatform === "PS4") {
+        matchesPlatform = p.platform === "PS4" || p.platform === "PS4/PS5" || p.name.toLowerCase().includes("ps4");
+      } else {
+        matchesPlatform = p.platform === selectedPlatform;
+      }
+    }
+    
+    return matchesSearch && matchesType && matchesPlatform;
   });
 
   const types = [
@@ -102,7 +115,10 @@ export default function DigitalMedia() {
             {types.map(type => (
               <button
                 key={type.value}
-                onClick={() => setSelectedType(type.value)}
+                onClick={() => {
+                  setSelectedType(type.value);
+                  setSelectedPlatform(null);
+                }}
                 className={`px-4 py-2 rounded-full text-sm font-medium transition flex items-center gap-2 ${
                   selectedType === type.value
                     ? "bg-red-600 text-white"
@@ -114,6 +130,53 @@ export default function DigitalMedia() {
               </button>
             ))}
           </div>
+
+          {/* Sub-categorias de Plataforma */}
+          {(selectedType === "jogo" || !selectedType) && (
+            <div className="flex gap-2 flex-wrap mt-4 pt-3 border-t border-slate-800">
+              <span className="text-slate-400 text-xs font-bold uppercase tracking-wider self-center mr-2">Plataforma:</span>
+              <button
+                onClick={() => setSelectedPlatform(null)}
+                className={`px-3 py-1 rounded-md text-xs font-bold uppercase transition ${
+                  selectedPlatform === null
+                    ? "bg-red-600 text-white"
+                    : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-850"
+                }`}
+              >
+                Todas
+              </button>
+              <button
+                onClick={() => setSelectedPlatform("PS5")}
+                className={`px-3 py-1 rounded-md text-xs font-bold uppercase transition flex items-center gap-1.5 ${
+                  selectedPlatform === "PS5"
+                    ? "bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]"
+                    : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-850"
+                }`}
+              >
+                🎮 PlayStation 5
+              </button>
+              <button
+                onClick={() => setSelectedPlatform("PS4")}
+                className={`px-3 py-1 rounded-md text-xs font-bold uppercase transition flex items-center gap-1.5 ${
+                  selectedPlatform === "PS4"
+                    ? "bg-sky-600 text-white shadow-[0_0_15px_rgba(3,105,161,0.4)]"
+                    : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-850"
+                }`}
+              >
+                🎮 PlayStation 4
+              </button>
+              <button
+                onClick={() => setSelectedPlatform("PS4/PS5")}
+                className={`px-3 py-1 rounded-md text-xs font-bold uppercase transition flex items-center gap-1.5 ${
+                  selectedPlatform === "PS4/PS5"
+                    ? "bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.4)]"
+                    : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-850"
+                }`}
+              >
+                🌟 Dual (PS4 & PS5)
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -157,8 +220,14 @@ export default function DigitalMedia() {
                         {getTypeIcon(product.type)}
                       </div>
                     )}
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
-                      <span className="text-xs text-red-400 font-bold">
+                    <div className="absolute bottom-2 left-2 z-10">
+                      <span 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedPlatform(product.platform || "PS4/PS5");
+                        }}
+                        className="text-[10px] bg-red-600 hover:bg-red-700 text-white px-2 py-0.5 rounded font-black uppercase tracking-wider cursor-pointer transition-colors shadow-lg border border-red-500/20"
+                      >
                         {product.platform || "PS4/PS5"}
                       </span>
                     </div>
