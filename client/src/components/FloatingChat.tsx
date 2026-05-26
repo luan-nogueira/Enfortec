@@ -293,21 +293,30 @@ export default function FloatingChat() {
   const currentUserName = isAuthenticated && user?.name ? user.name : "Visitante";
 
   return (
-    <div className="fixed bottom-6 right-6 z-[100]">
-      {/* Floating Button */}
-      {!isOpen && (
-        <Button
-          onClick={() => setIsOpen(true)}
-          className="w-16 h-16 rounded-full bg-red-600 hover:bg-red-700 shadow-[0_8px_30px_rgba(220,38,38,0.5)] flex items-center justify-center p-0 transition-all hover:scale-110 active:scale-95 group relative"
-        >
-          <MessageCircle className="w-8 h-8 text-white group-hover:rotate-12 transition-transform" />
-          <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 border-2 border-slate-950 rounded-full animate-pulse" />
-        </Button>
+    <>
+      {/* Frosted blurred background overlay when open */}
+      {isOpen && (
+        <div 
+          onClick={() => setIsOpen(false)}
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-[90] transition-all duration-500 cursor-pointer animate-in fade-in duration-300"
+        />
       )}
 
-      {/* Chat Window */}
-      {isOpen && (
-        <Card className="w-[360px] h-[520px] flex flex-col bg-slate-900 border-red-600/30 shadow-[0_20px_60px_rgba(0,0,0,0.6)] overflow-hidden">
+      <div className={`fixed bottom-6 right-6 ${isOpen ? "z-[100]" : "z-[80]"}`}>
+        {/* Floating Button */}
+        {!isOpen && (
+          <Button
+            onClick={() => setIsOpen(true)}
+            className="w-16 h-16 rounded-full bg-red-600 hover:bg-red-700 shadow-[0_8px_30px_rgba(220,38,38,0.5)] flex items-center justify-center p-0 transition-all hover:scale-110 active:scale-95 group relative"
+          >
+            <MessageCircle className="w-8 h-8 text-white group-hover:rotate-12 transition-transform" />
+            <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 border-2 border-slate-950 rounded-full animate-pulse" />
+          </Button>
+        )}
+
+        {/* Chat Window */}
+        {isOpen && (
+          <Card className="w-[360px] h-[520px] flex flex-col bg-slate-900 border-red-600/30 shadow-[0_20px_60px_rgba(0,0,0,0.6)] overflow-hidden">
           {/* Header */}
           <div className="p-4 bg-gradient-to-r from-red-700 to-red-600 flex justify-between items-center flex-shrink-0">
             <div className="flex items-center gap-3">
@@ -380,6 +389,7 @@ export default function FloatingChat() {
           </form>
         </Card>
       )}
-    </div>
+      </div>
+    </>
   );
 }
