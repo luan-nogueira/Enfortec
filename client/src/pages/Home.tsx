@@ -183,7 +183,7 @@ export default function Home() {
             {categories.map((cat) => (
               <div 
                 key={cat.name}
-                onClick={() => navigate(`/digital?search=${encodeURIComponent(cat.name)}`)}
+                onClick={() => navigate(`/digital?genre=${encodeURIComponent(cat.name)}`)}
                 className="bg-slate-900 border border-slate-800 hover:border-red-500/50 rounded-xl p-6 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all hover:bg-slate-800/50 group"
               >
                 <div className={`w-14 h-14 rounded-full bg-gradient-to-br ${cat.color} flex items-center justify-center text-2xl shadow-lg group-hover:scale-110 transition-transform`}>

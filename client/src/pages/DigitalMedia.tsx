@@ -1,21 +1,32 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Gamepad2, Gift, Lock, ArrowLeft, Flame } from "lucide-react";
+import { Search, Gamepad2, Gift, Lock, ArrowLeft, Flame, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 
+// Mapeamento de gêneros → palavras-chave nos nomes dos jogos
+const GENRE_MAP: Record<string, string[]> = {
+  "Ação": ["god of war", "devil may cry", "doom", "wolfenstein", "batman", "spiderman", "marvel", "dying light", "dead island", "watch dogs", "gta", "ghost recon", "call of duty", "cod", "battlefield", "uncharted", "mafia", "shadow", "rdr", "red dead", "far cry", "star wars", "jedi", "hellblade", "avatar", "atomic heart", "deadpool", "wuchang", "reanimal"],
+  "Aventura": ["uncharted", "horizon", "hogwarts", "assassin", "prince of persia", "detroit", "the last of us", "tlou", "martha", "the order", "shadow of the colossus", "tomb raider", "expedition"],
+  "RPG": ["diablo", "final fantasy", "dragon ball", "naruto", "demon slayer", "bleach", "the elder scrolls", "skyrim", "hogwarts", "prey"],
+  "Esportes": ["nba", "fifa", "wwe", "nhl", "mlb", "football", "tony hawk", "the crew", "test drive", "motorfest"],
+  "Corrida": ["the crew", "test drive", "solar crown", "motorfest", "gran turismo", "need for speed", "nfs"],
+  "Tiro / FPS": ["call of duty", "cod", "battlefield", "doom", "wolfenstein", "ghost recon", "sniper", "far cry", "halo", "borderlands"],
+};
+
 export default function DigitalMedia() {
   const { isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
-  const [searchTerm, setSearchTerm] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("search") || "";
-  });
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
+  const [selectedGenre, setSelectedGenre] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("genre") || null;
+  });
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -33,22 +44,28 @@ export default function DigitalMedia() {
   }, []);
 
   const filteredProducts = products.filter((p: any) => {
-    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const nameLower = p.name.toLowerCase();
+    const matchesSearch = !searchTerm || nameLower.includes(searchTerm.toLowerCase()) ||
       p.description?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = !selectedType || p.type === selectedType;
-    
+
     let matchesPlatform = true;
     if (selectedPlatform) {
       if (selectedPlatform === "PS5") {
-        matchesPlatform = p.platform === "PS5" || p.platform === "PS4/PS5" || p.name.toLowerCase().includes("ps5");
+        matchesPlatform = p.platform === "PS5" || p.platform === "PS4/PS5" || nameLower.includes("ps5");
       } else if (selectedPlatform === "PS4") {
-        matchesPlatform = p.platform === "PS4" || p.platform === "PS4/PS5" || p.name.toLowerCase().includes("ps4");
+        matchesPlatform = p.platform === "PS4" || p.platform === "PS4/PS5" || nameLower.includes("ps4");
       } else {
         matchesPlatform = p.platform === selectedPlatform;
       }
     }
-    
-    return matchesSearch && matchesType && matchesPlatform;
+
+    let matchesGenre = true;
+    if (selectedGenre && GENRE_MAP[selectedGenre]) {
+      matchesGenre = GENRE_MAP[selectedGenre].some(kw => nameLower.includes(kw));
+    }
+
+    return matchesSearch && matchesType && matchesPlatform && matchesGenre;
   });
 
   const types = [
@@ -101,6 +118,20 @@ export default function DigitalMedia() {
       {/* Filters */}
       <div className="bg-slate-900/50 border-b border-red-600/20">
         <div className="container mx-auto px-4 py-4">
+
+          {/* Chip de gênero ativo */}
+          {selectedGenre && (
+            <div className="mb-4 flex items-center gap-2">
+              <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Categoria:</span>
+              <span className="inline-flex items-center gap-2 bg-red-600/20 border border-red-500/40 text-red-300 text-sm font-bold px-3 py-1 rounded-full">
+                {selectedGenre}
+                <button onClick={() => setSelectedGenre(null)} className="hover:text-white transition-colors">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            </div>
+          )}
+
           <div className="flex gap-2 flex-wrap">
             <button
               onClick={() => setSelectedType(null)}
