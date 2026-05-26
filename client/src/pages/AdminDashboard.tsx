@@ -442,21 +442,21 @@ export default function AdminDashboard() {
 
       <main className="container mx-auto py-12 px-4">
         <Tabs defaultValue="usuarios" className="w-full" onValueChange={setActiveTab}>
-          <TabsList className="bg-slate-900/60 border border-red-600/20 mb-8 flex items-center justify-start overflow-x-auto overflow-y-hidden max-w-full h-12 p-1 gap-2 rounded-xl w-full md:w-auto">
-            <TabsTrigger value="usuarios" className="data-[state=active]:bg-red-600 data-[state=active]:text-white font-bold h-10 px-5 text-sm rounded-lg whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80">Gerenciar Acessos</TabsTrigger>
-            <TabsTrigger value="atendimento" className="data-[state=active]:bg-red-600 data-[state=active]:text-white font-bold h-10 px-5 text-sm rounded-lg whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 flex items-center gap-2">
+          <TabsList className="bg-slate-900/60 border border-red-600/20 mb-8 !flex !items-center !justify-start !overflow-x-auto !overflow-y-hidden !max-w-full !h-12 !p-1 !gap-2 !rounded-xl !w-full md:!w-auto">
+            <TabsTrigger value="usuarios" className="data-[state=active]:!bg-red-600 data-[state=active]:!text-white font-bold !h-10 !px-5 !text-sm !rounded-lg !whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 !inline-flex !items-center !justify-center">Gerenciar Acessos</TabsTrigger>
+            <TabsTrigger value="atendimento" className="data-[state=active]:!bg-red-600 data-[state=active]:!text-white font-bold !h-10 !px-5 !text-sm !rounded-lg !whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 !inline-flex !items-center !justify-center !gap-2">
               Central de Atendimento
               {chats.some(c => c.unreadByAdmin) && (
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
               )}
             </TabsTrigger>
-            <TabsTrigger value="referrals" className="data-[state=active]:bg-red-600 data-[state=active]:text-white font-bold h-10 px-5 text-sm rounded-lg whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 flex items-center gap-2">
+            <TabsTrigger value="referrals" className="data-[state=active]:!bg-red-600 data-[state=active]:!text-white font-bold !h-10 !px-5 !text-sm !rounded-lg !whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 !inline-flex !items-center !justify-center !gap-2">
               Indicações & Prêmios
               {(allRedemptions.some(r => r.status === "pendente") || allReferrals.some(r => r.status === "pendente")) && (
                 <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
               )}
             </TabsTrigger>
-            <TabsTrigger value="catalogo" className="data-[state=active]:bg-red-600 data-[state=active]:text-white font-bold h-10 px-5 text-sm rounded-lg whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 flex items-center gap-2">
+            <TabsTrigger value="catalogo" className="data-[state=active]:!bg-red-600 data-[state=active]:!text-white font-bold !h-10 !px-5 !text-sm !rounded-lg !whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 !inline-flex !items-center !justify-center !gap-2">
               🎮 Catálogo
             </TabsTrigger>
           </TabsList>
@@ -465,28 +465,33 @@ export default function AdminDashboard() {
             <h2 className="text-xl font-bold text-white mb-8 border-l-4 border-red-600 pl-4 uppercase tracking-widest text-sm italic">Gestão de Equipe</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {users.map((u) => (
-                <Card key={u.id} className="bg-slate-900 border-red-600/10 p-6 hover:border-red-600/30 transition-all card-neon">
-                  <div className="flex items-start justify-between mb-4">
+                <Card key={u.id} className="bg-slate-900/40 backdrop-blur-md border-red-600/10 p-6 hover:border-red-600/40 hover:shadow-[0_8px_30px_rgb(0,0,0,0.5)] transition-all duration-500 card-neon relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-red-600/5 rounded-full blur-2xl group-hover:bg-red-600/10 transition-all duration-500" />
+                  <div className="flex items-start justify-between mb-4 relative z-10">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center border border-red-600/20">
-                        <User className="w-6 h-6 text-red-500" />
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-slate-800 to-slate-950 flex items-center justify-center border border-red-600/30 shadow-[inset_0_2px_4px_rgba(0,0,0,0.6)] group-hover:border-red-600/60 transition-colors duration-500">
+                        <User className="w-5 h-5 text-red-500 group-hover:scale-110 transition-transform duration-500" />
                       </div>
                       <div>
-                        <p className="font-bold text-white">{u.name || "Sem Nome"}</p>
+                        <p className="font-bold text-white transition-colors duration-300 group-hover:text-red-500">{u.name || "Sem Nome"}</p>
                         <p className="text-xs text-slate-500">{u.email}</p>
                       </div>
                     </div>
-                    <div className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-tighter ${u.role === 'admin' ? 'bg-red-600 text-white' : u.role === 'collaborator' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                    <div className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all duration-300 ${
+                      u.role === 'admin' ? 'bg-red-500/10 text-red-400 border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.15)]' :
+                      u.role === 'collaborator' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.15)]' :
+                      'bg-slate-800/80 text-slate-400 border-slate-700/50'
+                    }`}>
                       {u.role}
                     </div>
                     {u.email !== 'luanmnogueira@gmail.com' && (
-                      <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(u.id, u.email)} className="text-slate-600 hover:text-red-500 -mt-2 -mr-2">
+                      <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(u.id, u.email)} className="text-slate-600 hover:text-red-500 -mt-2 -mr-2 relative z-20">
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     )}
                   </div>
 
-                  <div className="mt-4 border-t border-slate-800/60 pt-4">
+                  <div className="mt-4 border-t border-slate-800/60 pt-4 relative z-10">
                     <label className="text-xs text-slate-400 font-bold block mb-1">Saldo de Fortecoins</label>
                     <div className="flex items-center gap-2">
                       <div className="relative flex-1">
@@ -518,7 +523,7 @@ export default function AdminDashboard() {
                             alert("Erro ao atualizar saldo de moedas.");
                           }
                         }}
-                        className="bg-red-600 hover:bg-red-700 h-9 px-3 text-xs font-bold"
+                        className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 active:scale-95 transition-all duration-300 hover:shadow-[0_0_12px_rgba(220,38,38,0.4)] h-9 px-4 text-xs font-bold"
                       >
                         Salvar
                       </Button>
