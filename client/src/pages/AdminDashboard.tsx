@@ -442,21 +442,21 @@ export default function AdminDashboard() {
 
       <main className="container mx-auto py-12 px-4">
         <Tabs defaultValue="usuarios" className="w-full" onValueChange={setActiveTab}>
-          <TabsList className="bg-slate-900 border border-red-600/20 mb-8">
-            <TabsTrigger value="usuarios" className="data-[state=active]:bg-red-600 font-bold">Gerenciar Acessos</TabsTrigger>
-            <TabsTrigger value="atendimento" className="data-[state=active]:bg-red-600 font-bold flex items-center gap-2">
+          <TabsList className="bg-slate-900/60 border border-red-600/20 mb-8 flex items-center justify-start overflow-x-auto overflow-y-hidden max-w-full h-12 p-1 gap-2 rounded-xl w-full md:w-auto">
+            <TabsTrigger value="usuarios" className="data-[state=active]:bg-red-600 data-[state=active]:text-white font-bold h-10 px-5 text-sm rounded-lg whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80">Gerenciar Acessos</TabsTrigger>
+            <TabsTrigger value="atendimento" className="data-[state=active]:bg-red-600 data-[state=active]:text-white font-bold h-10 px-5 text-sm rounded-lg whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 flex items-center gap-2">
               Central de Atendimento
               {chats.some(c => c.unreadByAdmin) && (
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
               )}
             </TabsTrigger>
-            <TabsTrigger value="referrals" className="data-[state=active]:bg-red-600 font-bold flex items-center gap-2">
+            <TabsTrigger value="referrals" className="data-[state=active]:bg-red-600 data-[state=active]:text-white font-bold h-10 px-5 text-sm rounded-lg whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 flex items-center gap-2">
               Indicações & Prêmios
               {(allRedemptions.some(r => r.status === "pendente") || allReferrals.some(r => r.status === "pendente")) && (
                 <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
               )}
             </TabsTrigger>
-            <TabsTrigger value="catalogo" className="data-[state=active]:bg-red-600 font-bold flex items-center gap-2">
+            <TabsTrigger value="catalogo" className="data-[state=active]:bg-red-600 data-[state=active]:text-white font-bold h-10 px-5 text-sm rounded-lg whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 flex items-center gap-2">
               🎮 Catálogo
             </TabsTrigger>
           </TabsList>
