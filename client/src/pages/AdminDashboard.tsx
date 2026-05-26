@@ -49,6 +49,22 @@ export default function AdminDashboard() {
   const [prizeStock, setPrizeStock] = useState(1);
   const [addingPrize, setAddingPrize] = useState(false);
 
+  // Delivery Dialog States
+  const [deliveryOpen, setDeliveryOpen] = useState(false);
+  const [deliveryRedemptionId, setDeliveryRedemptionId] = useState("");
+  const [deliveryPrizeName, setDeliveryPrizeName] = useState("");
+  const [deliveryCode, setDeliveryCode] = useState("");
+  const [delivering, setDelivering] = useState(false);
+
+  // Refusal Dialog States
+  const [refusalOpen, setRefusalOpen] = useState(false);
+  const [refusalRedemptionId, setRefusalRedemptionId] = useState("");
+  const [refusalPrizeName, setRefusalPrizeName] = useState("");
+  const [refusalUserId, setRefusalUserId] = useState("");
+  const [refusalCost, setRefusalCost] = useState(0);
+  const [refusalReason, setRefusalReason] = useState("");
+  const [refusing, setRefusing] = useState(false);
+
   // Seed state
   const [seeding, setSeeding] = useState(false);
   const [seedLog, setSeedLog] = useState<string[]>([]);
@@ -308,75 +324,95 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeliverPrize = async (redemptionId: string, prizeName: string) => {
-    const code = prompt(`Digite o código do Gift Card ou a chave do jogo para entregar o prêmio "${prizeName}":`);
-    if (code === null) return; // Cancelou
-    
-    if (!code.trim()) {
+  const openDeliveryDialog = (redemptionId: string, prizeName: string) => {
+    setDeliveryRedemptionId(redemptionId);
+    setDeliveryPrizeName(prizeName);
+    setDeliveryCode("");
+    setDeliveryOpen(true);
+  };
+
+  const openRefusalDialog = (redemptionId: string, prizeName: string, userId: string, cost: number) => {
+    setRefusalRedemptionId(redemptionId);
+    setRefusalPrizeName(prizeName);
+    setRefusalUserId(userId);
+    setRefusalCost(cost);
+    setRefusalReason("");
+    setRefusalOpen(true);
+  };
+
+  const submitDelivery = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deliveryCode.trim()) {
       alert("O código ou mensagem de entrega é obrigatório.");
       return;
     }
 
+    setDelivering(true);
     try {
-      await updateDoc(doc(db, "redemptions", redemptionId), {
+      await updateDoc(doc(db, "redemptions", deliveryRedemptionId), {
         status: "entregue",
-        code: code.trim(),
+        code: deliveryCode.trim(),
         deliveredAt: new Date().toISOString()
       });
       alert("Prêmio entregue com sucesso! O usuário receberá o código em seu painel de Fortecoins.");
+      setDeliveryOpen(false);
     } catch (error) {
       console.error("Erro ao entregar prêmio:", error);
       alert("Erro ao registrar a entrega do prêmio.");
+    } finally {
+      setDelivering(false);
     }
   };
 
-  const handleRefusePrize = async (redemptionId: string, prizeName: string, userId: string, cost: number) => {
-    const reason = prompt(`Digite o motivo da recusa para o prêmio "${prizeName}" (ex: Conta suspeita, estoque esgotado):`);
-    if (reason === null) return; // Cancelou
-    
-    if (confirm(`Deseja realmente recusar o resgate do prêmio "${prizeName}"? Isso devolverá ${cost} Fortecoins ao usuário.`)) {
-      try {
-        // 1. Obter a solicitação para saber o prizeId
-        const redRef = doc(db, "redemptions", redemptionId);
-        const redSnap = await getDoc(redRef);
-        const redData = redSnap.data();
-        const prizeId = redData?.prizeId;
+  const submitRefusal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const finalReason = refusalReason.trim() || "Solicitação recusada pelo administrador.";
 
-        // 2. Atualizar status da solicitação
-        await updateDoc(redRef, {
-          status: "recusado",
-          code: reason.trim() || "Solicitação recusada pelo administrador.",
-          refusedAt: new Date().toISOString()
+    setRefusing(true);
+    try {
+      // 1. Obter a solicitação para saber o prizeId
+      const redRef = doc(db, "redemptions", refusalRedemptionId);
+      const redSnap = await getDoc(redRef);
+      const redData = redSnap.data();
+      const prizeId = redData?.prizeId;
+
+      // 2. Atualizar status da solicitação
+      await updateDoc(redRef, {
+        status: "recusado",
+        code: finalReason,
+        refusedAt: new Date().toISOString()
+      });
+
+      // 3. Devolver as moedas para o usuário
+      const userRef = doc(db, "users", refusalUserId);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        const currentCoins = userSnap.data()?.forteCoins ?? 0;
+        await updateDoc(userRef, {
+          forteCoins: currentCoins + refusalCost
         });
+      }
 
-        // 3. Devolver as moedas para o usuário
-        const userRef = doc(db, "users", userId);
-        const userSnap = await getDoc(userRef);
-        if (userSnap.exists()) {
-          const currentCoins = userSnap.data()?.forteCoins ?? 0;
-          await updateDoc(userRef, {
-            forteCoins: currentCoins + cost
+      // 4. Restaurar estoque do prêmio no Firestore
+      if (prizeId) {
+        const prizeRef = doc(db, "prizes", prizeId);
+        const prizeSnap = await getDoc(prizeRef);
+        if (prizeSnap.exists()) {
+          const currentStock = prizeSnap.data()?.stock ?? 0;
+          await updateDoc(prizeRef, {
+            stock: currentStock + 1,
+            isActive: true
           });
         }
-
-        // 4. Restaurar estoque do prêmio no Firestore
-        if (prizeId) {
-          const prizeRef = doc(db, "prizes", prizeId);
-          const prizeSnap = await getDoc(prizeRef);
-          if (prizeSnap.exists()) {
-            const currentStock = prizeSnap.data()?.stock ?? 0;
-            await updateDoc(prizeRef, {
-              stock: currentStock + 1,
-              isActive: true
-            });
-          }
-        }
-
-        alert(`Solicitação recusada com sucesso! ${cost} Fortecoins foram devolvidos ao usuário e o estoque do prêmio foi restaurado.`);
-      } catch (error) {
-        console.error("Erro ao recusar prêmio:", error);
-        alert("Erro ao processar recusa do prêmio.");
       }
+
+      alert(`Solicitação recusada com sucesso! ${refusalCost} Fortecoins foram devolvidos ao usuário e o estoque do prêmio foi restaurado.`);
+      setRefusalOpen(false);
+    } catch (error) {
+      console.error("Erro ao recusar prêmio:", error);
+      alert("Erro ao processar recusa do prêmio.");
+    } finally {
+      setRefusing(false);
     }
   };
 
@@ -855,13 +891,13 @@ export default function AdminDashboard() {
                         {red.status === "pendente" ? (
                           <div className="flex gap-2">
                             <Button 
-                              onClick={() => handleDeliverPrize(red.id, red.prizeName)}
+                              onClick={() => openDeliveryDialog(red.id, red.prizeName)}
                               className="flex-1 bg-red-600 hover:bg-red-700 font-bold h-9 text-xs rounded-lg"
                             >
                               Entregar Prêmio
                             </Button>
                             <Button 
-                              onClick={() => handleRefusePrize(red.id, red.prizeName, red.userId, red.cost)}
+                              onClick={() => openRefusalDialog(red.id, red.prizeName, red.userId, red.cost)}
                               variant="outline"
                               className="bg-red-950/20 hover:bg-red-950/40 text-red-400 border-red-500/30 hover:border-red-500/50 font-bold h-9 text-xs rounded-lg px-3"
                             >
@@ -1162,6 +1198,74 @@ export default function AdminDashboard() {
               </Button>
               <Button type="submit" disabled={addingPrize} className="bg-red-600 hover:bg-red-700 font-bold px-6 btn-neon">
                 {addingPrize ? "Cadastrando..." : "Cadastrar Prêmio"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Customizado de Entrega de Prêmio */}
+      <Dialog open={deliveryOpen} onOpenChange={setDeliveryOpen}>
+        <DialogContent className="bg-slate-900 border-red-600/30 text-white max-w-md card-neon">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2 text-neon">
+              <Gift className="text-red-500" /> Entregar Prêmio
+            </DialogTitle>
+            <DialogDescription className="text-slate-400 text-xs">
+              Digite o código do Gift Card ou chave do jogo para entregar o prêmio <span className="font-bold text-white">"{deliveryPrizeName}"</span>.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={submitDelivery} className="space-y-4 my-2">
+            <div className="space-y-2">
+              <Label className="text-xs text-slate-300 font-bold uppercase">Código ou Chave de Ativação</Label>
+              <textarea
+                value={deliveryCode}
+                onChange={(e) => setDeliveryCode(e.target.value)}
+                placeholder="Insira o código pin, link de resgate ou chave de ativação aqui..."
+                className="w-full h-24 p-3 bg-slate-950 border border-red-600/20 rounded-md text-sm text-white focus:outline-none focus:ring-1 focus:ring-red-500/50 font-mono"
+                required
+              />
+            </div>
+            <DialogFooter className="mt-6">
+              <Button type="button" variant="ghost" onClick={() => setDeliveryOpen(false)} className="text-slate-400 hover:text-white">
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={delivering} className="bg-red-600 hover:bg-red-700 font-bold px-6 btn-neon">
+                {delivering ? "Enviando..." : "Confirmar Entrega"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Customizado de Recusa de Prêmio */}
+      <Dialog open={refusalOpen} onOpenChange={setRefusalOpen}>
+        <DialogContent className="bg-slate-900 border-red-600/30 text-white max-w-md card-neon">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2 text-neon">
+              <X className="text-red-500" /> Recusar Resgate
+            </DialogTitle>
+            <DialogDescription className="text-slate-400 text-xs">
+              Você está prestes a recusar o resgate do prêmio <span className="font-bold text-white">"{refusalPrizeName}"</span>. Isso devolverá <span className="font-bold text-red-500">{refusalCost} FC</span> ao saldo do usuário.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={submitRefusal} className="space-y-4 my-2">
+            <div className="space-y-2">
+              <Label className="text-xs text-slate-300 font-bold uppercase">Motivo da Recusa</Label>
+              <textarea
+                value={refusalReason}
+                onChange={(e) => setRefusalReason(e.target.value)}
+                placeholder="Ex: Conta suspeita, estoque esgotado temporariamente, erro de solicitação..."
+                className="w-full h-24 p-3 bg-slate-950 border border-red-600/20 rounded-md text-sm text-white focus:outline-none focus:ring-1 focus:ring-red-500/50"
+                required
+              />
+            </div>
+            <DialogFooter className="mt-6">
+              <Button type="button" variant="ghost" onClick={() => setRefusalOpen(false)} className="text-slate-400 hover:text-white">
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={refusing} className="bg-red-600 hover:bg-red-700 font-bold px-6 btn-neon">
+                {refusing ? "Processando..." : "Recusar Resgate"}
               </Button>
             </DialogFooter>
           </form>
