@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, doc, updateDoc, setDoc, deleteDoc, query, orderBy, serverTimestamp, addDoc, getDoc } from "firebase/firestore";
 import { useLocation } from "wouter";
-import { Shield, User, UserCheck, UserPlus, ArrowLeft, Plus, X, Lock, Mail, Trash2, MessageCircle, Send, Coins, Gift, Check, Clock } from "lucide-react";
+import { Shield, User, UserCheck, UserPlus, ArrowLeft, Plus, X, Lock, Mail, Trash2, MessageCircle, Send, Coins, Gift, Check, Clock, LogOut } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import {
   Dialog,
@@ -22,7 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function AdminDashboard() {
-  const { user, isAuthenticated, isAdmin, loading: authLoading } = useAuth();
+  const { user, isAuthenticated, isAdmin, loading: authLoading, logout } = useAuth();
   const [, navigate] = useLocation();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -304,6 +304,38 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleRefusePrize = async (redemptionId: string, prizeName: string, userId: string, cost: number) => {
+    const reason = prompt(`Digite o motivo da recusa para o prêmio "${prizeName}" (ex: Conta suspeita, estoque esgotado):`);
+    if (reason === null) return; // Cancelou
+    
+    if (confirm(`Deseja realmente recusar o resgate do prêmio "${prizeName}"? Isso devolverá ${cost} Fortecoins ao usuário.`)) {
+      try {
+        // 1. Atualizar status
+        await updateDoc(doc(db, "redemptions", redemptionId), {
+          status: "recusado",
+          code: reason.trim() || "Solicitação recusada pelo administrador.",
+          refusedAt: new Date().toISOString()
+        });
+
+        // 2. Devolver as moedas
+        const userRef = doc(db, "users", userId);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          const currentCoins = userSnap.data()?.forteCoins ?? 0;
+          await updateDoc(userRef, {
+            forteCoins: currentCoins + cost
+          });
+          alert(`Solicitação recusada com sucesso! ${cost} Fortecoins foram devolvidos ao saldo do usuário.`);
+        } else {
+          alert(`A solicitação foi recusada, mas não foi possível localizar o usuário (${userId}) para reembolsar os pontos.`);
+        }
+      } catch (error) {
+        console.error("Erro ao recusar prêmio:", error);
+        alert("Erro ao processar recusa do prêmio.");
+      }
+    }
+  };
+
   const GAMES_CATALOG = [
     { name: "AGONY PS4/PS5", price: 9.90, platform: "PS4/PS5", imageUrl: "https://cdn.akamai.steamstatic.com/steam/apps/485980/header.jpg" },
     { name: "ASSASSIN'S CREED MIRAGE PS4/PS5", price: 59.90, platform: "PS4/PS5", imageUrl: "https://cdn.akamai.steamstatic.com/steam/apps/3035570/header.jpg" },
@@ -433,10 +465,15 @@ export default function AdminDashboard() {
               Painel do Gestor
             </h1>
           </div>
-          <Button onClick={() => setShowCreateModal(true)} className="bg-red-600 hover:bg-red-700 font-bold btn-neon flex items-center gap-2">
-            <Plus className="w-5 h-5" />
-            Criar Novo Acesso
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button onClick={() => setShowCreateModal(true)} className="bg-red-600 hover:bg-red-700 font-bold btn-neon flex items-center gap-2">
+              <Plus className="w-5 h-5" />
+              Criar Novo Acesso
+            </Button>
+            <Button variant="ghost" onClick={logout} className="text-slate-400 hover:text-red-500 hover:bg-red-950/20 font-bold flex items-center gap-2 h-10 px-4">
+              <LogOut className="w-4 h-4" /> Sair
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -695,6 +732,10 @@ export default function AdminDashboard() {
                               <span className="inline-block text-[10px] bg-yellow-500/10 text-yellow-500 px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider border border-yellow-500/20">
                                 Pendente
                               </span>
+                            ) : red.status === "recusado" ? (
+                              <span className="inline-block text-[10px] bg-red-500/10 text-red-500 px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider border border-red-500/20">
+                                Recusado
+                              </span>
                             ) : (
                               <span className="inline-block text-[10px] bg-green-500/10 text-green-500 px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider border border-green-500/20">
                                 Entregue
@@ -704,12 +745,25 @@ export default function AdminDashboard() {
                         </div>
 
                         {red.status === "pendente" ? (
-                          <Button 
-                            onClick={() => handleDeliverPrize(red.id, red.prizeName)}
-                            className="w-full bg-red-600 hover:bg-red-700 font-bold h-9 text-xs rounded-lg"
-                          >
-                            Entregar Prêmio (Enviar Código)
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button 
+                              onClick={() => handleDeliverPrize(red.id, red.prizeName)}
+                              className="flex-1 bg-red-600 hover:bg-red-700 font-bold h-9 text-xs rounded-lg"
+                            >
+                              Entregar Prêmio
+                            </Button>
+                            <Button 
+                              onClick={() => handleRefusePrize(red.id, red.prizeName, red.userId, red.cost)}
+                              variant="outline"
+                              className="bg-red-950/20 hover:bg-red-950/40 text-red-400 border-red-500/30 hover:border-red-500/50 font-bold h-9 text-xs rounded-lg px-3"
+                            >
+                              Recusar
+                            </Button>
+                          </div>
+                        ) : red.status === "recusado" ? (
+                          <div className="bg-red-950/20 p-2 rounded text-xs text-red-400 border border-red-500/10 select-all truncate">
+                            Recusado. Motivo: {red.code || "Nenhum motivo especificado."}
+                          </div>
                         ) : (
                           <div className="bg-slate-900/60 p-2 rounded text-xs font-mono text-green-400 border border-green-500/10 select-all truncate">
                             Código: {red.code}

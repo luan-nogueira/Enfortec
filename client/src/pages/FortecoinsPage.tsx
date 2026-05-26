@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, getDoc } from "firebase/firestore";
-import { ArrowLeft, Coins, Copy, Gift, HelpCircle, CheckCircle, Clock, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Coins, Copy, Gift, HelpCircle, CheckCircle, Clock, AlertTriangle, LogOut } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -26,7 +26,7 @@ const PREDEFINED_PRIZES: Prize[] = [
 ];
 
 export default function FortecoinsPage() {
-  const { user, isAuthenticated, loading } = useAuth();
+  const { user, isAuthenticated, loading, logout } = useAuth();
   const [, navigate] = useLocation();
   const [referrals, setReferrals] = useState<any[]>([]);
   const [redemptions, setRedemptions] = useState<any[]>([]);
@@ -160,9 +160,14 @@ export default function FortecoinsPage() {
               FORTE<span className="text-red-500">COINS</span>
             </h1>
           </div>
-          <div className="flex items-center gap-2 bg-red-950/40 border border-red-600/30 px-4 py-2 rounded-xl">
-            <Coins className="w-5 h-5 text-red-500" />
-            <span className="font-bold text-white text-lg">{user.forteCoins} FC</span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 bg-red-950/40 border border-red-600/30 px-4 py-2 rounded-xl">
+              <Coins className="w-5 h-5 text-red-500" />
+              <span className="font-bold text-white text-lg">{user.forteCoins} FC</span>
+            </div>
+            <Button variant="ghost" onClick={logout} className="text-slate-400 hover:text-red-500 hover:bg-red-950/20 font-bold flex items-center gap-2 h-10 px-4">
+              <LogOut className="w-4 h-4" /> Sair
+            </Button>
           </div>
         </div>
       </nav>
@@ -353,6 +358,10 @@ export default function FortecoinsPage() {
                           <span className="text-[10px] bg-yellow-500/10 text-yellow-500 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider border border-yellow-500/20">
                             Pendente
                           </span>
+                        ) : red.status === "recusado" ? (
+                          <span className="text-[10px] bg-red-500/10 text-red-500 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider border border-red-500/20">
+                            Recusado
+                          </span>
                         ) : (
                           <span className="text-[10px] bg-green-500/10 text-green-500 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider border border-green-500/20">
                             Entregue
@@ -377,6 +386,14 @@ export default function FortecoinsPage() {
                         >
                           Copiar
                         </Button>
+                      </div>
+                    )}
+
+                    {red.status === "recusado" && red.code && (
+                      <div className="bg-red-950/20 p-2.5 rounded-lg border border-red-900/30">
+                        <span className="text-xs font-semibold text-red-400">
+                          Motivo da recusa: {red.code}
+                        </span>
                       </div>
                     )}
                   </div>

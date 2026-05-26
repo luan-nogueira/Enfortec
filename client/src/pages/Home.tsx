@@ -2,14 +2,14 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocation } from "wouter";
-import { Zap, Gamepad2, Search, Shield, Package, LayoutGrid, Tag, Coins } from "lucide-react";
+import { Zap, Gamepad2, Search, Shield, Package, LayoutGrid, Tag, Coins, LogOut } from "lucide-react";
 import { getLoginUrl } from "@/const";
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, query, orderBy, limit } from "firebase/firestore";
 
 export default function Home() {
-  const { user, isAuthenticated, isAdmin, isCollaborator } = useAuth();
+  const { user, isAuthenticated, isAdmin, isCollaborator, logout } = useAuth();
   const [, navigate] = useLocation();
 
   const [usedProducts, setUsedProducts] = useState<any[]>([]);
@@ -102,6 +102,9 @@ export default function Home() {
                 <Button size="sm" onClick={() => navigate("/vendedor")} className="bg-red-600 hover:bg-red-700 text-white shadow-[0_0_10px_rgba(220,38,38,0.3)]">
                   Painel do Vendedor
                 </Button>
+                <Button variant="ghost" onClick={logout} className="text-slate-400 hover:text-red-500 hover:bg-red-950/20 font-bold flex items-center gap-2">
+                  <LogOut className="w-4 h-4" /> Sair
+                </Button>
               </div>
             ) : (
               <div className="flex gap-3">
@@ -112,6 +115,29 @@ export default function Home() {
                   Cadastrar
                 </Button>
               </div>
+            )}
+          </div>
+
+          {/* Mobile Nav Links */}
+          <div className="flex lg:hidden items-center gap-2">
+            {isAuthenticated ? (
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white hover:bg-slate-900 px-2 animate-pulse" onClick={() => navigate("/fortecoins")}>
+                  <Coins className="w-4 h-4 text-red-500" /> <span className="ml-1 text-xs">{user?.forteCoins ?? 0}</span>
+                </Button>
+                {isAdmin && (
+                  <Button variant="outline" size="icon" onClick={() => navigate("/admin")} className="w-8 h-8 border-red-600/50 text-red-500 hover:bg-red-950/50">
+                    <Shield className="w-4 h-4" />
+                  </Button>
+                )}
+                <Button variant="ghost" size="icon" onClick={logout} className="w-8 h-8 text-slate-400 hover:text-red-500">
+                  <LogOut className="w-4 h-4" />
+                </Button>
+              </div>
+            ) : (
+              <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white text-xs px-3" onClick={() => navigate("/login")}>
+                Entrar
+              </Button>
             )}
           </div>
         </div>
