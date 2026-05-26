@@ -38,6 +38,16 @@ export default function AdminDashboard() {
   // Indicações & Prêmios
   const [allReferrals, setAllReferrals] = useState<any[]>([]);
   const [allRedemptions, setAllRedemptions] = useState<any[]>([]);
+  const [allPrizes, setAllPrizes] = useState<any[]>([]);
+
+  // Modal de prêmios
+  const [showPrizeModal, setShowPrizeModal] = useState(false);
+  const [prizeName, setPrizeName] = useState("");
+  const [prizeCost, setPrizeCost] = useState(500);
+  const [prizeBadge, setPrizeBadge] = useState("Mais Popular");
+  const [prizeDesc, setPrizeDesc] = useState("");
+  const [prizeStock, setPrizeStock] = useState(1);
+  const [addingPrize, setAddingPrize] = useState(false);
 
   // Seed state
   const [seeding, setSeeding] = useState(false);
@@ -94,6 +104,22 @@ export default function AdminDashboard() {
         ...doc.data()
       })).sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setAllRedemptions(data);
+    });
+
+    return () => unsubscribe();
+  }, [isAuthenticated, isAdmin]);
+
+  // Escutar todos os prêmios da loja
+  useEffect(() => {
+    if (!isAuthenticated || !isAdmin) return;
+
+    const q = collection(db, "prizes");
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })).sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      setAllPrizes(data);
     });
 
     return () => unsubscribe();
@@ -310,14 +336,20 @@ export default function AdminDashboard() {
     
     if (confirm(`Deseja realmente recusar o resgate do prêmio "${prizeName}"? Isso devolverá ${cost} Fortecoins ao usuário.`)) {
       try {
-        // 1. Atualizar status
-        await updateDoc(doc(db, "redemptions", redemptionId), {
+        // 1. Obter a solicitação para saber o prizeId
+        const redRef = doc(db, "redemptions", redemptionId);
+        const redSnap = await getDoc(redRef);
+        const redData = redSnap.data();
+        const prizeId = redData?.prizeId;
+
+        // 2. Atualizar status da solicitação
+        await updateDoc(redRef, {
           status: "recusado",
           code: reason.trim() || "Solicitação recusada pelo administrador.",
           refusedAt: new Date().toISOString()
         });
 
-        // 2. Devolver as moedas
+        // 3. Devolver as moedas para o usuário
         const userRef = doc(db, "users", userId);
         const userSnap = await getDoc(userRef);
         if (userSnap.exists()) {
@@ -325,14 +357,86 @@ export default function AdminDashboard() {
           await updateDoc(userRef, {
             forteCoins: currentCoins + cost
           });
-          alert(`Solicitação recusada com sucesso! ${cost} Fortecoins foram devolvidos ao saldo do usuário.`);
-        } else {
-          alert(`A solicitação foi recusada, mas não foi possível localizar o usuário (${userId}) para reembolsar os pontos.`);
         }
+
+        // 4. Restaurar estoque do prêmio no Firestore
+        if (prizeId) {
+          const prizeRef = doc(db, "prizes", prizeId);
+          const prizeSnap = await getDoc(prizeRef);
+          if (prizeSnap.exists()) {
+            const currentStock = prizeSnap.data()?.stock ?? 0;
+            await updateDoc(prizeRef, {
+              stock: currentStock + 1,
+              isActive: true
+            });
+          }
+        }
+
+        alert(`Solicitação recusada com sucesso! ${cost} Fortecoins foram devolvidos ao usuário e o estoque do prêmio foi restaurado.`);
       } catch (error) {
         console.error("Erro ao recusar prêmio:", error);
         alert("Erro ao processar recusa do prêmio.");
       }
+    }
+  };
+
+  const handleAddPrize = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!prizeName.trim() || !prizeDesc.trim()) {
+      alert("Nome e descrição são obrigatórios.");
+      return;
+    }
+
+    setAddingPrize(true);
+    try {
+      const prizeId = "prize_" + Date.now();
+      await setDoc(doc(db, "prizes", prizeId), {
+        name: prizeName.trim(),
+        cost: Number(prizeCost),
+        badge: prizeBadge.trim(),
+        description: prizeDesc.trim(),
+        stock: Number(prizeStock),
+        isActive: Number(prizeStock) > 0,
+        createdAt: new Date().toISOString()
+      });
+
+      alert("Prêmio cadastrado com sucesso!");
+      setShowPrizeModal(false);
+      // Reset fields
+      setPrizeName("");
+      setPrizeCost(500);
+      setPrizeBadge("Mais Popular");
+      setPrizeDesc("");
+      setPrizeStock(1);
+    } catch (error) {
+      console.error("Erro ao cadastrar prêmio:", error);
+      alert("Erro ao cadastrar prêmio.");
+    } finally {
+      setAddingPrize(false);
+    }
+  };
+
+  const handleDeletePrize = async (prizeId: string) => {
+    if (confirm("Tem certeza que deseja excluir permanentemente este prêmio?")) {
+      try {
+        await deleteDoc(doc(db, "prizes", prizeId));
+        alert("Prêmio excluído com sucesso!");
+      } catch (error) {
+        console.error("Erro ao excluir prêmio:", error);
+        alert("Erro ao excluir prêmio.");
+      }
+    }
+  };
+
+  const handleTogglePrizeStatus = async (prizeId: string, currentStatus: boolean, stock: number) => {
+    try {
+      await updateDoc(doc(db, "prizes", prizeId), {
+        isActive: !currentStatus,
+        stock: (!currentStatus && stock <= 0) ? 1 : stock
+      });
+    } catch (error) {
+      console.error("Erro ao alterar status do prêmio:", error);
+      alert("Erro ao atualizar status do prêmio.");
     }
   };
 
@@ -492,6 +596,10 @@ export default function AdminDashboard() {
               {(allRedemptions.some(r => r.status === "pendente") || allReferrals.some(r => r.status === "pendente")) && (
                 <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
               )}
+            </TabsTrigger>
+            <TabsTrigger value="premios" className="data-[state=active]:!bg-red-600 data-[state=active]:!text-white font-bold !h-10 !px-5 !text-sm !rounded-lg !whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 !inline-flex !items-center !justify-center !gap-2">
+              <Gift className="w-4 h-4" />
+              Gerenciar Prêmios
             </TabsTrigger>
             <TabsTrigger value="catalogo" className="data-[state=active]:!bg-red-600 data-[state=active]:!text-white font-bold !h-10 !px-5 !text-sm !rounded-lg !whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 !inline-flex !items-center !justify-center !gap-2">
               🎮 Catálogo
@@ -854,6 +962,69 @@ export default function AdminDashboard() {
               )}
             </Card>
           </TabsContent>
+
+          <TabsContent value="premios">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Gift className="text-red-500" /> Prêmios Disponíveis na Loja
+                </h3>
+                <p className="text-slate-400 text-sm">
+                  Adicione, remova ou altere o estoque de prêmios que os usuários podem resgatar com Fortecoins.
+                </p>
+              </div>
+              <Button onClick={() => setShowPrizeModal(true)} className="bg-red-600 hover:bg-red-700 font-bold btn-neon flex items-center gap-2">
+                <Plus className="w-5 h-5" />
+                Adicionar Prêmio
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {allPrizes.map((p) => (
+                <Card key={p.id} className={`bg-slate-900 border-red-600/10 p-6 flex flex-col justify-between card-neon relative ${!p.isActive || p.stock <= 0 ? 'opacity-60' : ''}`}>
+                  <div>
+                    <div className="flex justify-between items-start mb-4">
+                      <span className="text-[10px] bg-red-600/20 text-red-500 px-2.5 py-1 rounded font-bold uppercase tracking-wider">
+                        {p.badge}
+                      </span>
+                      <span className="text-xs font-bold text-red-500 flex items-center gap-1">
+                        <Coins className="w-3.5 h-3.5" />
+                        {p.cost} FC
+                      </span>
+                    </div>
+                    <h4 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+                      {p.name}
+                      {(!p.isActive || p.stock <= 0) && (
+                        <span className="text-[9px] bg-red-600 text-white px-2 py-0.5 rounded font-black uppercase">Esgotado</span>
+                      )}
+                    </h4>
+                    <p className="text-slate-400 text-xs line-clamp-2 leading-relaxed">{p.description}</p>
+                    <p className="text-[11px] text-slate-500 mt-4 font-mono">Disponível: <span className="font-bold text-slate-300">{p.stock}</span> unidades</p>
+                  </div>
+
+                  <div className="flex gap-2 mt-6 pt-4 border-t border-slate-800">
+                    <Button
+                      onClick={() => handleTogglePrizeStatus(p.id, p.isActive, p.stock)}
+                      className={`flex-1 font-bold h-9 text-xs ${
+                        p.isActive 
+                          ? "bg-slate-800 hover:bg-slate-700 text-slate-300"
+                          : "bg-green-600 hover:bg-green-700 text-white"
+                      }`}
+                    >
+                      {p.isActive ? "Pausar" : "Ativar"}
+                    </Button>
+                    <Button
+                      onClick={() => handleDeletePrize(p.id)}
+                      variant="outline"
+                      className="bg-red-950/20 hover:bg-red-950/40 text-red-400 border-red-500/30 hover:border-red-500/50 font-bold h-9 text-xs px-3"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
         </Tabs>
       </main>
 
@@ -912,6 +1083,85 @@ export default function AdminDashboard() {
               <Button type="button" variant="ghost" onClick={() => setShowCreateModal(false)} className="text-slate-400">Cancelar</Button>
               <Button type="submit" disabled={creating} className="bg-red-600 hover:bg-red-700 btn-neon min-w-[120px]">
                 {creating ? "Criando..." : "Criar Usuário"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Criar Prêmio */}
+      <Dialog open={showPrizeModal} onOpenChange={setShowPrizeModal}>
+        <DialogContent className="bg-slate-900 border-red-600/30 text-white max-w-md card-neon">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2 text-neon">
+              <Gift className="text-red-500" /> Cadastrar Novo Prêmio
+            </DialogTitle>
+            <DialogDescription className="text-slate-400 text-xs">
+              Preencha as informações do prêmio que ficará disponível na loja de resgates.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleAddPrize} className="space-y-4 my-2">
+            <div className="space-y-2">
+              <Label className="text-xs text-slate-300 font-bold uppercase">Nome do Prêmio</Label>
+              <Input
+                value={prizeName}
+                onChange={(e) => setPrizeName(e.target.value)}
+                placeholder="Ex: Gift Card PSN R$ 100"
+                className="bg-slate-950 border-red-600/20 text-white"
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs text-slate-300 font-bold uppercase">Custo em ForteCoins</Label>
+                <Input
+                  type="number"
+                  value={prizeCost}
+                  onChange={(e) => setPrizeCost(Number(e.target.value))}
+                  placeholder="Ex: 500"
+                  className="bg-slate-950 border-red-600/20 text-white"
+                  min={1}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-slate-300 font-bold uppercase">Quantidade em Estoque</Label>
+                <Input
+                  type="number"
+                  value={prizeStock}
+                  onChange={(e) => setPrizeStock(Number(e.target.value))}
+                  placeholder="Ex: 1"
+                  className="bg-slate-950 border-red-600/20 text-white"
+                  min={0}
+                  required
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-slate-300 font-bold uppercase">Badge / Categoria</Label>
+              <Input
+                value={prizeBadge}
+                onChange={(e) => setPrizeBadge(e.target.value)}
+                placeholder="Ex: Console, Mais Popular, Lazer"
+                className="bg-slate-950 border-red-600/20 text-white"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-slate-300 font-bold uppercase">Descrição</Label>
+              <textarea
+                value={prizeDesc}
+                onChange={(e) => setPrizeDesc(e.target.value)}
+                placeholder="Descreva o que o usuário receberá ao resgatar este prêmio..."
+                className="w-full h-24 p-3 bg-slate-950 border border-red-600/20 rounded-md text-sm text-white focus:outline-none focus:ring-1 focus:ring-red-500/50"
+                required
+              />
+            </div>
+            <DialogFooter className="mt-6">
+              <Button type="button" variant="ghost" onClick={() => setShowPrizeModal(false)} className="text-slate-400 hover:text-white">
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={addingPrize} className="bg-red-600 hover:bg-red-700 font-bold px-6 btn-neon">
+                {addingPrize ? "Cadastrando..." : "Cadastrar Prêmio"}
               </Button>
             </DialogFooter>
           </form>
