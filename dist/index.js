@@ -1418,12 +1418,63 @@ var appRouter = router({
 });
 
 // server/_core/context.ts
+init_db();
+import { createRemoteJWKSet, jwtVerify as jwtVerify2 } from "jose";
+var JWKS = createRemoteJWKSet(
+  new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken-system@system.gserviceaccount.com")
+);
+var FIREBASE_PROJECT_ID = "enfortec-c9b78";
+async function verifyFirebaseToken(token) {
+  try {
+    const { payload } = await jwtVerify2(token, JWKS, {
+      issuer: `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`,
+      audience: FIREBASE_PROJECT_ID
+    });
+    return payload;
+  } catch (error) {
+    console.error("[FirebaseAuth] Token verification failed:", error);
+    return null;
+  }
+}
 async function createContext(opts) {
   let user = null;
   try {
     user = await sdk.authenticateRequest(opts.req);
   } catch (error) {
-    user = null;
+    const authHeader = opts.req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.substring(7);
+      const decoded = await verifyFirebaseToken(token);
+      if (decoded && decoded.sub) {
+        const uid = decoded.sub;
+        const email = decoded.email;
+        const name = decoded.name || email?.split("@")[0] || "User";
+        user = await getUserByOpenId(uid);
+        if (!user) {
+          try {
+            await upsertUser({
+              openId: uid,
+              name,
+              email,
+              loginMethod: "firebase",
+              lastSignedIn: /* @__PURE__ */ new Date()
+            });
+            user = await getUserByOpenId(uid);
+          } catch (dbError) {
+            console.error("[FirebaseAuth] Failed to upsert user in database:", dbError);
+          }
+        } else {
+          try {
+            await upsertUser({
+              openId: uid,
+              lastSignedIn: /* @__PURE__ */ new Date()
+            });
+          } catch (e) {
+            console.error("[FirebaseAuth] Failed to update user lastSignedIn:", e);
+          }
+        }
+      }
+    }
   }
   return {
     req: opts.req,

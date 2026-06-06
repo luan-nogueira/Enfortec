@@ -6,6 +6,7 @@ import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
 import { getLoginUrl } from "./const";
+import { auth } from "@/lib/firebase";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -41,6 +42,20 @@ const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
       url: "/api/trpc",
+      async headers() {
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+          try {
+            const token = await currentUser.getIdToken();
+            return {
+              Authorization: `Bearer ${token}`,
+            };
+          } catch (e) {
+            console.error("[TRPC Client] Failed to get Firebase ID token:", e);
+          }
+        }
+        return {};
+      },
       transformer: superjson,
       fetch(input, init) {
         return globalThis.fetch(input, {
