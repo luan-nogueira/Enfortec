@@ -66,6 +66,27 @@ app.get("/api/test-db", async (req, res) => {
   }
 });
 
+app.get("/api/inspect-db-url", (req, res) => {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    return res.json({ error: "DATABASE_URL is missing" });
+  }
+  try {
+    const parsed = new URL(url);
+    return res.json({
+      protocol: parsed.protocol,
+      host: parsed.host,
+      hostname: parsed.hostname,
+      port: parsed.port,
+      pathname: parsed.pathname,
+      search: parsed.search,
+      searchParams: Object.fromEntries(parsed.searchParams.entries()),
+    });
+  } catch (e: any) {
+    return res.json({ error: "Invalid URL", message: e.message, length: url.length });
+  }
+});
+
 // tRPC API
 app.use(
   "/api/trpc",
