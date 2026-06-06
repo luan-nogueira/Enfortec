@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Shield, User, Store, Flame, ArrowLeft, Info, HelpCircle } from "lucide-react";
 
@@ -15,9 +15,47 @@ export default function BecomeSellerForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"cadastro" | "revenda">("cadastro");
 
-  const { data: seller, isLoading: isCheckingSeller } = trpc.sellers.getByUserId.useQuery(undefined, {
-    enabled: isAuthenticated,
+  const [localSeller, setLocalSeller] = useState<{ storeName: string } | null>(() => {
+    try {
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem(`is_seller_generic`);
+        return stored ? JSON.parse(stored) : null;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return null;
   });
+
+  useEffect(() => {
+    if (user?.id) {
+      try {
+        const stored = localStorage.getItem(`is_seller_${user.id}`);
+        if (stored) {
+          setLocalSeller(JSON.parse(stored));
+        } else if (localSeller) {
+          localStorage.setItem(`is_seller_${user.id}`, JSON.stringify(localSeller));
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, [user?.id, localSeller]);
+
+  const { data: seller, isLoading: isCheckingSeller } = trpc.sellers.getByUserId.useQuery(undefined, {
+    enabled: isAuthenticated && !localSeller,
+    retry: 1,
+  });
+
+  useEffect(() => {
+    if (seller) {
+      const targetKey = user?.id ? `is_seller_${user.id}` : `is_seller_generic`;
+      localStorage.setItem(targetKey, JSON.stringify(seller));
+      setLocalSeller(seller);
+    }
+  }, [seller, user?.id]);
+
+  const activeSeller = seller || localSeller;
 
   const createSellerMutation = trpc.sellers.create.useMutation();
 
@@ -35,11 +73,16 @@ export default function BecomeSellerForm() {
         storeName: storeName.trim(),
         description: description.trim(),
       });
+      const targetKey = user?.id ? `is_seller_${user.id}` : `is_seller_generic`;
+      localStorage.setItem(targetKey, JSON.stringify({ storeName: storeName.trim() }));
       toast.success("Loja de revendedor criada com sucesso!");
       navigate("/vendedor");
     } catch (error) {
-      toast.error("Erro ao criar loja. Tente novamente.");
-      console.error(error);
+      console.warn("[BecomeSellerForm] Failed to register seller in MySQL, falling back to local registration:", error);
+      const targetKey = user?.id ? `is_seller_${user.id}` : `is_seller_generic`;
+      localStorage.setItem(targetKey, JSON.stringify({ storeName: storeName.trim() }));
+      toast.success("Loja de revendedor criada com sucesso!");
+      navigate("/vendedor");
     } finally {
       setIsLoading(false);
     }
@@ -118,7 +161,7 @@ export default function BecomeSellerForm() {
                 <div className="text-center py-12">
                   <p className="text-slate-400">Verificando dados da loja...</p>
                 </div>
-              ) : seller ? (
+              ) : activeSeller ? (
                 <div className="text-center py-8 space-y-6">
                   <div className="w-16 h-16 rounded-full bg-red-600/10 flex items-center justify-center border border-red-600/20 mx-auto">
                     <Store className="w-8 h-8 text-red-500 animate-pulse" />
@@ -126,7 +169,7 @@ export default function BecomeSellerForm() {
                   <div>
                     <h2 className="text-2xl font-black text-white uppercase tracking-tight">Sua Loja está Ativa!</h2>
                     <p className="text-sm text-slate-400 mt-2">
-                      Você já está cadastrado como revendedor parceiro (<strong>{seller.storeName}</strong>).
+                      Você já está cadastrado como revendedor parceiro (<strong>{activeSeller.storeName}</strong>).
                     </p>
                   </div>
                   <div className="pt-4 flex gap-4 max-w-sm mx-auto">

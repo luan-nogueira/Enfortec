@@ -90,15 +90,20 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 }
 
 export async function getUserByOpenId(openId: string) {
-  const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot get user: database not available");
+  try {
+    const db = await getDb();
+    if (!db) {
+      console.warn("[Database] Cannot get user: database not available");
+      return undefined;
+    }
+
+    const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+
+    return result.length > 0 ? result[0] : undefined;
+  } catch (error) {
+    console.error("[Database Error] getUserByOpenId failed:", error);
     return undefined;
   }
-
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-
-  return result.length > 0 ? result[0] : undefined;
 }
 
 // Products queries
@@ -117,10 +122,15 @@ export async function getProductById(id: number) {
 
 // Sellers queries
 export async function getSellerByUserId(userId: number) {
-  const db = await getDb();
-  if (!db) return null;
-  const result = await db.select().from(sellers).where(eq(sellers.userId, userId)).limit(1);
-  return result.length > 0 ? result[0] : null;
+  try {
+    const db = await getDb();
+    if (!db) return null;
+    const result = await db.select().from(sellers).where(eq(sellers.userId, userId)).limit(1);
+    return result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error("[Database Error] getSellerByUserId failed:", error);
+    return null;
+  }
 }
 
 export async function getActiveSellers() {
