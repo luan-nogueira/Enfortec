@@ -53,33 +53,49 @@ export async function createContext(
         const email = decoded.email as string | undefined;
         const name = (decoded.name as string | undefined) || email?.split("@")[0] || "User";
         
-        user = await db.getUserByOpenId(uid);
-        console.log("[TRPC Server] Database user lookup result (by openId):", user ? `found (id: ${user.id})` : "not found");
-        
-        if (!user) {
-          try {
-            console.log("[TRPC Server] User not found in database, upserting...");
-            await db.upsertUser({
-              openId: uid,
-              name: name,
-              email: email,
-              loginMethod: "firebase",
-              lastSignedIn: new Date(),
-            });
-            user = await db.getUserByOpenId(uid);
-            console.log("[TRPC Server] User upsert complete, user id:", user?.id);
-          } catch (dbError) {
-            console.error("[FirebaseAuth] Failed to upsert user in database:", dbError);
+        try {
+          user = await db.getUserByOpenId(uid);
+          console.log("[TRPC Server] Database user lookup result (by openId):", user ? `found (id: ${user.id})` : "not found");
+          
+          if (!user) {
+            try {
+              console.log("[TRPC Server] User not found in database, upserting...");
+              await db.upsertUser({
+                openId: uid,
+                name: name,
+                email: email,
+                loginMethod: "firebase",
+                lastSignedIn: new Date(),
+              });
+              user = await db.getUserByOpenId(uid);
+              console.log("[TRPC Server] User upsert complete, user id:", user?.id);
+            } catch (dbError) {
+              console.error("[FirebaseAuth] Failed to upsert user in database:", dbError);
+            }
+          } else {
+            try {
+              await db.upsertUser({
+                openId: uid,
+                lastSignedIn: new Date(),
+              });
+            } catch (e) {
+              console.error("[FirebaseAuth] Failed to update user lastSignedIn:", e);
+            }
           }
-        } else {
-          try {
-            await db.upsertUser({
-              openId: uid,
-              lastSignedIn: new Date(),
-            });
-          } catch (e) {
-            console.error("[FirebaseAuth] Failed to update user lastSignedIn:", e);
-          }
+        } catch (dbErr) {
+          console.error("[TRPC Server] Database user lookup failed, falling back to local mock user:", dbErr);
+          user = {
+            id: 999999,
+            openId: uid,
+            name: name,
+            email: email || null,
+            loginMethod: "firebase_fallback",
+            role: "user",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            lastSignedIn: new Date(),
+            balance: "0.00",
+          };
         }
       }
     }

@@ -11,6 +11,7 @@ let _pool: any = null;
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
+      const useSsl = !process.env.DATABASE_URL.includes("localhost") && !process.env.DATABASE_URL.includes("127.0.0.1");
       _pool = mysql.createPool({
         uri: process.env.DATABASE_URL,
         waitForConnections: true,
@@ -18,6 +19,7 @@ export async function getDb() {
         queueLimit: 0,
         enableKeepAlive: true,
         keepAliveInitialDelay: 10000,
+        ...(useSsl ? { ssl: { rejectUnauthorized: false } } : {}),
       });
       _db = drizzle(_pool);
     } catch (error) {
