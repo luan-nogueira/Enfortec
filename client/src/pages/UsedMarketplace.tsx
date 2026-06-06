@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Search, Star, ShoppingCart, ArrowLeft, Flame, User, Check, Package, Coins } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import {
   Dialog,
@@ -51,15 +51,20 @@ export default function UsedMarketplace() {
 
     setCheckoutProductId(product.id);
     try {
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
       const response = await fetch("/api/infinitepay/checkout", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
           name: `${product.name} (Usado)`,
           price: price,
-          redirectUrl: `${window.location.origin}/minhas-compras`
+          redirectUrl: `${window.location.origin}/minhas-compras`,
+          productType: "used",
+          productId: product.id,
+          sellerId: product.sellerId || null
         })
       });
 
@@ -110,7 +115,7 @@ export default function UsedMarketplace() {
     <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900">
       {/* Header */}
       <div className="bg-slate-950/80 backdrop-blur-md border-b border-red-600/20 sticky top-0 z-40">
-        <div className="container mx-auto px-4 py-6">
+        <div className="container mx-auto px-4 py-3 sm:py-6">
           <div className="flex items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-4">
               <Button 
@@ -124,7 +129,7 @@ export default function UsedMarketplace() {
               </Button>
               <div className="flex items-center gap-2">
                 <Flame className="w-6 h-6 text-red-500" />
-                <h1 className="text-3xl font-bold text-neon">Marketplace de Usados</h1>
+                <h1 className="text-xl sm:text-3xl font-bold text-neon">Marketplace de Usados</h1>
               </div>
             </div>
             {isAuthenticated && (
@@ -200,7 +205,7 @@ export default function UsedMarketplace() {
             <p className="text-slate-400 text-lg">Nenhum produto encontrado</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             {filteredProducts.map((product) => (
               <div
                 key={product.id}

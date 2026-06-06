@@ -1,7 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { Search, ShoppingCart, ArrowLeft, Flame, Package, Check, X, Coins } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -81,15 +81,20 @@ export default function Store() {
     
     setIsProcessingCheckout(true);
     try {
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
       const response = await fetch("/api/infinitepay/checkout", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
           name: `${selectedProduct.name} (${chosenVersion})`,
           price: price,
-          redirectUrl: `${window.location.origin}/minhas-compras`
+          redirectUrl: `${window.location.origin}/minhas-compras`,
+          productType: "store",
+          productId: selectedProduct.id,
+          sellerId: null
         })
       });
 

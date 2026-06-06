@@ -302,7 +302,7 @@ export default function FloatingChat() {
         />
       )}
 
-      <div className={`fixed bottom-6 right-6 ${isOpen ? "z-[100]" : "z-[80]"}`}>
+      <div className={`fixed bottom-20 right-4 sm:bottom-6 sm:right-6 ${isOpen ? "z-[100]" : "z-[80]"} lg:bottom-6 lg:right-6`}>
         {/* Floating Button */}
         {!isOpen && (
           <Button
@@ -316,7 +316,7 @@ export default function FloatingChat() {
 
         {/* Chat Window */}
         {isOpen && (
-          <Card className="w-[360px] h-[520px] flex flex-col bg-slate-900 border-red-600/30 shadow-[0_20px_60px_rgba(0,0,0,0.6)] overflow-hidden">
+          <Card className="w-[calc(100vw-2rem)] max-w-[360px] h-[520px] flex flex-col bg-slate-900 border-red-600/30 shadow-[0_20px_60px_rgba(0,0,0,0.6)] overflow-hidden">
           {/* Header */}
           <div className="p-4 bg-gradient-to-r from-red-700 to-red-600 flex justify-between items-center flex-shrink-0">
             <div className="flex items-center gap-3">

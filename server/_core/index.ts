@@ -120,19 +120,27 @@ app.use(
 );
 
 async function startServer() {
+  console.log("[Server] starting server...");
   const server = createServer(app);
 
+  console.log("[Server] NODE_ENV:", process.env.NODE_ENV);
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
+    console.log("[Server] Importing vite module...");
     const viteModule = "./vite.js";
     const { setupVite } = await import(viteModule);
+    console.log("[Server] Setting up Vite...");
     await setupVite(app, server);
+    console.log("[Server] Vite set up completed.");
   } else if (process.env.VERCEL !== "1") {
+    console.log("[Server] Importing vite module for static...");
     const viteModule = "./vite.js";
     const { serveStatic } = await import(viteModule);
+    console.log("[Server] Serving static files...");
     serveStatic(app);
   }
 
+  console.log("[Server] Finding available port...");
   const preferredPort = parseInt(process.env.PORT || "3000");
   const port = await findAvailablePort(preferredPort);
 
@@ -140,6 +148,7 @@ async function startServer() {
     console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
   }
 
+  console.log("[Server] Listening on port:", port);
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
   });

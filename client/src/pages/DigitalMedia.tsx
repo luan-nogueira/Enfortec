@@ -12,7 +12,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 
 // Mapeamento de gêneros → palavras-chave nos nomes dos jogos
@@ -89,15 +89,20 @@ export default function DigitalMedia() {
 
     setCheckoutProductId(product.id);
     try {
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
       const response = await fetch("/api/infinitepay/checkout", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
           name: product.name,
           price: price,
-          redirectUrl: `${window.location.origin}/minhas-compras`
+          redirectUrl: `${window.location.origin}/minhas-compras`,
+          productType: "digital",
+          productId: product.id,
+          sellerId: product.sellerId || null
         })
       });
 

@@ -2,7 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocation } from "wouter";
-import { Zap, Gamepad2, Search, Shield, Package, LayoutGrid, Tag, Coins, LogOut, HelpCircle } from "lucide-react";
+import { Zap, Gamepad2, Search, Shield, Package, LayoutGrid, Tag, Coins, LogOut, HelpCircle, Home as HomeIcon } from "lucide-react";
 import { getLoginUrl } from "@/const";
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
@@ -149,15 +149,15 @@ export default function Home() {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-red-600/20 blur-[120px] rounded-full pointer-events-none"></div>
         
         <div className="container mx-auto px-4 relative z-10 text-center">
-          <h1 className="text-4xl md:text-6xl font-black mb-6 text-white leading-tight">
+          <h1 className="text-3xl sm:text-4xl md:text-6xl font-black mb-4 sm:mb-6 text-white leading-tight">
             O Maior Marketplace Gamer
           </h1>
-          <p className="text-lg md:text-xl text-slate-400 mb-10 max-w-2xl mx-auto">
+          <p className="text-base sm:text-lg md:text-xl text-slate-400 mb-6 sm:mb-10 max-w-2xl mx-auto">
             Compre e venda jogos, gift cards e produtos físicos. 
             <strong className="text-red-400 font-semibold ml-1">Pagamento 100% Seguro.</strong>
           </p>
           
-          <div className="max-w-3xl mx-auto flex gap-2 relative">
+          <div className="max-w-3xl mx-auto flex flex-col sm:flex-row gap-2 relative">
             <div className="relative w-full">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-slate-500" />
               <Input 
@@ -170,7 +170,7 @@ export default function Home() {
               />
             </div>
             <Button
-              className="h-16 px-8 bg-red-600 hover:bg-red-700 text-white rounded-xl text-lg font-bold shrink-0 shadow-[0_0_20px_rgba(220,38,38,0.4)]"
+              className="h-14 sm:h-16 px-6 sm:px-8 bg-red-600 hover:bg-red-700 text-white rounded-xl text-base sm:text-lg font-bold shrink-0 shadow-[0_0_20px_rgba(220,38,38,0.4)] w-full sm:w-auto"
               onClick={() => { if (heroSearch.trim()) navigate(`/digital?search=${encodeURIComponent(heroSearch.trim())}`); }}
             >
               Buscar
@@ -185,7 +185,7 @@ export default function Home() {
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
             <Gamepad2 className="text-red-500 w-6 h-6" /> Categorias Populares
           </h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
             {categories.map((cat) => (
               <div 
                 key={cat.name}
@@ -217,7 +217,7 @@ export default function Home() {
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             {allListings.length > 0 ? allListings.map((listing: any) => {
               const priceValue = listing._type === 'used'
                 ? (listing.pricePS4 || listing.pricePS5 || 0)
@@ -280,7 +280,7 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-slate-950 border-t border-slate-800 py-12 mt-10">
+      <footer className="bg-slate-950 border-t border-slate-800 py-12 mt-10 pb-28 lg:pb-12">
         <div className="container mx-auto px-4 text-center">
           <div className="flex items-center justify-center gap-2 mb-6">
             <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center">🔥</div>

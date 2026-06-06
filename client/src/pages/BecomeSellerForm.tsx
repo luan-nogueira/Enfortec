@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { Shield, User, Store, Flame, ArrowLeft, Info, HelpCircle } from "lucide-react";
 
 export default function BecomeSellerForm() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const [, navigate] = useLocation();
   const [storeName, setStoreName] = useState("");
   const [description, setDescription] = useState("");
@@ -42,10 +42,24 @@ export default function BecomeSellerForm() {
     }
   }, [user?.id, localSeller]);
 
-  const { data: seller, isLoading: isCheckingSeller } = trpc.sellers.getByUserId.useQuery(undefined, {
+  const [checkTimedOut, setCheckTimedOut] = useState(false);
+
+  const { data: seller, isLoading: isCheckingSellerRaw } = trpc.sellers.getByUserId.useQuery(undefined, {
     enabled: isAuthenticated && !localSeller,
     retry: 1,
+    staleTime: 1000 * 60 * 5, // 5 min cache
+    gcTime: 1000 * 60 * 10,
   });
+
+  // Timeout de segurança: se demorar mais de 5s, libera a tela
+  useEffect(() => {
+    if (!isCheckingSellerRaw) return;
+    const timer = setTimeout(() => setCheckTimedOut(true), 5000);
+    return () => clearTimeout(timer);
+  }, [isCheckingSellerRaw]);
+
+  // Só mostra loading se ainda está checando E não deu timeout
+  const isCheckingSeller = isCheckingSellerRaw && !checkTimedOut;
 
   useEffect(() => {
     if (seller) {
@@ -94,7 +108,7 @@ export default function BecomeSellerForm() {
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
   };
 
-  if (!isAuthenticated) {
+  if (!authLoading && !isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950">
         <div className="text-center card-neon bg-slate-900 p-8 rounded-xl max-w-md w-full border border-red-600/30">

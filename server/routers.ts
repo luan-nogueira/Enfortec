@@ -128,7 +128,7 @@ export const appRouter = router({
     getByBuyerId: protectedProcedure.query(({ ctx }) => db.getOrdersByBuyerId(ctx.user.id)),
     getBySellerId: protectedProcedure.query(async ({ ctx }) => {
       const seller = await db.getSellerByUserId(ctx.user.id);
-      return seller ? db.getOrdersBySellerId(seller.id) : [];
+      return seller ? db.getOrdersBySellerId(seller.userId) : [];
     }),
     confirmAndReview: protectedProcedure
       .input(z.object({

@@ -1055,41 +1055,248 @@ Quer saber mais sobre algum? [Fale com o ADM no WhatsApp](${WA})`
 
 // server/_core/payment.ts
 import axios2 from "axios";
+
+// server/_core/context.ts
+import { createRemoteJWKSet, jwtVerify as jwtVerify2 } from "jose";
+var JWKS = createRemoteJWKSet(
+  new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com")
+);
+var FIREBASE_PROJECT_ID = "enfortec-c9b78";
+async function verifyFirebaseToken(token) {
+  try {
+    const { payload } = await jwtVerify2(token, JWKS, {
+      issuer: `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`,
+      audience: FIREBASE_PROJECT_ID
+    });
+    return payload;
+  } catch (error) {
+    console.error("[FirebaseAuth] Token verification failed:", error);
+    return null;
+  }
+}
+async function createContext(opts) {
+  let user = null;
+  try {
+    user = await sdk.authenticateRequest(opts.req);
+    console.log("[TRPC Server] OAuth cookie auth succeeded for user:", user?.id);
+  } catch (error) {
+    const authHeader = opts.req.headers.authorization;
+    console.log("[TRPC Server] OAuth auth failed. Authorization Header:", authHeader ? `${authHeader.substring(0, 25)}...` : "none");
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.substring(7);
+      const decoded = await verifyFirebaseToken(token);
+      console.log("[TRPC Server] Firebase Token decoded payload sub:", decoded?.sub || "none");
+      if (decoded && decoded.sub) {
+        const uid = decoded.sub;
+        const email = decoded.email;
+        const name = decoded.name || email?.split("@")[0] || "User";
+        try {
+          user = await getUserByOpenId(uid);
+          console.log("[TRPC Server] Database user lookup result (by openId):", user ? `found (id: ${user.id})` : "not found");
+          if (!user) {
+            try {
+              console.log("[TRPC Server] User not found in database, upserting...");
+              await upsertUser({
+                openId: uid,
+                name,
+                email,
+                loginMethod: "firebase",
+                lastSignedIn: /* @__PURE__ */ new Date()
+              });
+              user = await getUserByOpenId(uid);
+              console.log("[TRPC Server] User upsert complete, user id:", user?.id);
+            } catch (dbError) {
+              console.error("[FirebaseAuth] Failed to upsert user in database:", dbError);
+            }
+          } else {
+            try {
+              await upsertUser({
+                openId: uid,
+                lastSignedIn: /* @__PURE__ */ new Date()
+              });
+            } catch (e) {
+              console.error("[FirebaseAuth] Failed to update user lastSignedIn:", e);
+            }
+          }
+        } catch (dbErr) {
+          console.error("[TRPC Server] Database user lookup failed, falling back to local mock user:", dbErr);
+          user = {
+            id: 999999,
+            openId: uid,
+            name,
+            email: email || null,
+            loginMethod: "firebase_fallback",
+            role: "user",
+            createdAt: /* @__PURE__ */ new Date(),
+            updatedAt: /* @__PURE__ */ new Date(),
+            lastSignedIn: /* @__PURE__ */ new Date(),
+            balance: "0.00"
+          };
+        }
+        if (!user) {
+          console.log("[TRPC Server] SQL database unreachable or user not found, using Firebase user fallback.");
+          user = {
+            id: 999999,
+            openId: uid,
+            name,
+            email: email || null,
+            loginMethod: "firebase_fallback",
+            role: "user",
+            createdAt: /* @__PURE__ */ new Date(),
+            updatedAt: /* @__PURE__ */ new Date(),
+            lastSignedIn: /* @__PURE__ */ new Date(),
+            balance: "0.00"
+          };
+        }
+      }
+    }
+  }
+  return {
+    req: opts.req,
+    res: opts.res,
+    user
+  };
+}
+
+// server/_core/payment.ts
 function registerPaymentRoute(app2) {
   app2.post("/api/infinitepay/checkout", async (req, res) => {
     try {
-      const { name, price, quantity = 1, redirectUrl } = req.body;
+      const { name, price, quantity = 1, redirectUrl, productType = "store", productId, sellerId } = req.body;
       if (!name || price === void 0) {
         return res.status(400).json({ success: false, error: "Nome e pre\xE7o s\xE3o obrigat\xF3rios." });
       }
+      const apiKey = process.env.INFINITE_PAY_API_KEY;
+      const handle = process.env.INFINITE_PAY_HANDLE || "andre-luiz-srs";
+      let buyerId = 0;
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        const token = authHeader.substring(7);
+        const decoded = await verifyFirebaseToken(token);
+        if (decoded && decoded.sub) {
+          const user = await getUserByOpenId(decoded.sub);
+          if (user) {
+            buyerId = user.id;
+          }
+        }
+      }
+      let mysqlSellerId = null;
+      if (sellerId) {
+        const sellerUser = await getUserByOpenId(sellerId);
+        if (sellerUser) {
+          mysqlSellerId = sellerUser.id;
+        }
+      }
       const priceInCents = Math.round(parseFloat(price) * 100);
-      const handle = process.env.INFINITE_PAY_HANDLE || "efortegames";
+      const orderNsu = `${buyerId}_${mysqlSellerId || "null"}_${productType}_${productId || "null"}`;
+      const webhookUrl = `${req.protocol}://${req.get("host")}/api/infinitepay/webhook`;
       const payload = {
         handle,
+        order_nsu: orderNsu,
         redirect_url: redirectUrl || `${req.protocol}://${req.get("host")}/minhas-compras`,
+        webhook_url: webhookUrl,
         items: [
           {
             name,
+            description: name,
             price: priceInCents,
             quantity: Number(quantity)
           }
         ]
       };
       console.log("[InfinitePay] Criando link com payload:", JSON.stringify(payload));
+      const headers = {
+        "Content-Type": "application/json"
+      };
+      if (apiKey) {
+        headers["Authorization"] = `Bearer ${apiKey}`;
+      }
       const { data } = await axios2.post("https://api.checkout.infinitepay.io/links", payload, {
-        headers: {
-          "Content-Type": "application/json"
-        }
+        headers
       });
       if (data.success === false) {
         console.error("[InfinitePay] Erro retornado pela API:", data);
         return res.status(400).json({ success: false, error: data.message || "Erro da API InfinitePay" });
       }
+      console.log("[InfinitePay] Link gerado com sucesso:", data.url);
       return res.json({ success: true, url: data.url });
     } catch (error) {
       console.error("[InfinitePay] Erro interno na gera\xE7\xE3o do checkout:", error.response?.data || error.message);
       const errorMsg = error.response?.data?.message || error.message || "Erro desconhecido";
       return res.status(500).json({ success: false, error: errorMsg });
+    }
+  });
+  app2.post("/api/infinitepay/webhook", async (req, res) => {
+    try {
+      const event = req.body;
+      console.log("[InfinitePay Webhook] Evento recebido:", JSON.stringify(event));
+      const isPaid = event?.type === "charge.paid" || event?.type === "payment.approved" || event?.status === "paid" || event?.status === "approved";
+      if (!isPaid) {
+        console.log("[InfinitePay Webhook] Evento ignorado (n\xE3o \xE9 pagamento aprovado):", event?.type || event?.status);
+        return res.status(200).json({ received: true });
+      }
+      const paymentId = event?.id || event?.charge_id || event?.payment_id || null;
+      const totalPrice = event?.amount ? (event.amount / 100).toFixed(2) : event?.total_amount ? String(event.total_amount) : "0.00";
+      const productName = event?.items?.[0]?.name || event?.description || "Produto Eforte Games";
+      const orderNsu = event?.order_nsu || event?.data?.order_nsu || event?.payment?.order_nsu || event?.charge?.order_nsu || event?.object?.order_nsu || null;
+      let buyerId = 0;
+      let sellerId = null;
+      let productType = "store";
+      let productIdString = null;
+      if (orderNsu && typeof orderNsu === "string") {
+        const parts = orderNsu.split("_");
+        if (parts.length >= 4) {
+          buyerId = parseInt(parts[0]) || 0;
+          sellerId = parts[1] === "null" ? null : parseInt(parts[1]) || null;
+          productType = parts[2] || "store";
+          productIdString = parts[3] === "null" ? null : parts[3];
+        }
+      }
+      console.log(`[InfinitePay Webhook] Pagamento confirmado \u2014 ID: ${paymentId}, Valor: R$${totalPrice}, Produto: ${productName}, Buyer: ${buyerId}, Seller: ${sellerId}, Tipo: ${productType}`);
+      const database = await getDb();
+      if (database) {
+        let commissionPct = "10.00";
+        try {
+          const settings = await getPlatformSettings();
+          if (settings?.commissionPercentage) {
+            commissionPct = settings.commissionPercentage;
+          }
+        } catch (settingsErr) {
+          console.warn("[InfinitePay Webhook] Erro ao buscar comiss\xE3o das configura\xE7\xF5es:", settingsErr);
+        }
+        const total = parseFloat(totalPrice);
+        const pct = parseFloat(commissionPct) / 100;
+        const platformCommission = (total * pct).toFixed(2);
+        const sellerAmount = (total * (1 - pct)).toFixed(2);
+        await database.insert(orders).values({
+          buyerId,
+          sellerId,
+          productType,
+          quantity: 1,
+          totalPrice,
+          commissionPercentage: commissionPct,
+          platformCommission,
+          sellerAmount,
+          status: "pago",
+          paymentId: paymentId ? String(paymentId) : null
+        });
+        console.log("[InfinitePay Webhook] Pedido registrado no banco com sucesso.");
+      } else {
+        console.warn("[InfinitePay Webhook] Banco indispon\xEDvel \u2014 pedido n\xE3o registrado no MySQL.");
+      }
+      const adminPhone = "554384253691";
+      const adminMsg = encodeURIComponent(
+        `\u2705 Novo pagamento confirmado!
+
+Produto: ${productName}
+Valor: R$ ${parseFloat(totalPrice).toFixed(2).replace(".", ",")}
+ID: ${paymentId || "N/A"}`
+      );
+      console.log(`[InfinitePay Webhook] Link de notifica\xE7\xE3o admin: https://wa.me/${adminPhone}?text=${adminMsg}`);
+      return res.status(200).json({ received: true, success: true });
+    } catch (error) {
+      console.error("[InfinitePay Webhook] Erro ao processar evento:", error.message);
+      return res.status(200).json({ received: true, error: error.message });
     }
   });
 }
@@ -1343,7 +1550,7 @@ var appRouter = router({
     getByBuyerId: protectedProcedure.query(({ ctx }) => getOrdersByBuyerId(ctx.user.id)),
     getBySellerId: protectedProcedure.query(async ({ ctx }) => {
       const seller = await getSellerByUserId(ctx.user.id);
-      return seller ? getOrdersBySellerId(seller.id) : [];
+      return seller ? getOrdersBySellerId(seller.userId) : [];
     }),
     confirmAndReview: protectedProcedure.input(z2.object({
       orderId: z2.number(),
@@ -1368,108 +1575,6 @@ var appRouter = router({
     getBySellerId: publicProcedure.input(z2.number()).query(({ input }) => getReviewsBySellerId(input))
   })
 });
-
-// server/_core/context.ts
-import { createRemoteJWKSet, jwtVerify as jwtVerify2 } from "jose";
-var JWKS = createRemoteJWKSet(
-  new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com")
-);
-var FIREBASE_PROJECT_ID = "enfortec-c9b78";
-async function verifyFirebaseToken(token) {
-  try {
-    const { payload } = await jwtVerify2(token, JWKS, {
-      issuer: `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`,
-      audience: FIREBASE_PROJECT_ID
-    });
-    return payload;
-  } catch (error) {
-    console.error("[FirebaseAuth] Token verification failed:", error);
-    return null;
-  }
-}
-async function createContext(opts) {
-  let user = null;
-  try {
-    user = await sdk.authenticateRequest(opts.req);
-    console.log("[TRPC Server] OAuth cookie auth succeeded for user:", user?.id);
-  } catch (error) {
-    const authHeader = opts.req.headers.authorization;
-    console.log("[TRPC Server] OAuth auth failed. Authorization Header:", authHeader ? `${authHeader.substring(0, 25)}...` : "none");
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      const token = authHeader.substring(7);
-      const decoded = await verifyFirebaseToken(token);
-      console.log("[TRPC Server] Firebase Token decoded payload sub:", decoded?.sub || "none");
-      if (decoded && decoded.sub) {
-        const uid = decoded.sub;
-        const email = decoded.email;
-        const name = decoded.name || email?.split("@")[0] || "User";
-        try {
-          user = await getUserByOpenId(uid);
-          console.log("[TRPC Server] Database user lookup result (by openId):", user ? `found (id: ${user.id})` : "not found");
-          if (!user) {
-            try {
-              console.log("[TRPC Server] User not found in database, upserting...");
-              await upsertUser({
-                openId: uid,
-                name,
-                email,
-                loginMethod: "firebase",
-                lastSignedIn: /* @__PURE__ */ new Date()
-              });
-              user = await getUserByOpenId(uid);
-              console.log("[TRPC Server] User upsert complete, user id:", user?.id);
-            } catch (dbError) {
-              console.error("[FirebaseAuth] Failed to upsert user in database:", dbError);
-            }
-          } else {
-            try {
-              await upsertUser({
-                openId: uid,
-                lastSignedIn: /* @__PURE__ */ new Date()
-              });
-            } catch (e) {
-              console.error("[FirebaseAuth] Failed to update user lastSignedIn:", e);
-            }
-          }
-        } catch (dbErr) {
-          console.error("[TRPC Server] Database user lookup failed, falling back to local mock user:", dbErr);
-          user = {
-            id: 999999,
-            openId: uid,
-            name,
-            email: email || null,
-            loginMethod: "firebase_fallback",
-            role: "user",
-            createdAt: /* @__PURE__ */ new Date(),
-            updatedAt: /* @__PURE__ */ new Date(),
-            lastSignedIn: /* @__PURE__ */ new Date(),
-            balance: "0.00"
-          };
-        }
-        if (!user) {
-          console.log("[TRPC Server] SQL database unreachable or user not found, using Firebase user fallback.");
-          user = {
-            id: 999999,
-            openId: uid,
-            name,
-            email: email || null,
-            loginMethod: "firebase_fallback",
-            role: "user",
-            createdAt: /* @__PURE__ */ new Date(),
-            updatedAt: /* @__PURE__ */ new Date(),
-            lastSignedIn: /* @__PURE__ */ new Date(),
-            balance: "0.00"
-          };
-        }
-      }
-    }
-  }
-  return {
-    req: opts.req,
-    res: opts.res,
-    user
-  };
-}
 
 // server/_core/index.ts
 process.env.NODE_ENV = process.env.NODE_ENV || "development";
@@ -1569,21 +1674,30 @@ app.use(
   })
 );
 async function startServer() {
+  console.log("[Server] starting server...");
   const server = createServer(app);
+  console.log("[Server] NODE_ENV:", process.env.NODE_ENV);
   if (process.env.NODE_ENV === "development") {
+    console.log("[Server] Importing vite module...");
     const viteModule = "./vite.js";
     const { setupVite } = await import(viteModule);
+    console.log("[Server] Setting up Vite...");
     await setupVite(app, server);
+    console.log("[Server] Vite set up completed.");
   } else if (process.env.VERCEL !== "1") {
+    console.log("[Server] Importing vite module for static...");
     const viteModule = "./vite.js";
     const { serveStatic } = await import(viteModule);
+    console.log("[Server] Serving static files...");
     serveStatic(app);
   }
+  console.log("[Server] Finding available port...");
   const preferredPort = parseInt(process.env.PORT || "3000");
   const port = await findAvailablePort(preferredPort);
   if (port !== preferredPort) {
     console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
   }
+  console.log("[Server] Listening on port:", port);
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
   });

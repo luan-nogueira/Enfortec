@@ -17,6 +17,7 @@ import Login from "./pages/Login";
 import CollaboratorDashboard from "./pages/CollaboratorDashboard";
 import MyPurchases from "./pages/MyPurchases";
 import FloatingChat from "./components/FloatingChat";
+import MobileBottomNav from "./components/MobileBottomNav";
 import FAQ from "./pages/FAQ";
 
 import { useEffect } from "react";
@@ -68,6 +69,7 @@ function App() {
           <Toaster />
           <Router />
           <FloatingChat />
+          <MobileBottomNav />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

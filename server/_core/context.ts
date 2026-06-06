@@ -10,7 +10,7 @@ const JWKS = createRemoteJWKSet(
 
 const FIREBASE_PROJECT_ID = "enfortec-c9b78";
 
-async function verifyFirebaseToken(token: string) {
+export async function verifyFirebaseToken(token: string) {
   try {
     const { payload } = await jwtVerify(token, JWKS, {
       issuer: `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`,
