@@ -97,6 +97,22 @@ export async function createContext(
             balance: "0.00",
           };
         }
+        
+        if (!user) {
+          console.log("[TRPC Server] SQL database unreachable or user not found, using Firebase user fallback.");
+          user = {
+            id: 999999,
+            openId: uid,
+            name: name,
+            email: email || null,
+            loginMethod: "firebase_fallback",
+            role: "user",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            lastSignedIn: new Date(),
+            balance: "0.00",
+          };
+        }
       }
     }
   }
