@@ -7,8 +7,27 @@ import { ENV } from './_core/env';
 let _db: any = null;
 let _pool: any = null;
 
+// Detect serverless environment (Vercel) - in serverless we cannot use a persistent pool
+const IS_SERVERLESS = process.env.VERCEL === "1";
+
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
+  // In serverless, always create a fresh connection to avoid stale connections
+  if (IS_SERVERLESS && process.env.DATABASE_URL) {
+    try {
+      const useSsl = !process.env.DATABASE_URL.includes("localhost") && !process.env.DATABASE_URL.includes("127.0.0.1");
+      const connection = await mysql.createConnection({
+        uri: process.env.DATABASE_URL,
+        ...(useSsl ? { ssl: { rejectUnauthorized: false } } : {}),
+      });
+      return drizzle(connection);
+    } catch (error) {
+      console.warn("[Database] Failed to create serverless connection:", error);
+      return null;
+    }
+  }
+
+  // In development/long-running server: use pool for connection reuse
   if (!_db && process.env.DATABASE_URL) {
     try {
       const useSsl = !process.env.DATABASE_URL.includes("localhost") && !process.env.DATABASE_URL.includes("127.0.0.1");
