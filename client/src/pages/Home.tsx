@@ -86,6 +86,7 @@ export default function Home() {
             <a href="#categorias" className="text-slate-300 hover:text-white font-medium transition flex items-center gap-2"><LayoutGrid className="w-4 h-4" /> Categorias</a>
             <a href="#anuncios" className="text-slate-300 hover:text-white font-medium transition flex items-center gap-2"><Tag className="w-4 h-4" /> Anúncios</a>
             <a href="/faq" className="text-slate-300 hover:text-white font-medium transition flex items-center gap-2"><HelpCircle className="w-4 h-4" /> FAQ</a>
+            <a href="/virar-vendedor" className="text-slate-300 hover:text-white font-medium transition flex items-center gap-2"><Zap className="w-4 h-4 text-red-500" /> Revendedor</a>
             <span className="w-px h-6 bg-slate-800"></span>
             
             {isAuthenticated ? (
@@ -101,9 +102,6 @@ export default function Home() {
                     <Shield className="w-4 h-4 mr-2" /> Admin
                   </Button>
                 )}
-                <Button size="sm" onClick={() => navigate("/vendedor")} className="bg-red-600 hover:bg-red-700 text-white shadow-[0_0_10px_rgba(220,38,38,0.3)]">
-                  Painel do Vendedor
-                </Button>
                 <Button variant="ghost" onClick={logout} className="text-slate-400 hover:text-red-500 hover:bg-red-950/20 font-bold flex items-center gap-2">
                   <LogOut className="w-4 h-4" /> Sair
                 </Button>

@@ -91,7 +91,7 @@ const faqs = [
       },
       {
         q: "Como vendo meus jogos usados?",
-        a: "Faça login, clique em 'Painel do Vendedor' e cadastre seus produtos usados com fotos, descrição e preço. Nossa equipe aprova o anúncio em até 24 horas."
+        a: "Faça login, acesse a página 'Revendedor' para criar sua loja (ou o botão 'Vender meu Produto' na aba de Usados se já possuir cadastro) e cadastre seus produtos usados com fotos, descrição e preço. Nossa equipe aprova o anúncio em até 24 horas."
       },
     ]
   },

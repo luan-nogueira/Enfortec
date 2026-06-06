@@ -15,6 +15,10 @@ export default function BecomeSellerForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"cadastro" | "revenda">("cadastro");
 
+  const { data: seller, isLoading: isCheckingSeller } = trpc.sellers.getByUserId.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
+
   const createSellerMutation = trpc.sellers.create.useMutation();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -110,7 +114,32 @@ export default function BecomeSellerForm() {
           {/* Active Tab Content */}
           {activeTab === "cadastro" ? (
             <div className="bg-slate-900/60 backdrop-blur-md border border-red-600/20 rounded-3xl p-8 shadow-2xl card-neon">
-              <form onSubmit={handleSubmit} className="space-y-6">
+              {isCheckingSeller ? (
+                <div className="text-center py-12">
+                  <p className="text-slate-400">Verificando dados da loja...</p>
+                </div>
+              ) : seller ? (
+                <div className="text-center py-8 space-y-6">
+                  <div className="w-16 h-16 rounded-full bg-red-600/10 flex items-center justify-center border border-red-600/20 mx-auto">
+                    <Store className="w-8 h-8 text-red-500 animate-pulse" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-black text-white uppercase tracking-tight">Sua Loja está Ativa!</h2>
+                    <p className="text-sm text-slate-400 mt-2">
+                      Você já está cadastrado como revendedor parceiro (<strong>{seller.storeName}</strong>).
+                    </p>
+                  </div>
+                  <div className="pt-4 flex gap-4 max-w-sm mx-auto">
+                    <Button
+                      onClick={() => navigate("/vendedor")}
+                      className="w-full h-12 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black uppercase tracking-wider btn-neon"
+                    >
+                      Acessar Painel de Desapego
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-6">
                 {/* User Info */}
                 <div className="bg-slate-950/80 border border-red-600/10 p-5 rounded-2xl flex items-center gap-4">
                   <div className="w-12 h-12 rounded-full bg-red-600/10 flex items-center justify-center border border-red-600/20">
@@ -190,6 +219,7 @@ export default function BecomeSellerForm() {
                   </Button>
                 </div>
               </form>
+              )}
             </div>
           ) : (
             <div className="bg-slate-900/60 backdrop-blur-md border border-red-600/20 rounded-3xl p-8 shadow-2xl card-neon space-y-6">
