@@ -1421,7 +1421,7 @@ var appRouter = router({
 init_db();
 import { createRemoteJWKSet, jwtVerify as jwtVerify2 } from "jose";
 var JWKS = createRemoteJWKSet(
-  new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken-system@system.gserviceaccount.com")
+  new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com")
 );
 var FIREBASE_PROJECT_ID = "enfortec-c9b78";
 async function verifyFirebaseToken(token) {

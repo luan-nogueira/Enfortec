@@ -5,7 +5,7 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
 import * as db from "../db";
 
 const JWKS = createRemoteJWKSet(
-  new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken-system@system.gserviceaccount.com")
+  new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com")
 );
 
 const FIREBASE_PROJECT_ID = "enfortec-c9b78";
