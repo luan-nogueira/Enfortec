@@ -53,7 +53,16 @@ app.get("/api/test-db", async (req, res) => {
     const result = await db.execute("SELECT 1");
     return res.json({ success: true, result });
   } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message, stack: err.stack });
+    console.error("[TestDB Error]", err);
+    return res.status(500).json({ 
+      success: false, 
+      error: err.message, 
+      cause: err.cause ? { message: err.cause.message, code: err.cause.code } : null,
+      originalError: err.originalError ? { message: err.originalError.message, code: err.originalError.code, errno: err.originalError.errno, sqlState: err.originalError.sqlState } : null,
+      keys: Object.keys(err),
+      errJson: JSON.stringify(err, Object.getOwnPropertyNames(err)),
+      stack: err.stack 
+    });
   }
 });
 
