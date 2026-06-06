@@ -6,6 +6,14 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 export default function UsedMarketplace() {
   const { user, isAuthenticated } = useAuth();
@@ -15,6 +23,23 @@ export default function UsedMarketplace() {
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [checkoutProductId, setCheckoutProductId] = useState<string | null>(null);
+
+  const [selectedBargainProduct, setSelectedBargainProduct] = useState<any | null>(null);
+  const [bargainOffer, setBargainOffer] = useState("");
+
+  const handleBargainClick = (product: any) => {
+    setSelectedBargainProduct(product);
+    setBargainOffer("");
+  };
+
+  const handleFinalizeBargain = () => {
+    if (!selectedBargainProduct || !bargainOffer.trim()) return;
+    const price = parseFloat(selectedBargainProduct.pricePS4 || selectedBargainProduct.pricePS5 || 0);
+    const message = `Olá! Tenho interesse no produto usado: ${selectedBargainProduct.name} anunciado por ${selectedBargainProduct.sellerName || "vendedor"} (Preço original: R$ ${price.toFixed(2).replace('.', ',')}). Gostaria de pechinchar: você fecharia por R$ ${parseFloat(bargainOffer).toFixed(2).replace('.', ',')}?`;
+    const phone = "5543984253691";
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
+    setSelectedBargainProduct(null);
+  };
 
   const handleBuyClick = async (product: any) => {
     const price = parseFloat(product.pricePS4 || product.pricePS5 || 0);
@@ -236,14 +261,24 @@ export default function UsedMarketplace() {
                       </div>
                     </div>
 
-                    <Button 
-                      onClick={() => handleBuyClick(product)}
-                      disabled={checkoutProductId === product.id}
-                      className="w-full bg-red-600 hover:bg-red-700 text-white font-black text-lg h-12 rounded-2xl transition-all active:scale-95 shadow-lg border-b-4 border-red-800 flex items-center justify-center gap-3"
-                    >
-                      <ShoppingCart className="w-5 h-5" strokeWidth={3} />
-                      {checkoutProductId === product.id ? "Processando..." : "Comprar com Pix/Cartão"}
-                    </Button>
+                    <div className="flex flex-col gap-2">
+                      <Button 
+                        onClick={() => handleBuyClick(product)}
+                        disabled={checkoutProductId === product.id}
+                        className="w-full bg-red-600 hover:bg-red-700 text-white font-black text-lg h-12 rounded-2xl transition-all active:scale-95 shadow-lg border-b-4 border-red-800 flex items-center justify-center gap-3"
+                      >
+                        <ShoppingCart className="w-5 h-5" strokeWidth={3} />
+                        {checkoutProductId === product.id ? "Processando..." : "Comprar com Pix/Cartão"}
+                      </Button>
+                      {parseFloat(product.pricePS4 || product.pricePS5 || 0) > 0 && (
+                        <Button
+                          onClick={() => handleBargainClick(product)}
+                          className="w-full bg-slate-900 border border-red-600/30 hover:border-red-600/60 text-red-500 font-bold text-xs h-12 rounded-2xl flex items-center justify-center gap-1.5"
+                        >
+                          💸 Pechinchar
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -251,6 +286,54 @@ export default function UsedMarketplace() {
           </div>
         )}
       </div>
+
+      {/* Modal de Pechincha */}
+      <Dialog open={!!selectedBargainProduct} onOpenChange={(open) => !open && setSelectedBargainProduct(null)}>
+        <DialogContent className="bg-slate-900 border-red-600/30 text-white sm:max-w-[425px] card-neon">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-neon flex items-center gap-2">💸 Fazer uma Pechincha</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Proponha sua oferta para este desapego. Se aprovado, fechamos o negócio!
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-6 space-y-4">
+            <div className="flex gap-4 items-start mb-6">
+              <div className="w-20 h-20 rounded bg-slate-800 overflow-hidden border border-red-600/20">
+                <img src={selectedBargainProduct?.imageUrl} alt={selectedBargainProduct?.name} className="w-full h-full object-cover" />
+              </div>
+              <div>
+                <h4 className="font-bold text-white line-clamp-2">{selectedBargainProduct?.name}</h4>
+                <p className="text-xs text-slate-500">
+                  Preço original: R$ {selectedBargainProduct ? parseFloat(selectedBargainProduct.pricePS4 || selectedBargainProduct.pricePS5 || 0).toFixed(2).replace('.', ',') : "0,00"}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <label className="text-sm font-bold text-slate-300">Sua Oferta de Valor (R$)</label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="Ex: 50.00"
+                value={bargainOffer}
+                onChange={(e) => setBargainOffer(e.target.value)}
+                className="bg-slate-950 border-red-600/20 text-white focus-visible:ring-red-600 h-12 rounded-xl text-base"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button 
+              disabled={!bargainOffer.trim()}
+              onClick={handleFinalizeBargain}
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-12 text-lg rounded-xl shadow-lg shadow-green-600/20"
+            >
+              Enviar Proposta de Pechincha
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

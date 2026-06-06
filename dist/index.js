@@ -1106,6 +1106,47 @@ Quer saber mais sobre algum? [Fale com o ADM no WhatsApp](${WA})`
   });
 }
 
+// server/_core/payment.ts
+import axios2 from "axios";
+function registerPaymentRoute(app2) {
+  app2.post("/api/infinitepay/checkout", async (req, res) => {
+    try {
+      const { name, price, quantity = 1, redirectUrl } = req.body;
+      if (!name || price === void 0) {
+        return res.status(400).json({ success: false, error: "Nome e pre\xE7o s\xE3o obrigat\xF3rios." });
+      }
+      const priceInCents = Math.round(parseFloat(price) * 100);
+      const handle = process.env.INFINITE_PAY_HANDLE || "efortegames";
+      const payload = {
+        handle,
+        redirect_url: redirectUrl || `${req.protocol}://${req.get("host")}/minhas-compras`,
+        items: [
+          {
+            name,
+            price: priceInCents,
+            quantity: Number(quantity)
+          }
+        ]
+      };
+      console.log("[InfinitePay] Criando link com payload:", JSON.stringify(payload));
+      const { data } = await axios2.post("https://api.checkout.infinitepay.io/links", payload, {
+        headers: {
+          "Content-Type": "application/json"
+        }
+      });
+      if (data.success === false) {
+        console.error("[InfinitePay] Erro retornado pela API:", data);
+        return res.status(400).json({ success: false, error: data.message || "Erro da API InfinitePay" });
+      }
+      return res.json({ success: true, url: data.url });
+    } catch (error) {
+      console.error("[InfinitePay] Erro interno na gera\xE7\xE3o do checkout:", error.response?.data || error.message);
+      const errorMsg = error.response?.data?.message || error.message || "Erro desconhecido";
+      return res.status(500).json({ success: false, error: errorMsg });
+    }
+  });
+}
+
 // server/_core/systemRouter.ts
 import { z } from "zod";
 
@@ -1417,6 +1458,7 @@ registerStorageProxy(app);
 registerOAuthRoutes(app);
 registerSeedRoute(app);
 registerAiRoute(app);
+registerPaymentRoute(app);
 app.get("/api/test-db", async (req, res) => {
   try {
     const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));

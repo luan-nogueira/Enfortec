@@ -21,10 +21,30 @@ export default function Store() {
   const [searchTerm, setSearchTerm] = useState("");
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [chosenVersion, setChosenVersion] = useState<"PS4" | "PS5" | null>(null);
 
-  const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
+  const [selectedBargainProduct, setSelectedBargainProduct] = useState<any | null>(null);
+  const [chosenBargainVersion, setChosenBargainVersion] = useState<"PS4" | "PS5" | null>(null);
+  const [bargainOffer, setBargainOffer] = useState("");
+
+  const handleBargainClick = (product: any) => {
+    setSelectedBargainProduct(product);
+    setBargainOffer("");
+    if (product.pricePS4 && !product.pricePS5) setChosenBargainVersion("PS4");
+    else if (!product.pricePS4 && product.pricePS5) setChosenBargainVersion("PS5");
+    else setChosenBargainVersion(null);
+  };
+
+  const handleFinalizeBargain = () => {
+    if (!selectedBargainProduct || !chosenBargainVersion || !bargainOffer.trim()) return;
+    const originalPrice = chosenBargainVersion === "PS4" ? selectedBargainProduct.pricePS4 : selectedBargainProduct.pricePS5;
+    const message = `Olá! Tenho interesse no produto: ${selectedBargainProduct.name} (${chosenBargainVersion}) (Preço original: R$ ${originalPrice.toFixed(2)}). Gostaria de pechinchar: você fecharia por R$ ${parseFloat(bargainOffer).toFixed(2)}?`;
+    const phone = "5543984253691";
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
+    setSelectedBargainProduct(null);
+  };
 
   useEffect(() => {
     const q = query(collection(db, "store_products"), orderBy("createdAt", "desc"));
@@ -212,14 +232,24 @@ export default function Store() {
                       </div>
                     </div>
 
-                    <Button 
-                      onClick={() => handleBuyClick(product)}
-                      disabled={product.stock <= 0}
-                      className={`w-full ${product.stock > 0 ? 'bg-red-600 hover:bg-red-700 shadow-[0_8px_20px_rgba(220,38,38,0.3)]' : 'bg-slate-800 cursor-not-allowed opacity-50'} text-white font-black text-xl h-14 rounded-2xl mt-2 transition-all active:scale-[0.95] border-b-4 border-red-800 flex items-center justify-center gap-3 group/btn`}
-                    >
-                      <ShoppingCart className="w-5 h-5 transition-transform group-hover/btn:scale-110" strokeWidth={3} />
-                      {product.stock > 0 ? "Comprar" : "Indisponível"}
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        onClick={() => handleBuyClick(product)}
+                        disabled={product.stock <= 0}
+                        className={`flex-[2] ${product.stock > 0 ? 'bg-red-600 hover:bg-red-700 shadow-[0_8px_20px_rgba(220,38,38,0.3)]' : 'bg-slate-800 cursor-not-allowed opacity-50'} text-white font-black text-sm h-12 rounded-xl mt-2 transition-all active:scale-[0.95] border-b-4 border-red-800 flex items-center justify-center gap-2 group/btn`}
+                      >
+                        <ShoppingCart className="w-4 h-4 transition-transform group-hover/btn:scale-110" strokeWidth={3} />
+                        {product.stock > 0 ? "Comprar" : "Indisponível"}
+                      </Button>
+                      {product.stock > 0 && (
+                        <Button
+                          onClick={() => handleBargainClick(product)}
+                          className="flex-1 bg-slate-900 border border-red-600/30 hover:border-red-600/60 text-red-500 font-bold text-xs h-12 rounded-xl mt-2 transition-all active:scale-[0.95] flex items-center justify-center gap-1"
+                        >
+                          💸 Pechinchar
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -297,6 +327,84 @@ export default function Store() {
               className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-12 text-lg btn-neon"
             >
               {isProcessingCheckout ? "Gerando pagamento..." : "Confirmar e Ir para Checkout"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Pechincha */}
+      <Dialog open={!!selectedBargainProduct} onOpenChange={(open) => !open && setSelectedBargainProduct(null)}>
+        <DialogContent className="bg-slate-900 border-red-600/30 text-white sm:max-w-[425px] card-neon">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-neon flex items-center gap-2">💸 Fazer uma Pechincha</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Proponha sua oferta para o administrador. Se aprovado, fechamos o negócio!
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-6 space-y-4">
+            <div className="flex gap-4 items-start mb-6">
+              <div className="w-20 h-20 rounded bg-slate-800 overflow-hidden border border-red-600/20">
+                <img src={selectedBargainProduct?.imageUrl} alt={selectedBargainProduct?.name} className="w-full h-full object-cover" />
+              </div>
+              <div>
+                <h4 className="font-bold text-white line-clamp-2">{selectedBargainProduct?.name}</h4>
+                <p className="text-xs text-slate-500">Qual versão você quer propor?</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {selectedBargainProduct?.pricePS4 && (
+                <button
+                  type="button"
+                  onClick={() => setChosenBargainVersion("PS4")}
+                  className={`w-full p-3.5 rounded-xl border transition-all flex justify-between items-center ${
+                    chosenBargainVersion === "PS4" 
+                    ? "border-red-500 bg-red-500/10" 
+                    : "border-slate-700 bg-slate-800 hover:border-red-500/50"
+                  }`}
+                >
+                  <span className="font-bold">Versão PS4</span>
+                  <span className="text-slate-400 font-bold">R$ {selectedBargainProduct.pricePS4.toFixed(2)}</span>
+                </button>
+              )}
+
+              {selectedBargainProduct?.pricePS5 && (
+                <button
+                  type="button"
+                  onClick={() => setChosenBargainVersion("PS5")}
+                  className={`w-full p-3.5 rounded-xl border transition-all flex justify-between items-center ${
+                    chosenBargainVersion === "PS5" 
+                    ? "border-red-500 bg-red-500/10" 
+                    : "border-slate-700 bg-slate-800 hover:border-red-500/50"
+                  }`}
+                >
+                  <span className="font-bold">Versão PS5</span>
+                  <span className="text-slate-400 font-bold">R$ {selectedBargainProduct.pricePS5.toFixed(2)}</span>
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <label className="text-sm font-bold text-slate-300">Sua Oferta de Valor (R$)</label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="Ex: 50.00"
+                value={bargainOffer}
+                onChange={(e) => setBargainOffer(e.target.value)}
+                className="bg-slate-950 border-red-600/20 text-white focus-visible:ring-red-600 h-12 rounded-xl text-base"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button 
+              disabled={!chosenBargainVersion || !bargainOffer.trim()}
+              onClick={handleFinalizeBargain}
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-12 text-lg rounded-xl shadow-lg shadow-green-600/20"
+            >
+              Enviar Proposta de Pechincha
             </Button>
           </DialogFooter>
         </DialogContent>
