@@ -8,6 +8,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { registerSeedRoute } from "./seed";
 import { registerAiRoute } from "./ai";
+import { registerPaymentRoute } from "./payment";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 
@@ -39,6 +40,7 @@ registerStorageProxy(app);
 registerOAuthRoutes(app);
 registerSeedRoute(app);
 registerAiRoute(app);
+registerPaymentRoute(app);
 
 app.get("/api/test-db", async (req, res) => {
   try {

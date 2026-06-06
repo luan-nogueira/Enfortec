@@ -14,6 +14,44 @@ export default function UsedMarketplace() {
   const [selectedCondition, setSelectedCondition] = useState<string | null>(null);
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [checkoutProductId, setCheckoutProductId] = useState<string | null>(null);
+
+  const handleBuyClick = async (product: any) => {
+    const price = parseFloat(product.pricePS4 || product.pricePS5 || 0);
+    if (price === 0) {
+      const msg = encodeURIComponent(`Olá! Tenho interesse no jogo USADO: ${product.name} anunciado por ${product.sellerName || "vendedor"}. Como faço para comprar?`);
+      window.open(`https://wa.me/5543984253691?text=${msg}`, '_blank');
+      return;
+    }
+
+    setCheckoutProductId(product.id);
+    try {
+      const response = await fetch("/api/infinitepay/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          name: `${product.name} (Usado)`,
+          price: price,
+          redirectUrl: `${window.location.origin}/minhas-compras`
+        })
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success && data.url) {
+        window.open(data.url, "_blank");
+      } else {
+        throw new Error(data.error || "Erro ao gerar link de pagamento");
+      }
+    } catch (error) {
+      console.warn("[Checkout] Fallback para WhatsApp devido a erro:", error);
+      const msg = encodeURIComponent(`Olá! Tenho interesse no jogo USADO: ${product.name} anunciado por ${product.sellerName || "vendedor"}. Ainda está disponível?`);
+      window.open(`https://wa.me/5543984253691?text=${msg}`, '_blank');
+    } finally {
+      setCheckoutProductId(null);
+    }
+  };
   
   useEffect(() => {
     const q = query(collection(db, "used_products"), orderBy("createdAt", "desc"));
@@ -199,14 +237,12 @@ export default function UsedMarketplace() {
                     </div>
 
                     <Button 
-                      onClick={() => {
-                        const message = `Olá! Tenho interesse no jogo USADO: ${product.name} anunciado por ${product.sellerName}. Ainda está disponível?`;
-                        window.open(`https://wa.me/5543984253691?text=${encodeURIComponent(message)}`, "_blank");
-                      }}
+                      onClick={() => handleBuyClick(product)}
+                      disabled={checkoutProductId === product.id}
                       className="w-full bg-red-600 hover:bg-red-700 text-white font-black text-lg h-12 rounded-2xl transition-all active:scale-95 shadow-lg border-b-4 border-red-800 flex items-center justify-center gap-3"
                     >
                       <ShoppingCart className="w-5 h-5" strokeWidth={3} />
-                      Comprar Agora
+                      {checkoutProductId === product.id ? "Processando..." : "Comprar com Pix/Cartão"}
                     </Button>
                   </div>
                 </div>

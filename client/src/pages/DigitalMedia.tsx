@@ -53,6 +53,44 @@ export default function DigitalMedia() {
   const [sortOrder, setSortOrder] = useState<"az" | "za" | "asc" | "desc">("az");
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [checkoutProductId, setCheckoutProductId] = useState<string | null>(null);
+
+  const handleBuyClick = async (product: any) => {
+    const price = parseFloat(product.price);
+    if (price === 0) {
+      const msg = encodeURIComponent(`Olá! Tenho interesse no jogo "${product.name}" - valor sob consulta. Como faço para comprar?`);
+      window.open(`https://wa.me/554384253691?text=${msg}`, '_blank');
+      return;
+    }
+
+    setCheckoutProductId(product.id);
+    try {
+      const response = await fetch("/api/infinitepay/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          name: product.name,
+          price: price,
+          redirectUrl: `${window.location.origin}/minhas-compras`
+        })
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success && data.url) {
+        window.open(data.url, "_blank");
+      } else {
+        throw new Error(data.error || "Erro ao gerar link de pagamento");
+      }
+    } catch (error) {
+      console.warn("[Checkout] Fallback para WhatsApp devido a erro:", error);
+      const msg = encodeURIComponent(`Olá! Tenho interesse no jogo "${product.name}" - R$ ${price.toFixed(2).replace('.', ',')}. Como faço para comprar?`);
+      window.open(`https://wa.me/554384253691?text=${msg}`, '_blank');
+    } finally {
+      setCheckoutProductId(null);
+    }
+  };
 
   useEffect(() => {
     // Simple collection fetch — no composite index needed
@@ -340,15 +378,16 @@ export default function DigitalMedia() {
                     <Button
                       size="sm"
                       className="w-full bg-red-600 hover:bg-red-700 text-white font-bold btn-neon text-xs"
-                      onClick={() => {
-                        const msg = encodeURIComponent(`Olá! Tenho interesse no jogo "${product.name}" - R$ ${parseFloat(product.price).toFixed(2).replace('.', ',')}. Como faço para comprar?`);
-                        window.open(`https://wa.me/554384253691?text=${msg}`, '_blank');
-                      }}
+                      onClick={() => handleBuyClick(product)}
+                      disabled={checkoutProductId === product.id}
                     >
-                      <svg className="w-3 h-3 fill-current mr-1" viewBox="0 0 24 24">
-                        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.42 9.864-9.864.002-2.637-1.03-5.118-2.905-6.993C16.257 1.874 13.78 1.84 11.14 1.84 5.704 1.84 1.28 6.261 1.277 11.705c-.001 1.714.453 3.39 1.317 4.873L1.576 22.25l5.071-1.328z"/>
-                      </svg>
-                      Comprar via WhatsApp
+                      {parseFloat(product.price) === 0 ? (
+                        "Consultar via WhatsApp"
+                      ) : checkoutProductId === product.id ? (
+                        "Processando..."
+                      ) : (
+                        "Comprar com Pix/Cartão"
+                      )}
                     </Button>
                   </div>
                 </div>

@@ -24,6 +24,8 @@ export default function Store() {
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [chosenVersion, setChosenVersion] = useState<"PS4" | "PS5" | null>(null);
 
+  const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
+
   useEffect(() => {
     const q = query(collection(db, "store_products"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -52,14 +54,40 @@ export default function Store() {
     else setChosenVersion(null);
   };
 
-  const handleFinalizePurchase = () => {
+  const handleFinalizePurchase = async () => {
     if (!selectedProduct || !chosenVersion) return;
     
     const price = chosenVersion === "PS4" ? selectedProduct.pricePS4 : selectedProduct.pricePS5;
-    const message = `Olá! Quero comprar o produto: ${selectedProduct.name} (${chosenVersion}) no valor de R$ ${price.toFixed(2)}`;
-    const phone = "5543984253691"; // Número atualizado
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
-    setSelectedProduct(null);
+    
+    setIsProcessingCheckout(true);
+    try {
+      const response = await fetch("/api/infinitepay/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          name: `${selectedProduct.name} (${chosenVersion})`,
+          price: price,
+          redirectUrl: `${window.location.origin}/minhas-compras`
+        })
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success && data.url) {
+        window.open(data.url, "_blank");
+      } else {
+        throw new Error(data.error || "Erro ao gerar link de pagamento");
+      }
+    } catch (error) {
+      console.warn("[Checkout] Fallback para WhatsApp devido a erro:", error);
+      const message = `Olá! Quero comprar o produto: ${selectedProduct.name} (${chosenVersion}) no valor de R$ ${price.toFixed(2)}`;
+      const phone = "5543984253691"; // Número atualizado
+      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
+    } finally {
+      setIsProcessingCheckout(false);
+      setSelectedProduct(null);
+    }
   };
 
   return (
@@ -264,11 +292,11 @@ export default function Store() {
 
           <DialogFooter>
             <Button 
-              disabled={!chosenVersion}
+              disabled={!chosenVersion || isProcessingCheckout}
               onClick={handleFinalizePurchase}
               className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-12 text-lg btn-neon"
             >
-              Confirmar e Ir para Checkout
+              {isProcessingCheckout ? "Gerando pagamento..." : "Confirmar e Ir para Checkout"}
             </Button>
           </DialogFooter>
         </DialogContent>

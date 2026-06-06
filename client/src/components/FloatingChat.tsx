@@ -328,21 +328,50 @@ export default function FloatingChat() {
                 <p className="text-[10px] text-green-300 font-bold uppercase tracking-widest mt-0.5">● Online agora</p>
               </div>
             </div>
-            <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="text-white/70 hover:text-white hover:bg-white/10 h-8 w-8">
-              <X className="w-5 h-5" />
-            </Button>
+            <div className="flex items-center gap-1">
+              <a
+                href={WA_BASE}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors"
+                title="Suporte no WhatsApp"
+              >
+                <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                  <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.42 9.864-9.864.002-2.637-1.03-5.118-2.905-6.993C16.257 1.874 13.78 1.84 11.14 1.84 5.704 1.84 1.28 6.261 1.277 11.705c-.001 1.714.453 3.39 1.317 4.873L1.576 22.25l5.071-1.328z"/>
+                </svg>
+              </a>
+              <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="text-white/70 hover:text-white hover:bg-white/10 h-8 w-8">
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
           </div>
 
           {/* Messages */}
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-900/80">
             {/* Welcome message */}
             {messages.length === 0 && (
-              <div className="flex justify-start">
-                <div className="max-w-[88%] p-3.5 rounded-2xl rounded-bl-none text-sm bg-slate-800 text-slate-200 border border-red-600/20">
-                  <span className="block text-[9px] text-red-400 font-bold uppercase tracking-wider mb-1.5">Assistente 🤖</span>
-                  Olá, <b>{currentUserName}</b>! 👋 Sou o assistente da <b>Eforte Games</b>.
-                  <br /><br />
-                  Pergunte sobre jogos disponíveis (ex: <i>"Tem God of War?"</i>), preços, pagamentos ou como comprar!
+              <div className="space-y-3">
+                <div className="flex justify-start">
+                  <div className="max-w-[88%] p-3.5 rounded-2xl rounded-bl-none text-sm bg-slate-800 text-slate-200 border border-red-600/20">
+                    <span className="block text-[9px] text-red-400 font-bold uppercase tracking-wider mb-1.5">Assistente 🤖</span>
+                    Olá, <b>{currentUserName}</b>! 👋 Sou o assistente da <b>Eforte Games</b>.
+                    <br /><br />
+                    Pergunte sobre jogos disponíveis (ex: <i>"Tem God of War?"</i>), preços, pagamentos ou como comprar!
+                  </div>
+                </div>
+                {/* Botão de suporte WhatsApp na mensagem inicial */}
+                <div className="flex justify-start pl-2">
+                  <a
+                    href={WA_BASE}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl shadow-md transition-colors"
+                  >
+                    <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                      <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.42 9.864-9.864.002-2.637-1.03-5.118-2.905-6.993C16.257 1.874 13.78 1.84 11.14 1.84 5.704 1.84 1.28 6.261 1.277 11.705c-.001 1.714.453 3.39 1.317 4.873L1.576 22.25l5.071-1.328z"/>
+                    </svg>
+                    Falar com Suporte no WhatsApp
+                  </a>
                 </div>
               </div>
             )}
@@ -374,8 +403,23 @@ export default function FloatingChat() {
             )}
           </div>
 
+          {/* Quick Support Banner above Input */}
+          <div className="px-3 py-2 bg-slate-950/60 border-t border-red-600/10 flex justify-center flex-shrink-0">
+            <a
+              href={WA_BASE}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full bg-green-600 hover:bg-green-700 text-white font-black text-[11px] uppercase tracking-wider py-2 rounded-lg shadow-md transition-colors"
+            >
+              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.42 9.864-9.864.002-2.637-1.03-5.118-2.905-6.993C16.257 1.874 13.78 1.84 11.14 1.84 5.704 1.84 1.28 6.261 1.277 11.705c-.001 1.714.453 3.39 1.317 4.873L1.576 22.25l5.071-1.328z"/>
+              </svg>
+              Precisa de ajuda? Chamar no WhatsApp
+            </a>
+          </div>
+
           {/* Input */}
-          <form onSubmit={handleSend} className="p-3 bg-slate-950 border-t border-red-600/20 flex gap-2 flex-shrink-0">
+          <form onSubmit={handleSend} className="p-3 bg-slate-950 border-t border-red-600/10 flex gap-2 flex-shrink-0">
             <Input
               value={message}
               onChange={e => setMessage(e.target.value)}
