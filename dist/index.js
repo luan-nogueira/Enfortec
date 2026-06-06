@@ -256,11 +256,13 @@ async function getDb() {
     return null;
   }
   try {
-    const useSsl = !process.env.DATABASE_URL.includes("localhost") && !process.env.DATABASE_URL.includes("127.0.0.1");
+    const isLocal = process.env.DATABASE_URL.includes("localhost") || process.env.DATABASE_URL.includes("127.0.0.1");
     const connection = await mysql.createConnection({
       uri: process.env.DATABASE_URL,
-      connectTimeout: 1e4,
-      ...useSsl ? { ssl: { rejectUnauthorized: false } } : {}
+      connectTimeout: 15e3,
+      allowPublicKeyRetrieval: true,
+      // Railway and other cloud MySQL providers require SSL with self-signed certs
+      ...!isLocal ? { ssl: { rejectUnauthorized: false } } : {}
     });
     return drizzle(connection);
   } catch (error) {
