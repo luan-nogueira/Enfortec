@@ -43,25 +43,48 @@ registerAiRoute(app);
 registerPaymentRoute(app);
 
 app.get("/api/test-db", async (req, res) => {
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    return res.status(500).json({ success: false, error: "DATABASE_URL not set in environment" });
+  }
+  // Try to connect directly and catch errors
+  let connectError: any = null;
+  let db: any = null;
   try {
-    const { getDb } = await import("../db");
-    const db = await getDb();
-    if (!db) {
-      return res.status(500).json({ success: false, error: "Database instance is null (DATABASE_URL missing?)" });
-    }
-    // Run a raw query using the underlying pool or execute
+    const mysql = await import("mysql2/promise");
+    const { drizzle } = await import("drizzle-orm/mysql2");
+    const useSsl = !dbUrl.includes("localhost") && !dbUrl.includes("127.0.0.1");
+    const connection = await mysql.default.createConnection({
+      uri: dbUrl,
+      connectTimeout: 10000,
+      ...(useSsl ? { ssl: { rejectUnauthorized: false } } : {}),
+    });
+    db = drizzle(connection);
+  } catch (err: any) {
+    connectError = err;
+  }
+
+  if (!db || connectError) {
+    return res.status(500).json({ 
+      success: false, 
+      phase: "connect",
+      error: connectError?.message || "Connection returned null",
+      code: connectError?.code,
+      errno: connectError?.errno,
+      errJson: connectError ? JSON.stringify(connectError, Object.getOwnPropertyNames(connectError)) : null,
+    });
+  }
+
+  try {
     const result = await db.execute("SELECT 1");
     return res.json({ success: true, result });
   } catch (err: any) {
-    console.error("[TestDB Error]", err);
     return res.status(500).json({ 
       success: false, 
-      error: err.message, 
+      phase: "query",
+      error: err.message,
       cause: err.cause ? { message: err.cause.message, code: err.cause.code } : null,
-      originalError: err.originalError ? { message: err.originalError.message, code: err.originalError.code, errno: err.originalError.errno, sqlState: err.originalError.sqlState } : null,
-      keys: Object.keys(err),
       errJson: JSON.stringify(err, Object.getOwnPropertyNames(err)),
-      stack: err.stack 
     });
   }
 });

@@ -1,281 +1,255 @@
-var __defProp = Object.defineProperty;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __esm = (fn, res) => function __init() {
-  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
-};
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
+// server/_core/index.ts
+import "dotenv/config";
+import express from "express";
+import { createServer } from "http";
+import net from "net";
+import { createExpressMiddleware } from "@trpc/server/adapters/express";
+
+// shared/const.ts
+var COOKIE_NAME = "app_session_id";
+var ONE_YEAR_MS = 1e3 * 60 * 60 * 24 * 365;
+var AXIOS_TIMEOUT_MS = 3e4;
+var UNAUTHED_ERR_MSG = "Please login (10001)";
+var NOT_ADMIN_ERR_MSG = "You do not have required permission (10002)";
+
+// server/db.ts
+import { eq, and, desc } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/mysql2";
+import mysql from "mysql2/promise";
 
 // drizzle/schema.ts
 import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, json } from "drizzle-orm/mysql-core";
 import { relations } from "drizzle-orm";
-var users, sellers, products, usedProducts, digitalProducts, orders, coupons, reviews, messages, platformSettings, usersRelations, sellersRelations, usedProductsRelations, digitalProductsRelations, ordersRelations, reviewsRelations, messagesRelations;
-var init_schema = __esm({
-  "drizzle/schema.ts"() {
-    "use strict";
-    users = mysqlTable("users", {
-      /**
-       * Surrogate primary key. Auto-incremented numeric value managed by the database.
-       * Use this for relations between tables.
-       */
-      id: int("id").autoincrement().primaryKey(),
-      /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
-      openId: varchar("openId", { length: 64 }).notNull().unique(),
-      name: text("name"),
-      email: varchar("email", { length: 320 }),
-      loginMethod: varchar("loginMethod", { length: 64 }),
-      role: mysqlEnum("role", ["user", "admin", "vendedor"]).default("user").notNull(),
-      createdAt: timestamp("createdAt").defaultNow().notNull(),
-      updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-      lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
-      balance: decimal("balance", { precision: 12, scale: 2 }).default("0").notNull()
-    });
-    sellers = mysqlTable("sellers", {
-      id: int("id").autoincrement().primaryKey(),
-      userId: int("userId").notNull().unique(),
-      storeName: varchar("storeName", { length: 255 }).notNull(),
-      description: text("description"),
-      rating: decimal("rating", { precision: 3, scale: 2 }).default("0"),
-      totalReviews: int("totalReviews").default(0),
-      commissionPercentage: decimal("commissionPercentage", { precision: 5, scale: 2 }).default("10"),
-      isActive: boolean("isActive").default(true),
-      createdAt: timestamp("createdAt").defaultNow().notNull(),
-      updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
-    });
-    products = mysqlTable("products", {
-      id: int("id").autoincrement().primaryKey(),
-      name: varchar("name", { length: 255 }).notNull(),
-      description: text("description"),
-      price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-      category: varchar("category", { length: 100 }).notNull(),
-      stock: int("stock").notNull().default(0),
-      images: json("images").$type().default([]),
-      isActive: boolean("isActive").default(true),
-      mercadoLibreId: varchar("mercadoLibreId", { length: 255 }),
-      createdAt: timestamp("createdAt").defaultNow().notNull(),
-      updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
-    });
-    usedProducts = mysqlTable("usedProducts", {
-      id: int("id").autoincrement().primaryKey(),
-      sellerId: int("sellerId").notNull(),
-      name: varchar("name", { length: 255 }).notNull(),
-      description: text("description"),
-      price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-      condition: mysqlEnum("condition", ["novo", "como_novo", "bom", "aceitavel"]).notNull(),
-      images: json("images").$type().default([]),
-      status: mysqlEnum("status", ["pendente", "aprovado", "rejeitado", "vendido"]).default("pendente"),
-      createdAt: timestamp("createdAt").defaultNow().notNull(),
-      updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
-    });
-    digitalProducts = mysqlTable("digitalProducts", {
-      id: int("id").autoincrement().primaryKey(),
-      sellerId: int("sellerId"),
-      name: varchar("name", { length: 255 }).notNull(),
-      description: text("description"),
-      price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-      type: mysqlEnum("type", ["jogo", "gift_card", "licenca", "outro"]).notNull(),
-      keyOrCode: text("keyOrCode"),
-      downloadUrl: varchar("downloadUrl", { length: 500 }),
-      imageUrl: varchar("imageUrl", { length: 500 }),
-      stock: int("stock").notNull().default(1),
-      isActive: boolean("isActive").default(true),
-      createdAt: timestamp("createdAt").defaultNow().notNull(),
-      updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
-    });
-    orders = mysqlTable("orders", {
-      id: int("id").autoincrement().primaryKey(),
-      buyerId: int("buyerId").notNull(),
-      sellerId: int("sellerId"),
-      productId: int("productId"),
-      usedProductId: int("usedProductId"),
-      digitalProductId: int("digitalProductId"),
-      productType: mysqlEnum("productType", ["store", "used", "digital"]).notNull(),
-      quantity: int("quantity").notNull().default(1),
-      totalPrice: decimal("totalPrice", { precision: 10, scale: 2 }).notNull(),
-      commissionPercentage: decimal("commissionPercentage", { precision: 5, scale: 2 }).notNull(),
-      platformCommission: decimal("platformCommission", { precision: 10, scale: 2 }).notNull(),
-      sellerAmount: decimal("sellerAmount", { precision: 10, scale: 2 }).notNull(),
-      status: mysqlEnum("status", ["pendente", "pago", "enviado", "entregue", "cancelado"]).default("pendente"),
-      paymentId: varchar("paymentId", { length: 255 }),
-      createdAt: timestamp("createdAt").defaultNow().notNull(),
-      updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
-    });
-    coupons = mysqlTable("coupons", {
-      id: int("id").autoincrement().primaryKey(),
-      code: varchar("code", { length: 50 }).notNull().unique(),
-      discountPercentage: decimal("discountPercentage", { precision: 5, scale: 2 }).notNull(),
-      maxUses: int("maxUses"),
-      usedCount: int("usedCount").default(0),
-      expiresAt: timestamp("expiresAt"),
-      isActive: boolean("isActive").default(true),
-      createdAt: timestamp("createdAt").defaultNow().notNull()
-    });
-    reviews = mysqlTable("reviews", {
-      id: int("id").autoincrement().primaryKey(),
-      orderId: int("orderId").notNull(),
-      sellerId: int("sellerId").notNull(),
-      buyerId: int("buyerId").notNull(),
-      rating: int("rating").notNull(),
-      comment: text("comment"),
-      createdAt: timestamp("createdAt").defaultNow().notNull()
-    });
-    messages = mysqlTable("messages", {
-      id: int("id").autoincrement().primaryKey(),
-      senderId: int("senderId").notNull(),
-      recipientId: int("recipientId").notNull(),
-      orderId: int("orderId"),
-      content: text("content").notNull(),
-      isRead: boolean("isRead").default(false),
-      createdAt: timestamp("createdAt").defaultNow().notNull()
-    });
-    platformSettings = mysqlTable("platform_settings", {
-      id: int("id").autoincrement().primaryKey(),
-      commissionPercentage: decimal("commissionPercentage", { precision: 5, scale: 2 }).default("10"),
-      updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
-    });
-    usersRelations = relations(users, ({ one, many }) => ({
-      seller: one(sellers, {
-        fields: [users.id],
-        references: [sellers.userId]
-      }),
-      buyerOrders: many(orders, {
-        relationName: "buyer"
-      }),
-      sellerOrders: many(orders, {
-        relationName: "seller"
-      }),
-      sentMessages: many(messages, {
-        relationName: "sender"
-      }),
-      receivedMessages: many(messages, {
-        relationName: "recipient"
-      })
-    }));
-    sellersRelations = relations(sellers, ({ one, many }) => ({
-      user: one(users, {
-        fields: [sellers.userId],
-        references: [users.id]
-      }),
-      usedProducts: many(usedProducts),
-      digitalProducts: many(digitalProducts),
-      orders: many(orders),
-      reviews: many(reviews)
-    }));
-    usedProductsRelations = relations(usedProducts, ({ one, many }) => ({
-      seller: one(sellers, {
-        fields: [usedProducts.sellerId],
-        references: [sellers.id]
-      }),
-      orders: many(orders)
-    }));
-    digitalProductsRelations = relations(digitalProducts, ({ one, many }) => ({
-      seller: one(sellers, {
-        fields: [digitalProducts.sellerId],
-        references: [sellers.id]
-      }),
-      orders: many(orders)
-    }));
-    ordersRelations = relations(orders, ({ one }) => ({
-      buyer: one(users, {
-        fields: [orders.buyerId],
-        references: [users.id],
-        relationName: "buyer"
-      }),
-      seller: one(users, {
-        fields: [orders.sellerId],
-        references: [users.id],
-        relationName: "seller"
-      }),
-      product: one(products, {
-        fields: [orders.productId],
-        references: [products.id]
-      }),
-      usedProduct: one(usedProducts, {
-        fields: [orders.usedProductId],
-        references: [usedProducts.id]
-      }),
-      digitalProduct: one(digitalProducts, {
-        fields: [orders.digitalProductId],
-        references: [digitalProducts.id]
-      })
-    }));
-    reviewsRelations = relations(reviews, ({ one }) => ({
-      order: one(orders, {
-        fields: [reviews.orderId],
-        references: [orders.id]
-      }),
-      seller: one(sellers, {
-        fields: [reviews.sellerId],
-        references: [sellers.id]
-      }),
-      buyer: one(users, {
-        fields: [reviews.buyerId],
-        references: [users.id]
-      })
-    }));
-    messagesRelations = relations(messages, ({ one }) => ({
-      sender: one(users, {
-        fields: [messages.senderId],
-        references: [users.id],
-        relationName: "sender"
-      }),
-      recipient: one(users, {
-        fields: [messages.recipientId],
-        references: [users.id],
-        relationName: "recipient"
-      }),
-      order: one(orders, {
-        fields: [messages.orderId],
-        references: [orders.id]
-      })
-    }));
-  }
+var users = mysqlTable("users", {
+  /**
+   * Surrogate primary key. Auto-incremented numeric value managed by the database.
+   * Use this for relations between tables.
+   */
+  id: int("id").autoincrement().primaryKey(),
+  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
+  openId: varchar("openId", { length: 64 }).notNull().unique(),
+  name: text("name"),
+  email: varchar("email", { length: 320 }),
+  loginMethod: varchar("loginMethod", { length: 64 }),
+  role: mysqlEnum("role", ["user", "admin", "vendedor"]).default("user").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+  balance: decimal("balance", { precision: 12, scale: 2 }).default("0").notNull()
 });
+var sellers = mysqlTable("sellers", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  storeName: varchar("storeName", { length: 255 }).notNull(),
+  description: text("description"),
+  rating: decimal("rating", { precision: 3, scale: 2 }).default("0"),
+  totalReviews: int("totalReviews").default(0),
+  commissionPercentage: decimal("commissionPercentage", { precision: 5, scale: 2 }).default("10"),
+  isActive: boolean("isActive").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+});
+var products = mysqlTable("products", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  category: varchar("category", { length: 100 }).notNull(),
+  stock: int("stock").notNull().default(0),
+  images: json("images").$type().default([]),
+  isActive: boolean("isActive").default(true),
+  mercadoLibreId: varchar("mercadoLibreId", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+});
+var usedProducts = mysqlTable("usedProducts", {
+  id: int("id").autoincrement().primaryKey(),
+  sellerId: int("sellerId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  condition: mysqlEnum("condition", ["novo", "como_novo", "bom", "aceitavel"]).notNull(),
+  images: json("images").$type().default([]),
+  status: mysqlEnum("status", ["pendente", "aprovado", "rejeitado", "vendido"]).default("pendente"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+});
+var digitalProducts = mysqlTable("digitalProducts", {
+  id: int("id").autoincrement().primaryKey(),
+  sellerId: int("sellerId"),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  type: mysqlEnum("type", ["jogo", "gift_card", "licenca", "outro"]).notNull(),
+  keyOrCode: text("keyOrCode"),
+  downloadUrl: varchar("downloadUrl", { length: 500 }),
+  imageUrl: varchar("imageUrl", { length: 500 }),
+  stock: int("stock").notNull().default(1),
+  isActive: boolean("isActive").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+});
+var orders = mysqlTable("orders", {
+  id: int("id").autoincrement().primaryKey(),
+  buyerId: int("buyerId").notNull(),
+  sellerId: int("sellerId"),
+  productId: int("productId"),
+  usedProductId: int("usedProductId"),
+  digitalProductId: int("digitalProductId"),
+  productType: mysqlEnum("productType", ["store", "used", "digital"]).notNull(),
+  quantity: int("quantity").notNull().default(1),
+  totalPrice: decimal("totalPrice", { precision: 10, scale: 2 }).notNull(),
+  commissionPercentage: decimal("commissionPercentage", { precision: 5, scale: 2 }).notNull(),
+  platformCommission: decimal("platformCommission", { precision: 10, scale: 2 }).notNull(),
+  sellerAmount: decimal("sellerAmount", { precision: 10, scale: 2 }).notNull(),
+  status: mysqlEnum("status", ["pendente", "pago", "enviado", "entregue", "cancelado"]).default("pendente"),
+  paymentId: varchar("paymentId", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+});
+var coupons = mysqlTable("coupons", {
+  id: int("id").autoincrement().primaryKey(),
+  code: varchar("code", { length: 50 }).notNull().unique(),
+  discountPercentage: decimal("discountPercentage", { precision: 5, scale: 2 }).notNull(),
+  maxUses: int("maxUses"),
+  usedCount: int("usedCount").default(0),
+  expiresAt: timestamp("expiresAt"),
+  isActive: boolean("isActive").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull()
+});
+var reviews = mysqlTable("reviews", {
+  id: int("id").autoincrement().primaryKey(),
+  orderId: int("orderId").notNull(),
+  sellerId: int("sellerId").notNull(),
+  buyerId: int("buyerId").notNull(),
+  rating: int("rating").notNull(),
+  comment: text("comment"),
+  createdAt: timestamp("createdAt").defaultNow().notNull()
+});
+var messages = mysqlTable("messages", {
+  id: int("id").autoincrement().primaryKey(),
+  senderId: int("senderId").notNull(),
+  recipientId: int("recipientId").notNull(),
+  orderId: int("orderId"),
+  content: text("content").notNull(),
+  isRead: boolean("isRead").default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull()
+});
+var platformSettings = mysqlTable("platform_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  commissionPercentage: decimal("commissionPercentage", { precision: 5, scale: 2 }).default("10"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+});
+var usersRelations = relations(users, ({ one, many }) => ({
+  seller: one(sellers, {
+    fields: [users.id],
+    references: [sellers.userId]
+  }),
+  buyerOrders: many(orders, {
+    relationName: "buyer"
+  }),
+  sellerOrders: many(orders, {
+    relationName: "seller"
+  }),
+  sentMessages: many(messages, {
+    relationName: "sender"
+  }),
+  receivedMessages: many(messages, {
+    relationName: "recipient"
+  })
+}));
+var sellersRelations = relations(sellers, ({ one, many }) => ({
+  user: one(users, {
+    fields: [sellers.userId],
+    references: [users.id]
+  }),
+  usedProducts: many(usedProducts),
+  digitalProducts: many(digitalProducts),
+  orders: many(orders),
+  reviews: many(reviews)
+}));
+var usedProductsRelations = relations(usedProducts, ({ one, many }) => ({
+  seller: one(sellers, {
+    fields: [usedProducts.sellerId],
+    references: [sellers.id]
+  }),
+  orders: many(orders)
+}));
+var digitalProductsRelations = relations(digitalProducts, ({ one, many }) => ({
+  seller: one(sellers, {
+    fields: [digitalProducts.sellerId],
+    references: [sellers.id]
+  }),
+  orders: many(orders)
+}));
+var ordersRelations = relations(orders, ({ one }) => ({
+  buyer: one(users, {
+    fields: [orders.buyerId],
+    references: [users.id],
+    relationName: "buyer"
+  }),
+  seller: one(users, {
+    fields: [orders.sellerId],
+    references: [users.id],
+    relationName: "seller"
+  }),
+  product: one(products, {
+    fields: [orders.productId],
+    references: [products.id]
+  }),
+  usedProduct: one(usedProducts, {
+    fields: [orders.usedProductId],
+    references: [usedProducts.id]
+  }),
+  digitalProduct: one(digitalProducts, {
+    fields: [orders.digitalProductId],
+    references: [digitalProducts.id]
+  })
+}));
+var reviewsRelations = relations(reviews, ({ one }) => ({
+  order: one(orders, {
+    fields: [reviews.orderId],
+    references: [orders.id]
+  }),
+  seller: one(sellers, {
+    fields: [reviews.sellerId],
+    references: [sellers.id]
+  }),
+  buyer: one(users, {
+    fields: [reviews.buyerId],
+    references: [users.id]
+  })
+}));
+var messagesRelations = relations(messages, ({ one }) => ({
+  sender: one(users, {
+    fields: [messages.senderId],
+    references: [users.id],
+    relationName: "sender"
+  }),
+  recipient: one(users, {
+    fields: [messages.recipientId],
+    references: [users.id],
+    relationName: "recipient"
+  }),
+  order: one(orders, {
+    fields: [messages.orderId],
+    references: [orders.id]
+  })
+}));
 
 // server/_core/env.ts
-var ENV;
-var init_env = __esm({
-  "server/_core/env.ts"() {
-    "use strict";
-    ENV = {
-      appId: process.env.VITE_APP_ID ?? "",
-      cookieSecret: process.env.JWT_SECRET ?? "",
-      databaseUrl: process.env.DATABASE_URL ?? "",
-      oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
-      ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
-      isProduction: process.env.NODE_ENV === "production",
-      forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
-      forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? ""
-    };
-  }
-});
+var ENV = {
+  appId: process.env.VITE_APP_ID ?? "",
+  cookieSecret: process.env.JWT_SECRET ?? "",
+  databaseUrl: process.env.DATABASE_URL ?? "",
+  oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
+  ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
+  isProduction: process.env.NODE_ENV === "production",
+  forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
+  forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? ""
+};
 
 // server/db.ts
-var db_exports = {};
-__export(db_exports, {
-  confirmOrderAndReview: () => confirmOrderAndReview,
-  getActiveDigitalProducts: () => getActiveDigitalProducts,
-  getActiveProducts: () => getActiveProducts,
-  getActiveSellers: () => getActiveSellers,
-  getApprovedUsedProducts: () => getApprovedUsedProducts,
-  getCouponByCode: () => getCouponByCode,
-  getDb: () => getDb,
-  getOrdersByBuyerId: () => getOrdersByBuyerId,
-  getOrdersBySellerId: () => getOrdersBySellerId,
-  getPlatformSettings: () => getPlatformSettings,
-  getProductById: () => getProductById,
-  getReviewsBySellerId: () => getReviewsBySellerId,
-  getSellerByUserId: () => getSellerByUserId,
-  getUsedProductsBySellerId: () => getUsedProductsBySellerId,
-  getUserByOpenId: () => getUserByOpenId,
-  updatePlatformSettings: () => updatePlatformSettings,
-  upsertUser: () => upsertUser
-});
-import { eq, and, desc } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
-import mysql from "mysql2/promise";
 async function getDb() {
   if (!process.env.DATABASE_URL) {
     console.warn("[Database] DATABASE_URL is not set");
@@ -408,12 +382,6 @@ async function getOrdersBySellerId(sellerId) {
   if (!db) return [];
   return db.select().from(orders).where(eq(orders.sellerId, sellerId)).orderBy(desc(orders.createdAt));
 }
-async function getCouponByCode(code) {
-  const db = await getDb();
-  if (!db) return void 0;
-  const result = await db.select().from(coupons).where(and(eq(coupons.code, code), eq(coupons.isActive, true))).limit(1);
-  return result.length > 0 ? result[0] : void 0;
-}
 async function getReviewsBySellerId(sellerId) {
   const db = await getDb();
   if (!db) return [];
@@ -480,30 +448,6 @@ async function confirmOrderAndReview(orderId, buyerId, rating, comment) {
   }
   return { success: true };
 }
-var init_db = __esm({
-  "server/db.ts"() {
-    "use strict";
-    init_schema();
-    init_env();
-  }
-});
-
-// server/_core/index.ts
-import "dotenv/config";
-import express from "express";
-import { createServer } from "http";
-import net from "net";
-import { createExpressMiddleware } from "@trpc/server/adapters/express";
-
-// shared/const.ts
-var COOKIE_NAME = "app_session_id";
-var ONE_YEAR_MS = 1e3 * 60 * 60 * 24 * 365;
-var AXIOS_TIMEOUT_MS = 3e4;
-var UNAUTHED_ERR_MSG = "Please login (10001)";
-var NOT_ADMIN_ERR_MSG = "You do not have required permission (10002)";
-
-// server/_core/oauth.ts
-init_db();
 
 // server/_core/cookies.ts
 function isSecureRequest(req) {
@@ -533,8 +477,6 @@ var HttpError = class extends Error {
 var ForbiddenError = (msg) => new HttpError(403, msg);
 
 // server/_core/sdk.ts
-init_db();
-init_env();
 import axios from "axios";
 import { parse as parseCookieHeader } from "cookie";
 import { SignJWT, jwtVerify } from "jose";
@@ -793,7 +735,6 @@ function registerOAuthRoutes(app2) {
 }
 
 // server/_core/storageProxy.ts
-init_env();
 function registerStorageProxy(app2) {
   app2.get("/manus-storage/*", async (req, res) => {
     const key = req.params[0];
@@ -835,8 +776,6 @@ function registerStorageProxy(app2) {
 }
 
 // server/_core/seed.ts
-init_db();
-init_schema();
 import { eq as eq2 } from "drizzle-orm";
 var gameImages = {
   "A WAY OUT": "https://cdn.akamai.steamstatic.com/steam/apps/1222700/header.jpg",
@@ -1157,7 +1096,6 @@ function registerPaymentRoute(app2) {
 import { z } from "zod";
 
 // server/_core/notification.ts
-init_env();
 import { TRPCError } from "@trpc/server";
 var TITLE_MAX_LENGTH = 1200;
 var CONTENT_MAX_LENGTH = 2e4;
@@ -1298,9 +1236,6 @@ var systemRouter = router({
 });
 
 // server/routers.ts
-init_db();
-init_db();
-init_schema();
 import { z as z2 } from "zod";
 var appRouter = router({
   system: systemRouter,
@@ -1433,7 +1368,6 @@ var appRouter = router({
 });
 
 // server/_core/context.ts
-init_db();
 import { createRemoteJWKSet, jwtVerify as jwtVerify2 } from "jose";
 var JWKS = createRemoteJWKSet(
   new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com")
@@ -1563,24 +1497,45 @@ registerSeedRoute(app);
 registerAiRoute(app);
 registerPaymentRoute(app);
 app.get("/api/test-db", async (req, res) => {
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    return res.status(500).json({ success: false, error: "DATABASE_URL not set in environment" });
+  }
+  let connectError = null;
+  let db = null;
   try {
-    const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-    const db = await getDb2();
-    if (!db) {
-      return res.status(500).json({ success: false, error: "Database instance is null (DATABASE_URL missing?)" });
-    }
+    const mysql2 = await import("mysql2/promise");
+    const { drizzle: drizzle2 } = await import("drizzle-orm/mysql2");
+    const useSsl = !dbUrl.includes("localhost") && !dbUrl.includes("127.0.0.1");
+    const connection = await mysql2.default.createConnection({
+      uri: dbUrl,
+      connectTimeout: 1e4,
+      ...useSsl ? { ssl: { rejectUnauthorized: false } } : {}
+    });
+    db = drizzle2(connection);
+  } catch (err) {
+    connectError = err;
+  }
+  if (!db || connectError) {
+    return res.status(500).json({
+      success: false,
+      phase: "connect",
+      error: connectError?.message || "Connection returned null",
+      code: connectError?.code,
+      errno: connectError?.errno,
+      errJson: connectError ? JSON.stringify(connectError, Object.getOwnPropertyNames(connectError)) : null
+    });
+  }
+  try {
     const result = await db.execute("SELECT 1");
     return res.json({ success: true, result });
   } catch (err) {
-    console.error("[TestDB Error]", err);
     return res.status(500).json({
       success: false,
+      phase: "query",
       error: err.message,
       cause: err.cause ? { message: err.cause.message, code: err.cause.code } : null,
-      originalError: err.originalError ? { message: err.originalError.message, code: err.originalError.code, errno: err.originalError.errno, sqlState: err.originalError.sqlState } : null,
-      keys: Object.keys(err),
-      errJson: JSON.stringify(err, Object.getOwnPropertyNames(err)),
-      stack: err.stack
+      errJson: JSON.stringify(err, Object.getOwnPropertyNames(err))
     });
   }
 });
