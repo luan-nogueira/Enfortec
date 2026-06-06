@@ -4,49 +4,25 @@ import mysql from "mysql2/promise";
 import { InsertUser, users, sellers, products, usedProducts, digitalProducts, orders, reviews, coupons, platformSettings } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
-let _db: any = null;
-let _pool: any = null;
-
-// Detect serverless environment (Vercel) - in serverless we cannot use a persistent pool
-const IS_SERVERLESS = process.env.VERCEL === "1";
-
-// Lazily create the drizzle instance so local tooling can run without a DB.
+// Always create a fresh connection per call - avoids PROTOCOL_CONNECTION_LOST in serverless (Vercel)
+// and also works fine in long-running servers (Railway, local dev).
 export async function getDb() {
-  // In serverless, always create a fresh connection to avoid stale connections
-  if (IS_SERVERLESS && process.env.DATABASE_URL) {
-    try {
-      const useSsl = !process.env.DATABASE_URL.includes("localhost") && !process.env.DATABASE_URL.includes("127.0.0.1");
-      const connection = await mysql.createConnection({
-        uri: process.env.DATABASE_URL,
-        ...(useSsl ? { ssl: { rejectUnauthorized: false } } : {}),
-      });
-      return drizzle(connection);
-    } catch (error) {
-      console.warn("[Database] Failed to create serverless connection:", error);
-      return null;
-    }
+  if (!process.env.DATABASE_URL) {
+    console.warn("[Database] DATABASE_URL is not set");
+    return null;
   }
-
-  // In development/long-running server: use pool for connection reuse
-  if (!_db && process.env.DATABASE_URL) {
-    try {
-      const useSsl = !process.env.DATABASE_URL.includes("localhost") && !process.env.DATABASE_URL.includes("127.0.0.1");
-      _pool = mysql.createPool({
-        uri: process.env.DATABASE_URL,
-        waitForConnections: true,
-        connectionLimit: 10,
-        queueLimit: 0,
-        enableKeepAlive: true,
-        keepAliveInitialDelay: 10000,
-        ...(useSsl ? { ssl: { rejectUnauthorized: false } } : {}),
-      });
-      _db = drizzle(_pool);
-    } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
-      _db = null;
-    }
+  try {
+    const useSsl = !process.env.DATABASE_URL.includes("localhost") && !process.env.DATABASE_URL.includes("127.0.0.1");
+    const connection = await mysql.createConnection({
+      uri: process.env.DATABASE_URL,
+      connectTimeout: 10000,
+      ...(useSsl ? { ssl: { rejectUnauthorized: false } } : {}),
+    });
+    return drizzle(connection);
+  } catch (error) {
+    console.warn("[Database] Failed to create connection:", error);
+    return null;
   }
-  return _db;
 }
 
 export async function upsertUser(user: InsertUser): Promise<void> {
