@@ -1440,18 +1440,23 @@ async function createContext(opts) {
   let user = null;
   try {
     user = await sdk.authenticateRequest(opts.req);
+    console.log("[TRPC Server] OAuth cookie auth succeeded for user:", user?.id);
   } catch (error) {
     const authHeader = opts.req.headers.authorization;
+    console.log("[TRPC Server] OAuth auth failed. Authorization Header:", authHeader ? `${authHeader.substring(0, 25)}...` : "none");
     if (authHeader && authHeader.startsWith("Bearer ")) {
       const token = authHeader.substring(7);
       const decoded = await verifyFirebaseToken(token);
+      console.log("[TRPC Server] Firebase Token decoded payload sub:", decoded?.sub || "none");
       if (decoded && decoded.sub) {
         const uid = decoded.sub;
         const email = decoded.email;
         const name = decoded.name || email?.split("@")[0] || "User";
         user = await getUserByOpenId(uid);
+        console.log("[TRPC Server] Database user lookup result (by openId):", user ? `found (id: ${user.id})` : "not found");
         if (!user) {
           try {
+            console.log("[TRPC Server] User not found in database, upserting...");
             await upsertUser({
               openId: uid,
               name,
@@ -1460,6 +1465,7 @@ async function createContext(opts) {
               lastSignedIn: /* @__PURE__ */ new Date()
             });
             user = await getUserByOpenId(uid);
+            console.log("[TRPC Server] User upsert complete, user id:", user?.id);
           } catch (dbError) {
             console.error("[FirebaseAuth] Failed to upsert user in database:", dbError);
           }

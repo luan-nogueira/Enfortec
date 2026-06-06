@@ -47,12 +47,15 @@ const trpcClient = trpc.createClient({
         if (currentUser) {
           try {
             const token = await currentUser.getIdToken();
+            console.log("[TRPC Client] Firebase user found, sending token.");
             return {
               Authorization: `Bearer ${token}`,
             };
           } catch (e) {
             console.error("[TRPC Client] Failed to get Firebase ID token:", e);
           }
+        } else {
+          console.warn("[TRPC Client] auth.currentUser is null.");
         }
         return {};
       },
