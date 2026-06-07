@@ -67,6 +67,73 @@ app.get("/api/test-db", async (req, res) => {
   }
 });
 
+app.get("/api/test-create-order", async (req, res) => {
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    return res.status(500).json({ success: false, error: "DATABASE_URL not set in environment" });
+  }
+  try {
+    const { neon } = await import("@neondatabase/serverless");
+    const { drizzle } = await import("drizzle-orm/neon-http");
+    const { eq } = await import("drizzle-orm");
+    const { users: usersTable, orders: ordersTable } = await import("../../drizzle/schema");
+
+    const sql = neon(dbUrl);
+    const db = drizzle(sql);
+
+    // 1. Busca Luan pelo email ou cria se não existir
+    const userEmail = "luanmnogueira@gmail.com";
+    let buyer = await db.select().from(usersTable).where(eq(usersTable.email, userEmail)).limit(1).then(r => r[0]);
+
+    if (!buyer) {
+      // Tenta criar Luan para o teste
+      const mockOpenId = "test_luan_" + Math.random().toString(36).substring(7);
+      await db.insert(usersTable).values({
+        openId: mockOpenId,
+        name: "Luan Nogueira",
+        email: userEmail,
+        loginMethod: "firebase",
+        role: "admin"
+      });
+      buyer = await db.select().from(usersTable).where(eq(usersTable.email, userEmail)).limit(1).then(r => r[0]);
+    }
+
+    if (!buyer) {
+      throw new Error("Não foi possível carregar ou criar o usuário Luan.");
+    }
+
+    // 2. Insere um pedido mock pago associado a Luan
+    const orderId = await db.insert(ordersTable).values({
+      buyerId: buyer.id,
+      productType: "digital",
+      totalPrice: "89.90",
+      commissionPercentage: "10.00",
+      platformCommission: "8.99",
+      sellerAmount: "80.91",
+      status: "pago",
+      paymentId: "TESTE-PGTO-" + Math.random().toString(36).substring(2, 7).toUpperCase(),
+    }).returning({ id: ordersTable.id }).then(r => r[0]?.id);
+
+    return res.send(`
+      <div style="font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 30px; border: 1px solid #ef4444; border-radius: 12px; background-color: #0b0f19; color: #fff; text-align: center; box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);">
+        <h2 style="color: #ef4444; margin-top: 0;">🎉 Pedido de Teste Criado!</h2>
+        <p>Um jogo digital mock foi inserido na sua conta com sucesso.</p>
+        <div style="background: #1e293b; padding: 15px; border-radius: 8px; text-align: left; font-family: monospace; margin: 20px 0; border: 1px solid rgba(255,255,255,0.1);">
+          <strong>ID do Pedido:</strong> #${orderId}<br>
+          <strong>Comprador:</strong> ${buyer.name} (${buyer.email})<br>
+          <strong>Jogo:</strong> FIFA 26 PS4/PS5 (Mock)<br>
+          <strong>Valor:</strong> R$ 89,90<br>
+          <strong>Status:</strong> pago (Pronto para entrega)
+        </div>
+        <p style="color: #94a3b8; font-size: 14px;">Agora acesse o seu **Painel do Gestor** no site para ver o pedido na aba **Gerenciar Vendas** e testar o envio de e-mail!</p>
+        <a href="/admin" style="display: inline-block; background: #ef4444; color: #fff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; margin-top: 10px; transition: 0.2s;">Ir para Painel do Gestor</a>
+      </div>
+    `);
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.get("/api/inspect-db-url", (req, res) => {
   const url = process.env.DATABASE_URL;
   if (!url) {
