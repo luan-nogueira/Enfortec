@@ -126,6 +126,8 @@ function aiAnswer(q: string): string {
   const nq = norm(q);
 
   // FAQ
+  if (/preciso de ajuda|ajuda com algum jogo|qual jogo deseja ajuda/.test(nq))
+    return "Com certeza! Estou aqui para ajudar. 🎮\n\nSe você deseja ajuda com um jogo específico, digite o nome dele para eu buscar no nosso catálogo (ex: *'Tem God of War?'* ou *'Far Cry'*).\n\nSe preferir falar diretamente com um atendente humano, clique aqui: [👉 Chamar no WhatsApp](" + WA_BASE + ")";
   if (/pagamento|pix|cartao|boleto|pagar|pago/.test(nq))
     return "Aceitamos **Pix**, **Cartão de Crédito** e **Boleto**. Todo pagamento é seguro via Mercado Pago. 💳";
   if (/entrega|envio|prazo|frete|como recebo/.test(nq))
@@ -214,12 +216,21 @@ function renderMessageText(text: string) {
 // ─── Component ───────────────────────────────────────────────────────────────
 type Msg = { id: string; text: string; senderId: string; senderName: string; timestamp: any };
 
+// Mensagens de boas-vindas automáticas do bot
+const WELCOME_FLOW: { text: string; delay: number }[] = [
+  { text: "Olá! 👋 Bem-vindo à **Eforte Games**! Preciso de ajuda?", delay: 600 },
+  { text: "🎮 Precisa de ajuda com algum jogo?", delay: 1400 },
+  { text: "🔍 Qual jogo deseja ajuda? Digite o nome abaixo ou clique em uma das opções rápidas!", delay: 2200 },
+];
+
 export default function FloatingChat() {
   const { user, isAuthenticated } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Msg[]>([]);
   const [thinking, setThinking] = useState(false);
+  const [showChips, setShowChips] = useState(false);
+  const welcomeStarted = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Real-time messages for authenticated users
@@ -236,11 +247,54 @@ export default function FloatingChat() {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, thinking]);
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!message.trim() || thinking) return;
-    const msg = message.trim();
-    setMessage("");
+  // Fluxo de boas-vindas automático: envia as mensagens sequencialmente
+  // Só dispara uma vez, quando o chat é aberto e ainda não há mensagens
+  useEffect(() => {
+    if (!isOpen || welcomeStarted.current) return;
+    // Para usuários autenticados, aguarda o Firestore carregar antes de decidir
+    // Se já tiver mensagens do Firestore, não exibe boas-vindas
+    const delayCheck = setTimeout(() => {
+      if (welcomeStarted.current) return;
+      // Acessa o estado atual de messages via closure não é confiável;
+      // usamos um pequeno delay para o Firestore ter chance de popular
+      welcomeStarted.current = true;
+      setShowChips(false);
+
+      const timeouts: ReturnType<typeof setTimeout>[] = [];
+
+      WELCOME_FLOW.forEach((step, idx) => {
+        const tTyping = setTimeout(() => setThinking(true), step.delay - 500 < 0 ? 0 : step.delay - 500);
+        const tMsg = setTimeout(() => {
+          setThinking(false);
+          setMessages(prev => {
+            // Se já houver mensagens reais (do Firestore), não acrescenta as de boas-vindas
+            if (prev.length > 0 && !prev[0]?.id?.startsWith("welcome-")) return prev;
+            return [
+              ...prev,
+              {
+                id: `welcome-${idx}`,
+                text: step.text,
+                senderId: "ai-support",
+                senderName: "Assistente Eforte",
+                timestamp: new Date(),
+              },
+            ];
+          });
+          if (idx === WELCOME_FLOW.length - 1) {
+            setShowChips(true);
+          }
+        }, step.delay);
+        timeouts.push(tTyping, tMsg);
+      });
+
+      return () => timeouts.forEach(clearTimeout);
+    }, isAuthenticated ? 800 : 100); // aguarda um pouco mais para usuários autenticados
+
+    return () => clearTimeout(delayCheck);
+  }, [isOpen, isAuthenticated]);
+
+  const sendMessage = async (msg: string) => {
+    if (!msg.trim() || thinking) return;
 
     const uid = isAuthenticated && user?.id ? user.id : "guest";
     const uname = isAuthenticated && user?.name ? user.name : "Visitante";
@@ -287,6 +341,18 @@ export default function FloatingChat() {
         id: `ai-${Date.now()}`, text: answer, senderId: "ai-support", senderName: "Assistente Eforte", timestamp: new Date()
       }]);
     }
+  };
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!message.trim() || thinking) return;
+    const msg = message.trim();
+    setMessage("");
+    await sendMessage(msg);
+  };
+
+  const handleSelectSuggestion = async (text: string) => {
+    await sendMessage(text);
   };
 
   const currentUserId = isAuthenticated && user?.id ? user.id : "guest";
@@ -348,40 +414,12 @@ export default function FloatingChat() {
 
           {/* Messages */}
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-900/80">
-            {/* Welcome message */}
-            {messages.length === 0 && (
-              <div className="space-y-3">
-                <div className="flex justify-start">
-                  <div className="max-w-[88%] p-3.5 rounded-2xl rounded-bl-none text-sm bg-slate-800 text-slate-200 border border-red-600/20">
-                    <span className="block text-[9px] text-red-400 font-bold uppercase tracking-wider mb-1.5">Assistente 🤖</span>
-                    Olá, <b>{currentUserName}</b>! 👋 Sou o assistente da <b>Eforte Games</b>.
-                    <br /><br />
-                    Pergunte sobre jogos disponíveis (ex: <i>"Tem God of War?"</i>), preços, pagamentos ou como comprar!
-                  </div>
-                </div>
-                {/* Botão de suporte WhatsApp na mensagem inicial */}
-                <div className="flex justify-start pl-2">
-                  <a
-                    href={WA_BASE}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl shadow-md transition-colors"
-                  >
-                    <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-                      <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.42 9.864-9.864.002-2.637-1.03-5.118-2.905-6.993C16.257 1.874 13.78 1.84 11.14 1.84 5.704 1.84 1.28 6.261 1.277 11.705c-.001 1.714.453 3.39 1.317 4.873L1.576 22.25l5.071-1.328z"/>
-                    </svg>
-                    Falar com Suporte no WhatsApp
-                  </a>
-                </div>
-              </div>
-            )}
-
             {messages.map(msg => (
               <div key={msg.id} className={`flex ${msg.senderId === currentUserId ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[88%] p-3.5 rounded-2xl text-sm font-medium ${
                   msg.senderId === currentUserId
                     ? "bg-red-600 text-white rounded-br-none shadow-lg"
-                    : "bg-slate-800 text-slate-200 rounded-bl-none border border-red-600/10"
+                    : "bg-slate-800 text-slate-200 rounded-bl-none border border-red-600/20"
                 }`}>
                   {msg.senderId === "ai-support" && (
                     <span className="block text-[9px] text-red-400 font-bold uppercase tracking-wider mb-1.5">Assistente 🤖</span>
@@ -391,10 +429,52 @@ export default function FloatingChat() {
               </div>
             ))}
 
+            {/* Chips de ação rápida — aparecem após as mensagens de boas-vindas */}
+            {showChips && messages.length === WELCOME_FLOW.length && (
+              <div className="flex flex-col gap-2 pl-1 pr-2 mt-1">
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-0.5">Resposta rápida:</span>
+                {[
+                  { emoji: "🎮", label: "Sim, preciso de ajuda com um jogo!", query: "Preciso de ajuda" },
+                  { emoji: "💳", label: "Como funciona o pagamento?", query: "Como funciona o pagamento" },
+                  { emoji: "📦", label: "Como recebo meu jogo?", query: "Como recebo meu jogo" },
+                  { emoji: "💬", label: "Falar com suporte", query: "contato" },
+                ].map(chip => (
+                  <button
+                    key={chip.query}
+                    type="button"
+                    onClick={() => { setShowChips(false); handleSelectSuggestion(chip.query); }}
+                    className="text-left text-xs bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white px-3 py-2.5 rounded-xl border border-red-600/15 hover:border-red-600/40 transition-all font-semibold cursor-pointer active:scale-95"
+                  >
+                    {chip.emoji} {chip.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Chips reaparecem após uma troca de mensagens se o usuário quiser continuar */}
+            {!showChips && messages.length > 0 && messages[messages.length - 1]?.senderId === "ai-support" && !thinking && (
+              <div className="flex flex-wrap gap-1.5 pl-1 pr-2 mt-1">
+                {[
+                  { emoji: "🎮", label: "Ver catálogo", query: "quais jogos vocês têm" },
+                  { emoji: "💬", label: "Falar com suporte", query: "contato" },
+                ].map(chip => (
+                  <button
+                    key={chip.query}
+                    type="button"
+                    onClick={() => handleSelectSuggestion(chip.query)}
+                    className="text-xs bg-slate-800/70 hover:bg-slate-700 text-slate-300 hover:text-white px-2.5 py-1.5 rounded-lg border border-slate-700/60 hover:border-red-600/30 transition-all font-medium cursor-pointer active:scale-95"
+                  >
+                    {chip.emoji} {chip.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Typing indicator */}
             {thinking && (
               <div className="flex justify-start">
                 <div className="p-3.5 rounded-2xl rounded-bl-none bg-slate-800 border border-red-600/10 flex gap-1.5 items-center">
+                  <span className="text-[9px] text-red-400 font-bold uppercase tracking-wider mr-1">Assistente 🤖</span>
                   <div className="w-2 h-2 rounded-full bg-red-500 animate-bounce" style={{ animationDelay: "0ms" }} />
                   <div className="w-2 h-2 rounded-full bg-red-500 animate-bounce" style={{ animationDelay: "150ms" }} />
                   <div className="w-2 h-2 rounded-full bg-red-500 animate-bounce" style={{ animationDelay: "300ms" }} />
@@ -402,6 +482,8 @@ export default function FloatingChat() {
               </div>
             )}
           </div>
+
+
 
           {/* Quick Support Banner above Input */}
           <div className="px-3 py-2 bg-slate-950/60 border-t border-red-600/10 flex justify-center flex-shrink-0">
