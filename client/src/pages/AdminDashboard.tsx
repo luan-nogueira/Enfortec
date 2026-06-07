@@ -20,6 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { trpc } from "@/lib/trpc";
 
 export default function AdminDashboard() {
   const { user, isAuthenticated, isAdmin, loading: authLoading, logout } = useAuth();
@@ -27,6 +28,39 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("usuarios");
+
+  // Delivery Game States
+  const [deliverGameOpen, setDeliverGameOpen] = useState(false);
+  const [selectedDeliverOrder, setSelectedDeliverOrder] = useState<any>(null);
+  const [deliveryInstructions, setDeliveryInstructions] = useState("");
+
+  const { data: sales, isLoading: loadingSales, refetch: refetchSales } = trpc.orders.listAll.useQuery(undefined, {
+    enabled: isAuthenticated && isAdmin,
+  });
+
+  const deliverOrderMutation = trpc.orders.deliverOrder.useMutation({
+    onSuccess: () => {
+      refetchSales();
+      setDeliverGameOpen(false);
+      alert("Dados do jogo salvos e enviados com sucesso!");
+    },
+    onError: (err: any) => {
+      alert("Erro ao entregar o jogo: " + (err.message || "Erro desconhecido"));
+    }
+  });
+
+  const handleDeliverGame = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedDeliverOrder) return;
+    if (!deliveryInstructions.trim()) {
+      alert("As instruções ou chave do jogo não podem ser vazias.");
+      return;
+    }
+    deliverOrderMutation.mutate({
+      orderId: selectedDeliverOrder.id,
+      deliveryDetails: deliveryInstructions.trim()
+    });
+  };
 
   // Atendimento
   const [chats, setChats] = useState<any[]>([]);
@@ -637,8 +671,8 @@ export default function AdminDashboard() {
               <Gift className="w-4 h-4" />
               Gerenciar Prêmios
             </TabsTrigger>
-            <TabsTrigger value="catalogo" className="data-[state=active]:!bg-red-600 data-[state=active]:!text-white font-bold !h-10 !px-5 !text-sm !rounded-lg !whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 !inline-flex !items-center !justify-center !gap-2">
-              🎮 Catálogo
+            <TabsTrigger value="vendas" className="data-[state=active]:!bg-red-600 data-[state=active]:!text-white font-bold !h-10 !px-5 !text-sm !rounded-lg !whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 !inline-flex !items-center !justify-center !gap-2">
+              📦 Gerenciar Vendas
             </TabsTrigger>
           </TabsList>
 
@@ -972,30 +1006,101 @@ export default function AdminDashboard() {
             </div>
           </TabsContent>
 
-          <TabsContent value="catalogo">
-            <Card className="bg-slate-900 border-red-600/10 p-8 card-neon">
-              <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
-                🎮 Popular Catálogo de Jogos
+          <TabsContent value="vendas">
+            <Card className="bg-slate-900 border-red-600/10 p-6 flex flex-col card-neon">
+              <h3 className="text-lg font-bold text-white mb-6 border-l-4 border-red-600 pl-3 uppercase tracking-wider text-sm italic flex items-center gap-2">
+                📦 Gerenciar Vendas ({sales?.length || 0})
               </h3>
-              <p className="text-slate-400 text-sm mb-6">
-                Clique no botão abaixo para inserir/atualizar todos os {GAMES_CATALOG.length} jogos PS4/PS5 no Firestore. Operação segura — não duplica jogos já existentes.
-              </p>
-              <Button
-                onClick={handleSeedGames}
-                disabled={seeding}
-                className="bg-red-600 hover:bg-red-700 font-bold btn-neon px-8 py-4 text-lg mb-6"
-              >
-                {seeding ? `⏳ Inserindo jogos... aguarde` : `🚀 Popular ${GAMES_CATALOG.length} Jogos no Catálogo`}
-              </Button>
-              {seedLog.length > 0 && (
-                <div className="bg-slate-950 rounded-lg p-4 h-64 overflow-y-auto font-mono text-xs border border-slate-700">
-                  {seedLog.map((line, i) => (
-                    <p key={i} className={line.startsWith("[+]") ? "text-green-400" : line.startsWith("[~]") ? "text-yellow-400" : line.startsWith("[!]") ? "text-red-400" : "text-white font-bold mt-2"}>
-                      {line}
-                    </p>
-                  ))}
-                </div>
-              )}
+              
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-red-600/20 text-slate-400 text-xs uppercase tracking-wider">
+                      <th className="py-3 px-4">Pedido ID</th>
+                      <th className="py-3 px-4">Comprador</th>
+                      <th className="py-3 px-4">Jogo/Produto</th>
+                      <th className="py-3 px-4">Tipo</th>
+                      <th className="py-3 px-4">Valor</th>
+                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4 text-right">Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingSales ? (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-slate-500 italic text-sm">Carregando vendas...</td>
+                      </tr>
+                    ) : !sales || sales.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-slate-500 italic text-sm">Nenhuma venda registrada no sistema.</td>
+                      </tr>
+                    ) : (
+                      sales.map((sale: any) => (
+                        <tr key={sale.id} className="border-b border-slate-800/40 hover:bg-slate-800/10 text-sm">
+                          <td className="py-3.5 px-4 font-mono text-xs">#{sale.id}</td>
+                          <td className="py-3.5 px-4">
+                            <div className="font-bold text-white">{sale.buyerName}</div>
+                            <div className="text-xs text-slate-500">{sale.buyerEmail}</div>
+                          </td>
+                          <td className="py-3.5 px-4 font-semibold text-slate-200">{sale.productName}</td>
+                          <td className="py-3.5 px-4">
+                            <span className="text-xs uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-bold border border-slate-700/50">
+                              {sale.productType === 'store' ? 'Loja' :
+                               sale.productType === 'digital' ? 'Digital' : 'Usado'}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 font-bold text-red-500">R$ {Number(sale.totalPrice).toFixed(2)}</td>
+                          <td className="py-3.5 px-4">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-black uppercase tracking-wider border
+                              ${sale.status === 'pendente' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' :
+                                sale.status === 'pago' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
+                                sale.status === 'enviado' ? 'bg-purple-500/10 text-purple-500 border-purple-500/20' :
+                                sale.status === 'entregue' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
+                                'bg-red-500/10 text-red-500 border-red-500/20'}`}>
+                              {sale.status}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            {sale.status === 'pago' ? (
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedDeliverOrder(sale);
+                                  setDeliveryInstructions(
+                                    `Obrigado por adquirir o jogo ${sale.productName}, aqui está o login e senha para acesso a conta:\n\n` +
+                                    `Login: \n` +
+                                    `Senha: \n\n` +
+                                    `Qualquer coisa estaremos a disposição para ajudar no que precisar, você pode entrar em contato conosco pelo chat do site ou pelo nosso WhatsApp: +55 43 8425-3691.`
+                                  );
+                                  setDeliverGameOpen(true);
+                                }}
+                                className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs"
+                              >
+                                Fornecer Jogo
+                              </Button>
+                            ) : (sale.status === 'enviado' || sale.status === 'entregue') ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedDeliverOrder(sale);
+                                  setDeliveryInstructions(sale.deliveryDetails || "");
+                                  setDeliverGameOpen(true);
+                                }}
+                                className="border-red-600/30 text-red-400 hover:bg-red-950/20 font-bold text-xs"
+                              >
+                                Ver Entrega
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-slate-600 italic">N/A</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </Card>
           </TabsContent>
 
@@ -1267,6 +1372,51 @@ export default function AdminDashboard() {
               <Button type="submit" disabled={refusing} className="bg-red-600 hover:bg-red-700 font-bold px-6 btn-neon">
                 {refusing ? "Processando..." : "Recusar Resgate"}
               </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Fornecer / Ver Entrega do Jogo */}
+      <Dialog open={deliverGameOpen} onOpenChange={setDeliverGameOpen}>
+        <DialogContent className="bg-slate-900 border-red-600/30 text-white max-w-md card-neon">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2 text-neon">
+              <Shield className="text-red-500" /> 
+              {selectedDeliverOrder?.status === 'pago' ? "Fornecer Dados do Jogo" : "Dados de Entrega do Jogo"}
+            </DialogTitle>
+            <DialogDescription className="text-slate-400 text-xs">
+              {selectedDeliverOrder?.status === 'pago' 
+                ? `Insira os dados de acesso da conta ou chave de ativação para entregar o jogo "${selectedDeliverOrder?.productName}" ao usuário.`
+                : `Dados de entrega fornecidos para o jogo "${selectedDeliverOrder?.productName}". Você pode editá-los abaixo se necessário.`
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleDeliverGame} className="space-y-4 my-2">
+            <div className="space-y-2">
+              <Label className="text-xs text-slate-300 font-bold uppercase">Chave de Ativação / Dados da Conta</Label>
+              <textarea
+                value={deliveryInstructions}
+                onChange={(e) => setDeliveryInstructions(e.target.value)}
+                placeholder="Insira a chave/código do jogo, ou e-mail/senha da conta do jogo, links de instrução..."
+                className="w-full h-32 p-3 bg-slate-950 border border-red-600/20 rounded-md text-sm text-white focus:outline-none focus:ring-1 focus:ring-red-500/50 font-mono"
+                required
+              />
+            </div>
+            <DialogFooter className="mt-6">
+              <Button type="button" variant="ghost" onClick={() => setDeliverGameOpen(false)} className="text-slate-400 hover:text-white">
+                Fechar
+              </Button>
+              {(selectedDeliverOrder?.status === 'pago' || selectedDeliverOrder?.status === 'enviado' || selectedDeliverOrder?.status === 'entregue') && (
+                <Button type="submit" disabled={deliverOrderMutation.isPending} className="bg-red-600 hover:bg-red-700 font-bold px-6 btn-neon">
+                  {deliverOrderMutation.isPending 
+                    ? "Salvando..." 
+                    : selectedDeliverOrder?.status === 'pago' 
+                      ? "Confirmar Entrega" 
+                      : "Salvar Alterações"
+                  }
+                </Button>
+              )}
             </DialogFooter>
           </form>
         </DialogContent>
