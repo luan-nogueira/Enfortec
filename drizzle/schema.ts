@@ -1,134 +1,143 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, json } from "drizzle-orm/mysql-core";
+import { integer, pgEnum, pgTable, text, timestamp, varchar, numeric, boolean, json, serial } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 /**
- * Core user table backing auth flow.
- * Extend this file with additional tables as your product grows.
- * Columns use camelCase to match both database fields and generated types.
+ * Core schema for the Enfortec marketplace.
+ * Uses PostgreSQL (Neon) types.
  */
-export const users = mysqlTable("users", {
-  /**
-   * Surrogate primary key. Auto-incremented numeric value managed by the database.
-   * Use this for relations between tables.
-   */
-  id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+export const roleEnum = pgEnum("role", ["user", "admin", "vendedor"]);
+export const conditionEnum = pgEnum("condition", ["novo", "como_novo", "bom", "aceitavel"]);
+export const usedStatusEnum = pgEnum("used_status", ["pendente", "aprovado", "rejeitado", "vendido"]);
+export const digitalTypeEnum = pgEnum("digital_type", ["jogo", "gift_card", "licenca", "outro"]);
+export const productTypeEnum = pgEnum("product_type", ["store", "used", "digital"]);
+export const orderStatusEnum = pgEnum("order_status", ["pendente", "pago", "enviado", "entregue", "cancelado"]);
+
+// ─── Tables ───────────────────────────────────────────────────────────────────
+
+export const users = pgTable("users", {
+  /** Surrogate primary key. Auto-incremented by PostgreSQL. */
+  id: serial("id").primaryKey(),
+  /** OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin", "vendedor"]).default("user").notNull(),
+  role: roleEnum("role").default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => new Date()),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
-  balance: decimal("balance", { precision: 12, scale: 2 }).default("0").notNull(),
+  balance: numeric("balance", { precision: 12, scale: 2 }).default("0").notNull(),
 });
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
 // Sellers table - for users who want to sell used products or digital items
-export const sellers = mysqlTable("sellers", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull().unique(),
+export const sellers = pgTable("sellers", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull().unique(),
   storeName: varchar("storeName", { length: 255 }).notNull(),
   description: text("description"),
-  rating: decimal("rating", { precision: 3, scale: 2 }).default("0"),
-  totalReviews: int("totalReviews").default(0),
-  commissionPercentage: decimal("commissionPercentage", { precision: 5, scale: 2 }).default("10"),
+  rating: numeric("rating", { precision: 3, scale: 2 }).default("0"),
+  totalReviews: integer("totalReviews").default(0),
+  commissionPercentage: numeric("commissionPercentage", { precision: 5, scale: 2 }).default("10"),
   isActive: boolean("isActive").default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => new Date()),
 });
 
 export type Seller = typeof sellers.$inferSelect;
 export type InsertSeller = typeof sellers.$inferInsert;
 
 // Products table - for store's own physical products
-export const products = mysqlTable("products", {
-  id: int("id").autoincrement().primaryKey(),
+export const products = pgTable("products", {
+  id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
-  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  price: numeric("price", { precision: 10, scale: 2 }).notNull(),
   category: varchar("category", { length: 100 }).notNull(),
-  stock: int("stock").notNull().default(0),
+  stock: integer("stock").notNull().default(0),
   images: json("images").$type<string[]>().default([]),
   isActive: boolean("isActive").default(true),
   mercadoLibreId: varchar("mercadoLibreId", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => new Date()),
 });
 
 export type Product = typeof products.$inferSelect;
 export type InsertProduct = typeof products.$inferInsert;
 
 // Used Products table - for marketplace of used items
-export const usedProducts = mysqlTable("usedProducts", {
-  id: int("id").autoincrement().primaryKey(),
-  sellerId: int("sellerId").notNull(),
+export const usedProducts = pgTable("usedProducts", {
+  id: serial("id").primaryKey(),
+  sellerId: integer("sellerId").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
-  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-  condition: mysqlEnum("condition", ["novo", "como_novo", "bom", "aceitavel"]).notNull(),
+  price: numeric("price", { precision: 10, scale: 2 }).notNull(),
+  condition: conditionEnum("condition").notNull(),
   images: json("images").$type<string[]>().default([]),
-  status: mysqlEnum("status", ["pendente", "aprovado", "rejeitado", "vendido"]).default("pendente"),
+  status: usedStatusEnum("status").default("pendente"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => new Date()),
 });
 
 export type UsedProduct = typeof usedProducts.$inferSelect;
 export type InsertUsedProduct = typeof usedProducts.$inferInsert;
 
 // Digital Products table - for games, gift cards, licenses
-export const digitalProducts = mysqlTable("digitalProducts", {
-  id: int("id").autoincrement().primaryKey(),
-  sellerId: int("sellerId"),
+export const digitalProducts = pgTable("digitalProducts", {
+  id: serial("id").primaryKey(),
+  sellerId: integer("sellerId"),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
-  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-  type: mysqlEnum("type", ["jogo", "gift_card", "licenca", "outro"]).notNull(),
+  price: numeric("price", { precision: 10, scale: 2 }).notNull(),
+  type: digitalTypeEnum("type").notNull(),
   keyOrCode: text("keyOrCode"),
   downloadUrl: varchar("downloadUrl", { length: 500 }),
   imageUrl: varchar("imageUrl", { length: 500 }),
-  stock: int("stock").notNull().default(1),
+  stock: integer("stock").notNull().default(1),
   isActive: boolean("isActive").default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => new Date()),
 });
 
 export type DigitalProduct = typeof digitalProducts.$inferSelect;
 export type InsertDigitalProduct = typeof digitalProducts.$inferInsert;
 
 // Orders table - for all purchases
-export const orders = mysqlTable("orders", {
-  id: int("id").autoincrement().primaryKey(),
-  buyerId: int("buyerId").notNull(),
-  sellerId: int("sellerId"),
-  productId: int("productId"),
-  usedProductId: int("usedProductId"),
-  digitalProductId: int("digitalProductId"),
-  productType: mysqlEnum("productType", ["store", "used", "digital"]).notNull(),
-  quantity: int("quantity").notNull().default(1),
-  totalPrice: decimal("totalPrice", { precision: 10, scale: 2 }).notNull(),
-  commissionPercentage: decimal("commissionPercentage", { precision: 5, scale: 2 }).notNull(),
-  platformCommission: decimal("platformCommission", { precision: 10, scale: 2 }).notNull(),
-  sellerAmount: decimal("sellerAmount", { precision: 10, scale: 2 }).notNull(),
-  status: mysqlEnum("status", ["pendente", "pago", "enviado", "entregue", "cancelado"]).default("pendente"),
+export const orders = pgTable("orders", {
+  id: serial("id").primaryKey(),
+  buyerId: integer("buyerId").notNull(),
+  sellerId: integer("sellerId"),
+  productId: integer("productId"),
+  usedProductId: integer("usedProductId"),
+  digitalProductId: integer("digitalProductId"),
+  productType: productTypeEnum("productType").notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  totalPrice: numeric("totalPrice", { precision: 10, scale: 2 }).notNull(),
+  commissionPercentage: numeric("commissionPercentage", { precision: 5, scale: 2 }).notNull(),
+  platformCommission: numeric("platformCommission", { precision: 10, scale: 2 }).notNull(),
+  sellerAmount: numeric("sellerAmount", { precision: 10, scale: 2 }).notNull(),
+  status: orderStatusEnum("status").default("pendente"),
   paymentId: varchar("paymentId", { length: 255 }),
+  deliveryDetails: text("deliveryDetails"),
+  coinsUsed: integer("coinsUsed").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => new Date()),
 });
 
 export type Order = typeof orders.$inferSelect;
 export type InsertOrder = typeof orders.$inferInsert;
 
 // Discounts/Coupons table
-export const coupons = mysqlTable("coupons", {
-  id: int("id").autoincrement().primaryKey(),
+export const coupons = pgTable("coupons", {
+  id: serial("id").primaryKey(),
   code: varchar("code", { length: 50 }).notNull().unique(),
-  discountPercentage: decimal("discountPercentage", { precision: 5, scale: 2 }).notNull(),
-  maxUses: int("maxUses"),
-  usedCount: int("usedCount").default(0),
+  discountPercentage: numeric("discountPercentage", { precision: 5, scale: 2 }).notNull(),
+  maxUses: integer("maxUses"),
+  usedCount: integer("usedCount").default(0),
   expiresAt: timestamp("expiresAt"),
   isActive: boolean("isActive").default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -138,12 +147,12 @@ export type Coupon = typeof coupons.$inferSelect;
 export type InsertCoupon = typeof coupons.$inferInsert;
 
 // Reviews/Ratings table
-export const reviews = mysqlTable("reviews", {
-  id: int("id").autoincrement().primaryKey(),
-  orderId: int("orderId").notNull(),
-  sellerId: int("sellerId").notNull(),
-  buyerId: int("buyerId").notNull(),
-  rating: int("rating").notNull(),
+export const reviews = pgTable("reviews", {
+  id: serial("id").primaryKey(),
+  orderId: integer("orderId").notNull(),
+  sellerId: integer("sellerId").notNull(),
+  buyerId: integer("buyerId").notNull(),
+  rating: integer("rating").notNull(),
   comment: text("comment"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
@@ -152,11 +161,11 @@ export type Review = typeof reviews.$inferSelect;
 export type InsertReview = typeof reviews.$inferInsert;
 
 // Messages table - for chat between buyer and seller
-export const messages = mysqlTable("messages", {
-  id: int("id").autoincrement().primaryKey(),
-  senderId: int("senderId").notNull(),
-  recipientId: int("recipientId").notNull(),
-  orderId: int("orderId"),
+export const messages = pgTable("messages", {
+  id: serial("id").primaryKey(),
+  senderId: integer("senderId").notNull(),
+  recipientId: integer("recipientId").notNull(),
+  orderId: integer("orderId"),
   content: text("content").notNull(),
   isRead: boolean("isRead").default(false),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -165,17 +174,18 @@ export const messages = mysqlTable("messages", {
 export type Message = typeof messages.$inferSelect;
 export type InsertMessage = typeof messages.$inferInsert;
 
-// Global Settings table - for commission and other platform configs
-export const platformSettings = mysqlTable("platform_settings", {
-  id: int("id").autoincrement().primaryKey(),
-  commissionPercentage: decimal("commissionPercentage", { precision: 5, scale: 2 }).default("10"),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+// Global Settings table - singleton row (id=1) for commission and platform configs
+export const platformSettings = pgTable("platform_settings", {
+  id: integer("id").primaryKey(),
+  commissionPercentage: numeric("commissionPercentage", { precision: 5, scale: 2 }).default("10"),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => new Date()),
 });
 
 export type PlatformSettings = typeof platformSettings.$inferSelect;
 export type InsertPlatformSettings = typeof platformSettings.$inferInsert;
 
-// Relations
+// ─── Relations ────────────────────────────────────────────────────────────────
+
 export const usersRelations = relations(users, ({ one, many }) => ({
   seller: one(sellers, {
     fields: [users.id],

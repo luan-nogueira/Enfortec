@@ -1,28 +1,23 @@
 import { eq, and, desc } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
-import mysql from "mysql2/promise";
+import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-http";
 import { InsertUser, users, sellers, products, usedProducts, digitalProducts, orders, reviews, coupons, platformSettings } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
-// Always create a fresh connection per call - avoids PROTOCOL_CONNECTION_LOST in serverless (Vercel)
-// and also works fine in long-running servers (Railway, local dev).
-export async function getDb() {
+/**
+ * Returns a Drizzle ORM instance connected to Neon (PostgreSQL).
+ * Neon serverless uses HTTP — no persistent connections needed.
+ */
+export function getDb() {
   if (!process.env.DATABASE_URL) {
     console.warn("[Database] DATABASE_URL is not set");
     return null;
   }
   try {
-    const isLocal = process.env.DATABASE_URL.includes("localhost") || process.env.DATABASE_URL.includes("127.0.0.1");
-    const connection = await mysql.createConnection({
-      uri: process.env.DATABASE_URL,
-      connectTimeout: 15000,
-      allowPublicKeyRetrieval: true,
-      // Railway and other cloud MySQL providers require SSL with self-signed certs
-      ...(!isLocal ? { ssl: { rejectUnauthorized: false } } : {}),
-    });
-    return drizzle(connection);
-  } catch (error) {
-    console.warn("[Database] Failed to create connection:", error);
+    const sql = neon(process.env.DATABASE_URL);
+    return drizzle(sql);
+  } catch (error: any) {
+    console.warn("[Database] Falha ao inicializar banco:", error.message);
     return null;
   }
 }
@@ -32,7 +27,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     throw new Error("User openId is required for upsert");
   }
 
-  const db = await getDb();
+  const db = getDb();
   if (!db) {
     console.warn("[Database] Cannot upsert user: database not available");
     return;
@@ -77,7 +72,9 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
+    // PostgreSQL: onConflictDoUpdate (replaces MySQL's onDuplicateKeyUpdate)
+    await db.insert(users).values(values).onConflictDoUpdate({
+      target: users.openId,
       set: updateSet,
     });
   } catch (error) {
@@ -88,7 +85,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 
 export async function getUserByOpenId(openId: string) {
   try {
-    const db = await getDb();
+    const db = getDb();
     if (!db) {
       console.warn("[Database] Cannot get user: database not available");
       return undefined;
@@ -105,13 +102,13 @@ export async function getUserByOpenId(openId: string) {
 
 // Products queries
 export async function getActiveProducts() {
-  const db = await getDb();
+  const db = getDb();
   if (!db) return [];
   return db.select().from(products).where(eq(products.isActive, true)).orderBy(desc(products.createdAt));
 }
 
 export async function getProductById(id: number) {
-  const db = await getDb();
+  const db = getDb();
   if (!db) return undefined;
   const result = await db.select().from(products).where(eq(products.id, id)).limit(1);
   return result.length > 0 ? result[0] : undefined;
@@ -120,7 +117,7 @@ export async function getProductById(id: number) {
 // Sellers queries
 export async function getSellerByUserId(userId: number) {
   try {
-    const db = await getDb();
+    const db = getDb();
     if (!db) return null;
     const result = await db.select().from(sellers).where(eq(sellers.userId, userId)).limit(1);
     return result.length > 0 ? result[0] : null;
@@ -131,47 +128,200 @@ export async function getSellerByUserId(userId: number) {
 }
 
 export async function getActiveSellers() {
-  const db = await getDb();
+  const db = getDb();
   if (!db) return [];
   return db.select().from(sellers).where(eq(sellers.isActive, true)).orderBy(desc(sellers.rating));
 }
 
 // Used Products queries
 export async function getApprovedUsedProducts() {
-  const db = await getDb();
+  const db = getDb();
   if (!db) return [];
   return db.select().from(usedProducts).where(eq(usedProducts.status, 'aprovado')).orderBy(desc(usedProducts.createdAt));
 }
 
 export async function getUsedProductsBySellerId(sellerId: number) {
-  const db = await getDb();
+  const db = getDb();
   if (!db) return [];
   return db.select().from(usedProducts).where(eq(usedProducts.sellerId, sellerId)).orderBy(desc(usedProducts.createdAt));
 }
 
 // Digital Products queries
 export async function getActiveDigitalProducts() {
-  const db = await getDb();
+  const db = getDb();
   if (!db) return [];
   return db.select().from(digitalProducts).where(eq(digitalProducts.isActive, true)).orderBy(desc(digitalProducts.createdAt));
 }
 
 // Orders queries
 export async function getOrdersByBuyerId(buyerId: number) {
-  const db = await getDb();
+  const db = getDb();
   if (!db) return [];
-  return db.select().from(orders).where(eq(orders.buyerId, buyerId)).orderBy(desc(orders.createdAt));
+  
+  const results = await db
+    .select({
+      order: orders,
+      product: products,
+      usedProduct: usedProducts,
+      digitalProduct: digitalProducts,
+    })
+    .from(orders)
+    .leftJoin(products, eq(orders.productId, products.id))
+    .leftJoin(usedProducts, eq(orders.usedProductId, usedProducts.id))
+    .leftJoin(digitalProducts, eq(orders.digitalProductId, digitalProducts.id))
+    .where(eq(orders.buyerId, buyerId))
+    .orderBy(desc(orders.createdAt));
+
+  return results.map(r => {
+    let productName = "Produto";
+    if (r.order.productType === "store" && r.product) {
+      productName = r.product.name;
+    } else if (r.order.productType === "used" && r.usedProduct) {
+      productName = r.usedProduct.name;
+    } else if (r.order.productType === "digital" && r.digitalProduct) {
+      productName = r.digitalProduct.name;
+    }
+    return {
+      ...r.order,
+      productName,
+    };
+  });
 }
 
 export async function getOrdersBySellerId(sellerId: number) {
-  const db = await getDb();
+  const db = getDb();
   if (!db) return [];
-  return db.select().from(orders).where(eq(orders.sellerId, sellerId)).orderBy(desc(orders.createdAt));
+
+  const results = await db
+    .select({
+      order: orders,
+      product: products,
+      usedProduct: usedProducts,
+      digitalProduct: digitalProducts,
+    })
+    .from(orders)
+    .leftJoin(products, eq(orders.productId, products.id))
+    .leftJoin(usedProducts, eq(orders.usedProductId, usedProducts.id))
+    .leftJoin(digitalProducts, eq(orders.digitalProductId, digitalProducts.id))
+    .where(eq(orders.sellerId, sellerId))
+    .orderBy(desc(orders.createdAt));
+
+  return results.map(r => {
+    let productName = "Produto";
+    if (r.order.productType === "store" && r.product) {
+      productName = r.product.name;
+    } else if (r.order.productType === "used" && r.usedProduct) {
+      productName = r.usedProduct.name;
+    } else if (r.order.productType === "digital" && r.digitalProduct) {
+      productName = r.digitalProduct.name;
+    }
+    return {
+      ...r.order,
+      productName,
+    };
+  });
+}
+
+export async function getAllOrdersWithDetails() {
+  const db = getDb();
+  if (!db) return [];
+
+  const results = await db
+    .select({
+      order: orders,
+      buyer: users,
+      product: products,
+      usedProduct: usedProducts,
+      digitalProduct: digitalProducts,
+    })
+    .from(orders)
+    .leftJoin(users, eq(orders.buyerId, users.id))
+    .leftJoin(products, eq(orders.productId, products.id))
+    .leftJoin(usedProducts, eq(orders.usedProductId, usedProducts.id))
+    .leftJoin(digitalProducts, eq(orders.digitalProductId, digitalProducts.id))
+    .orderBy(desc(orders.createdAt));
+
+  return results.map(r => {
+    let productName = "Produto";
+    if (r.order.productType === "store" && r.product) {
+      productName = r.product.name;
+    } else if (r.order.productType === "used" && r.usedProduct) {
+      productName = r.usedProduct.name;
+    } else if (r.order.productType === "digital" && r.digitalProduct) {
+      productName = r.digitalProduct.name;
+    }
+    return {
+      ...r.order,
+      buyerName: r.buyer?.name || "Sem Nome",
+      buyerEmail: r.buyer?.email || "Sem E-mail",
+      productName,
+    };
+  });
+}
+
+export async function deliverOrder(orderId: number, deliveryDetails: string) {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Fetch order with buyer email and product name
+  const orderResult = await db
+    .select({
+      order: orders,
+      buyer: users,
+      product: products,
+      usedProduct: usedProducts,
+      digitalProduct: digitalProducts,
+    })
+    .from(orders)
+    .leftJoin(users, eq(orders.buyerId, users.id))
+    .leftJoin(products, eq(orders.productId, products.id))
+    .leftJoin(usedProducts, eq(orders.usedProductId, usedProducts.id))
+    .leftJoin(digitalProducts, eq(orders.digitalProductId, digitalProducts.id))
+    .where(eq(orders.id, orderId))
+    .limit(1);
+
+  const orderInfo = orderResult[0];
+  if (!orderInfo) throw new Error("Pedido não encontrado");
+
+  await db
+    .update(orders)
+    .set({
+      deliveryDetails,
+      status: "enviado",
+    })
+    .where(eq(orders.id, orderId));
+
+  // Send email asynchronously
+  const buyerEmail = orderInfo.buyer?.email;
+  if (buyerEmail) {
+    let productName = "Produto";
+    if (orderInfo.order.productType === "store" && orderInfo.product) {
+      productName = orderInfo.product.name;
+    } else if (orderInfo.order.productType === "used" && orderInfo.usedProduct) {
+      productName = orderInfo.usedProduct.name;
+    } else if (orderInfo.order.productType === "digital" && orderInfo.digitalProduct) {
+      productName = orderInfo.digitalProduct.name;
+    }
+
+    try {
+      const { sendDeliveryEmail } = await import("./email");
+      await sendDeliveryEmail({
+        to: buyerEmail,
+        buyerName: orderInfo.buyer?.name || "Cliente",
+        productName,
+        deliveryDetails,
+      });
+    } catch (emailErr) {
+      console.error("[Email] Erro ao enviar email de entrega:", emailErr);
+    }
+  }
+
+  return { success: true };
 }
 
 // Coupons queries
 export async function getCouponByCode(code: string) {
-  const db = await getDb();
+  const db = getDb();
   if (!db) return undefined;
   const result = await db.select().from(coupons).where(and(eq(coupons.code, code), eq(coupons.isActive, true))).limit(1);
   return result.length > 0 ? result[0] : undefined;
@@ -179,33 +329,33 @@ export async function getCouponByCode(code: string) {
 
 // Reviews queries
 export async function getReviewsBySellerId(sellerId: number) {
-  const db = await getDb();
+  const db = getDb();
   if (!db) return [];
   return db.select().from(reviews).where(eq(reviews.sellerId, sellerId)).orderBy(desc(reviews.createdAt));
 }
 
 // Platform Settings queries
 export async function getPlatformSettings() {
-  const db = await getDb();
+  const db = getDb();
   if (!db) return undefined;
   const result = await db.select().from(platformSettings).where(eq(platformSettings.id, 1)).limit(1);
   if (result.length === 0) {
-    // Initialize if not exists
-    await db.insert(platformSettings).values({ id: 1, commissionPercentage: "10" });
+    // Initialize singleton row if not exists
+    await db.insert(platformSettings).values({ id: 1, commissionPercentage: "10" }).onConflictDoNothing();
     return { id: 1, commissionPercentage: "10" };
   }
   return result[0];
 }
 
 export async function updatePlatformSettings(commissionPercentage: string) {
-  const db = await getDb();
+  const db = getDb();
   if (!db) return;
   await db.update(platformSettings).set({ commissionPercentage }).where(eq(platformSettings.id, 1));
 }
 
 // Balance, Order Confirmation, and Reviews (Escrow System)
 export async function confirmOrderAndReview(orderId: number, buyerId: number, rating: number, comment?: string) {
-  const db = await getDb();
+  const db = getDb();
   if (!db) throw new Error("Database not available");
 
   const result = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
@@ -237,7 +387,7 @@ export async function confirmOrderAndReview(orderId: number, buyerId: number, ra
   // Insert Review
   await db.insert(reviews).values({
     orderId: order.id,
-    sellerId: sellerProfile?.id ?? order.sellerId, // Fallback to user ID if no specific seller profile
+    sellerId: sellerProfile?.id ?? order.sellerId,
     buyerId: buyerId,
     rating: rating,
     comment: comment || null,

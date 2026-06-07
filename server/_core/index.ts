@@ -1,4 +1,8 @@
-import "dotenv/config";
+import dotenv from "dotenv";
+import path from "path";
+// Carrega .env e .env.local (para desenvolvimento local)
+dotenv.config();
+dotenv.config({ path: path.resolve(process.cwd(), ".env.local"), override: false });
 process.env.NODE_ENV = process.env.NODE_ENV || "development";
 import express from "express";
 import { createServer } from "http";
@@ -47,43 +51,17 @@ app.get("/api/test-db", async (req, res) => {
   if (!dbUrl) {
     return res.status(500).json({ success: false, error: "DATABASE_URL not set in environment" });
   }
-  // Try to connect directly and catch errors
-  let connectError: any = null;
-  let db: any = null;
   try {
-    const mysql = await import("mysql2/promise");
-    const { drizzle } = await import("drizzle-orm/mysql2");
-    const useSsl = !dbUrl.includes("localhost") && !dbUrl.includes("127.0.0.1");
-    const connection = await mysql.default.createConnection({
-      uri: dbUrl,
-      connectTimeout: 10000,
-      ...(useSsl ? { ssl: { rejectUnauthorized: false } } : {}),
-    });
-    db = drizzle(connection);
-  } catch (err: any) {
-    connectError = err;
-  }
-
-  if (!db || connectError) {
-    return res.status(500).json({ 
-      success: false, 
-      phase: "connect",
-      error: connectError?.message || "Connection returned null",
-      code: connectError?.code,
-      errno: connectError?.errno,
-      errJson: connectError ? JSON.stringify(connectError, Object.getOwnPropertyNames(connectError)) : null,
-    });
-  }
-
-  try {
-    const result = await db.execute("SELECT 1");
-    return res.json({ success: true, result });
+    const { neon } = await import("@neondatabase/serverless");
+    const { drizzle } = await import("drizzle-orm/neon-http");
+    const sql = neon(dbUrl);
+    const db = drizzle(sql);
+    const result = await db.execute("SELECT 1 AS ok");
+    return res.json({ success: true, result, driver: "neon-serverless" });
   } catch (err: any) {
     return res.status(500).json({ 
       success: false, 
-      phase: "query",
       error: err.message,
-      cause: err.cause ? { message: err.cause.message, code: err.cause.code } : null,
       errJson: JSON.stringify(err, Object.getOwnPropertyNames(err)),
     });
   }
