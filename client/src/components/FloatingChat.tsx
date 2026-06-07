@@ -127,15 +127,17 @@ function aiAnswer(q: string): string {
 
   // FAQ
   if (/preciso de ajuda|ajuda com algum jogo|qual jogo deseja ajuda/.test(nq))
-    return "Com certeza! Estou aqui para ajudar. 🎮\n\nSe você deseja ajuda com um jogo específico, digite o nome dele para eu buscar no nosso catálogo (ex: *'Tem God of War?'* ou *'Far Cry'*).\n\nSe preferir falar diretamente com um atendente humano, clique aqui: [👉 Chamar no WhatsApp](" + WA_BASE + ")";
-  if (/pagamento|pix|cartao|boleto|pagar|pago/.test(nq))
-    return "Aceitamos **Pix**, **Cartão de Crédito** e **Boleto**. Todo pagamento é seguro via Mercado Pago. 💳";
+    return "Com certeza! Estou aqui para ajudar. 🎮\n\nSe você deseja ajuda com um jogo específico, digite o nome dele e eu vejo se temos disponível.\n\nSe preferir falar diretamente com um atendente, clique aqui: [👉 Chamar no WhatsApp](" + WA_BASE + ")";
+  if (/pagamento|pix|cartao|boleto|pagar|pago|infinitepay/.test(nq))
+    return "Aceitamos **Pix**, **Cartão de Crédito** e **Boleto** via InfinitePay. 💳\n\nVocê também pode usar suas **ForteCoins** como desconto! (10 FC = R$ 1,00 de desconto)";
+  if (/fortecoin|moeda|coins|desconto/.test(nq))
+    return "As **ForteCoins** são nossa moeda virtual! 🪙\n\nA cada compra você acumula pontos e pode usar como desconto em qualquer produto.\n\n**10 ForteCoins = R$ 1,00 de desconto**\n\nAcesse a loja e marque a opção \"Usar ForteCoins\" no checkout.";
   if (/entrega|envio|prazo|frete|como recebo/.test(nq))
-    return "Mídias digitais são enviadas via **WhatsApp ou e-mail** logo após o pagamento. Produtos físicos vão pelos Correios com rastreio. 📦";
+    return "Mídias digitais são enviadas via **WhatsApp ou e-mail** logo após a confirmação do pagamento. 📦\n\nProdutos físicos vão pelos Correios com rastreio.";
   if (/contato|whatsapp|telefone|suporte|falar com|atendimento|adm/.test(nq))
     return `Fale diretamente com a nossa equipe:\n[👉 Abrir WhatsApp](${WA_BASE})`;
-  if (/como comprar|adquirir|vender|virar vendedor/.test(nq))
-    return "Navegue pelo catálogo de **Mídia Digital** ou **Usados** e clique em 'Comprar'. O pagamento é combinado diretamente pelo WhatsApp. 🛒";
+  if (/como comprar|adquirir|onde comprar/.test(nq))
+    return "É simples! 🛒\n\n1. Acesse nossa **[Loja](/loja)**\n2. Escolha o jogo e a versão (PS4/PS5)\n3. Preencha seus dados\n4. Use suas **ForteCoins** como desconto (opcional)\n5. Pague via Pix, Cartão ou Boleto";
   if (/oi|ola|olá|bom dia|boa tarde|boa noite|tudo bem/.test(nq))
     return "Olá! 👋 Sou o assistente da **Eforte Games**.\n\nPosso te ajudar a encontrar jogos, tirar dúvidas sobre pagamentos e muito mais. Pergunte o que quiser! 🎮";
 
@@ -163,16 +165,16 @@ function aiAnswer(q: string): string {
 
   if (scored[0].score >= 80 && scored.length === 1 && !isListMode) {
     const g = scored[0].g;
-    const wa = `${WA_BASE}?text=${encodeURIComponent(`Olá! Tenho interesse no jogo ${g.name} - ${fmt(g.price)}`)}`;
-    return `✅ Temos **${g.name}** disponível!\n\n💰 Preço: **${fmt(g.price)}**\n\n[👉 Comprar via WhatsApp](${wa})`;
+    return `✅ Temos **${g.name}** disponível!\n\n💰 Preço: **${fmt(g.price)}**\n🪙 Você pode usar **ForteCoins** como desconto no checkout!\n\n[👉 Ver na Loja](/loja)`;
   }
 
   const top = scored.slice(0, 7);
   const list = top.map(x => `• **${x.g.name}** — ${fmt(x.g.price)}`).join("\n");
   const extra = scored.length > 7 ? `\n\n_...e mais ${scored.length - 7} resultados_` : "";
-  return `Encontrei **${scored.length}** jogo(s):\n\n${list}${extra}\n\nQuer saber mais? [Fale no WhatsApp](${WA_BASE})`;
+  return `Encontrei **${scored.length}** jogo(s) no catálogo:\n\n${list}${extra}\n\n[👉 Ver todos na Loja](/loja)`;
 }
 // ─────────────────────────────────────────────────────────────────────────────
+
 
 function parseBold(text: string) {
   const parts = text.split(/\*\*([^*]+)\*\*/g);
