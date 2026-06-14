@@ -169,32 +169,33 @@ export default function FortecoinsPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 pb-20">
       {/* Header */}
-      <nav className="bg-slate-950/90 backdrop-blur-md border-b border-red-700/20 sticky top-0 z-50 py-4">
+      <nav className="bg-slate-950/90 backdrop-blur-md border-b border-red-700/20 sticky top-0 z-50 py-3">
         <div className="container mx-auto px-4 flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="text-slate-400 hover:text-white">
-              <ArrowLeft className="w-6 h-6" />
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="text-slate-400 hover:text-white w-8 h-8">
+              <ArrowLeft className="w-5 h-5" />
             </Button>
-            <h1 className="text-2xl font-black tracking-tight text-white flex items-center gap-2">
-              <Coins className="w-7 h-7 text-red-500 animate-bounce" />
+            <h1 className="text-lg sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
+              <Coins className="w-5 h-5 sm:w-7 sm:h-7 text-red-500 animate-bounce" />
               FORTE<span className="text-red-500">COINS</span>
             </h1>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 bg-red-950/40 border border-red-600/30 px-4 py-2 rounded-xl">
-              <Coins className="w-5 h-5 text-red-500" />
-              <span className="font-bold text-white text-lg">{user.forteCoins} FC</span>
+          <div className="flex items-center gap-2 sm:gap-4">
+            <div className="flex items-center gap-1.5 bg-red-950/40 border border-red-600/30 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl">
+              <Coins className="w-4 h-4 text-red-500" />
+              <span className="font-bold text-white text-sm sm:text-lg">{user.forteCoins} FC</span>
             </div>
-            <Button variant="ghost" onClick={logout} className="text-slate-400 hover:text-red-500 hover:bg-red-950/20 font-bold flex items-center gap-2 h-10 px-4">
-              <LogOut className="w-4 h-4" /> Sair
+            <Button variant="ghost" onClick={logout} className="text-slate-400 hover:text-red-500 hover:bg-red-950/20 font-bold flex items-center gap-1.5 h-9 px-2 sm:px-4">
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">Sair</span>
             </Button>
           </div>
         </div>
       </nav>
 
-      <main className="container mx-auto px-4 py-10 max-w-6xl">
+      <main className="container mx-auto px-4 py-6 sm:py-10 max-w-6xl pb-24 lg:pb-10">
         {/* Top Info Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-10">
           
           {/* Card 1: Balance Wallet */}
           <Card className="bg-slate-900/60 border-red-600/20 backdrop-blur-md p-6 flex flex-col justify-between card-neon md:col-span-1">
@@ -274,10 +275,10 @@ export default function FortecoinsPage() {
         </div>
 
         {/* Rewards Catalog */}
-        <h2 className="text-2xl font-black text-white mb-6 flex items-center gap-2 uppercase tracking-tight italic">
-          <Gift className="text-red-500 w-6 h-6" /> Loja de Resgate de Prêmios
+        <h2 className="text-xl sm:text-2xl font-black text-white mb-4 sm:mb-6 flex items-center gap-2 uppercase tracking-tight italic">
+          <Gift className="text-red-500 w-5 h-5 sm:w-6 sm:h-6" /> Loja de Resgate
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8 sm:mb-12">
           {prizesList.map((prize) => (
             <Card key={prize.id} className="bg-slate-900 border-slate-800 hover:border-red-600/30 overflow-hidden flex flex-col justify-between transition-all group card-neon">
               <div className="p-6">
@@ -316,7 +317,7 @@ export default function FortecoinsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
           {/* Invited Friends List */}
-          <Card className="bg-slate-900/40 border-slate-800 p-6 flex flex-col h-[400px]">
+          <Card className="bg-slate-900/40 border-slate-800 p-4 sm:p-6 flex flex-col h-72 sm:h-[400px]">
             <h3 className="text-lg font-bold text-white mb-4 border-l-4 border-red-600 pl-3 uppercase tracking-wider text-sm italic">
               Amigos Indicados ({referrals.length})
             </h3>
@@ -354,7 +355,7 @@ export default function FortecoinsPage() {
           </Card>
 
           {/* Redemption History */}
-          <Card className="bg-slate-900/40 border-slate-800 p-6 flex flex-col h-[400px]">
+          <Card className="bg-slate-900/40 border-slate-800 p-4 sm:p-6 flex flex-col h-72 sm:h-[400px]">
             <h3 className="text-lg font-bold text-white mb-4 border-l-4 border-red-600 pl-3 uppercase tracking-wider text-sm italic">
               Meus Resgates ({redemptions.length})
             </h3>

@@ -304,30 +304,30 @@ export default function DigitalMedia() {
     <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900">
       {/* Header */}
       <div className="bg-gradient-to-r from-purple-900 to-slate-950 border-b border-red-600/20">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex items-center gap-4 mb-6">
+        <div className="container mx-auto px-4 py-4 sm:py-8">
+          <div className="flex items-center gap-3 mb-4">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => navigate("/")}
-              className="text-white hover:text-red-300"
+              className="text-white hover:text-red-300 px-2"
             >
-              <ArrowLeft className="w-5 h-5 mr-2" />
-              Voltar
+              <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Voltar</span>
             </Button>
             <div className="flex items-center gap-2">
-              <Flame className="w-6 h-6 text-red-500" />
-              <h1 className="text-3xl font-bold text-neon">Mídia Digital PS4 & PS5</h1>
+              <Flame className="w-5 h-5 sm:w-6 sm:h-6 text-red-500" />
+              <h1 className="text-lg sm:text-3xl font-bold text-neon">Mídia Digital PS4 & PS5</h1>
             </div>
           </div>
           <div className="flex gap-4 flex-col md:flex-row">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
+              <Search className="absolute left-3 top-3 w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
               <Input
                 placeholder="Buscar jogos..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 bg-slate-900 border-slate-700 text-white placeholder:text-slate-500"
+                className="pl-9 sm:pl-10 bg-slate-900 border-slate-700 text-white placeholder:text-slate-500 h-10"
               />
             </div>
           </div>
@@ -336,25 +336,25 @@ export default function DigitalMedia() {
 
       {/* Filters */}
       <div className="bg-slate-900/50 border-b border-red-600/20">
-        <div className="container mx-auto px-4 py-4">
+        <div className="container mx-auto px-4 py-3">
 
           {/* Chip de gênero ativo */}
           {selectedGenre && (
-            <div className="mb-4 flex items-center gap-2">
-              <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Categoria:</span>
-              <span className="inline-flex items-center gap-2 bg-red-600/20 border border-red-500/40 text-red-300 text-sm font-bold px-3 py-1 rounded-full">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Categoria:</span>
+              <span className="inline-flex items-center gap-2 bg-red-600/20 border border-red-500/40 text-red-300 text-xs font-bold px-2.5 py-0.5 rounded-full">
                 {selectedGenre}
                 <button onClick={() => setSelectedGenre(null)} className="hover:text-white transition-colors">
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-3 h-3" />
                 </button>
               </span>
             </div>
           )}
 
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-1.5 sm:gap-2 flex-wrap">
             <button
               onClick={() => setSelectedType(null)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
                 selectedType === null
                   ? "bg-red-600 text-white"
                   : "bg-slate-800 text-slate-300 hover:bg-slate-700 border border-red-600/20"
@@ -369,13 +369,13 @@ export default function DigitalMedia() {
                   setSelectedType(type.value);
                   setSelectedPlatform(null);
                 }}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition flex items-center gap-2 ${
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition flex items-center gap-1.5 ${
                   selectedType === type.value
                     ? "bg-red-600 text-white"
                     : "bg-slate-800 text-slate-300 hover:bg-slate-700 border border-red-600/20"
                 }`}
               >
-                <type.icon className="w-4 h-4" />
+                <type.icon className="w-3.5 h-3.5" />
                 {type.label}
               </button>
             ))}
@@ -383,63 +383,67 @@ export default function DigitalMedia() {
 
           {/* Sub-categorias de Plataforma */}
           {(selectedType === "jogo" || !selectedType) && (
-            <div className="flex gap-2 flex-wrap mt-4 pt-3 border-t border-slate-800">
-              <span className="text-slate-400 text-xs font-bold uppercase tracking-wider self-center mr-2">Plataforma:</span>
+            <div className="flex gap-1.5 sm:gap-2 flex-wrap mt-3 pt-2.5 border-t border-slate-800">
+              <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider self-center mr-1">Plataforma:</span>
               <button
                 onClick={() => setSelectedPlatform(null)}
-                className={`px-3 py-1 rounded-md text-xs font-bold uppercase transition ${
+                className={`px-2.5 py-1 rounded-md text-[10px] sm:text-xs font-bold uppercase transition ${
                   selectedPlatform === null
                     ? "bg-red-600 text-white"
-                    : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-850"
+                    : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-700"
                 }`}
               >
                 Todas
               </button>
               <button
                 onClick={() => setSelectedPlatform("PS5")}
-                className={`px-3 py-1 rounded-md text-xs font-bold uppercase transition flex items-center gap-1.5 ${
+                className={`px-2.5 py-1 rounded-md text-[10px] sm:text-xs font-bold uppercase transition flex items-center gap-1 ${
                   selectedPlatform === "PS5"
                     ? "bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]"
-                    : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-850"
+                    : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-700"
                 }`}
               >
-                🎮 PlayStation 5
+                🎮 PS5
               </button>
               <button
                 onClick={() => setSelectedPlatform("PS4")}
-                className={`px-3 py-1 rounded-md text-xs font-bold uppercase transition flex items-center gap-1.5 ${
+                className={`px-2.5 py-1 rounded-md text-[10px] sm:text-xs font-bold uppercase transition flex items-center gap-1 ${
                   selectedPlatform === "PS4"
                     ? "bg-sky-600 text-white shadow-[0_0_15px_rgba(3,105,161,0.4)]"
-                    : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-850"
+                    : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-700"
                 }`}
               >
-                🎮 PlayStation 4
+                🎮 PS4
               </button>
               <button
                 onClick={() => setSelectedPlatform("PS4/PS5")}
-                className={`px-3 py-1 rounded-md text-xs font-bold uppercase transition flex items-center gap-1.5 ${
+                className={`px-2.5 py-1 rounded-md text-[10px] sm:text-xs font-bold uppercase transition flex items-center gap-1 ${
                   selectedPlatform === "PS4/PS5"
                     ? "bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.4)]"
-                    : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-850"
+                    : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-700"
                 }`}
               >
-                🌟 Dual (PS4 & PS5)
+                🌟 Dual
               </button>
+            </div>
+          )}
+        </div>
+      </div>tton>
             </div>
           )}
         </div>
       </div>
 
       {/* Products Grid */}
-      <div className="container mx-auto px-4 py-12">
+      <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-12 pb-24 lg:pb-12">
         {isLoading ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-4">
             {Array.from({ length: 10 }).map((_, i) => (
               <div key={i} className="card-neon animate-pulse">
-                <div className="bg-slate-800 h-52 rounded-t-xl" />
-                <div className="p-3">
-                  <div className="h-4 bg-slate-700 rounded mb-2" />
-                  <div className="h-3 bg-slate-700 rounded w-2/3" />
+                <div className="bg-slate-800 h-36 sm:h-52 rounded-t-xl" />
+                <div className="p-2.5 sm:p-3">
+                  <div className="h-3 sm:h-4 bg-slate-700 rounded mb-2" />
+                  <div className="h-2.5 sm:h-3 bg-slate-700 rounded w-2/3" />
                 </div>
               </div>
             ))}
@@ -452,20 +456,20 @@ export default function DigitalMedia() {
         ) : (
           <>
             {/* Sort bar */}
-            <div className="flex flex-wrap justify-between items-center mb-6 gap-3">
-              <p className="text-slate-400 text-sm">{filteredProducts.length} jogos encontrados</p>
-              <div className="flex items-center gap-2">
-                <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Ordenar:</span>
+            <div className="flex flex-wrap justify-between items-center mb-4 sm:mb-6 gap-2">
+              <p className="text-slate-400 text-xs sm:text-sm">{filteredProducts.length} jogos encontrados</p>
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-500 text-[10px] sm:text-xs font-bold uppercase tracking-wider">Ordenar:</span>
                 {([
                   { val: "az", label: "A→Z" },
                   { val: "za", label: "Z→A" },
-                  { val: "asc", label: "Menor Preço" },
-                  { val: "desc", label: "Maior Preço" },
+                  { val: "asc", label: "Menor" },
+                  { val: "desc", label: "Maior" },
                 ] as const).map(opt => (
                   <button
                     key={opt.val}
                     onClick={() => setSortOrder(opt.val)}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
+                    className={`px-2 sm:px-3 py-1 rounded-lg text-[10px] sm:text-xs font-bold transition ${
                       sortOrder === opt.val
                         ? "bg-red-600 text-white"
                         : "bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700"
@@ -476,10 +480,10 @@ export default function DigitalMedia() {
                 ))}
               </div>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-4">
               {filteredProducts.map((product: any) => (
                 <div key={product.id} className="card-neon overflow-hidden group hover:scale-105 transition-transform duration-200 flex flex-col">
-                  <div className="relative overflow-hidden bg-slate-800 h-52">
+                  <div className="relative overflow-hidden bg-slate-800 h-36 sm:h-52">
                     {product.imageUrl ? (
                       <img
                         src={product.imageUrl}
@@ -494,51 +498,51 @@ export default function DigitalMedia() {
                         {getTypeIcon(product.type)}
                       </div>
                     )}
-                    {/* Game badge (Lançamento / Oferta / Popular) */}
+                    {/* Game badge */}
                     {(() => {
                       const badge = getGameBadge(product.name);
                       return badge ? (
-                        <div className={`absolute top-2 right-2 z-10 ${badge.color} text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-lg`}>
+                        <div className={`absolute top-1.5 right-1.5 z-10 ${badge.color} text-white text-[7px] sm:text-[9px] font-black px-1.5 sm:px-2 py-0.5 rounded-full uppercase tracking-wider shadow-lg`}>
                           {badge.label}
                         </div>
                       ) : null;
                     })()}
-                    <div className="absolute bottom-2 left-2 z-10">
+                    <div className="absolute bottom-1.5 left-1.5 z-10">
                       <span 
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedPlatform(product.platform || "PS4/PS5");
                         }}
-                        className="text-[10px] bg-red-600 hover:bg-red-700 text-white px-2 py-0.5 rounded font-black uppercase tracking-wider cursor-pointer transition-colors shadow-lg border border-red-500/20"
+                        className="text-[8px] sm:text-[10px] bg-red-600 hover:bg-red-700 text-white px-1.5 sm:px-2 py-0.5 rounded font-black uppercase tracking-wider cursor-pointer transition-colors shadow-lg border border-red-500/20"
                       >
                         {product.platform || "PS4/PS5"}
                       </span>
                     </div>
                   </div>
-                  <div className="p-3 flex flex-col flex-1">
-                    <h3 className="text-sm font-bold text-white line-clamp-2 mb-2 group-hover:text-red-400 transition-colors flex-1">
+                  <div className="p-2 sm:p-3 flex flex-col flex-1">
+                    <h3 className="text-[11px] sm:text-sm font-bold text-white line-clamp-2 mb-1.5 sm:mb-2 group-hover:text-red-400 transition-colors flex-1">
                       {product.name}
                     </h3>
-                    <div className="flex justify-between items-center mb-3">
-                      <span className="text-xl font-black text-red-500">
+                    <div className="flex justify-between items-center mb-2 sm:mb-3">
+                      <span className="text-base sm:text-xl font-black text-red-500">
                         {parseFloat(product.price) === 0
                           ? "Consultar"
                           : `R$ ${parseFloat(product.price).toFixed(2).replace('.', ',')}`}
                       </span>
                     </div>
-                    <div className="flex flex-col gap-2 mt-2">
+                    <div className="flex flex-col gap-1.5">
                       <Button
                         size="sm"
-                        className="w-full bg-red-600 hover:bg-red-700 text-white font-bold btn-neon text-xs"
+                        className="w-full bg-red-600 hover:bg-red-700 text-white font-bold btn-neon text-[10px] sm:text-xs h-8 sm:h-9"
                         onClick={() => handleBuyClick(product)}
                         disabled={isProcessingCheckout && selectedProduct?.id === product.id}
                       >
                         {parseFloat(product.price) === 0 ? (
-                          "Consultar via WhatsApp"
+                          "Consultar"
                         ) : (isProcessingCheckout && selectedProduct?.id === product.id) ? (
-                          "Processando..."
+                          "..."
                         ) : (
-                          "Comprar com Pix/Cartão"
+                          "Comprar"
                         )}
                       </Button>
                       {selectedProduct?.id === product.id && checkoutError && (
@@ -548,7 +552,7 @@ export default function DigitalMedia() {
                         <Button
                           size="sm"
                           onClick={() => handleBargainClick(product)}
-                          className="w-full bg-slate-900 border border-red-600/30 hover:border-red-600/60 text-red-500 font-bold text-xs flex items-center justify-center gap-1.5"
+                          className="w-full bg-slate-900 border border-red-600/30 hover:border-red-600/60 text-red-500 font-bold text-[10px] sm:text-xs flex items-center justify-center gap-1 h-8 sm:h-9"
                         >
                           💸 Pechinchar
                         </Button>

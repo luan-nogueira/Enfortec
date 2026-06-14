@@ -144,33 +144,33 @@ export default function Home() {
       </nav>
 
       {/* Hero / Search Section */}
-      <section className="relative pt-20 pb-16 overflow-hidden">
+      <section className="relative pt-10 sm:pt-20 pb-8 sm:pb-16 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-red-900/20 to-slate-950 z-0 pointer-events-none"></div>
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-red-600/20 blur-[120px] rounded-full pointer-events-none"></div>
         
         <div className="container mx-auto px-4 relative z-10 text-center">
-          <h1 className="text-2xl sm:text-4xl md:text-6xl font-black mb-3 sm:mb-6 text-white leading-tight">
+          <h1 className="text-xl sm:text-4xl md:text-6xl font-black mb-2 sm:mb-6 text-white leading-tight">
             O Maior Marketplace Gamer
           </h1>
-          <p className="text-sm sm:text-lg md:text-xl text-slate-400 mb-5 sm:mb-10 max-w-2xl mx-auto">
+          <p className="text-xs sm:text-lg md:text-xl text-slate-400 mb-4 sm:mb-10 max-w-2xl mx-auto">
             Compre e venda jogos, gift cards e produtos físicos. 
             <strong className="text-red-400 font-semibold ml-1">Pagamento 100% Seguro.</strong>
           </p>
           
           <div className="max-w-3xl mx-auto flex flex-col sm:flex-row gap-2 relative">
             <div className="relative w-full">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 sm:w-6 sm:h-6 text-slate-500" />
+              <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-6 sm:h-6 text-slate-500" />
               <Input 
                 type="text" 
-                placeholder="Busque por jogos, gift cards, produtos físicos..." 
+                placeholder="Busque por jogos, gift cards..." 
                 value={heroSearch}
                 onChange={(e) => setHeroSearch(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && heroSearch.trim()) navigate(`/digital?search=${encodeURIComponent(heroSearch.trim())}`); }}
-                className="w-full h-12 sm:h-16 pl-11 sm:pl-14 pr-4 bg-slate-900/80 border-slate-700 text-white text-sm sm:text-lg rounded-xl focus:border-red-500 focus:ring-red-500/20 shadow-xl"
+                className="w-full h-11 sm:h-16 pl-9 sm:pl-14 pr-4 bg-slate-900/80 border-slate-700 text-white text-sm sm:text-lg rounded-xl focus:border-red-500 focus:ring-red-500/20 shadow-xl"
               />
             </div>
             <Button
-              className="h-12 sm:h-16 px-6 sm:px-8 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm sm:text-lg font-bold shrink-0 shadow-[0_0_20px_rgba(220,38,38,0.4)] w-full sm:w-auto"
+              className="h-11 sm:h-16 px-5 sm:px-8 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm sm:text-lg font-bold shrink-0 shadow-[0_0_20px_rgba(220,38,38,0.4)] w-full sm:w-auto"
               onClick={() => { if (heroSearch.trim()) navigate(`/digital?search=${encodeURIComponent(heroSearch.trim())}`); }}
             >
               Buscar
@@ -180,22 +180,22 @@ export default function Home() {
       </section>
 
       {/* Popular Categories */}
-      <section id="categorias" className="py-12 bg-slate-900/30">
+      <section id="categorias" className="py-6 sm:py-12 bg-slate-900/30">
         <div className="container mx-auto px-4">
-          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-            <Gamepad2 className="text-red-500 w-6 h-6" /> Categorias Populares
+          <h2 className="text-lg sm:text-2xl font-bold text-white mb-4 sm:mb-6 flex items-center gap-2">
+            <Gamepad2 className="text-red-500 w-5 h-5 sm:w-6 sm:h-6" /> Categorias Populares
           </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+          <div className="grid grid-cols-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4">
             {categories.map((cat) => (
               <div 
                 key={cat.name}
                 onClick={() => navigate(`/digital?genre=${encodeURIComponent(cat.name)}`)}
-                className="bg-slate-900 border border-slate-800 hover:border-red-500/50 rounded-xl p-6 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all hover:bg-slate-800/50 group"
+                className="bg-slate-900 border border-slate-800 hover:border-red-500/50 rounded-xl p-3 sm:p-6 flex flex-col items-center justify-center gap-2 sm:gap-3 cursor-pointer transition-all hover:bg-slate-800/50 group"
               >
-                <div className={`w-14 h-14 rounded-full bg-gradient-to-br ${cat.color} flex items-center justify-center text-2xl shadow-lg group-hover:scale-110 transition-transform`}>
+                <div className={`w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br ${cat.color} flex items-center justify-center text-xl sm:text-2xl shadow-lg group-hover:scale-110 transition-transform`}>
                   {cat.icon}
                 </div>
-                <span className="text-sm font-semibold text-slate-300 text-center">{cat.name}</span>
+                <span className="text-[10px] sm:text-sm font-semibold text-slate-300 text-center">{cat.name}</span>
               </div>
             ))}
           </div>
@@ -203,14 +203,14 @@ export default function Home() {
       </section>
 
       {/* Recent Listings (Anúncios) */}
-      <section id="anuncios" className="py-16">
+      <section id="anuncios" className="py-8 sm:py-16">
         <div className="container mx-auto px-4">
-          <div className="flex justify-between items-end mb-8">
+          <div className="flex justify-between items-end mb-5 sm:mb-8">
             <div>
-              <h2 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
-                <Tag className="text-red-500 w-8 h-8" /> Últimos Anúncios
+              <h2 className="text-xl sm:text-3xl font-bold text-white mb-1 sm:mb-2 flex items-center gap-2 sm:gap-3">
+                <Tag className="text-red-500 w-5 h-5 sm:w-8 sm:h-8" /> Últimos Anúncios
               </h2>
-              <p className="text-slate-400">Descubra as melhores ofertas da comunidade.</p>
+              <p className="text-slate-400 text-xs sm:text-base">Descubra as melhores ofertas da comunidade.</p>
             </div>
             <Button variant="outline" className="border-slate-700 text-slate-300 hover:bg-slate-800 hidden md:flex" onClick={() => navigate("/digital")}>
               Ver todos

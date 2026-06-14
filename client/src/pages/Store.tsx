@@ -233,42 +233,42 @@ export default function Store() {
     <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900">
       {/* Header */}
       <div className="bg-slate-950/80 backdrop-blur-md border-b border-red-600/20 sticky top-0 z-40">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between gap-4 mb-6">
-            <div className="flex items-center gap-4">
+        <div className="container mx-auto px-4 py-3 sm:py-6">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3">
               <Button 
                 variant="ghost" 
                 size="sm"
                 onClick={() => navigate("/")}
-                className="text-slate-300 hover:text-red-500"
+                className="text-slate-300 hover:text-red-500 px-2"
               >
-                <ArrowLeft className="w-5 h-5 mr-2" />
-                Voltar
+                <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Voltar</span>
               </Button>
               <div className="flex items-center gap-2">
-                <Flame className="w-6 h-6 text-red-500" />
-                <h1 className="text-3xl font-bold text-neon">Loja Própria</h1>
+                <Flame className="w-5 h-5 sm:w-6 sm:h-6 text-red-500" />
+                <h1 className="text-lg sm:text-3xl font-bold text-neon">Loja Própria</h1>
               </div>
             </div>
             {isAuthenticated && (
               <Button 
                 variant="ghost" 
-                className="text-slate-300 hover:text-white hover:bg-slate-900 flex items-center gap-2"
+                className="text-slate-300 hover:text-white hover:bg-slate-900 flex items-center gap-1.5 px-2 sm:px-4"
                 onClick={() => navigate("/fortecoins")}
               >
                 <Coins className="w-4 h-4 text-red-500" />
-                <span>{user?.forteCoins ?? 0} FC</span>
+                <span className="text-sm">{user?.forteCoins ?? 0} FC</span>
               </Button>
             )}
           </div>
           <div className="flex gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-3 w-5 h-5 text-red-500/50" />
+              <Search className="absolute left-3 top-3 w-4 h-4 sm:w-5 sm:h-5 text-red-500/50" />
               <Input
                 placeholder="Buscar produtos..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 bg-slate-900 border-red-600/30 text-white placeholder:text-slate-500"
+                className="pl-9 sm:pl-10 bg-slate-900 border-red-600/30 text-white placeholder:text-slate-500 h-10"
               />
             </div>
           </div>
@@ -276,7 +276,7 @@ export default function Store() {
       </div>
 
       {/* Products Grid */}
-      <div className="container mx-auto px-4 py-12">
+      <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-12 pb-24 lg:pb-12">
         {isLoading ? (
           <div className="text-center py-12">
             <p className="text-slate-400 text-lg">Carregando produtos...</p>

@@ -238,46 +238,46 @@ export default function UsedMarketplace() {
       {/* Header */}
       <div className="bg-slate-950/80 backdrop-blur-md border-b border-red-600/20 sticky top-0 z-40">
         <div className="container mx-auto px-4 py-3 sm:py-6">
-          <div className="flex items-center justify-between gap-4 mb-6">
-            <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3">
               <Button 
                 variant="ghost" 
                 size="sm"
                 onClick={() => navigate("/")}
-                className="text-slate-300 hover:text-red-500"
+                className="text-slate-300 hover:text-red-500 px-2"
               >
-                <ArrowLeft className="w-5 h-5 mr-2" />
-                Voltar
+                <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Voltar</span>
               </Button>
               <div className="flex items-center gap-2">
-                <Flame className="w-6 h-6 text-red-500" />
-                <h1 className="text-xl sm:text-3xl font-bold text-neon">Marketplace de Usados</h1>
+                <Flame className="w-5 h-5 sm:w-6 sm:h-6 text-red-500" />
+                <h1 className="text-base sm:text-3xl font-bold text-neon">Marketplace de Usados</h1>
               </div>
             </div>
             {isAuthenticated && (
               <Button 
                 variant="ghost" 
-                className="text-slate-300 hover:text-white hover:bg-slate-900 flex items-center gap-2"
+                className="text-slate-300 hover:text-white hover:bg-slate-900 flex items-center gap-1.5 px-2 sm:px-4"
                 onClick={() => navigate("/fortecoins")}
               >
                 <Coins className="w-4 h-4 text-red-500" />
-                <span>{user?.forteCoins ?? 0} FC</span>
+                <span className="text-sm">{user?.forteCoins ?? 0} FC</span>
               </Button>
             )}
           </div>
-          <div className="flex gap-4 flex-col md:flex-row">
+          <div className="flex gap-2 flex-col sm:flex-row">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-3 w-5 h-5 text-red-500/50" />
+              <Search className="absolute left-3 top-3 w-4 h-4 sm:w-5 sm:h-5 text-red-500/50" />
               <Input
                 placeholder="Buscar produtos usados..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 bg-slate-900 border-red-600/30 text-white placeholder:text-slate-500"
+                className="pl-9 sm:pl-10 bg-slate-900 border-red-600/30 text-white placeholder:text-slate-500 h-10"
               />
             </div>
             {isAuthenticated && (
-              <Button onClick={() => navigate("/vendedor")} className="bg-red-600 hover:bg-red-700 text-white font-black btn-neon">
-                <Package className="w-5 h-5 mr-2" />
+              <Button onClick={() => navigate("/vendedor")} className="bg-red-600 hover:bg-red-700 text-white font-black btn-neon text-xs sm:text-sm h-10">
+                <Package className="w-4 h-4 mr-1.5" />
                 Vender meu Produto
               </Button>
             )}
@@ -287,11 +287,11 @@ export default function UsedMarketplace() {
 
       {/* Filters */}
       <div className="bg-slate-900/50 border-b border-red-600/20">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex gap-2 flex-wrap">
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex gap-1.5 sm:gap-2 flex-wrap">
             <button
               onClick={() => setSelectedCondition(null)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
                 selectedCondition === null
                   ? "bg-red-600 text-white neon-glow"
                   : "bg-slate-800 text-slate-300 hover:bg-slate-700 border border-red-600/20"
@@ -303,7 +303,7 @@ export default function UsedMarketplace() {
               <button
                 key={condition.value}
                 onClick={() => setSelectedCondition(condition.value)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
                   selectedCondition === condition.value
                     ? "bg-red-600 text-white neon-glow"
                     : "bg-slate-800 text-slate-300 hover:bg-slate-700 border border-red-600/20"
@@ -317,7 +317,7 @@ export default function UsedMarketplace() {
       </div>
 
       {/* Products Grid */}
-      <div className="container mx-auto px-4 py-12">
+      <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-12 pb-24 lg:pb-12">
         {isLoading ? (
           <div className="text-center py-12">
             <p className="text-slate-400 text-lg">Carregando produtos...</p>
