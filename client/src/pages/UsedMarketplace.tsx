@@ -327,14 +327,14 @@ export default function UsedMarketplace() {
             <p className="text-slate-400 text-lg">Nenhum produto encontrado</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
             {filteredProducts.map((product) => (
               <div
                 key={product.id}
-                className="group relative bg-slate-900/40 rounded-3xl border border-red-600/10 overflow-hidden hover:border-red-600/40 transition-all duration-500 hover:shadow-[0_20px_50px_rgba(220,38,38,0.15)] flex flex-col h-full"
+                className="group relative bg-slate-900/40 rounded-2xl sm:rounded-3xl border border-red-600/10 overflow-hidden hover:border-red-600/40 transition-all duration-500 hover:shadow-[0_20px_50px_rgba(220,38,38,0.15)] flex flex-col h-full"
               >
                 {/* Image Section */}
-                <div className="relative h-48 overflow-hidden bg-slate-950">
+                <div className="relative h-32 sm:h-48 overflow-hidden bg-slate-950">
                   {product.imageUrl ? (
                     <img 
                       src={product.imageUrl} 
@@ -343,59 +343,60 @@ export default function UsedMarketplace() {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-slate-800">
-                      <ShoppingCart className="w-16 h-16" />
+                      <ShoppingCart className="w-10 h-10 sm:w-16 sm:h-16" />
                     </div>
                   )}
                   
                   {/* Badge */}
-                  <div className="absolute top-4 right-4 z-10">
-                    <span className="bg-red-600 text-white text-[10px] px-3 py-1.5 rounded-full font-black uppercase tracking-wider shadow-xl border border-white/10">
+                  <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10">
+                    <span className="bg-red-600 text-white text-[8px] sm:text-[10px] px-2 py-0.5 sm:px-3 sm:py-1.5 rounded-full font-black uppercase tracking-wider shadow-xl border border-white/10">
                       USADO
                     </span>
                   </div>
 
-                  <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-slate-950 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 h-16 sm:h-24 bg-gradient-to-t from-slate-950 to-transparent" />
                 </div>
 
                 {/* Content */}
-                <div className="p-6 flex-1 flex flex-col">
-                  <div className="mb-4">
-                    <h3 className="text-xl font-black text-white line-clamp-1 mb-1">{product.name}</h3>
-                    <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">{product.category || "JOGO USADO"}</p>
+                <div className="p-3 sm:p-6 flex-1 flex flex-col justify-between">
+                  <div>
+                    <h3 className="text-sm sm:text-xl font-black text-white line-clamp-2 sm:line-clamp-1 mb-0.5 sm:mb-1">{product.name}</h3>
+                    <p className="text-slate-500 text-[8px] sm:text-[10px] font-bold uppercase tracking-widest">{product.category || "JOGO USADO"}</p>
                   </div>
 
-                  <div className="flex items-center gap-2 mb-6 p-2 rounded-xl bg-slate-950/50 border border-red-600/5">
-                    <div className="w-8 h-8 rounded-full bg-red-600/10 flex items-center justify-center border border-red-600/20">
-                      <User className="w-4 h-4 text-red-500" />
+                  <div className="flex items-center gap-1.5 sm:gap-2 my-3 sm:my-6 p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-slate-950/50 border border-red-600/5">
+                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-red-600/10 flex items-center justify-center border border-red-600/20">
+                      <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-500" />
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Vendido por:</span>
-                      <span className="text-xs font-black text-white">{product.sellerName || "Usuário Verificado"}</span>
+                      <span className="text-[8px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Vendido por:</span>
+                      <span className="text-[10px] sm:text-xs font-black text-white line-clamp-1">{product.sellerName || "Usuário Verificado"}</span>
                     </div>
                   </div>
 
-                  <div className="mt-auto space-y-4">
-                    <div className="flex justify-between items-center">
+                  <div className="mt-auto space-y-3 sm:space-y-4">
+                    <div className="flex justify-between items-center gap-2">
                       <div className="flex flex-col">
-                        <span className="text-2xl font-black text-red-500 tracking-tighter">
+                        <span className="text-base sm:text-2xl font-black text-red-500 tracking-tighter">
                           R$ {parseFloat(product.pricePS4 || product.pricePS5 || 0).toFixed(2).replace('.', ',')}
                         </span>
-                        <span className="text-[10px] text-slate-500 font-bold italic">Valor Unitário</span>
+                        <span className="text-[8px] sm:text-[10px] text-slate-500 font-bold italic">Valor Unitário</span>
                       </div>
-                      <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 text-green-500 text-[10px] font-black uppercase tracking-wider border border-green-500/20">
-                        <Check className="w-3 h-3" strokeWidth={4} />
-                        Disponível
+                      <div className="flex items-center gap-1 px-1.5 py-0.5 sm:px-3 sm:py-1.5 rounded-full bg-green-500/10 text-green-500 text-[8px] sm:text-[10px] font-black uppercase tracking-wider border border-green-500/20">
+                        <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3" strokeWidth={4} />
+                        <span className="hidden sm:inline">Disponível</span>
+                        <span className="sm:hidden">Sim</span>
                       </div>
                     </div>
 
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-1.5 sm:gap-2">
                       <Button 
                         onClick={() => handleBuyClick(product)}
                         disabled={isProcessingCheckout && selectedProduct?.id === product.id}
-                        className="w-full bg-red-600 hover:bg-red-700 text-white font-black text-lg h-12 rounded-2xl transition-all active:scale-95 shadow-lg border-b-4 border-red-800 flex items-center justify-center gap-3"
+                        className="w-full bg-red-600 hover:bg-red-700 text-white font-black text-xs sm:text-lg h-10 sm:h-12 rounded-xl sm:rounded-2xl transition-all active:scale-95 shadow-lg border-b-2 sm:border-b-4 border-red-800 flex items-center justify-center gap-1.5 sm:gap-3"
                       >
-                        <ShoppingCart className="w-5 h-5" strokeWidth={3} />
-                        {(isProcessingCheckout && selectedProduct?.id === product.id) ? "Processando..." : "Comprar com Pix/Cartão"}
+                        <ShoppingCart className="w-3.5 h-3.5 sm:w-5 sm:h-5" strokeWidth={3} />
+                        {(isProcessingCheckout && selectedProduct?.id === product.id) ? "..." : "Comprar"}
                       </Button>
                       {selectedProduct?.id === product.id && checkoutError && (
                         <p className="text-red-400 text-[10px] text-center">⚠️ {checkoutError}</p>
@@ -403,7 +404,7 @@ export default function UsedMarketplace() {
                       {parseFloat(product.pricePS4 || product.pricePS5 || 0) > 0 && (
                         <Button
                           onClick={() => handleBargainClick(product)}
-                          className="w-full bg-slate-900 border border-red-600/30 hover:border-red-600/60 text-red-500 font-bold text-xs h-12 rounded-2xl flex items-center justify-center gap-1.5"
+                          className="w-full bg-slate-900 border border-red-600/30 hover:border-red-600/60 text-red-500 font-bold text-[10px] sm:text-xs h-10 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center gap-1"
                         >
                           💸 Pechinchar
                         </Button>

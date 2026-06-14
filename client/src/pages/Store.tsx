@@ -286,11 +286,11 @@ export default function Store() {
             <p className="text-slate-400 text-lg">Nenhum produto encontrado</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
             {filteredProducts.map((product) => (
-              <div key={product.id} className="relative bg-slate-950 rounded-[2rem] overflow-hidden border border-red-600/20 shadow-2xl group transition-all hover:border-red-600/50">
+              <div key={product.id} className="relative bg-slate-950 rounded-2xl sm:rounded-[2rem] overflow-hidden border border-red-600/20 shadow-2xl group transition-all hover:border-red-600/50 flex flex-col h-full">
                 {/* Image Container with Logo Overlay */}
-                <div className="relative h-80 overflow-hidden">
+                <div className="relative h-40 sm:h-80 overflow-hidden">
                   {product.imageUrl ? (
                     <img 
                       src={product.imageUrl} 
@@ -306,68 +306,70 @@ export default function Store() {
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-60" />
                   
                   {/* Logo Overlay */}
-                  <div className="absolute top-6 left-6 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                  <div className="absolute top-3 left-3 sm:top-6 sm:left-6 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
                     <div className="flex flex-col items-center">
-                      <span className="text-white font-black text-2xl tracking-tight leading-none italic uppercase">EFORTE</span>
-                      <span className="text-red-600 font-bold text-[8px] tracking-[0.4em] leading-none -mt-0.5 ml-1">GAMES</span>
+                      <span className="text-white font-black text-xs sm:text-2xl tracking-tight leading-none italic uppercase">EFORTE</span>
+                      <span className="text-red-600 font-bold text-[5px] sm:text-[8px] tracking-[0.4em] leading-none -mt-0.5 ml-0.5 sm:ml-1">GAMES</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Content Area */}
-                <div className="p-6 bg-slate-950/40 backdrop-blur-md">
-                  <h3 className="text-2xl font-black text-white mb-1 tracking-tight leading-tight line-clamp-1">{product.name}</h3>
-                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em] mb-4">
-                    {product.category || "JOGO DIGITAL"}
-                  </p>
-                  
-                  <div className="h-[1px] bg-red-600/10 w-full mb-6" />
+                <div className="p-3 sm:p-6 bg-slate-950/40 backdrop-blur-md flex-1 flex flex-col justify-between">
+                  <div>
+                    <h3 className="text-sm sm:text-2xl font-black text-white mb-0.5 sm:mb-1 tracking-tight leading-tight line-clamp-2 sm:line-clamp-1">{product.name}</h3>
+                    <p className="text-slate-500 text-[8px] sm:text-[10px] font-bold uppercase tracking-[0.2em] mb-2 sm:mb-4">
+                      {product.category || "JOGO DIGITAL"}
+                    </p>
+                    
+                    <div className="h-[1px] bg-red-600/10 w-full mb-3 sm:mb-6" />
+                  </div>
 
-                  <div className="flex flex-col gap-4">
-                    <div className="flex justify-between items-center">
-                      <div className="space-y-3">
+                  <div className="flex flex-col gap-3 sm:gap-4 mt-auto">
+                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5">
+                      <div className="space-y-1.5 sm:space-y-3">
                         {product.pricePS4 && (
-                          <div className="flex items-center gap-3">
-                            <div className="bg-[#003791] px-2 py-1 rounded-md flex items-center justify-center w-14 shadow-lg border border-white/10">
-                              <span className="text-white text-[10px] font-black italic tracking-tighter">PS4</span>
+                          <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="bg-[#003791] px-1.5 py-0.5 sm:px-2 sm:py-1 rounded flex items-center justify-center w-10 sm:w-14 shadow-lg border border-white/10">
+                              <span className="text-white text-[8px] sm:text-[10px] font-black italic tracking-tighter">PS4</span>
                             </div>
-                            <span className="text-xl font-black text-red-600 tracking-tighter whitespace-nowrap">R$ {product.pricePS4.toFixed(2).replace('.', ',')}</span>
+                            <span className="text-sm sm:text-xl font-black text-red-600 tracking-tighter whitespace-nowrap">R$ {product.pricePS4.toFixed(2).replace('.', ',')}</span>
                           </div>
                         )}
                         {product.pricePS5 && (
-                          <div className="flex items-center gap-3">
-                            <div className="bg-white px-2 py-1 rounded-md flex items-center justify-center w-14 shadow-lg border border-black/10">
-                              <span className="text-black text-[10px] font-black italic tracking-tighter">PS5</span>
+                          <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="bg-white px-1.5 py-0.5 sm:px-2 sm:py-1 rounded flex items-center justify-center w-10 sm:w-14 shadow-lg border border-black/10">
+                              <span className="text-black text-[8px] sm:text-[10px] font-black italic tracking-tighter">PS5</span>
                             </div>
-                            <span className="text-xl font-black text-red-600 tracking-tighter whitespace-nowrap">R$ {product.pricePS5.toFixed(2).replace('.', ',')}</span>
+                            <span className="text-sm sm:text-xl font-black text-red-600 tracking-tighter whitespace-nowrap">R$ {product.pricePS5.toFixed(2).replace('.', ',')}</span>
                           </div>
                         )}
                         {!product.pricePS4 && !product.pricePS5 && (
-                           <span className="text-lg font-black text-slate-500 italic">Sob Consulta</span>
+                           <span className="text-xs sm:text-lg font-black text-slate-500 italic">Sob Consulta</span>
                         )}
                       </div>
 
-                      <div className="flex flex-col items-end gap-2">
-                        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${product.stock > 0 ? 'border-green-500/30 bg-green-500/10 text-green-500' : 'border-red-500/30 bg-red-500/10 text-red-500'} text-[10px] font-black uppercase tracking-wider`}>
-                          {product.stock > 0 ? <Check className="w-3 h-3" strokeWidth={4} /> : <X className="w-3 h-3" strokeWidth={4} />}
+                      <div className="flex flex-col items-start sm:items-end gap-2">
+                        <div className={`flex items-center gap-1.5 px-2 py-0.5 sm:px-3 sm:py-1.5 rounded-full border ${product.stock > 0 ? 'border-green-500/30 bg-green-500/10 text-green-500' : 'border-red-500/30 bg-red-500/10 text-red-500'} text-[8px] sm:text-[10px] font-black uppercase tracking-wider`}>
+                          {product.stock > 0 ? <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3" strokeWidth={4} /> : <X className="w-2.5 h-2.5 sm:w-3 sm:h-3" strokeWidth={4} />}
                           {product.stock > 0 ? `Estoque: ${product.stock}` : "Esgotado"}
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-1.5 sm:gap-2">
                       <Button 
                         onClick={() => handleBuyClick(product)}
                         disabled={product.stock <= 0}
-                        className={`flex-[2] ${product.stock > 0 ? 'bg-red-600 hover:bg-red-700 shadow-[0_8px_20px_rgba(220,38,38,0.3)]' : 'bg-slate-800 cursor-not-allowed opacity-50'} text-white font-black text-sm h-12 rounded-xl mt-2 transition-all active:scale-[0.95] border-b-4 border-red-800 flex items-center justify-center gap-2 group/btn`}
+                        className={`flex-[2] ${product.stock > 0 ? 'bg-red-600 hover:bg-red-700 shadow-[0_8px_20px_rgba(220,38,38,0.3)]' : 'bg-slate-800 cursor-not-allowed opacity-50'} text-white font-black text-[10px] sm:text-sm h-10 sm:h-12 rounded-lg sm:rounded-xl mt-2 transition-all active:scale-[0.95] border-b-2 sm:border-b-4 border-red-800 flex items-center justify-center gap-1.5 sm:gap-2 group/btn`}
                       >
-                        <ShoppingCart className="w-4 h-4 transition-transform group-hover/btn:scale-110" strokeWidth={3} />
+                        <ShoppingCart className="w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform group-hover/btn:scale-110" strokeWidth={3} />
                         {product.stock > 0 ? "Comprar" : "Indisponível"}
                       </Button>
                       {product.stock > 0 && (
                         <Button
                           onClick={() => handleBargainClick(product)}
-                          className="flex-1 bg-slate-900 border border-red-600/30 hover:border-red-600/60 text-red-500 font-bold text-xs h-12 rounded-xl mt-2 transition-all active:scale-[0.95] flex items-center justify-center gap-1"
+                          className="flex-1 bg-slate-900 border border-red-600/30 hover:border-red-600/60 text-red-500 font-bold text-[10px] sm:text-xs h-10 sm:h-12 rounded-lg sm:rounded-xl mt-2 transition-all active:scale-[0.95] flex items-center justify-center gap-1"
                         >
                           💸 Pechinchar
                         </Button>

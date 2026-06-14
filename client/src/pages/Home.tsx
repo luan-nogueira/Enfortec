@@ -149,28 +149,28 @@ export default function Home() {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-red-600/20 blur-[120px] rounded-full pointer-events-none"></div>
         
         <div className="container mx-auto px-4 relative z-10 text-center">
-          <h1 className="text-3xl sm:text-4xl md:text-6xl font-black mb-4 sm:mb-6 text-white leading-tight">
+          <h1 className="text-2xl sm:text-4xl md:text-6xl font-black mb-3 sm:mb-6 text-white leading-tight">
             O Maior Marketplace Gamer
           </h1>
-          <p className="text-base sm:text-lg md:text-xl text-slate-400 mb-6 sm:mb-10 max-w-2xl mx-auto">
+          <p className="text-sm sm:text-lg md:text-xl text-slate-400 mb-5 sm:mb-10 max-w-2xl mx-auto">
             Compre e venda jogos, gift cards e produtos físicos. 
             <strong className="text-red-400 font-semibold ml-1">Pagamento 100% Seguro.</strong>
           </p>
           
           <div className="max-w-3xl mx-auto flex flex-col sm:flex-row gap-2 relative">
             <div className="relative w-full">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-slate-500" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 sm:w-6 sm:h-6 text-slate-500" />
               <Input 
                 type="text" 
                 placeholder="Busque por jogos, gift cards, produtos físicos..." 
                 value={heroSearch}
                 onChange={(e) => setHeroSearch(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && heroSearch.trim()) navigate(`/digital?search=${encodeURIComponent(heroSearch.trim())}`); }}
-                className="w-full h-16 pl-14 pr-4 bg-slate-900/80 border-slate-700 text-white text-lg rounded-xl focus:border-red-500 focus:ring-red-500/20 shadow-xl"
+                className="w-full h-12 sm:h-16 pl-11 sm:pl-14 pr-4 bg-slate-900/80 border-slate-700 text-white text-sm sm:text-lg rounded-xl focus:border-red-500 focus:ring-red-500/20 shadow-xl"
               />
             </div>
             <Button
-              className="h-14 sm:h-16 px-6 sm:px-8 bg-red-600 hover:bg-red-700 text-white rounded-xl text-base sm:text-lg font-bold shrink-0 shadow-[0_0_20px_rgba(220,38,38,0.4)] w-full sm:w-auto"
+              className="h-12 sm:h-16 px-6 sm:px-8 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm sm:text-lg font-bold shrink-0 shadow-[0_0_20px_rgba(220,38,38,0.4)] w-full sm:w-auto"
               onClick={() => { if (heroSearch.trim()) navigate(`/digital?search=${encodeURIComponent(heroSearch.trim())}`); }}
             >
               Buscar
@@ -217,7 +217,7 @@ export default function Home() {
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
             {allListings.length > 0 ? allListings.map((listing: any) => {
               const priceValue = listing._type === 'used'
                 ? (listing.pricePS4 || listing.pricePS5 || 0)
@@ -228,7 +228,7 @@ export default function Home() {
                   className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-red-500/40 transition-all group flex flex-col h-full cursor-pointer"
                   onClick={() => navigate(listing._type === 'digital' ? '/digital' : '/usados')}
                 >
-                  <div className="h-40 bg-slate-800 relative overflow-hidden">
+                  <div className="h-28 sm:h-40 bg-slate-800 relative overflow-hidden">
                     {listing.imageUrl || (listing.images && listing.images.length > 0) ? (
                       <img 
                         src={listing.imageUrl || listing.images[0]} 
@@ -237,30 +237,30 @@ export default function Home() {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-slate-600 bg-slate-800/50">
-                        <Gamepad2 className="w-12 h-12 opacity-50" />
+                        <Gamepad2 className="w-8 h-8 sm:w-12 sm:h-12 opacity-50" />
                       </div>
                     )}
-                    <div className="absolute top-2 left-2 px-2 py-1 bg-slate-950/80 backdrop-blur-md text-[10px] uppercase font-bold text-white rounded">
+                    <div className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 px-1.5 py-0.5 sm:px-2 sm:py-1 bg-slate-950/80 backdrop-blur-md text-[8px] sm:text-[10px] uppercase font-bold text-white rounded">
                       {listing._type === 'digital' ? 'Mídia Digital' : 'Usado'}
                     </div>
                   </div>
-                  <div className="p-4 flex flex-col flex-grow">
-                    <h3 className="text-white font-medium line-clamp-2 mb-2 group-hover:text-red-400 transition-colors">
+                  <div className="p-3 sm:p-4 flex flex-col flex-grow">
+                    <h3 className="text-white font-medium text-xs sm:text-base line-clamp-2 mb-1.5 sm:mb-2 group-hover:text-red-400 transition-colors">
                       {listing.name}
                     </h3>
-                    <div className="mt-auto flex items-end justify-between pt-4 border-t border-slate-800">
-                      <span className="text-2xl font-black text-white">
+                    <div className="mt-auto flex flex-col sm:flex-row sm:items-end justify-between gap-2 pt-2.5 sm:pt-4 border-t border-slate-800">
+                      <span className="text-base sm:text-2xl font-black text-white">
                         {Number(priceValue) === 0 ? (
-                          <span className="text-lg font-bold text-red-500">A definir</span>
+                          <span className="text-xs sm:text-lg font-bold text-red-500">A definir</span>
                         ) : (
                           <>
-                            <span className="text-sm text-slate-500 font-normal">R$</span> {Number(priceValue).toFixed(2).replace('.', ',')}
+                            <span className="text-[10px] sm:text-sm text-slate-500 font-normal">R$</span> {Number(priceValue).toFixed(2).replace('.', ',')}
                           </>
                         )}
                       </span>
                       <Button
                         size="sm"
-                        className="bg-red-600 hover:bg-red-700 text-white rounded-lg px-4"
+                        className="bg-red-600 hover:bg-red-700 text-white rounded-lg px-2.5 py-1 sm:px-4 text-[10px] sm:text-xs"
                         onClick={(e) => {
                           e.stopPropagation();
                           const page = listing._type === 'digital' ? '/digital' : '/usados';
