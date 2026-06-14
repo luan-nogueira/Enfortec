@@ -3,6 +3,7 @@ import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { useLocation } from "wouter";
+import { toast } from "sonner";
 
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
@@ -77,6 +78,22 @@ export function useAuth(options?: UseAuthOptions) {
               }
 
               const userData = userDoc.data();
+              
+              // Reembolso automático de ForteCoins se o checkout expirou
+              if (userData?.pendingRefund && typeof userData.pendingRefund === "object") {
+                const { coins, expiresAt } = userData.pendingRefund;
+                if (Date.now() > expiresAt) {
+                  const currentCoins = userData.forteCoins ?? 0;
+                  console.log(`[useAuth] Checkout expirado. Reembolsando ${coins} ForteCoins.`);
+                  await setDoc(userRef, {
+                    forteCoins: currentCoins + coins,
+                    pendingRefund: null
+                  }, { merge: true });
+                  toast.warning(`Seu tempo de checkout expirou. ${coins} ForteCoins foram devolvidas ao seu saldo.`);
+                  return;
+                }
+              }
+
               let needsUpdate = false;
               const updateFields: any = {};
               

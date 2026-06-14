@@ -54,7 +54,7 @@ export async function createContext(
         const name = (decoded.name as string | undefined) || email?.split("@")[0] || "User";
         
         try {
-          user = await db.getUserByOpenId(uid);
+          user = (await db.getUserByOpenId(uid)) || null;
           console.log("[TRPC Server] Database user lookup result (by openId):", user ? `found (id: ${user.id})` : "not found");
           
           if (!user) {
@@ -67,7 +67,7 @@ export async function createContext(
                 loginMethod: "firebase",
                 lastSignedIn: new Date(),
               });
-              user = await db.getUserByOpenId(uid);
+              user = (await db.getUserByOpenId(uid)) || null;
               console.log("[TRPC Server] User upsert complete, user id:", user?.id);
             } catch (dbError) {
               console.error("[FirebaseAuth] Failed to upsert user in database:", dbError);

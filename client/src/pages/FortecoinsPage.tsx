@@ -31,6 +31,26 @@ export default function FortecoinsPage() {
   const [referrals, setReferrals] = useState<any[]>([]);
   const [redemptions, setRedemptions] = useState<any[]>([]);
   const [redeemingId, setRedeemingId] = useState<string | null>(null);
+  const [prizesList, setPrizesList] = useState<any[]>([]);
+
+  // Carregar prêmios do banco de dados (ou usar predefinidos como fallback)
+  useEffect(() => {
+    const q = collection(db, "prizes");
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })).filter((p: any) => p.isActive !== false);
+
+      if (data.length > 0) {
+        setPrizesList(data);
+      } else {
+        setPrizesList(PREDEFINED_PRIZES);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // Redireciona se não estiver logado
   useEffect(() => {
@@ -258,7 +278,7 @@ export default function FortecoinsPage() {
           <Gift className="text-red-500 w-6 h-6" /> Loja de Resgate de Prêmios
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-          {PREDEFINED_PRIZES.map((prize) => (
+          {prizesList.map((prize) => (
             <Card key={prize.id} className="bg-slate-900 border-slate-800 hover:border-red-600/30 overflow-hidden flex flex-col justify-between transition-all group card-neon">
               <div className="p-6">
                 <div className="flex justify-between items-start mb-4">

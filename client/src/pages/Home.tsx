@@ -258,7 +258,15 @@ export default function Home() {
                           </>
                         )}
                       </span>
-                      <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white rounded-lg px-4">
+                      <Button
+                        size="sm"
+                        className="bg-red-600 hover:bg-red-700 text-white rounded-lg px-4"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const page = listing._type === 'digital' ? '/digital' : '/usados';
+                          navigate(`${page}?search=${encodeURIComponent(listing.name)}`);
+                        }}
+                      >
                         {Number(priceValue) === 0 ? "Contatar" : "Comprar"}
                       </Button>
                     </div>

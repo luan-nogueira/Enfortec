@@ -4,10 +4,11 @@ import { firebaseConfig } from "@/lib/firebase";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, onSnapshot, doc, updateDoc, setDoc, deleteDoc, query, orderBy, serverTimestamp, addDoc, getDoc } from "firebase/firestore";
 import { useLocation } from "wouter";
-import { Shield, User, UserCheck, UserPlus, ArrowLeft, Plus, X, Lock, Mail, Trash2, MessageCircle, Send, Coins, Gift, Check, Clock, LogOut } from "lucide-react";
+import { Shield, User, UserCheck, UserPlus, ArrowLeft, Plus, X, Lock, Mail, Trash2, MessageCircle, Send, Coins, Gift, Check, Clock, LogOut, Gamepad2, Edit } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import {
   Dialog,
@@ -21,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 
 export default function AdminDashboard() {
   const { user, isAuthenticated, isAdmin, loading: authLoading, logout } = useAuth();
@@ -42,10 +44,10 @@ export default function AdminDashboard() {
     onSuccess: () => {
       refetchSales();
       setDeliverGameOpen(false);
-      alert("Dados do jogo salvos e enviados com sucesso!");
+      toast.success("Dados do jogo salvos e enviados com sucesso!");
     },
     onError: (err: any) => {
-      alert("Erro ao entregar o jogo: " + (err.message || "Erro desconhecido"));
+      toast.error("Erro ao entregar o jogo: " + (err.message || "Erro desconhecido"));
     }
   });
 
@@ -53,7 +55,7 @@ export default function AdminDashboard() {
     e.preventDefault();
     if (!selectedDeliverOrder) return;
     if (!deliveryInstructions.trim()) {
-      alert("As instruções ou chave do jogo não podem ser vazias.");
+      toast.warning("As instruções ou chave do jogo não podem ser vazias.");
       return;
     }
     deliverOrderMutation.mutate({
@@ -62,12 +64,262 @@ export default function AdminDashboard() {
     });
   };
 
-  // Atendimento
-  const [chats, setChats] = useState<any[]>([]);
-  const [selectedChat, setSelectedChat] = useState<any>(null);
-  const [chatMessages, setChatMessages] = useState<any[]>([]);
-  const [adminMessage, setAdminMessage] = useState("");
-  const scrollRef = useRef<HTMLDivElement>(null);
+  // Jogos
+  const [gamesList, setGamesList] = useState<any[]>([]);
+  const [showGameModal, setShowGameModal] = useState(false);
+  const [gameName, setGameName] = useState("");
+  const [gamePrice, setGamePrice] = useState(0);
+  const [gamePlatform, setGamePlatform] = useState("");
+  const [gameImageUrl, setGameImageUrl] = useState("");
+  const [gameStock, setGameStock] = useState(999);
+  const [gameIsActive, setGameIsActive] = useState(true);
+  const [gameCoverFit, setGameCoverFit] = useState<"cover" | "contain">("cover");
+  const [addingGame, setAddingGame] = useState(false);
+  const [editingGameId, setEditingGameId] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingImage(true);
+    try {
+      const storageRef = ref(storage, `digital_products_covers/${Date.now()}_${file.name}`);
+      const snapshot = await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(snapshot.ref);
+      setGameImageUrl(url);
+      toast.success("Imagem enviada com sucesso!");
+    } catch (error: any) {
+      console.error("Erro ao fazer upload da imagem:", error);
+      toast.error("Erro ao fazer upload da imagem: " + (error.message || error));
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  // Cadastro em Lote
+  const [showBatchModal, setShowBatchModal] = useState(false);
+  const [batchRawText, setBatchRawText] = useState("");
+  const [batchGames, setBatchGames] = useState<any[]>([]);
+  const [isProcessingBatchSearch, setIsProcessingBatchSearch] = useState(false);
+  const [isSavingBatch, setIsSavingBatch] = useState(false);
+  const [batchSaveProgress, setBatchSaveProgress] = useState(0);
+
+  const handleProcessBatchText = () => {
+    if (!batchRawText.trim()) {
+      toast.warning("Por favor, insira pelo menos um jogo.");
+      return;
+    }
+
+    const lines = batchRawText.split("\n");
+    const parsedGames: any[] = [];
+
+    lines.forEach((line, index) => {
+      let text = line.trim();
+      if (!text) return;
+
+      // Filtra/Ignora cabeçalhos, avisos ou decorações de WhatsApp
+      if (
+        text.startsWith("🎮") || 
+        text.startsWith("💥") || 
+        text.startsWith("🎁") || 
+        text.startsWith("⚠️") || 
+        text.startsWith("🚨")
+      ) return;
+
+      if (
+        text.includes("PROMOÇÃO") || 
+        text.includes("ESCOLHA QUALQUER") || 
+        text.includes("VALOR NEGOCIÁVEL") || 
+        text.includes("Levou 4") || 
+        text.includes("O combo deve") || 
+        text.includes("POUQUÍSSIMAS") ||
+        text.includes("DAYS OF PLAY") || 
+        text.includes("ENCERRA DIA")
+      ) return;
+
+      // Se começa com emojis e não tem números, provavelmente é um cabeçalho de categoria
+      if (/^\p{Emoji}/u.test(text) && !/\d/.test(text)) {
+        return;
+      }
+
+      // Remove marcadores de lista no início da linha (como *, -, •, +)
+      text = text.replace(/^[*•\-+]\s*/, "").trim();
+
+      if (!text) return;
+
+      const lowerText = text.toLowerCase();
+      if (
+        lowerText.startsWith("ação e aventura") || 
+        lowerText.startsWith("terror e sobrevivência") || 
+        lowerText.startsWith("tiro") || 
+        lowerText.startsWith("corrida") || 
+        lowerText.startsWith("rpg") || 
+        lowerText.startsWith("outros")
+      ) {
+        return;
+      }
+
+      let name = "";
+      let price = 0;
+      let platform = "PS4/PS5";
+      let stock = 999;
+
+      // Caso A: Se a linha contiver ponto e vírgula, tratamos como delimitador clássico
+      if (text.includes(";")) {
+        const parts = text.split(";");
+        name = parts[0]?.trim() || "";
+        price = parts[1] ? parseFloat(parts[1].trim().replace(",", ".")) : 0;
+        platform = parts[2]?.trim() || "PS4/PS5";
+        stock = parts[3] ? parseInt(parts[3].trim()) : 999;
+      } else {
+        // Caso B: Parse inteligente do texto corrido (ex: "A Plague Tale Requiem PS5 74 90")
+        let nameAndPlatform = text;
+        const doubleNumberRegex = /\s+(\d+)\s+(\d{2})$/; // ex: "74 90" ou "134 90"
+        const singlePriceRegex = /\s+(\d+[,.]\d{2})$/;   // ex: "24.90" ou "24,90"
+        const simpleIntRegex = /\s+(\d+)$/;              // ex: "20" ou "60"
+
+        if (doubleNumberRegex.test(text)) {
+          const match = text.match(doubleNumberRegex);
+          price = parseFloat(`${match[1]}.${match[2]}`);
+          nameAndPlatform = text.replace(doubleNumberRegex, "").trim();
+        } else if (singlePriceRegex.test(text)) {
+          const match = text.match(singlePriceRegex);
+          price = parseFloat(match[1].replace(",", "."));
+          nameAndPlatform = text.replace(singlePriceRegex, "").trim();
+        } else if (simpleIntRegex.test(text)) {
+          const match = text.match(simpleIntRegex);
+          price = parseFloat(match[1]);
+          nameAndPlatform = text.replace(simpleIntRegex, "").trim();
+        }
+
+        // Tenta extrair plataforma do final do nome
+        const platformRegex = /\s*\(?(PS4\s*[\/\-&eE]?\s*PS5|PS5\s*[\/\-&eE]?\s*PS4|PS5|PS4)\)?$/i;
+        if (platformRegex.test(nameAndPlatform)) {
+          const match = nameAndPlatform.match(platformRegex);
+          platform = match[1].toUpperCase().replace(/\s+/g, "/"); // Normaliza para PS4/PS5, PS5 ou PS4
+          name = nameAndPlatform.replace(platformRegex, "").trim();
+        } else {
+          name = nameAndPlatform;
+        }
+
+        // Se o preço for 0, mas estivermos na promoção secundária ou semelhante, podemos dar um valor padrão como 33.30
+        if (price === 0) {
+          price = 33.30;
+        }
+      }
+
+      if (name) {
+        parsedGames.push({
+          id: `batch-${index}-${Date.now()}`,
+          name,
+          price: isNaN(price) ? 33.30 : price,
+          platform: platform || "PS4/PS5",
+          stock: isNaN(stock) ? 999 : stock,
+          imageUrl: "",
+          status: "pending",
+          errorMsg: ""
+        });
+      }
+    });
+
+    setBatchGames(parsedGames);
+    triggerBatchCoverSearch(parsedGames);
+  };
+
+  const triggerBatchCoverSearch = async (games: any[]) => {
+    setIsProcessingBatchSearch(true);
+    const updatedGames = [...games];
+
+    updatedGames.forEach(g => {
+      g.status = "searching";
+    });
+    setBatchGames([...updatedGames]);
+
+    const promises = updatedGames.map(async (game, idx) => {
+      try {
+        const response = await fetch(`/api/games/search-cover?term=${encodeURIComponent(game.name)}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.imageUrl) {
+            updatedGames[idx].imageUrl = data.imageUrl;
+            updatedGames[idx].status = "found";
+          } else {
+            updatedGames[idx].status = "error";
+            updatedGames[idx].errorMsg = "Capa não encontrada";
+          }
+        } else {
+          updatedGames[idx].status = "error";
+          updatedGames[idx].errorMsg = "Jogo não encontrado";
+        }
+      } catch (err) {
+        updatedGames[idx].status = "error";
+        updatedGames[idx].errorMsg = "Erro na busca";
+      }
+      setBatchGames([...updatedGames]);
+    });
+
+    await Promise.all(promises);
+    setIsProcessingBatchSearch(false);
+  };
+
+  const handleBatchImageUpload = async (gameId: string, file: File) => {
+    const updated = [...batchGames];
+    const index = updated.findIndex(g => g.id === gameId);
+    if (index === -1) return;
+
+    updated[index].status = "searching";
+    setBatchGames([...updated]);
+
+    try {
+      const storageRef = ref(storage, `digital_products_covers/${Date.now()}_${file.name}`);
+      const snapshot = await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(snapshot.ref);
+      updated[index].imageUrl = url;
+      updated[index].status = "found";
+    } catch (error: any) {
+      console.error(error);
+      updated[index].status = "error";
+      updated[index].errorMsg = "Erro no upload";
+    } finally {
+      setBatchGames([...updated]);
+    }
+  };
+
+  const handleSaveBatchGames = async () => {
+    if (batchGames.length === 0) return;
+    setIsSavingBatch(true);
+    setBatchSaveProgress(0);
+
+    let count = 0;
+    try {
+      for (const game of batchGames) {
+        await addDoc(collection(db, "digital_products"), {
+          name: game.name.trim(),
+          price: Number(game.price),
+          platform: game.platform.trim(),
+          imageUrl: game.imageUrl.trim(),
+          stock: Number(game.stock),
+          isActive: true,
+          type: "jogo",
+          description: "Jogo Mídia Digital.",
+          createdAt: new Date().toISOString()
+        });
+        count++;
+        setBatchSaveProgress(Math.round((count / batchGames.length) * 100));
+      }
+      toast.success(`${count} jogos cadastrados com sucesso!`);
+      setShowBatchModal(false);
+      setBatchRawText("");
+      setBatchGames([]);
+    } catch (error) {
+      console.error("Erro ao cadastrar lote:", error);
+      toast.error(`Erro ao salvar lote de jogos. Cadastrados: ${count} de ${batchGames.length}.`);
+    } finally {
+      setIsSavingBatch(false);
+      setBatchSaveProgress(0);
+    }
+  };
 
   // Indicações & Prêmios
   const [allReferrals, setAllReferrals] = useState<any[]>([]);
@@ -82,6 +334,26 @@ export default function AdminDashboard() {
   const [prizeDesc, setPrizeDesc] = useState("");
   const [prizeStock, setPrizeStock] = useState(1);
   const [addingPrize, setAddingPrize] = useState(false);
+  const [editingPrizeId, setEditingPrizeId] = useState<string | null>(null);
+
+  const resetPrizeForm = () => {
+    setPrizeName("");
+    setPrizeCost(500);
+    setPrizeBadge("Mais Popular");
+    setPrizeDesc("");
+    setPrizeStock(1);
+    setEditingPrizeId(null);
+  };
+
+  const openEditPrize = (prize: any) => {
+    setEditingPrizeId(prize.id);
+    setPrizeName(prize.name || "");
+    setPrizeCost(prize.cost || 500);
+    setPrizeBadge(prize.badge || "Mais Popular");
+    setPrizeDesc(prize.description || "");
+    setPrizeStock(prize.stock ?? 1);
+    setShowPrizeModal(true);
+  };
 
   // Delivery Dialog States
   const [deliveryOpen, setDeliveryOpen] = useState(false);
@@ -164,85 +436,144 @@ export default function AdminDashboard() {
     if (!isAuthenticated || !isAdmin) return;
 
     const q = collection(db, "prizes");
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })).sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+      if (snapshot.empty) {
+        // Auto-seed predefined prizes to Firestore if empty
+        const PREDEFINED_PRIZES = [
+          { id: "steam_50", name: "Gift Card Steam R$ 50", cost: 500, description: "Código de ativação Steam para qualquer jogo.", badge: "Mais Popular", stock: 10, isActive: true },
+          { id: "psn_50", name: "Gift Card PSN R$ 50", cost: 500, description: "Crédito na PlayStation Store para comprar jogos e DLCs.", badge: "Console", stock: 10, isActive: true },
+          { id: "xbox_50", name: "Gift Card Xbox R$ 50", cost: 500, description: "Crédito Xbox para jogos, assinaturas ou passes.", badge: "Console", stock: 10, isActive: true },
+          { id: "steam_100", name: "Gift Card Steam R$ 100", cost: 1000, description: "Crédito em dobro para a maior plataforma de jogos de PC.", badge: "Super Valor", stock: 10, isActive: true },
+          { id: "netflix_50", name: "Gift Card Netflix R$ 50", cost: 500, description: "Assista a séries e filmes com mensalidades pagas.", badge: "Lazer", stock: 10, isActive: true },
+          { id: "random_game", name: "Jogo Digital Aleatório PC", cost: 300, description: "Uma chave digital aleatória da Steam garantindo um jogo.", badge: "Surpresa", stock: 10, isActive: true }
+        ];
+
+        try {
+          for (const prize of PREDEFINED_PRIZES) {
+            await setDoc(doc(db, "prizes", prize.id), {
+              name: prize.name,
+              cost: prize.cost,
+              description: prize.description,
+              badge: prize.badge,
+              stock: prize.stock,
+              isActive: prize.isActive,
+              createdAt: new Date().toISOString()
+            });
+          }
+        } catch (err) {
+          console.error("Erro ao auto-cadastrar prêmios:", err);
+        }
+      } else {
+        setAllPrizes(data);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [isAuthenticated, isAdmin]);
+
+  // Escutar Jogos
+  useEffect(() => {
+    if (!isAuthenticated || !isAdmin) return;
+
+    const q = collection(db, "digital_products");
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })).sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-      setAllPrizes(data);
+      setGamesList(data);
     });
 
     return () => unsubscribe();
   }, [isAuthenticated, isAdmin]);
 
-  // Escutar Chats (Atendimento)
-  useEffect(() => {
-    if (!isAuthenticated || !isAdmin) return;
-
-    const q = query(collection(db, "chats"), orderBy("updatedAt", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setChats(data);
-    });
-
-    return () => unsubscribe();
-  }, [isAuthenticated, isAdmin]);
-
-  // Escutar Mensagens do Chat Selecionado
-  useEffect(() => {
-    if (!selectedChat?.id) return;
-
-    const q = query(
-      collection(db, "chats", selectedChat.id, "messages"),
-      orderBy("timestamp", "asc")
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setChatMessages(data);
-    });
-
-    return () => unsubscribe();
-  }, [selectedChat]);
-
-  // Scroll ao receber mensagem
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [chatMessages]);
-
-  const handleSendAdminMessage = async (e: React.FormEvent) => {
+  const handleSaveGame = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!adminMessage.trim() || !selectedChat?.id) return;
-
-    const msg = adminMessage;
-    setAdminMessage("");
-
-    try {
-      // 1. Atualiza documento do chat (marca que admin respondeu)
-      await updateDoc(doc(db, "chats", selectedChat.id), {
-        lastMessage: msg,
-        updatedAt: serverTimestamp(),
-        unreadByAdmin: false
-      });
-
-      // 2. Adiciona a mensagem
-      await addDoc(collection(db, "chats", selectedChat.id, "messages"), {
-        text: msg,
-        senderId: user.id,
-        senderName: "Gestor Eforte",
-        timestamp: serverTimestamp()
-      });
-    } catch (error) {
-      console.error("Erro ao enviar resposta:", error);
+    if (!gameName.trim() || !gamePlatform.trim()) {
+      toast.warning("Nome e plataforma são obrigatórios.");
+      return;
     }
+    setAddingGame(true);
+    try {
+      if (editingGameId) {
+        await updateDoc(doc(db, "digital_products", editingGameId), {
+          name: gameName.trim(),
+          price: Number(gamePrice),
+          platform: gamePlatform.trim(),
+          imageUrl: gameImageUrl.trim(),
+          coverFit: gameCoverFit,
+          stock: Number(gameStock),
+          isActive: gameIsActive
+        });
+        toast.success("Jogo atualizado com sucesso!");
+      } else {
+        await addDoc(collection(db, "digital_products"), {
+          name: gameName.trim(),
+          price: Number(gamePrice),
+          platform: gamePlatform.trim(),
+          imageUrl: gameImageUrl.trim(),
+          coverFit: gameCoverFit,
+          stock: Number(gameStock),
+          isActive: gameIsActive,
+          type: "jogo",
+          description: "Jogo Mídia Digital.",
+          createdAt: new Date().toISOString()
+        });
+        toast.success("Jogo cadastrado com sucesso!");
+      }
+      setShowGameModal(false);
+      resetGameForm();
+    } catch (error) {
+      console.error("Erro ao salvar jogo:", error);
+      toast.error("Erro ao salvar jogo.");
+    } finally {
+      setAddingGame(false);
+    }
+  };
+
+  const resetGameForm = () => {
+    setGameName("");
+    setGamePrice(0);
+    setGamePlatform("");
+    setGameImageUrl("");
+    setGameCoverFit("cover");
+    setGameStock(999);
+    setGameIsActive(true);
+    setEditingGameId(null);
+  };
+
+  const openEditGame = (game: any) => {
+    setEditingGameId(game.id);
+    setGameName(game.name || "");
+    setGamePrice(game.price || 0);
+    setGamePlatform(game.platform || "");
+    setGameImageUrl(game.imageUrl || "");
+    setGameCoverFit(game.coverFit || "cover");
+    setGameStock(game.stock ?? 999);
+    setGameIsActive(game.isActive ?? true);
+    setShowGameModal(true);
+  };
+
+  const handleDeleteGame = (gameId: string) => {
+    toast("Tem certeza que deseja excluir permanentemente este jogo?", {
+      action: {
+        label: "Excluir",
+        onClick: async () => {
+          try {
+            await deleteDoc(doc(db, "digital_products", gameId));
+            toast.success("Jogo excluído com sucesso!");
+          } catch (error) {
+            console.error("Erro ao excluir jogo:", error);
+            toast.error("Erro ao excluir jogo.");
+          }
+        }
+      }
+    });
   };
 
   const handleToggleCollaborator = async (userId: string, currentRole: string) => {
@@ -251,15 +582,16 @@ export default function AdminDashboard() {
       await updateDoc(doc(db, "users", userId), {
         role: newRole
       });
+      toast.success("Permissão atualizada com sucesso!");
     } catch (error) {
       console.error("Erro ao atualizar papel:", error);
-      alert("Erro ao atualizar permissão.");
+      toast.error("Erro ao atualizar permissão.");
     }
   };
 
   const handleToggleAdmin = async (userId: string, currentRole: string) => {
     if (users.find(u => u.id === userId)?.email === "luanmnogueira@gmail.com") {
-      alert("Não é possível alterar o cargo do gestor principal.");
+      toast.warning("Não é possível alterar o cargo do gestor principal.");
       return;
     }
     const newRole = currentRole === "admin" ? "user" : "admin";
@@ -267,16 +599,17 @@ export default function AdminDashboard() {
       await updateDoc(doc(db, "users", userId), {
         role: newRole
       });
+      toast.success("Permissão atualizada com sucesso!");
     } catch (error) {
       console.error("Erro ao atualizar papel:", error);
-      alert("Erro ao atualizar permissão.");
+      toast.error("Erro ao atualizar permissão.");
     }
   };
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newUserPassword.length < 6) {
-      alert("A senha deve ter no mínimo 6 caracteres.");
+      toast.warning("A senha deve ter no mínimo 6 caracteres.");
       return;
     }
 
@@ -300,7 +633,7 @@ export default function AdminDashboard() {
         createdAt: new Date().toISOString()
       });
 
-      alert(`Usuário ${newUserName} criado com sucesso como ${newUserRole}!`);
+      toast.success(`Usuário ${newUserName} criado com sucesso como ${newUserRole}!`);
       setShowCreateModal(false);
       
       // Limpar campos
@@ -309,7 +642,7 @@ export default function AdminDashboard() {
       setNewUserPassword("");
     } catch (error: any) {
       console.error("Erro ao criar usuário:", error);
-      alert("Erro ao criar usuário: " + (error.message || "Erro desconhecido"));
+      toast.error("Erro ao criar usuário: " + (error.message || "Erro desconhecido"));
     } finally {
       if (secondaryApp) await deleteApp(secondaryApp);
       setCreating(false);
@@ -318,44 +651,55 @@ export default function AdminDashboard() {
 
   const handleDeleteUser = async (userId: string, email: string) => {
     if (email === "luanmnogueira@gmail.com") return;
-    if (confirm(`Tem certeza que deseja remover o acesso de ${email}? (Isso removerá as permissões no Firestore)`)) {
-      try {
-        await deleteDoc(doc(db, "users", userId));
-      } catch (error) {
-        alert("Erro ao deletar usuário.");
+    toast(`Tem certeza que deseja remover o acesso de ${email}? (Isso removerá as permissões no Firestore)`, {
+      action: {
+        label: "Excluir",
+        onClick: async () => {
+          try {
+            await deleteDoc(doc(db, "users", userId));
+            toast.success("Acesso removido com sucesso!");
+          } catch (error) {
+            toast.error("Erro ao deletar usuário.");
+          }
+        }
       }
-    }
+    });
   };
 
   const handleConfirmPurchase = async (referral: any) => {
     if (referral.status === "pago") return;
     
-    if (confirm(`Confirmar que o usuário indicado (${referral.inviteeName}) efetuou a compra de um jogo? Isso creditará +100 Fortecoins ao padrinho.`)) {
-      try {
-        // 1. Atualizar status da indicação
-        await updateDoc(doc(db, "referrals", referral.id), {
-          status: "pago",
-          confirmedAt: new Date().toISOString()
-        });
+    toast(`Confirmar que o usuário indicado (${referral.inviteeName}) efetuou a compra de um jogo? Isso creditará +100 Fortecoins ao padrinho.`, {
+      action: {
+        label: "Confirmar",
+        onClick: async () => {
+          try {
+            // 1. Atualizar status da indicação
+            await updateDoc(doc(db, "referrals", referral.id), {
+              status: "pago",
+              confirmedAt: new Date().toISOString()
+            });
 
-        // 2. Incrementar moedas do indicador
-        const referrerRef = doc(db, "users", referral.referrerId);
-        const referrerSnap = await getDoc(referrerRef);
-        
-        if (referrerSnap.exists()) {
-          const currentCoins = referrerSnap.data()?.forteCoins ?? 0;
-          await updateDoc(referrerRef, {
-            forteCoins: currentCoins + 100
-          });
-          alert(`Sucesso! Compra de jogo confirmada e 100 Fortecoins adicionados ao saldo do padrinho.`);
-        } else {
-          alert(`A indicação foi marcada como paga, mas o padrinho correspondente (${referral.referrerId}) não foi localizado no Firestore.`);
+            // 2. Incrementar moedas do indicador
+            const referrerRef = doc(db, "users", referral.referrerId);
+            const referrerSnap = await getDoc(referrerRef);
+            
+            if (referrerSnap.exists()) {
+              const currentCoins = referrerSnap.data()?.forteCoins ?? 0;
+              await updateDoc(referrerRef, {
+                forteCoins: currentCoins + 100
+              });
+              toast.success(`Sucesso! Compra de jogo confirmada e 100 Fortecoins adicionados ao saldo do padrinho.`);
+            } else {
+              toast.error(`A indicação foi marcada como paga, mas o padrinho correspondente (${referral.referrerId}) não foi localizado no Firestore.`);
+            }
+          } catch (error) {
+            console.error("Erro ao confirmar compra da indicação:", error);
+            toast.error("Erro ao processar confirmação. Tente novamente.");
+          }
         }
-      } catch (error) {
-        console.error("Erro ao confirmar compra da indicação:", error);
-        alert("Erro ao processar confirmação. Tente novamente.");
       }
-    }
+    });
   };
 
   const openDeliveryDialog = (redemptionId: string, prizeName: string) => {
@@ -377,7 +721,7 @@ export default function AdminDashboard() {
   const submitDelivery = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!deliveryCode.trim()) {
-      alert("O código ou mensagem de entrega é obrigatório.");
+      toast.warning("O código ou mensagem de entrega é obrigatório.");
       return;
     }
 
@@ -388,11 +732,11 @@ export default function AdminDashboard() {
         code: deliveryCode.trim(),
         deliveredAt: new Date().toISOString()
       });
-      alert("Prêmio entregue com sucesso! O usuário receberá o código em seu painel de Fortecoins.");
+      toast.success("Prêmio entregue com sucesso! O usuário receberá o código em seu painel de Fortecoins.");
       setDeliveryOpen(false);
     } catch (error) {
       console.error("Erro ao entregar prêmio:", error);
-      alert("Erro ao registrar a entrega do prêmio.");
+      toast.error("Erro ao registrar a entrega do prêmio.");
     } finally {
       setDelivering(false);
     }
@@ -440,11 +784,11 @@ export default function AdminDashboard() {
         }
       }
 
-      alert(`Solicitação recusada com sucesso! ${refusalCost} Fortecoins foram devolvidos ao usuário e o estoque do prêmio foi restaurado.`);
+      toast.success(`Solicitação recusada com sucesso! ${refusalCost} Fortecoins foram devolvidos ao usuário e o estoque do prêmio foi restaurado.`);
       setRefusalOpen(false);
     } catch (error) {
       console.error("Erro ao recusar prêmio:", error);
-      alert("Erro ao processar recusa do prêmio.");
+      toast.error("Erro ao processar recusa do prêmio.");
     } finally {
       setRefusing(false);
     }
@@ -453,49 +797,60 @@ export default function AdminDashboard() {
   const handleAddPrize = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prizeName.trim() || !prizeDesc.trim()) {
-      alert("Nome e descrição são obrigatórios.");
+      toast.warning("Nome e descrição são obrigatórios.");
       return;
     }
 
     setAddingPrize(true);
     try {
-      const prizeId = "prize_" + Date.now();
-      await setDoc(doc(db, "prizes", prizeId), {
-        name: prizeName.trim(),
-        cost: Number(prizeCost),
-        badge: prizeBadge.trim(),
-        description: prizeDesc.trim(),
-        stock: Number(prizeStock),
-        isActive: Number(prizeStock) > 0,
-        createdAt: new Date().toISOString()
-      });
-
-      alert("Prêmio cadastrado com sucesso!");
+      if (editingPrizeId) {
+        await updateDoc(doc(db, "prizes", editingPrizeId), {
+          name: prizeName.trim(),
+          cost: Number(prizeCost),
+          badge: prizeBadge.trim(),
+          description: prizeDesc.trim(),
+          stock: Number(prizeStock),
+          isActive: Number(prizeStock) > 0
+        });
+        toast.success("Prêmio atualizado com sucesso!");
+      } else {
+        const prizeId = "prize_" + Date.now();
+        await setDoc(doc(db, "prizes", prizeId), {
+          name: prizeName.trim(),
+          cost: Number(prizeCost),
+          badge: prizeBadge.trim(),
+          description: prizeDesc.trim(),
+          stock: Number(prizeStock),
+          isActive: Number(prizeStock) > 0,
+          createdAt: new Date().toISOString()
+        });
+        toast.success("Prêmio cadastrado com sucesso!");
+      }
       setShowPrizeModal(false);
-      // Reset fields
-      setPrizeName("");
-      setPrizeCost(500);
-      setPrizeBadge("Mais Popular");
-      setPrizeDesc("");
-      setPrizeStock(1);
+      resetPrizeForm();
     } catch (error) {
-      console.error("Erro ao cadastrar prêmio:", error);
-      alert("Erro ao cadastrar prêmio.");
+      console.error("Erro ao salvar prêmio:", error);
+      toast.error("Erro ao salvar prêmio.");
     } finally {
       setAddingPrize(false);
     }
   };
 
   const handleDeletePrize = async (prizeId: string) => {
-    if (confirm("Tem certeza que deseja excluir permanentemente este prêmio?")) {
-      try {
-        await deleteDoc(doc(db, "prizes", prizeId));
-        alert("Prêmio excluído com sucesso!");
-      } catch (error) {
-        console.error("Erro ao excluir prêmio:", error);
-        alert("Erro ao excluir prêmio.");
+    toast("Tem certeza que deseja excluir permanentemente este prêmio?", {
+      action: {
+        label: "Excluir",
+        onClick: async () => {
+          try {
+            await deleteDoc(doc(db, "prizes", prizeId));
+            toast.success("Prêmio excluído com sucesso!");
+          } catch (error) {
+            console.error("Erro ao excluir prêmio:", error);
+            toast.error("Erro ao excluir prêmio.");
+          }
+        }
       }
-    }
+    });
   };
 
   const handleTogglePrizeStatus = async (prizeId: string, currentStatus: boolean, stock: number) => {
@@ -504,9 +859,10 @@ export default function AdminDashboard() {
         isActive: !currentStatus,
         stock: (!currentStatus && stock <= 0) ? 1 : stock
       });
+      toast.success(`Prêmio ${!currentStatus ? 'ativado' : 'pausado'} com sucesso!`);
     } catch (error) {
       console.error("Erro ao alterar status do prêmio:", error);
-      alert("Erro ao atualizar status do prêmio.");
+      toast.error("Erro ao atualizar status do prêmio.");
     }
   };
 
@@ -585,30 +941,37 @@ export default function AdminDashboard() {
   ];
 
   const handleSeedGames = async () => {
-    if (!confirm(`Isso vai inserir ${GAMES_CATALOG.length} jogos no Firestore. Continuar?`)) return;
-    setSeeding(true);
-    setSeedLog([]);
-    const col = collection(db, "digital_products");
-    let inserted = 0; let updated = 0;
-    for (const game of GAMES_CATALOG) {
-      try {
-        const { getDocs, query: q2, where } = await import("firebase/firestore");
-        const snap = await getDocs(q2(col, where("name", "==", game.name)));
-        if (!snap.empty) {
-          await updateDoc(snap.docs[0].ref, { price: game.price, imageUrl: game.imageUrl, platform: game.platform, isActive: true });
-          setSeedLog(l => [...l, `[~] Atualizado: ${game.name}`]);
-          updated++;
-        } else {
-          await addDoc(col, { ...game, type: "jogo", description: "Jogo PS4/PS5 - Mídia Digital.", isActive: true, stock: 999, createdAt: new Date().toISOString() });
-          setSeedLog(l => [...l, `[+] Inserido: ${game.name}`]);
-          inserted++;
+    toast(`Isso vai inserir ${GAMES_CATALOG.length} jogos no Firestore. Continuar?`, {
+      action: {
+        label: "Continuar",
+        onClick: async () => {
+          setSeeding(true);
+          setSeedLog([]);
+          const col = collection(db, "digital_products");
+          let inserted = 0; let updated = 0;
+          for (const game of GAMES_CATALOG) {
+            try {
+              const { getDocs, query: q2, where } = await import("firebase/firestore");
+              const snap = await getDocs(q2(col, where("name", "==", game.name)));
+              if (!snap.empty) {
+                await updateDoc(snap.docs[0].ref, { price: game.price, imageUrl: game.imageUrl, platform: game.platform, isActive: true });
+                setSeedLog(l => [...l, `[~] Atualizado: ${game.name}`]);
+                updated++;
+              } else {
+                await addDoc(col, { ...game, type: "jogo", description: "Jogo PS4/PS5 - Mídia Digital.", isActive: true, stock: 999, createdAt: new Date().toISOString() });
+                setSeedLog(l => [...l, `[+] Inserido: ${game.name}`]);
+                inserted++;
+              }
+            } catch (e: any) {
+              setSeedLog(l => [...l, `[!] Erro em ${game.name}: ${e.message}`]);
+            }
+          }
+          setSeedLog(l => [...l, `\n✅ Concluído! Inseridos: ${inserted}, Atualizados: ${updated}`]);
+          setSeeding(false);
+          toast.success("Processo de seeding concluído!");
         }
-      } catch (e: any) {
-        setSeedLog(l => [...l, `[!] Erro em ${game.name}: ${e.message}`]);
       }
-    }
-    setSeedLog(l => [...l, `\n✅ Concluído! Inseridos: ${inserted}, Atualizados: ${updated}`]);
-    setSeeding(false);
+    });
   };
 
   if (authLoading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white font-bold">Verificando Credenciais...</div>;
@@ -655,11 +1018,9 @@ export default function AdminDashboard() {
         <Tabs defaultValue="usuarios" className="w-full" onValueChange={setActiveTab}>
           <TabsList className="bg-slate-900/60 border border-red-600/20 mb-8 !flex !items-center !justify-start !overflow-x-auto !overflow-y-hidden !max-w-full !h-12 !p-1 !gap-2 !rounded-xl !w-full md:!w-auto">
             <TabsTrigger value="usuarios" className="data-[state=active]:!bg-red-600 data-[state=active]:!text-white font-bold !h-10 !px-5 !text-sm !rounded-lg !whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 !inline-flex !items-center !justify-center">Gerenciar Acessos</TabsTrigger>
-            <TabsTrigger value="atendimento" className="data-[state=active]:!bg-red-600 data-[state=active]:!text-white font-bold !h-10 !px-5 !text-sm !rounded-lg !whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 !inline-flex !items-center !justify-center !gap-2">
-              Central de Atendimento
-              {chats.some(c => c.unreadByAdmin) && (
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              )}
+            <TabsTrigger value="jogos" className="data-[state=active]:!bg-red-600 data-[state=active]:!text-white font-bold !h-10 !px-5 !text-sm !rounded-lg !whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 !inline-flex !items-center !justify-center !gap-2">
+              <Gamepad2 className="w-4 h-4" />
+              Gerenciar Jogos
             </TabsTrigger>
             <TabsTrigger value="referrals" className="data-[state=active]:!bg-red-600 data-[state=active]:!text-white font-bold !h-10 !px-5 !text-sm !rounded-lg !whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 !inline-flex !items-center !justify-center !gap-2">
               Indicações & Prêmios
@@ -725,17 +1086,17 @@ export default function AdminDashboard() {
                           const inputEl = document.getElementById(`coins-input-${u.id}`) as HTMLInputElement;
                           const newCoins = parseInt(inputEl?.value || "0");
                           if (isNaN(newCoins) || newCoins < 0) {
-                            alert("Por favor, digite um valor válido.");
+                            toast.warning("Por favor, digite um valor válido.");
                             return;
                           }
                           try {
                             await updateDoc(doc(db, "users", u.id), {
                               forteCoins: newCoins
                             });
-                            alert(`Saldo de ${u.name || u.email} atualizado para ${newCoins} Fortecoins!`);
+                            toast.success(`Saldo de ${u.name || u.email} atualizado para ${newCoins} Fortecoins!`);
                           } catch (error) {
                             console.error("Erro ao atualizar moedas:", error);
-                            alert("Erro ao atualizar saldo de moedas.");
+                            toast.error("Erro ao atualizar saldo de moedas.");
                           }
                         }}
                         className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 active:scale-95 transition-all duration-300 hover:shadow-[0_0_12px_rgba(220,38,38,0.4)] h-9 px-4 text-xs font-bold"
@@ -782,99 +1143,62 @@ export default function AdminDashboard() {
             </div>
           </TabsContent>
 
-          <TabsContent value="atendimento">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[600px]">
-              {/* Lista de Chats */}
-              <Card className="bg-slate-900 border-red-600/10 flex flex-col overflow-hidden">
-                <div className="p-4 border-b border-red-600/20 bg-slate-950/50">
-                  <h3 className="font-black text-white text-sm uppercase tracking-widest italic">Conversas Recentes</h3>
-                </div>
-                <div className="flex-1 overflow-y-auto">
-                  {chats.length === 0 && (
-                    <div className="p-8 text-center text-slate-600 italic text-sm">Nenhuma conversa ativa no momento.</div>
-                  )}
-                  {chats.map(chat => (
-                    <div 
-                      key={chat.id}
-                      onClick={() => setSelectedChat(chat)}
-                      className={`p-4 border-b border-red-600/5 cursor-pointer transition flex items-center gap-3 ${
-                        selectedChat?.id === chat.id ? "bg-red-600/10" : "hover:bg-slate-800"
-                      }`}
-                    >
-                      <div className="relative">
-                        <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center border border-red-600/20">
-                          <User className="w-5 h-5 text-slate-400" />
-                        </div>
-                        {chat.unreadByAdmin && (
-                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-slate-900" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold text-white text-sm truncate">{chat.userName}</p>
-                        <p className="text-xs text-slate-500 truncate italic">"{chat.lastMessage}"</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-
-              {/* Janela de Chat */}
-              <Card className="lg:col-span-2 bg-slate-900 border-red-600/10 flex flex-col overflow-hidden relative">
-                {selectedChat ? (
-                  <>
-                    <div className="p-4 border-b border-red-600/20 bg-slate-950 flex justify-between items-center">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-red-600/10 flex items-center justify-center border border-red-600/20">
-                          <User className="w-5 h-5 text-red-500" />
-                        </div>
-                        <div>
-                          <p className="font-black text-white">{selectedChat.userName}</p>
-                          <p className="text-[10px] text-slate-500">{selectedChat.userEmail}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div 
-                      ref={scrollRef}
-                      className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-950/20"
-                    >
-                      {chatMessages.map(msg => (
-                        <div 
-                          key={msg.id}
-                          className={`flex ${msg.senderId === user.id ? "justify-end" : "justify-start"}`}
-                        >
-                          <div className={`max-w-[70%] p-3 rounded-2xl text-sm font-medium ${
-                            msg.senderId === user.id 
-                              ? "bg-red-600 text-white rounded-br-none shadow-lg" 
-                              : "bg-slate-800 text-slate-200 rounded-bl-none border border-red-600/10"
-                          }`}>
-                            <p className="text-[10px] opacity-50 mb-1">{msg.senderName}</p>
-                            {msg.text}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <form onSubmit={handleSendAdminMessage} className="p-4 bg-slate-950 border-t border-red-600/20 flex gap-4">
-                      <Input 
-                        value={adminMessage}
-                        onChange={e => setAdminMessage(e.target.value)}
-                        placeholder="Responda ao cliente..."
-                        className="bg-slate-900 border-red-600/30 text-white"
+          <TabsContent value="jogos">
+            <div className="flex justify-between items-center mb-8 border-l-4 border-red-600 pl-4">
+              <h2 className="text-xl font-bold text-white uppercase tracking-widest text-sm italic">Catálogo de Jogos</h2>
+              <div className="flex gap-2">
+                <Button onClick={() => { setBatchGames([]); setBatchRawText(""); setShowBatchModal(true); }} className="bg-slate-900 border border-red-600/30 hover:border-red-600/60 text-red-500 font-bold flex items-center gap-2">
+                  📦 Cadastrar em Lote
+                </Button>
+                <Button onClick={() => { resetGameForm(); setShowGameModal(true); }} className="bg-red-600 hover:bg-red-700 font-bold btn-neon flex items-center gap-2">
+                  <Plus className="w-5 h-5" /> Adicionar Jogo
+                </Button>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {gamesList.map((game) => (
+                <Card key={game.id} className={`bg-slate-900/40 backdrop-blur-md border-red-600/10 p-4 hover:border-red-600/40 hover:shadow-[0_8px_30px_rgb(0,0,0,0.5)] transition-all duration-500 card-neon relative overflow-hidden group ${!game.isActive ? 'opacity-50' : ''}`}>
+                  <div className="aspect-[16/9] w-full rounded-md overflow-hidden mb-4 bg-slate-800 flex items-center justify-center relative">
+                    {game.imageUrl ? (
+                      <img 
+                        src={game.imageUrl} 
+                        alt={game.name} 
+                        className={`w-full h-full ${game.coverFit === 'contain' ? 'object-contain bg-slate-900/60 p-2' : 'object-cover'} group-hover:scale-105 transition-transform duration-500`} 
                       />
-                      <Button type="submit" className="bg-red-600 hover:bg-red-700 px-6 font-bold">
-                        <Send className="w-4 h-4 mr-2" />
-                        Enviar
-                      </Button>
-                    </form>
-                  </>
-                ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center text-slate-600 opacity-30">
-                    <MessageCircle className="w-24 h-24 mb-4" />
-                    <p className="text-xl font-black italic uppercase tracking-widest">Selecione uma conversa</p>
+                    ) : (
+                      <Gamepad2 className="w-12 h-12 text-slate-600" />
+                    )}
                   </div>
-                )}
-              </Card>
+                  <div>
+                    <div className="flex justify-between items-start gap-2 mb-2">
+                      <h3 className="font-bold text-white text-sm line-clamp-2 flex-1" title={game.name}>{game.name}</h3>
+                      <div className="flex items-center gap-1 shrink-0 bg-slate-950/80 rounded border border-slate-800 p-0.5">
+                        <Button variant="ghost" size="icon" onClick={() => openEditGame(game)} className="h-6 w-6 text-blue-400 hover:text-blue-300 hover:bg-blue-400/10">
+                          <Edit className="w-3 h-3" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDeleteGame(game.id)} className="h-6 w-6 text-red-500 hover:text-red-400 hover:bg-red-500/10">
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-400 mb-1">Plataforma: <span className="text-white font-medium">{game.platform}</span></p>
+                    <p className="text-xs text-slate-400 mb-1">Preço: <span className="text-green-400 font-bold">R$ {Number(game.price || 0).toFixed(2)}</span></p>
+                    <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-800/50">
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border ${
+                        game.isActive 
+                        ? "bg-green-500/10 text-green-500 border-green-500/20" 
+                        : "bg-red-500/10 text-red-500 border-red-500/20"
+                      }`}>
+                        {game.isActive ? "Ativo" : "Inativo"}
+                      </span>
+                      <span className="text-[10px] text-slate-500 font-medium bg-slate-900 px-2 py-0.5 rounded">
+                        Estq: {game.stock}
+                      </span>
+                    </div>
+                  </div>
+                </Card>
+              ))}
             </div>
           </TabsContent>
 
@@ -1114,7 +1438,7 @@ export default function AdminDashboard() {
                   Adicione, remova ou altere o estoque de prêmios que os usuários podem resgatar com Fortecoins.
                 </p>
               </div>
-              <Button onClick={() => setShowPrizeModal(true)} className="bg-red-600 hover:bg-red-700 font-bold btn-neon flex items-center gap-2">
+              <Button onClick={() => { resetPrizeForm(); setShowPrizeModal(true); }} className="bg-red-600 hover:bg-red-700 font-bold btn-neon flex items-center gap-2">
                 <Plus className="w-5 h-5" />
                 Adicionar Prêmio
               </Button>
@@ -1153,6 +1477,13 @@ export default function AdminDashboard() {
                       }`}
                     >
                       {p.isActive ? "Pausar" : "Ativar"}
+                    </Button>
+                    <Button
+                      onClick={() => openEditPrize(p)}
+                      variant="outline"
+                      className="bg-blue-950/20 hover:bg-blue-950/40 text-blue-400 border-blue-500/30 hover:border-blue-500/50 font-bold h-9 text-xs px-3"
+                    >
+                      <Edit className="w-4 h-4" />
                     </Button>
                     <Button
                       onClick={() => handleDeletePrize(p.id)}
@@ -1230,15 +1561,21 @@ export default function AdminDashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal de Criar Prêmio */}
-      <Dialog open={showPrizeModal} onOpenChange={setShowPrizeModal}>
+      {/* Modal de Criar / Editar Prêmio */}
+      <Dialog open={showPrizeModal} onOpenChange={(open) => {
+        if (!open) resetPrizeForm();
+        setShowPrizeModal(open);
+      }}>
         <DialogContent className="bg-slate-900 border-red-600/30 text-white max-w-md card-neon">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-2 text-neon">
-              <Gift className="text-red-500" /> Cadastrar Novo Prêmio
+              <Gift className="text-red-500" /> {editingPrizeId ? "Editar Prêmio" : "Cadastrar Novo Prêmio"}
             </DialogTitle>
             <DialogDescription className="text-slate-400 text-xs">
-              Preencha as informações do prêmio que ficará disponível na loja de resgates.
+              {editingPrizeId 
+                ? "Altere as informações do prêmio selecionado na loja de resgates."
+                : "Preencha as informações do prêmio que ficará disponível na loja de resgates."
+              }
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleAddPrize} className="space-y-4 my-2">
@@ -1298,11 +1635,139 @@ export default function AdminDashboard() {
               />
             </div>
             <DialogFooter className="mt-6">
-              <Button type="button" variant="ghost" onClick={() => setShowPrizeModal(false)} className="text-slate-400 hover:text-white">
+              <Button type="button" variant="ghost" onClick={() => { setShowPrizeModal(false); resetPrizeForm(); }} className="text-slate-400 hover:text-white">
                 Cancelar
               </Button>
               <Button type="submit" disabled={addingPrize} className="bg-red-600 hover:bg-red-700 font-bold px-6 btn-neon">
-                {addingPrize ? "Cadastrando..." : "Cadastrar Prêmio"}
+                {addingPrize ? "Salvando..." : (editingPrizeId ? "Salvar Alterações" : "Cadastrar Prêmio")}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Adicionar / Editar Jogo */}
+      <Dialog open={showGameModal} onOpenChange={setShowGameModal}>
+        <DialogContent className="bg-slate-900 border-red-600/30 text-white max-w-md card-neon">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2 text-neon">
+              <Gamepad2 className="text-red-500" /> {editingGameId ? "Editar Jogo" : "Cadastrar Novo Jogo"}
+            </DialogTitle>
+            <DialogDescription className="text-slate-400 text-xs">
+              Preencha as informações do jogo que ficará disponível na loja.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSaveGame} className="space-y-4 my-2">
+            <div className="space-y-2">
+              <Label className="text-xs text-slate-300 font-bold uppercase">Nome do Jogo</Label>
+              <Input
+                value={gameName}
+                onChange={(e) => setGameName(e.target.value)}
+                placeholder="Ex: God of War Ragnarok"
+                className="bg-slate-950 border-red-600/20 text-white"
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs text-slate-300 font-bold uppercase">Plataforma</Label>
+                <Input
+                  value={gamePlatform}
+                  onChange={(e) => setGamePlatform(e.target.value)}
+                  placeholder="Ex: PS4/PS5"
+                  className="bg-slate-950 border-red-600/20 text-white"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-slate-300 font-bold uppercase">Preço (R$)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={gamePrice}
+                  onChange={(e) => setGamePrice(Number(e.target.value))}
+                  placeholder="Ex: 150.00"
+                  className="bg-slate-950 border-red-600/20 text-white"
+                  min={0}
+                  required
+                />
+              </div>
+            </div>
+            <div className="space-y-4 border border-red-600/10 p-3 rounded-lg bg-slate-950/20">
+              <div className="space-y-2">
+                <Label className="text-xs text-slate-300 font-bold uppercase">URL da Capa (Imagem)</Label>
+                <Input
+                  value={gameImageUrl}
+                  onChange={(e) => setGameImageUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="bg-slate-950 border-red-600/20 text-white"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-slate-300 font-bold uppercase">Ou Enviar Foto Local</Label>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageFileChange}
+                  disabled={uploadingImage}
+                  className="bg-slate-950 border-red-600/20 text-white cursor-pointer file:bg-red-600 file:text-white file:border-0 file:rounded-md file:px-3 file:py-1 file:mr-3 hover:file:bg-red-700"
+                />
+                {uploadingImage && <p className="text-xs text-red-500 animate-pulse">Enviando imagem...</p>}
+              </div>
+              {gameImageUrl && (
+                <div className="h-24 w-36 rounded overflow-hidden border border-red-600/20 relative group">
+                  <img src={gameImageUrl} alt="Preview" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setGameImageUrl("")}
+                    className="absolute top-1 right-1 bg-red-600 rounded-full p-1 text-white hover:bg-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-slate-300 font-bold uppercase">Enquadramento da Capa</Label>
+              <select
+                value={gameCoverFit}
+                onChange={(e) => setGameCoverFit(e.target.value as "cover" | "contain")}
+                className="w-full bg-slate-950 border border-red-600/20 rounded-md h-10 px-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-red-500/50"
+              >
+                <option value="cover">Preencher Card (Cortar bordas se necessário)</option>
+                <option value="contain">Mostrar Foto Inteira (Com fundo e sem cortes)</option>
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs text-slate-300 font-bold uppercase">Estoque</Label>
+                <Input
+                  type="number"
+                  value={gameStock}
+                  onChange={(e) => setGameStock(Number(e.target.value))}
+                  placeholder="Ex: 999"
+                  className="bg-slate-950 border-red-600/20 text-white"
+                  min={0}
+                />
+              </div>
+              <div className="space-y-2 flex flex-col justify-end">
+                <label className="flex items-center gap-2 cursor-pointer h-10">
+                  <input
+                    type="checkbox"
+                    checked={gameIsActive}
+                    onChange={(e) => setGameIsActive(e.target.checked)}
+                    className="w-4 h-4 rounded border-red-600/20 bg-slate-950 text-red-600 focus:ring-red-500 focus:ring-offset-slate-900"
+                  />
+                  <span className="text-xs font-bold text-slate-300 uppercase">Ativo na Loja</span>
+                </label>
+              </div>
+            </div>
+            <DialogFooter className="mt-6">
+              <Button type="button" variant="ghost" onClick={() => { setShowGameModal(false); resetGameForm(); }} className="text-slate-400 hover:text-white">
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={addingGame} className="bg-red-600 hover:bg-red-700 font-bold px-6 btn-neon">
+                {addingGame ? "Salvando..." : (editingGameId ? "Salvar Alterações" : "Cadastrar Jogo")}
               </Button>
             </DialogFooter>
           </form>
@@ -1419,6 +1884,198 @@ export default function AdminDashboard() {
               )}
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Cadastro em Lote */}
+      <Dialog open={showBatchModal} onOpenChange={setShowBatchModal}>
+        <DialogContent className="bg-slate-900 border-red-600/30 text-white max-w-4xl card-neon max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2 text-neon">
+              <Plus className="text-red-500" /> Cadastrar Jogos em Lote
+            </DialogTitle>
+            <DialogDescription className="text-slate-400 text-xs">
+              Adicione múltiplos jogos de uma vez. Cole a lista abaixo e nós buscaremos as capas no Steam automaticamente.
+            </DialogDescription>
+          </DialogHeader>
+
+          {batchGames.length === 0 ? (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label className="text-xs text-slate-300 font-bold uppercase">Lista de Jogos (Formatada)</Label>
+                <textarea
+                  value={batchRawText}
+                  onChange={(e) => setBatchRawText(e.target.value)}
+                  placeholder="Exemplo de digitação:&#10;God of War; 150.00; PS5; 999&#10;FIFA 26; 250.00; PS4/PS5; 500&#10;Resident Evil 4; 180.00; PS4; 999"
+                  className="w-full h-48 p-3 bg-slate-950 border border-red-600/20 rounded-md text-sm text-white focus:outline-none focus:ring-1 focus:ring-red-500/50 font-mono"
+                />
+                <p className="text-[10px] text-slate-500">
+                  Formato por linha: <strong>Nome do Jogo; Preço; Plataforma; Estoque</strong> (Separados por ponto e vírgula).
+                </p>
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="ghost" onClick={() => setShowBatchModal(false)} className="text-slate-400 hover:text-white">
+                  Cancelar
+                </Button>
+                <Button onClick={handleProcessBatchText} className="bg-red-600 hover:bg-red-700 font-bold px-6 btn-neon">
+                  Processar Jogos
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-6 py-4">
+              <div className="max-h-[50vh] overflow-y-auto border border-red-600/10 rounded-lg">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-950 text-slate-400 text-[10px] uppercase tracking-wider border-b border-red-600/20">
+                      <th className="py-2.5 px-3 w-16">Capa</th>
+                      <th className="py-2.5 px-3">Nome</th>
+                      <th className="py-2.5 px-3 w-28">Preço (R$)</th>
+                      <th className="py-2.5 px-3 w-32">Plataforma</th>
+                      <th className="py-2.5 px-3 w-24">Estoque</th>
+                      <th className="py-2.5 px-3 w-20 text-center">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {batchGames.map((game, idx) => (
+                      <tr key={game.id} className="border-b border-slate-800/60 text-xs">
+                        <td className="py-3 px-3">
+                          <div className="h-12 w-20 rounded bg-slate-950 overflow-hidden border border-red-600/10 flex items-center justify-center relative">
+                            {game.imageUrl ? (
+                              <img src={game.imageUrl} alt="Capa" className="w-full h-full object-cover" />
+                            ) : game.status === "searching" ? (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <span className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+                              </div>
+                            ) : (
+                              <span className="text-[9px] text-slate-600 text-center font-bold">Sem capa</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-3">
+                          <Input
+                            value={game.name}
+                            onChange={(e) => {
+                              const updated = [...batchGames];
+                              updated[idx].name = e.target.value;
+                              setBatchGames(updated);
+                            }}
+                            className="bg-slate-950 border-slate-800 h-8 text-xs text-white"
+                          />
+                        </td>
+                        <td className="py-3 px-3">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={game.price}
+                            onChange={(e) => {
+                              const updated = [...batchGames];
+                              updated[idx].price = Number(e.target.value);
+                              setBatchGames(updated);
+                            }}
+                            className="bg-slate-950 border-slate-800 h-8 text-xs text-white"
+                          />
+                        </td>
+                        <td className="py-3 px-3">
+                          <Input
+                            value={game.platform}
+                            onChange={(e) => {
+                              const updated = [...batchGames];
+                              updated[idx].platform = e.target.value;
+                              setBatchGames(updated);
+                            }}
+                            className="bg-slate-950 border-slate-800 h-8 text-xs text-white"
+                          />
+                        </td>
+                        <td className="py-3 px-3">
+                          <Input
+                            type="number"
+                            value={game.stock}
+                            onChange={(e) => {
+                              const updated = [...batchGames];
+                              updated[idx].stock = Number(e.target.value);
+                              setBatchGames(updated);
+                            }}
+                            className="bg-slate-950 border-slate-800 h-8 text-xs text-white"
+                          />
+                        </td>
+                        <td className="py-3 px-3 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <label className="cursor-pointer hover:bg-slate-800 p-1.5 rounded text-blue-400 hover:text-blue-300" title="Upload local de foto">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleBatchImageUpload(game.id, file);
+                                }}
+                                className="hidden"
+                              />
+                              📸
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = batchGames.filter((_, i) => i !== idx);
+                                setBatchGames(updated);
+                              }}
+                              className="hover:bg-slate-800 p-1.5 rounded text-red-500 hover:text-red-400"
+                              title="Remover linha"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {isSavingBatch && (
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs text-red-400 font-bold">
+                    <span>Salvando jogos no Firestore...</span>
+                    <span>{batchSaveProgress}%</span>
+                  </div>
+                  <div className="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden border border-red-600/10">
+                    <div className="bg-red-600 h-full transition-all duration-300" style={{ width: `${batchSaveProgress}%` }} />
+                  </div>
+                </div>
+              )}
+
+              <DialogFooter className="flex items-center justify-between gap-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => { setBatchGames([]); }}
+                  disabled={isSavingBatch}
+                  className="border-slate-700 text-slate-300 hover:bg-slate-800"
+                >
+                  Voltar
+                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => triggerBatchCoverSearch(batchGames)}
+                    disabled={isProcessingBatchSearch || isSavingBatch}
+                    className="text-red-500 hover:bg-red-500/10 font-bold animate-pulse"
+                  >
+                    {isProcessingBatchSearch ? "Buscando..." : "Refazer Busca de Capas"}
+                  </Button>
+                  <Button
+                    onClick={handleSaveBatchGames}
+                    disabled={isSavingBatch || batchGames.length === 0}
+                    className="bg-red-600 hover:bg-red-700 font-bold px-6 btn-neon"
+                  >
+                    {isSavingBatch ? "Cadastrando..." : `Cadastrar ${batchGames.length} Jogos`}
+                  </Button>
+                </div>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

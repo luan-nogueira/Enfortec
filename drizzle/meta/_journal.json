@@ -29,6 +29,20 @@
       "when": 1779033411141,
       "tag": "0003_wet_impossible_man",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1780788386145,
+      "tag": "0004_flat_switch",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1780790561447,
+      "tag": "0005_red_talos",
+      "breakpoints": true
     }
   ]
 }

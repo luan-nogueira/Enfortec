@@ -1,0 +1,1 @@
+ALTER TABLE `orders` ADD `coinsUsed` int DEFAULT 0 NOT NULL;

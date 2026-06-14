@@ -1,9 +1,10 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Gamepad2, Gift, Lock, ArrowLeft, Flame, X } from "lucide-react";
+import { Search, Gamepad2, Gift, Lock, ArrowLeft, Flame, X, Coins } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -46,7 +47,7 @@ function getGameBadge(name: string) {
 }
 
 export default function DigitalMedia() {
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
   const [searchTerm, setSearchTerm] = useState(() => {
     const params = new URLSearchParams(window.location.search);
@@ -62,6 +63,23 @@ export default function DigitalMedia() {
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [checkoutProductId, setCheckoutProductId] = useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const [customerName, setCustomerName] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [useCoins, setUseCoins] = useState(false);
+  const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
+
+  useEffect(() => {
+    if (selectedProduct) {
+      setCustomerName(user?.name || "");
+      setCustomerEmail(user?.email || "");
+      setCustomerPhone(localStorage.getItem("customerPhone") || "");
+      setUseCoins(false);
+    }
+  }, [selectedProduct, user]);
 
   const [selectedBargainProduct, setSelectedBargainProduct] = useState<any | null>(null);
   const [bargainOffer, setBargainOffer] = useState("");
@@ -79,7 +97,7 @@ export default function DigitalMedia() {
     setSelectedBargainProduct(null);
   };
 
-  const handleBuyClick = async (product: any) => {
+  const handleBuyClick = (product: any) => {
     const price = parseFloat(product.price);
     if (price === 0) {
       const msg = encodeURIComponent(`Olá! Tenho interesse no jogo "${product.name}" - valor sob consulta. Como faço para comprar?`);
@@ -87,9 +105,53 @@ export default function DigitalMedia() {
       return;
     }
 
-    setCheckoutProductId(product.id);
+    setSelectedProduct(product);
+    setCheckoutError(null);
+  };
+
+  const handleFinalizePurchase = async () => {
+    if (!selectedProduct) return;
+    const price = parseFloat(selectedProduct.price);
+
+    if (!customerName.trim() || !customerEmail.trim() || !customerPhone.trim()) {
+      setCheckoutError("Por favor, preencha todos os dados de contato (Nome, E-mail e WhatsApp).");
+      return;
+    }
+
+    setIsProcessingCheckout(true);
+    setCheckoutError(null);
+
+    const coinsToUse = useCoins ? Math.min(user?.forteCoins || 0, Math.ceil(price * 10)) : 0;
+    let coinsDeducted = false;
+
     try {
+      // 1. Débito imediato de moedas no Firestore para segurança
+      if (coinsToUse > 0 && user?.id) {
+        const userRef = doc(db, "users", user.id);
+        const userSnap = await getDoc(userRef);
+        const currentCoins = userSnap.data()?.forteCoins ?? 0;
+        
+        if (currentCoins < coinsToUse) {
+          setCheckoutError("Saldo de ForteCoins insuficiente.");
+          setIsProcessingCheckout(false);
+          return;
+        }
+
+        await updateDoc(userRef, {
+          forteCoins: currentCoins - coinsToUse,
+          pendingRefund: {
+            coins: coinsToUse,
+            expiresAt: Date.now() + 15 * 60 * 1000 // expira em 15 minutos
+          }
+        });
+        coinsDeducted = true;
+      }
+
       const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+      const formattedPhone = customerPhone.startsWith("+") 
+        ? customerPhone 
+        : `+55${customerPhone.replace(/\D/g, "")}`;
+
       const response = await fetch("/api/infinitepay/checkout", {
         method: "POST",
         headers: {
@@ -97,27 +159,83 @@ export default function DigitalMedia() {
           ...(token ? { Authorization: `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
-          name: product.name,
+          name: selectedProduct.name,
           price: price,
           redirectUrl: `${window.location.origin}/minhas-compras`,
           productType: "digital",
-          productId: product.id,
-          sellerId: product.sellerId || null
+          productId: selectedProduct.id,
+          sellerId: selectedProduct.sellerId || null,
+          coinsToUse: coinsToUse,
+          customer: {
+            name: customerName,
+            email: customerEmail,
+            phone_number: formattedPhone
+          }
         })
       });
 
       const data = await response.json();
-      if (response.ok && data.success && data.url) {
-        window.open(data.url, "_blank");
+      if (response.ok && data.success) {
+        // Salva telefone no localStorage para compras futuras
+        localStorage.setItem("customerPhone", customerPhone);
+
+        if (data.url) {
+          window.open(data.url, "_blank");
+        } else if (data.paidWithCoins) {
+          // Compra 100% paga com moedas
+          if (user?.id) {
+            const userRef = doc(db, "users", user.id);
+            await updateDoc(userRef, {
+              pendingRefund: null
+            });
+          }
+          toast.success("Compra efetuada com sucesso usando ForteCoins!");
+          navigate("/minhas-compras");
+        }
+        setSelectedProduct(null);
       } else {
-        throw new Error(data.error || "Erro ao gerar link de pagamento");
+        const errorMsg = data.error || "Erro ao gerar link de pagamento. Tente novamente.";
+        console.error("[Checkout] Erro da API:", errorMsg);
+        setCheckoutError(errorMsg);
+
+        // Estorna moedas em caso de erro da API
+        if (coinsDeducted && user?.id) {
+          const userRef = doc(db, "users", user.id);
+          const userSnap = await getDoc(userRef);
+          const currentCoins = userSnap.data()?.forteCoins ?? 0;
+          await updateDoc(userRef, {
+            forteCoins: currentCoins + coinsToUse,
+            pendingRefund: null
+          });
+          coinsDeducted = false;
+        }
       }
-    } catch (error) {
-      console.warn("[Checkout] Fallback para WhatsApp devido a erro:", error);
-      const msg = encodeURIComponent(`Olá! Tenho interesse no jogo "${product.name}" - R$ ${price.toFixed(2).replace('.', ',')}. Como faço para comprar?`);
-      window.open(`https://wa.me/554384253691?text=${msg}`, '_blank');
+    } catch (error: any) {
+      // Estorna moedas em caso de falha de rede
+      if (coinsDeducted && user?.id) {
+        try {
+          const userRef = doc(db, "users", user.id);
+          const userSnap = await getDoc(userRef);
+          const currentCoins = userSnap.data()?.forteCoins ?? 0;
+          await updateDoc(userRef, {
+            forteCoins: currentCoins + coinsToUse,
+            pendingRefund: null
+          });
+        } catch (refundErr) {
+          console.error("[Checkout] Erro ao estornar moedas:", refundErr);
+        }
+      }
+
+      // Só vai para WhatsApp se for erro de rede (servidor offline)
+      if (error instanceof TypeError && error.message.includes("fetch")) {
+        const msg = encodeURIComponent(`Olá! Tenho interesse no jogo "${selectedProduct.name}" - R$ ${price.toFixed(2).replace('.', ',')}. Como faço para comprar?`);
+        window.open(`https://wa.me/554384253691?text=${msg}`, '_blank');
+        setSelectedProduct(null);
+      } else {
+        setCheckoutError(error.message || "Erro desconhecido ao processar pagamento.");
+      }
     } finally {
-      setCheckoutProductId(null);
+      setIsProcessingCheckout(false);
     }
   };
 
@@ -177,6 +295,10 @@ export default function DigitalMedia() {
     const Icon = typeObj?.icon || Gamepad2;
     return <Icon className="w-6 h-6" />;
   };
+
+  const price = selectedProduct ? parseFloat(selectedProduct.price) : 0;
+  const coinsToUseVal = useCoins ? Math.min(user?.forteCoins || 0, Math.ceil(price * 10)) : 0;
+  const coinDiscount = coinsToUseVal * 0.10;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900">
@@ -362,7 +484,7 @@ export default function DigitalMedia() {
                       <img
                         src={product.imageUrl}
                         alt={product.name}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        className={`w-full h-full ${product.coverFit === 'contain' ? 'object-contain bg-slate-900/60 p-2' : 'object-cover'} group-hover:scale-110 transition-transform duration-500`}
                         onError={(e) => {
                           (e.target as HTMLImageElement).style.display = 'none';
                         }}
@@ -409,16 +531,19 @@ export default function DigitalMedia() {
                         size="sm"
                         className="w-full bg-red-600 hover:bg-red-700 text-white font-bold btn-neon text-xs"
                         onClick={() => handleBuyClick(product)}
-                        disabled={checkoutProductId === product.id}
+                        disabled={isProcessingCheckout && selectedProduct?.id === product.id}
                       >
                         {parseFloat(product.price) === 0 ? (
                           "Consultar via WhatsApp"
-                        ) : checkoutProductId === product.id ? (
+                        ) : (isProcessingCheckout && selectedProduct?.id === product.id) ? (
                           "Processando..."
                         ) : (
                           "Comprar com Pix/Cartão"
                         )}
                       </Button>
+                      {selectedProduct?.id === product.id && checkoutError && (
+                        <p className="text-red-400 text-[10px] text-center">⚠️ {checkoutError}</p>
+                      )}
                       {parseFloat(product.price) > 0 && (
                         <Button
                           size="sm"
@@ -436,6 +561,128 @@ export default function DigitalMedia() {
           </>
         )}
       </div>
+
+      {/* Modal de Confirmação de Compra */}
+      <Dialog open={!!selectedProduct} onOpenChange={(open) => !open && setSelectedProduct(null)}>
+        <DialogContent className="bg-slate-900 border-red-600/30 text-white sm:max-w-[425px] card-neon">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-neon flex items-center gap-2">🎮 Confirmar Compra</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Preencha os dados de contato e escolha se deseja aplicar ForteCoins.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-6 space-y-4">
+            <div className="flex gap-4 items-start mb-6">
+              <div className="w-20 h-20 rounded bg-slate-800 overflow-hidden border border-red-600/20">
+                <img src={selectedProduct?.imageUrl} alt={selectedProduct?.name} className="w-full h-full object-cover" />
+              </div>
+              <div>
+                <h4 className="font-bold text-white line-clamp-2">{selectedProduct?.name}</h4>
+                <p className="text-xs text-slate-500">{selectedProduct?.platform || "PS4/PS5"}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4 pt-4 border-t border-slate-800 animate-in fade-in slide-in-from-top-2 duration-300">
+              <h4 className="font-bold text-sm text-slate-300 flex items-center gap-2">
+                <span>📋 Dados para Entrega (WhatsApp/Contato)</span>
+              </h4>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Nome Completo</label>
+                  <Input
+                    autoComplete="name"
+                    placeholder="Ex: João da Silva"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    className="bg-slate-950 border-slate-800 focus-visible:ring-red-600 h-10"
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">E-mail</label>
+                  <Input
+                    type="email"
+                    autoComplete="email"
+                    placeholder="Ex: joao@email.com"
+                    value={customerEmail}
+                    onChange={(e) => setCustomerEmail(e.target.value)}
+                    className="bg-slate-950 border-slate-800 focus-visible:ring-red-600 h-10"
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">WhatsApp / Telefone (com DDD)</label>
+                  <Input
+                    type="tel"
+                    autoComplete="tel"
+                    placeholder="Ex: 11999998888"
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    className="bg-slate-950 border-slate-800 focus-visible:ring-red-600 h-10"
+                  />
+                </div>
+              </div>
+
+              {isAuthenticated && user?.forteCoins > 0 && (
+                <div className="bg-red-950/20 border border-red-500/20 rounded-xl p-3.5 space-y-2.5 mt-4">
+                  <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={useCoins}
+                      onChange={(e) => setUseCoins(e.target.checked)}
+                      className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-red-600 focus:ring-red-500"
+                    />
+                    <span className="text-sm font-bold text-white flex items-center gap-1">
+                      <Coins className="w-4 h-4 text-red-500" /> Usar minhas ForteCoins
+                    </span>
+                  </label>
+                  
+                  {useCoins && (
+                    <div className="text-xs text-slate-300 space-y-1 pl-6">
+                      <p>Saldo disponível: <strong className="text-white">{user.forteCoins} FC</strong></p>
+                      <p>Desconto a aplicar: <strong className="text-red-500">R$ {coinDiscount.toFixed(2)}</strong> (usando {coinsToUseVal} FC)</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              <div className="pt-2">
+                <div className="flex justify-between text-sm text-slate-400">
+                  <span>Subtotal:</span>
+                  <span>R$ {price.toFixed(2)}</span>
+                </div>
+                {useCoins && coinDiscount > 0 && (
+                  <div className="flex justify-between text-sm text-red-500">
+                    <span>Desconto ForteCoins:</span>
+                    <span>- R$ {coinDiscount.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-lg font-black text-white mt-1 pt-1 border-t border-slate-800">
+                  <span>Total Final:</span>
+                  <span>R$ {Math.max(0, price - coinDiscount).toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="flex flex-col gap-3">
+            {checkoutError && (
+              <div className="w-full bg-red-950/60 border border-red-500/40 rounded-xl px-4 py-3 text-sm text-red-300">
+                ⚠️ {checkoutError}
+              </div>
+            )}
+            <Button 
+              disabled={isProcessingCheckout}
+              onClick={handleFinalizePurchase}
+              className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-12 text-lg btn-neon"
+            >
+              {isProcessingCheckout ? "Gerando pagamento..." : "Confirmar e Ir para Checkout"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de Pechincha */}
       <Dialog open={!!selectedBargainProduct} onOpenChange={(open) => !open && setSelectedBargainProduct(null)}>

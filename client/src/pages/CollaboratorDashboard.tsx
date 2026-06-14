@@ -10,6 +10,7 @@ import { storage } from "@/lib/firebase";
 import { Plus, Trash2, Edit2, Store, Package } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
+import { toast } from "sonner";
 
 interface Product {
   id: string;
@@ -73,7 +74,7 @@ export default function CollaboratorDashboard() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingId && !imageFile) {
-      alert("Por favor, selecione uma imagem.");
+      toast.warning("Por favor, selecione uma imagem.");
       return;
     }
     
@@ -105,19 +106,19 @@ export default function CollaboratorDashboard() {
       if (editingId) {
         // Atualizar existente
         await updateDoc(doc(db, "store_products", editingId), productData);
-        alert("Produto atualizado com sucesso!");
+        toast.success("Produto atualizado com sucesso!");
       } else {
         // Criar novo
         productData.createdAt = new Date().toISOString();
         await addDoc(collection(db, "store_products"), productData);
-        alert("Produto adicionado com sucesso!");
+        toast.success("Produto adicionado com sucesso!");
       }
 
       // Limpar form
       cancelEdit();
     } catch (error) {
       console.error("Erro ao salvar produto:", error);
-      alert("Erro ao salvar produto. Verifique as permissões do Firestore/Storage.");
+      toast.error("Erro ao salvar produto. Verifique as permissões do Firestore/Storage.");
     } finally {
       setLoading(false);
     }
@@ -147,14 +148,20 @@ export default function CollaboratorDashboard() {
   };
 
   const handleDeleteProduct = async (id: string) => {
-    if (confirm("Tem certeza que deseja excluir este produto?")) {
-      try {
-        await deleteDoc(doc(db, "store_products", id));
-      } catch (error) {
-        console.error("Erro ao deletar:", error);
-        alert("Erro ao deletar produto.");
+    toast("Tem certeza que deseja excluir este produto?", {
+      action: {
+        label: "Excluir",
+        onClick: async () => {
+          try {
+            await deleteDoc(doc(db, "store_products", id));
+            toast.success("Produto excluído com sucesso!");
+          } catch (error) {
+            console.error("Erro ao deletar:", error);
+            toast.error("Erro ao deletar produto.");
+          }
+        }
       }
-    }
+    });
   };
 
   return (

@@ -2,10 +2,11 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { auth, db } from "@/lib/firebase";
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc, getDoc, updateDoc } from "firebase/firestore";
 import { Search, ShoppingCart, ArrowLeft, Flame, Package, Check, X, Coins } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -22,8 +23,23 @@ export default function Store() {
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [chosenVersion, setChosenVersion] = useState<"PS4" | "PS5" | null>(null);
+
+  const [customerName, setCustomerName] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [useCoins, setUseCoins] = useState(false);
+
+  useEffect(() => {
+    if (selectedProduct) {
+      setCustomerName(user?.name || "");
+      setCustomerEmail(user?.email || "");
+      setCustomerPhone(localStorage.getItem("customerPhone") || "");
+      setUseCoins(false);
+    }
+  }, [selectedProduct, user]);
 
   const [selectedBargainProduct, setSelectedBargainProduct] = useState<any | null>(null);
   const [chosenBargainVersion, setChosenBargainVersion] = useState<"PS4" | "PS5" | null>(null);
@@ -68,6 +84,7 @@ export default function Store() {
 
   const handleBuyClick = (product: any) => {
     setSelectedProduct(product);
+    setCheckoutError(null);
     // Se só tiver um preço, já seleciona a versão automaticamente
     if (product.pricePS4 && !product.pricePS5) setChosenVersion("PS4");
     else if (!product.pricePS4 && product.pricePS5) setChosenVersion("PS5");
@@ -79,9 +96,45 @@ export default function Store() {
     
     const price = chosenVersion === "PS4" ? selectedProduct.pricePS4 : selectedProduct.pricePS5;
     
+    if (!customerName.trim() || !customerEmail.trim() || !customerPhone.trim()) {
+      setCheckoutError("Por favor, preencha todos os dados de contato (Nome, E-mail e WhatsApp).");
+      return;
+    }
+
     setIsProcessingCheckout(true);
+    setCheckoutError(null);
+
+    const coinsToUse = useCoins ? Math.min(user?.forteCoins || 0, Math.ceil(price * 10)) : 0;
+    let coinsDeducted = false;
+
     try {
+      // 1. Débito imediato de moedas no Firestore para segurança
+      if (coinsToUse > 0 && user?.id) {
+        const userRef = doc(db, "users", user.id);
+        const userSnap = await getDoc(userRef);
+        const currentCoins = userSnap.data()?.forteCoins ?? 0;
+        
+        if (currentCoins < coinsToUse) {
+          setCheckoutError("Saldo de ForteCoins insuficiente.");
+          setIsProcessingCheckout(false);
+          return;
+        }
+
+        await updateDoc(userRef, {
+          forteCoins: currentCoins - coinsToUse,
+          pendingRefund: {
+            coins: coinsToUse,
+            expiresAt: Date.now() + 15 * 60 * 1000 // expira em 15 minutos
+          }
+        });
+        coinsDeducted = true;
+      }
+
       const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+      const formattedPhone = customerPhone.startsWith("+") 
+        ? customerPhone 
+        : `+55${customerPhone.replace(/\D/g, "")}`;
+
       const response = await fetch("/api/infinitepay/checkout", {
         method: "POST",
         headers: {
@@ -94,26 +147,87 @@ export default function Store() {
           redirectUrl: `${window.location.origin}/minhas-compras`,
           productType: "store",
           productId: selectedProduct.id,
-          sellerId: null
+          sellerId: null,
+          coinsToUse: coinsToUse,
+          customer: {
+            name: customerName,
+            email: customerEmail,
+            phone_number: formattedPhone
+          }
         })
       });
 
       const data = await response.json();
-      if (response.ok && data.success && data.url) {
-        window.open(data.url, "_blank");
+      if (response.ok && data.success) {
+        // Salva telefone no localStorage para compras futuras
+        localStorage.setItem("customerPhone", customerPhone);
+
+        if (data.url) {
+          window.open(data.url, "_blank");
+        } else if (data.paidWithCoins) {
+          // Compra 100% paga com moedas
+          if (user?.id) {
+            const userRef = doc(db, "users", user.id);
+            await updateDoc(userRef, {
+              pendingRefund: null
+            });
+          }
+          toast.success("Compra efetuada com sucesso usando ForteCoins!");
+          navigate("/minhas-compras");
+        }
+        setSelectedProduct(null);
       } else {
-        throw new Error(data.error || "Erro ao gerar link de pagamento");
+        const errorMsg = data.error || "Erro ao gerar link de pagamento. Tente novamente.";
+        console.error("[Checkout] Erro da API:", errorMsg);
+        setCheckoutError(errorMsg);
+
+        // Estorna moedas em caso de erro da API
+        if (coinsDeducted && user?.id) {
+          const userRef = doc(db, "users", user.id);
+          const userSnap = await getDoc(userRef);
+          const currentCoins = userSnap.data()?.forteCoins ?? 0;
+          await updateDoc(userRef, {
+            forteCoins: currentCoins + coinsToUse,
+            pendingRefund: null
+          });
+          coinsDeducted = false;
+        }
       }
-    } catch (error) {
-      console.warn("[Checkout] Fallback para WhatsApp devido a erro:", error);
-      const message = `Olá! Quero comprar o produto: ${selectedProduct.name} (${chosenVersion}) no valor de R$ ${price.toFixed(2)}`;
-      const phone = "5543984253691"; // Número atualizado
-      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
+    } catch (error: any) {
+      // Estorna moedas em caso de falha de rede
+      if (coinsDeducted && user?.id) {
+        try {
+          const userRef = doc(db, "users", user.id);
+          const userSnap = await getDoc(userRef);
+          const currentCoins = userSnap.data()?.forteCoins ?? 0;
+          await updateDoc(userRef, {
+            forteCoins: currentCoins + coinsToUse,
+            pendingRefund: null
+          });
+        } catch (refundErr) {
+          console.error("[Checkout] Erro ao estornar moedas:", refundErr);
+        }
+      }
+
+      // Só vai para WhatsApp se for erro de rede (servidor offline)
+      if (error instanceof TypeError && error.message.includes("fetch")) {
+        const message = `Olá! Quero comprar o produto: ${selectedProduct.name} (${chosenVersion}) no valor de R$ ${price.toFixed(2)}`;
+        const phone = "5543984253691";
+        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
+        setSelectedProduct(null);
+      } else {
+        setCheckoutError(error.message || "Erro desconhecido ao processar pagamento.");
+      }
     } finally {
       setIsProcessingCheckout(false);
-      setSelectedProduct(null);
     }
   };
+
+  const price = chosenVersion 
+    ? (chosenVersion === "PS4" ? selectedProduct?.pricePS4 : selectedProduct?.pricePS5) || 0
+    : 0;
+  const coinsToUseVal = useCoins ? Math.min(user?.forteCoins || 0, Math.ceil(price * 10)) : 0;
+  const coinDiscount = coinsToUseVal * 0.10;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900">
@@ -178,7 +292,11 @@ export default function Store() {
                 {/* Image Container with Logo Overlay */}
                 <div className="relative h-80 overflow-hidden">
                   {product.imageUrl ? (
-                    <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                    <img 
+                      src={product.imageUrl} 
+                      alt={product.name} 
+                      className={`w-full h-full ${product.coverFit === 'contain' ? 'object-contain bg-slate-900/60 p-2' : 'object-cover'} transition-transform duration-700 group-hover:scale-110`} 
+                    />
                   ) : (
                     <div className="w-full h-full bg-slate-900 flex items-center justify-center">
                       <Package className="w-16 h-16 text-slate-800" />
@@ -275,8 +393,12 @@ export default function Store() {
           
           <div className="py-6 space-y-4">
             <div className="flex gap-4 items-start mb-6">
-              <div className="w-20 h-20 rounded bg-slate-800 overflow-hidden border border-red-600/20">
-                <img src={selectedProduct?.imageUrl} alt={selectedProduct?.name} className="w-full h-full object-cover" />
+              <div className="w-20 h-20 rounded bg-slate-800 overflow-hidden border border-red-600/20 flex items-center justify-center">
+                <img 
+                  src={selectedProduct?.imageUrl} 
+                  alt={selectedProduct?.name} 
+                  className={`w-full h-full ${selectedProduct?.coverFit === 'contain' ? 'object-contain p-1' : 'object-cover'}`} 
+                />
               </div>
               <div>
                 <h4 className="font-bold text-white line-clamp-2">{selectedProduct?.name}</h4>
@@ -323,9 +445,99 @@ export default function Store() {
                 </button>
               )}
             </div>
+
+            {chosenVersion && (
+              <div className="space-y-4 pt-4 border-t border-slate-800 animate-in fade-in slide-in-from-top-2 duration-300">
+                <h4 className="font-bold text-sm text-slate-300 flex items-center gap-2">
+                  <span>📋 Dados para Entrega (WhatsApp/Contato)</span>
+                </h4>
+                
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Nome Completo</label>
+                    <Input
+                      autoComplete="name"
+                      placeholder="Ex: João da Silva"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      className="bg-slate-950 border-slate-800 focus-visible:ring-red-600 h-10"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">E-mail</label>
+                    <Input
+                      type="email"
+                      autoComplete="email"
+                      placeholder="Ex: joao@email.com"
+                      value={customerEmail}
+                      onChange={(e) => setCustomerEmail(e.target.value)}
+                      className="bg-slate-950 border-slate-800 focus-visible:ring-red-600 h-10"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">WhatsApp / Telefone (com DDD)</label>
+                    <Input
+                      type="tel"
+                      autoComplete="tel"
+                      placeholder="Ex: 11999998888"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      className="bg-slate-950 border-slate-800 focus-visible:ring-red-600 h-10"
+                    />
+                  </div>
+                </div>
+
+                {isAuthenticated && user?.forteCoins > 0 && (
+                  <div className="bg-red-950/20 border border-red-500/20 rounded-xl p-3.5 space-y-2.5 mt-4">
+                    <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={useCoins}
+                        onChange={(e) => setUseCoins(e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-red-600 focus:ring-red-500"
+                      />
+                      <span className="text-sm font-bold text-white flex items-center gap-1">
+                        <Coins className="w-4 h-4 text-red-500" /> Usar minhas ForteCoins
+                      </span>
+                    </label>
+                    
+                    {useCoins && (
+                      <div className="text-xs text-slate-300 space-y-1 pl-6">
+                        <p>Saldo disponível: <strong className="text-white">{user.forteCoins} FC</strong></p>
+                        <p>Desconto a aplicar: <strong className="text-red-500">R$ {coinDiscount.toFixed(2)}</strong> (usando {coinsToUseVal} FC)</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                <div className="pt-2">
+                  <div className="flex justify-between text-sm text-slate-400">
+                    <span>Subtotal:</span>
+                    <span>R$ {price.toFixed(2)}</span>
+                  </div>
+                  {useCoins && coinDiscount > 0 && (
+                    <div className="flex justify-between text-sm text-red-500">
+                      <span>Desconto ForteCoins:</span>
+                      <span>- R$ {coinDiscount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-lg font-black text-white mt-1 pt-1 border-t border-slate-800">
+                    <span>Total Final:</span>
+                    <span>R$ {Math.max(0, price - coinDiscount).toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex flex-col gap-3">
+            {checkoutError && (
+              <div className="w-full bg-red-950/60 border border-red-500/40 rounded-xl px-4 py-3 text-sm text-red-300">
+                ⚠️ {checkoutError}
+              </div>
+            )}
             <Button 
               disabled={!chosenVersion || isProcessingCheckout}
               onClick={handleFinalizePurchase}

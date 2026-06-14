@@ -130,6 +130,19 @@ export const appRouter = router({
       const seller = await db.getSellerByUserId(ctx.user.id);
       return seller ? db.getOrdersBySellerId(seller.userId) : [];
     }),
+    listAll: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== 'admin') throw new Error("Unauthorized");
+      return db.getAllOrdersWithDetails();
+    }),
+    deliverOrder: protectedProcedure
+      .input(z.object({
+        orderId: z.number(),
+        deliveryDetails: z.string().min(1),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') throw new Error("Unauthorized");
+        return db.deliverOrder(input.orderId, input.deliveryDetails);
+      }),
     confirmAndReview: protectedProcedure
       .input(z.object({
         orderId: z.number(),

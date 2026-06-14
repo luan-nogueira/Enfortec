@@ -10,6 +10,7 @@ import { useLocation } from "wouter";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Plus, TrendingUp, ShoppingCart, Star, Flame, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 
 // Mock data removido ou mantido apenas como exemplo vazio
 const mockEarningsData = [
@@ -54,7 +55,7 @@ export default function SellerDashboard() {
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!imageFile) {
-      alert("Por favor, selecione uma foto do produto.");
+      toast.warning("Por favor, selecione uma foto do produto.");
       return;
     }
 
@@ -87,19 +88,29 @@ export default function SellerDashboard() {
       const fileInput = document.getElementById("sellerImageUpload") as HTMLInputElement;
       if (fileInput) fileInput.value = "";
       
-      alert("Produto anunciado com sucesso!");
+      toast.success("Produto anunciado com sucesso!");
     } catch (error) {
       console.error(error);
-      alert("Erro ao anunciar produto. Verifique as permissões de Storage e Firestore.");
+      toast.error("Erro ao anunciar produto. Verifique as permissões de Storage e Firestore.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeleteProduct = async (id: string) => {
-    if (confirm("Deletar este anúncio?")) {
-      await deleteDoc(doc(db, "used_products", id));
-    }
+    toast("Deletar este anúncio?", {
+      action: {
+        label: "Deletar",
+        onClick: async () => {
+          try {
+            await deleteDoc(doc(db, "used_products", id));
+            toast.success("Anúncio deletado com sucesso!");
+          } catch (error) {
+            toast.error("Erro ao deletar anúncio.");
+          }
+        }
+      }
+    });
   };
 
   if (!isAuthenticated) {

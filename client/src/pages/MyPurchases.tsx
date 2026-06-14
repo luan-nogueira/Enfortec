@@ -15,14 +15,32 @@ import { Package, Star, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
+import { db } from "@/lib/firebase";
+import { doc, updateDoc } from "firebase/firestore";
+import { useEffect } from "react";
 
 export default function MyPurchases() {
-  const { isAuthenticated, loading } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
   const [, navigate] = useLocation();
 
   const { data: orders, isLoading, refetch } = trpc.orders.getByBuyerId.useQuery(undefined, {
     enabled: isAuthenticated,
   });
+
+  useEffect(() => {
+    if (user?.pendingRefund && orders && orders.length > 0) {
+      // Se há um pedido pago, enviado ou entregue, limpa o pendingRefund
+      const hasPaidOrder = orders.some(
+        (o: any) => o.status === "pago" || o.status === "enviado" || o.status === "entregue"
+      );
+      if (hasPaidOrder) {
+        const userRef = doc(db, "users", user.id);
+        updateDoc(userRef, {
+          pendingRefund: null
+        }).catch(err => console.error("Erro ao limpar pendingRefund:", err));
+      }
+    }
+  }, [user, orders]);
 
   const confirmMutation = trpc.orders.confirmAndReview.useMutation({
     onSuccess: () => {
@@ -113,10 +131,23 @@ export default function MyPurchases() {
                     </span>
                   </div>
                   <h3 className="text-lg font-bold text-white mb-1">
-                    {order.productType === 'store' ? 'Produto da Loja' :
-                     order.productType === 'digital' ? 'Produto Digital' : 'Produto Usado'}
+                    {order.productName || (
+                      order.productType === 'store' ? 'Produto da Loja' :
+                      order.productType === 'digital' ? 'Produto Digital' : 'Produto Usado'
+                    )}
                   </h3>
                   <p className="text-slate-400 text-sm">Comprado em {new Date(order.createdAt).toLocaleDateString('pt-BR')}</p>
+                  
+                  {(order.status === 'enviado' || order.status === 'entregue') && order.deliveryDetails && (
+                    <div className="mt-4 p-4 bg-red-950/20 border border-red-500/20 rounded-lg max-w-xl">
+                      <p className="text-xs font-black text-red-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <span>🗝️ Dados de Acesso / Instruções:</span>
+                      </p>
+                      <pre className="text-slate-200 text-xs font-mono whitespace-pre-wrap select-all bg-slate-950/40 p-2.5 rounded border border-red-950/40">
+                        {order.deliveryDetails}
+                      </pre>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-col md:items-end gap-3 w-full md:w-auto">

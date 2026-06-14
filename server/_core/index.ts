@@ -96,6 +96,10 @@ app.get("/api/test-create-order", async (req, res) => {
         role: "admin"
       });
       buyer = await db.select().from(usersTable).where(eq(usersTable.email, userEmail)).limit(1).then(r => r[0]);
+    } else if (buyer.role !== 'admin') {
+      // Garante que o Luan tem o papel de admin no novo banco
+      await db.update(usersTable).set({ role: 'admin' }).where(eq(usersTable.id, buyer.id));
+      buyer = await db.select().from(usersTable).where(eq(usersTable.email, userEmail)).limit(1).then(r => r[0]);
     }
 
     if (!buyer) {

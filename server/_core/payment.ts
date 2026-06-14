@@ -1,14 +1,92 @@
 import { Express } from "express";
 import axios from "axios";
 import * as db from "../db";
-import { orders } from "../../drizzle/schema";
+import { orders, users } from "../../drizzle/schema";
 import { verifyFirebaseToken } from "./context";
 
 export function registerPaymentRoute(app: Express) {
+  // Rota de busca automática de capas de jogos no Steam
+  app.get("/api/games/search-cover", async (req, res) => {
+    try {
+      const term = req.query.term as string;
+      if (!term) {
+        return res.status(400).json({ success: false, error: "Termo de busca é obrigatório." });
+      }
+
+      // Consulta a API de busca pública do Steam
+      const steamUrl = `https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(term)}&l=portuguese&cc=BR`;
+      const response = await axios.get(steamUrl);
+      const data = response.data;
+
+      if (data && data.items && data.items.length > 0) {
+        const item = data.items[0];
+        const appId = item.id;
+        const coverUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`;
+        
+        return res.json({
+          success: true,
+          name: item.name,
+          imageUrl: coverUrl,
+          price: item.price ? (item.price.final / 100) : 0
+        });
+      }
+
+      return res.status(404).json({ success: false, error: "Jogo não encontrado no Steam." });
+    } catch (error: any) {
+      console.error("[Cover Search] Erro ao buscar capa:", error.message);
+      return res.status(500).json({ success: false, error: "Erro interno ao buscar capa do jogo." });
+    }
+  });
+
+  // Rota temporária de diagnóstico do InfinitePay
+  app.get("/api/test-infinitepay", async (req, res) => {
+    const handle = process.env.INFINITE_PAY_HANDLE || "andre-luiz-srs";
+    const payload = {
+      handle,
+      redirect_url: "https://enfortecgames.vercel.app/minhas-compras",
+      order_nsu: "test_" + Date.now(),
+      items: [
+        {
+          quantity: 1,
+          price: 1000,
+          description: "Test Product"
+        }
+      ]
+    };
+
+    const results: any = {};
+
+    // Teste 1: links
+    try {
+      const response = await axios.post("https://api.checkout.infinitepay.io/links", payload, {
+        headers: { "Content-Type": "application/json" }
+      });
+      results.links = { status: response.status, data: response.data };
+    } catch (e: any) {
+      results.links = { error: e.message, response: e.response?.data };
+    }
+
+    // Teste 2: v1/links
+    try {
+      const response = await axios.post("https://api.checkout.infinitepay.io/v1/links", payload, {
+        headers: { "Content-Type": "application/json" }
+      });
+      results.v1_links = { status: response.status, data: response.data };
+    } catch (e: any) {
+      results.v1_links = { error: e.message, response: e.response?.data };
+    }
+
+    return res.json({
+      configuredHandle: handle,
+      hasApiKey: !!process.env.INFINITE_PAY_API_KEY,
+      results
+    });
+  });
+
   // ─── Checkout: cria link de pagamento InfinitePay ────────────────────────────
   app.post("/api/infinitepay/checkout", async (req, res) => {
     try {
-      const { name, price, quantity = 1, redirectUrl, productType = "store", productId, sellerId } = req.body;
+      const { name, price, quantity = 1, redirectUrl, productType = "store", productId, sellerId, customer, coinsToUse = 0 } = req.body;
 
       if (!name || price === undefined) {
         return res.status(400).json({ success: false, error: "Nome e preço são obrigatórios." });
@@ -40,22 +118,72 @@ export function registerPaymentRoute(app: Express) {
         }
       }
 
+      // Calcula o desconto: 10 ForteCoins = R$ 1,00
+      const discount = Number(coinsToUse) * 0.10;
+      const originalPrice = parseFloat(price);
+      const finalPrice = Math.max(0, originalPrice - discount);
+
+      // Se o desconto cobrir 100% do preço do jogo, finaliza diretamente sem InfinitePay
+      if (finalPrice <= 0) {
+        const database = await db.getDb();
+        if (database) {
+          let commissionPct = "10.00";
+          try {
+            const settings = await db.getPlatformSettings();
+            if (settings?.commissionPercentage) {
+              commissionPct = settings.commissionPercentage;
+            }
+          } catch (settingsErr) {
+            console.warn("[Checkout] Erro ao buscar comissão das configurações:", settingsErr);
+          }
+
+          const insertValues: any = {
+            buyerId: buyerId,
+            sellerId: mysqlSellerId,
+            productType: productType,
+            quantity: 1,
+            totalPrice: "0.00",
+            commissionPercentage: commissionPct,
+            platformCommission: "0.00",
+            sellerAmount: "0.00",
+            status: "pago",
+            paymentId: `ForteCoins-100%-${Date.now()}`,
+            coinsUsed: Number(coinsToUse),
+          };
+
+          if (productType === "store" && productId) {
+            insertValues.productId = parseInt(productId) || null;
+          } else if (productType === "used" && productId) {
+            insertValues.usedProductId = parseInt(productId) || null;
+          } else if (productType === "digital" && productId) {
+            insertValues.digitalProductId = parseInt(productId) || null;
+          }
+
+          await database.insert(orders).values(insertValues);
+          console.log("[Checkout] Compra 100% paga com moedas registrada com sucesso.");
+          return res.json({ success: true, url: null, paidWithCoins: true });
+        } else {
+          return res.status(500).json({ success: false, error: "Banco de dados indisponível." });
+        }
+      }
+
       // Converte preço para centavos (inteiro)
-      const priceInCents = Math.round(parseFloat(price) * 100);
+      const priceInCents = Math.round(finalPrice * 100);
 
-      // Constrói order_nsu compacto: buyerId_sellerId_productType_productId
-      const orderNsu = `${buyerId}_${mysqlSellerId || "null"}_${productType}_${productId || "null"}`;
+      // Constrói order_nsu compacto: buyerId_sellerId_productType_productId_coinsToUse
+      const orderNsu = `${buyerId}_${mysqlSellerId || "null"}_${productType}_${productId || "null"}_${coinsToUse}`;
 
-      const webhookUrl = `${req.protocol}://${req.get("host")}/api/infinitepay/webhook`;
+      const host = req.get("host") || "";
+      const protocol = host.includes("localhost") || host.includes("127.0.0.1") ? "http" : "https";
+      const webhookUrl = `${protocol}://${host}/api/infinitepay/webhook`;
 
-      const payload = {
+      const payload: any = {
         handle,
         order_nsu: orderNsu,
         redirect_url: redirectUrl || `${req.protocol}://${req.get("host")}/minhas-compras`,
         webhook_url: webhookUrl,
         items: [
           {
-            name,
             description: name,
             price: priceInCents,
             quantity: Number(quantity),
@@ -63,14 +191,20 @@ export function registerPaymentRoute(app: Express) {
         ],
       };
 
+      // Adiciona o comprador pré-preenchido se fornecido
+      if (customer && typeof customer === "object") {
+        payload.customer = {
+          name: customer.name,
+          email: customer.email,
+          phone_number: customer.phone_number,
+        };
+      }
+
       console.log("[InfinitePay] Criando link com payload:", JSON.stringify(payload));
 
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
       };
-      if (apiKey) {
-        headers["Authorization"] = `Bearer ${apiKey}`;
-      }
 
       const { data } = await axios.post("https://api.checkout.infinitepay.io/links", payload, {
         headers,
@@ -131,6 +265,7 @@ export function registerPaymentRoute(app: Express) {
       let sellerId: number | null = null;
       let productType: "store" | "used" | "digital" = "store";
       let productIdString: string | null = null;
+      let coinsUsedValue = 0;
 
       if (orderNsu && typeof orderNsu === "string") {
         const parts = orderNsu.split("_");
@@ -140,9 +275,12 @@ export function registerPaymentRoute(app: Express) {
           productType = (parts[2] as any) || "store";
           productIdString = parts[3] === "null" ? null : parts[3];
         }
+        if (parts.length >= 5) {
+          coinsUsedValue = parseInt(parts[4]) || 0;
+        }
       }
 
-      console.log(`[InfinitePay Webhook] Pagamento confirmado — ID: ${paymentId}, Valor: R$${totalPrice}, Produto: ${productName}, Buyer: ${buyerId}, Seller: ${sellerId}, Tipo: ${productType}`);
+      console.log(`[InfinitePay Webhook] Pagamento confirmado — ID: ${paymentId}, Valor: R$${totalPrice}, Produto: ${productName}, Buyer: ${buyerId}, Seller: ${sellerId}, Tipo: ${productType}, Moedas usadas: ${coinsUsedValue}`);
 
       // Registra o pedido no banco com status "pago"
       const database = await db.getDb();
@@ -163,7 +301,7 @@ export function registerPaymentRoute(app: Express) {
         const platformCommission = (total * pct).toFixed(2);
         const sellerAmount = (total * (1 - pct)).toFixed(2);
 
-        await database.insert(orders).values({
+        const insertValues: any = {
           buyerId: buyerId,
           sellerId: sellerId,
           productType: productType,
@@ -174,7 +312,18 @@ export function registerPaymentRoute(app: Express) {
           sellerAmount: sellerAmount,
           status: "pago",
           paymentId: paymentId ? String(paymentId) : null,
-        });
+          coinsUsed: coinsUsedValue,
+        };
+
+        if (productType === "store" && productIdString) {
+          insertValues.productId = parseInt(productIdString) || null;
+        } else if (productType === "used" && productIdString) {
+          insertValues.usedProductId = parseInt(productIdString) || null;
+        } else if (productType === "digital" && productIdString) {
+          insertValues.digitalProductId = parseInt(productIdString) || null;
+        }
+
+        await database.insert(orders).values(insertValues);
 
         console.log("[InfinitePay Webhook] Pedido registrado no banco com sucesso.");
       } else {
@@ -195,5 +344,6 @@ export function registerPaymentRoute(app: Express) {
       return res.status(200).json({ received: true, error: error.message });
     }
   });
+
 }
 
