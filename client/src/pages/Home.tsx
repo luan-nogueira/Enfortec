@@ -98,26 +98,39 @@ export default function Home() {
     return () => unsubPromos();
   }, []);
 
-  const activeBanners = promos.length > 0 ? promos : DEFAULT_BANNERS;
+  // Mix dynamic games from the database into the slides as requested by the user
+  const activeBanners = [
+    ...promos,
+    ...digitalProducts.slice(0, 5).map(game => ({
+      id: `game-banner-${game.id}`,
+      title: game.name,
+      description: `💥 Jogo de Mídia Digital de alta performance para ${game.platform}. Compre no precinho com cashback de 7 ForteCoins!`,
+      imageUrl: game.imageUrl || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200",
+      link: `/digital?search=${encodeURIComponent(game.name)}`,
+      expiresAt: null
+    }))
+  ];
+
+  const finalBanners = activeBanners.length > 0 ? activeBanners : DEFAULT_BANNERS;
 
   useEffect(() => {
-    if (activeBanners.length <= 1) return;
+    if (finalBanners.length <= 1) return;
     const interval = setInterval(() => {
-      setCurrentSlide(prev => (prev + 1) % activeBanners.length);
+      setCurrentSlide(prev => (prev + 1) % finalBanners.length);
     }, 6000);
     return () => clearInterval(interval);
-  }, [activeBanners.length]);
+  }, [finalBanners.length]);
 
   useEffect(() => {
     setCurrentSlide(0);
-  }, [activeBanners.length]);
+  }, [finalBanners.length]);
 
   const nextSlide = () => {
-    setCurrentSlide(prev => (prev + 1) % activeBanners.length);
+    setCurrentSlide(prev => (prev + 1) % finalBanners.length);
   };
 
   const prevSlide = () => {
-    setCurrentSlide(prev => (prev - 1 + activeBanners.length) % activeBanners.length);
+    setCurrentSlide(prev => (prev - 1 + finalBanners.length) % finalBanners.length);
   };
 
   useEffect(() => {
@@ -255,7 +268,7 @@ export default function Home() {
           <div className="relative w-full h-[240px] sm:h-[380px] md:h-[420px] bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-[0_0_30px_rgba(0,0,0,0.5)] group/carousel">
             
             {/* Slides */}
-            {activeBanners.map((banner, index) => (
+            {finalBanners.map((banner, index) => (
               <div
                 key={banner.id}
                 onClick={() => navigate(banner.link || "/")}
@@ -298,7 +311,7 @@ export default function Home() {
             ))}
 
             {/* Navigation Arrows */}
-            {activeBanners.length > 1 && (
+            {finalBanners.length > 1 && (
               <>
                 <button
                   onClick={(e) => {
@@ -322,9 +335,9 @@ export default function Home() {
             )}
 
             {/* Dot Indicators */}
-            {activeBanners.length > 1 && (
+            {finalBanners.length > 1 && (
               <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
-                {activeBanners.map((_, i) => (
+                {finalBanners.map((_, i) => (
                   <button
                     key={i}
                     onClick={(e) => {

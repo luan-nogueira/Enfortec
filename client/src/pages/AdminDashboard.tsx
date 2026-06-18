@@ -1616,6 +1616,176 @@ export default function AdminDashboard() {
               ))}
             </div>
           </TabsContent>
+
+          <TabsContent value="promocoes">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  📢 Banners Promocionais
+                </h3>
+                <p className="text-slate-400 text-sm">
+                  Gerencie os banners exibidos no carrossel da página inicial.
+                </p>
+              </div>
+              <Button onClick={() => setShowPromoModal(true)} className="bg-red-600 hover:bg-red-700 font-bold btn-neon flex items-center gap-2">
+                <Plus className="w-5 h-5" />
+                Criar Banner Promo
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {promosList.length === 0 ? (
+                <div className="col-span-full py-12 text-center text-slate-500 italic">
+                  Nenhum banner cadastrado.
+                </div>
+              ) : (
+                promosList.map((p) => (
+                  <Card key={p.id} className={`bg-slate-900 border-red-600/10 p-0 flex flex-col justify-between card-neon overflow-hidden ${!p.isActive ? 'opacity-65' : ''}`}>
+                    <div className="h-40 bg-slate-950 relative overflow-hidden border-b border-slate-800">
+                      {p.imageUrl ? (
+                        <img src={p.imageUrl} alt={p.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-slate-600">Sem Imagem</div>
+                      )}
+                      <div className="absolute top-2 right-2 flex gap-1.5">
+                        <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border uppercase tracking-wider ${
+                          p.isActive 
+                          ? "bg-green-500/10 text-green-500 border-green-500/20" 
+                          : "bg-red-500/10 text-red-500 border-red-500/20"
+                        }`}>
+                          {p.isActive ? "Ativo" : "Inativo"}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="p-5 flex-grow">
+                      <h4 className="text-base font-bold text-white mb-2 truncate">{p.title}</h4>
+                      <p className="text-slate-405 text-xs truncate mb-1.5"><strong className="text-slate-500">Link:</strong> {p.link || 'Nenhum'}</p>
+                      {p.expiresAt && (
+                        <p className="text-red-405 text-xs font-semibold flex items-center gap-1.5 mt-2">
+                          <Clock className="w-3.5 h-3.5" />
+                          Expira: {new Date(p.expiresAt).toLocaleString("pt-BR")}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="p-5 pt-0 flex gap-2 border-t border-slate-850/60 mt-2">
+                      <Button
+                        onClick={() => handleTogglePromoActive(p.id, p.isActive)}
+                        className={`flex-1 font-bold h-9 text-xs ${
+                          p.isActive 
+                            ? "bg-slate-800 hover:bg-slate-700 text-slate-300"
+                            : "bg-green-600 hover:bg-green-700 text-white"
+                        }`}
+                      >
+                        {p.isActive ? "Pausar" : "Ativar"}
+                      </Button>
+                      <Button
+                        onClick={() => handleDeletePromo(p.id)}
+                        variant="outline"
+                        className="bg-red-950/20 hover:bg-red-950/40 text-red-400 border-red-500/30 hover:border-red-500/50 font-bold h-9 text-xs px-3"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </Card>
+                ))
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="cupons">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  🎟️ Cupons de Desconto
+                </h3>
+                <p className="text-slate-400 text-sm">
+                  Crie e gerencie cupons aplicados no fechamento de pedidos (checkout).
+                </p>
+              </div>
+              <Button onClick={() => setShowCouponModal(true)} className="bg-red-600 hover:bg-red-700 font-bold btn-neon flex items-center gap-2">
+                <Plus className="w-5 h-5" />
+                Criar Cupom
+              </Button>
+            </div>
+
+            <Card className="bg-slate-900 border-red-600/10 p-6 flex flex-col card-neon">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-red-600/20 text-slate-400 text-xs uppercase tracking-wider">
+                      <th className="py-3 px-4">Código</th>
+                      <th className="py-3 px-4">Desconto (%)</th>
+                      <th className="py-3 px-4">Uso Máximo</th>
+                      <th className="py-3 px-4">Utilizados</th>
+                      <th className="py-3 px-4">Expiração</th>
+                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4 text-right">Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {!dbCoupons || dbCoupons.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-slate-500 italic text-sm">Nenhum cupom cadastrado no sistema.</td>
+                      </tr>
+                    ) : (
+                      dbCoupons.map((coupon: any) => (
+                        <tr key={coupon.id} className="border-b border-slate-800/40 hover:bg-slate-800/10 text-sm">
+                          <td className="py-3.5 px-4 font-mono font-bold text-white text-base">
+                            {coupon.code}
+                          </td>
+                          <td className="py-3.5 px-4 font-bold text-red-500">
+                            {coupon.discountPercentage}%
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-300">
+                            {coupon.maxUses !== null ? coupon.maxUses : "Sem limite"}
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-300 font-semibold">
+                            {coupon.usedCount}
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-400">
+                            {coupon.expiresAt 
+                              ? new Date(coupon.expiresAt).toLocaleDateString("pt-BR") 
+                              : "Nunca"}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border
+                              ${coupon.isActive 
+                                ? "bg-green-500/10 text-green-500 border-green-500/20" 
+                                : "bg-red-500/10 text-red-500 border-red-500/20"}`}>
+                              {coupon.isActive ? "Ativo" : "Inativo"}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                onClick={() => handleToggleCouponActive(coupon.id, coupon.isActive)}
+                                className={`font-bold h-8 text-xs ${
+                                  coupon.isActive 
+                                    ? "bg-slate-850 hover:bg-slate-800 text-slate-350"
+                                    : "bg-green-600 hover:bg-green-700 text-white"
+                                }`}
+                              >
+                                {coupon.isActive ? "Desativar" : "Ativar"}
+                              </Button>
+                              <Button
+                                onClick={() => handleDeleteCoupon(coupon.id)}
+                                variant="outline"
+                                className="bg-red-950/20 hover:bg-red-950/40 text-red-400 border-red-500/30 hover:border-red-500/50 font-bold h-8 text-xs px-2.5"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </TabsContent>
         </Tabs>
       </main>
 
@@ -2195,6 +2365,163 @@ export default function AdminDashboard() {
               </DialogFooter>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Criação de Banner Promocional */}
+      <Dialog open={showPromoModal} onOpenChange={setShowPromoModal}>
+        <DialogContent className="bg-slate-900 border-red-600/30 text-white sm:max-w-[425px] card-neon">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black text-neon flex items-center gap-2">
+              📢 Criar Banner Promo
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Cadastre um banner no carrossel de promoções da home.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleCreatePromo} className="space-y-4 pt-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="promoTitle" className="text-slate-300">Título do Banner</Label>
+              <Input
+                id="promoTitle"
+                value={promoTitle}
+                onChange={(e) => setPromoTitle(e.target.value)}
+                placeholder="Ex: Super Desconto em Gift Cards!"
+                required
+                className="bg-slate-950 border-slate-800 text-white"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="promoImage" className="text-slate-300">URL da Imagem</Label>
+              <Input
+                id="promoImage"
+                value={promoImage}
+                onChange={(e) => setPromoImage(e.target.value)}
+                placeholder="Ex: https://link.com/imagem.jpg"
+                required
+                className="bg-slate-950 border-slate-800 text-white"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="promoLink" className="text-slate-300">Link de Redirecionamento (Rota ou URL)</Label>
+              <Input
+                id="promoLink"
+                value={promoLink}
+                onChange={(e) => setPromoLink(e.target.value)}
+                placeholder="Ex: /fortecoins ou /digital"
+                className="bg-slate-950 border-slate-800 text-white"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="promoCountdown" className="text-slate-300">Cronômetro de Expiração (Opcional)</Label>
+              <Input
+                id="promoCountdown"
+                type="datetime-local"
+                value={promoCountdown}
+                onChange={(e) => setPromoCountdown(e.target.value)}
+                className="bg-slate-950 border-slate-800 text-white"
+              />
+            </div>
+
+            <DialogFooter className="pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowPromoModal(false)}
+                className="border-slate-700 text-slate-300 hover:bg-slate-800"
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" className="bg-red-600 hover:bg-red-700 font-bold btn-neon">
+                Salvar Banner
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Criação de Cupom */}
+      <Dialog open={showCouponModal} onOpenChange={setShowCouponModal}>
+        <DialogContent className="bg-slate-900 border-red-600/30 text-white sm:max-w-[425px] card-neon">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black text-neon flex items-center gap-2">
+              🎟️ Criar Novo Cupom
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Cadastre um cupom de desconto para os clientes usarem no checkout.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleCreateCoupon} className="space-y-4 pt-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="couponCode" className="text-slate-300">Código do Cupom</Label>
+              <Input
+                id="couponCode"
+                value={couponCodeForm}
+                onChange={(e) => setCouponCodeForm(e.target.value)}
+                placeholder="Ex: DESCONTO10"
+                required
+                className="bg-slate-950 border-slate-800 text-white uppercase"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="couponDiscount" className="text-slate-300">Desconto (%)</Label>
+              <Input
+                id="couponDiscount"
+                type="number"
+                min="1"
+                max="100"
+                value={couponDiscountForm}
+                onChange={(e) => setCouponDiscountForm(e.target.value)}
+                placeholder="Ex: 15"
+                required
+                className="bg-slate-950 border-slate-800 text-white"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="couponMaxUses" className="text-slate-300">Limite de Usos (Opcional)</Label>
+              <Input
+                id="couponMaxUses"
+                type="number"
+                min="1"
+                value={couponMaxUsesForm}
+                onChange={(e) => setCouponMaxUsesForm(e.target.value)}
+                placeholder="Ex: 50"
+                className="bg-slate-950 border-slate-800 text-white"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="couponExpires" className="text-slate-300">Data de Expiração (Opcional)</Label>
+              <Input
+                id="couponExpires"
+                type="date"
+                value={couponExpiresForm}
+                onChange={(e) => setCouponExpiresForm(e.target.value)}
+                className="bg-slate-950 border-slate-800 text-white"
+              />
+            </div>
+
+            <DialogFooter className="pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowCouponModal(false)}
+                className="border-slate-700 text-slate-300 hover:bg-slate-800"
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" className="bg-red-600 hover:bg-red-700 font-bold btn-neon">
+                Criar Cupom
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
