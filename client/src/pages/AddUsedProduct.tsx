@@ -7,6 +7,36 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Upload } from "lucide-react";
 
+const BRAZIL_STATES = [
+  { uf: "AC", name: "Acre" },
+  { uf: "AL", name: "Alagoas" },
+  { uf: "AP", name: "Amapá" },
+  { uf: "AM", name: "Amazonas" },
+  { uf: "BA", name: "Bahia" },
+  { uf: "CE", name: "Ceará" },
+  { uf: "DF", name: "Distrito Federal" },
+  { uf: "ES", name: "Espírito Santo" },
+  { uf: "GO", name: "Goiás" },
+  { uf: "MA", name: "Maranhão" },
+  { uf: "MT", name: "Mato Grosso" },
+  { uf: "MS", name: "Mato Grosso do Sul" },
+  { uf: "MG", name: "Minas Gerais" },
+  { uf: "PA", name: "Pará" },
+  { uf: "PB", name: "Paraíba" },
+  { uf: "PR", name: "Paraná" },
+  { uf: "PE", name: "Pernambuco" },
+  { uf: "PI", name: "Piauí" },
+  { uf: "RJ", name: "Rio de Janeiro" },
+  { uf: "RN", name: "Rio Grande do Norte" },
+  { uf: "RS", name: "Rio Grande do Sul" },
+  { uf: "RO", name: "Rondônia" },
+  { uf: "RR", name: "Roraima" },
+  { uf: "SC", name: "Santa Catarina" },
+  { uf: "SP", name: "São Paulo" },
+  { uf: "SE", name: "Sergipe" },
+  { uf: "TO", name: "Tocantins" }
+];
+
 export default function AddUsedProduct() {
   const { isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
@@ -16,6 +46,8 @@ export default function AddUsedProduct() {
     price: "",
     condition: "como_novo" as const,
     images: [] as string[],
+    estado: "",
+    cidade: "",
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -36,7 +68,7 @@ export default function AddUsedProduct() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name.trim() || !formData.description.trim() || !formData.price) {
+    if (!formData.name.trim() || !formData.description.trim() || !formData.price || !formData.estado || !formData.cidade.trim()) {
       toast.error("Preencha todos os campos obrigatórios");
       return;
     }
@@ -54,6 +86,8 @@ export default function AddUsedProduct() {
         price: parseFloat(formData.price),
         condition: formData.condition,
         images: formData.images,
+        estado: formData.estado,
+        cidade: formData.cidade.trim(),
       });
       toast.success("Produto adicionado com sucesso!");
       navigate("/vendedor");
@@ -173,6 +207,42 @@ export default function AddUsedProduct() {
                     <option value="bom">Bom</option>
                     <option value="aceitavel">Aceitável</option>
                   </select>
+                </div>
+              </div>
+
+              {/* Region Selector */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-900 mb-2">
+                    Estado (UF) *
+                  </label>
+                  <select
+                    name="estado"
+                    value={formData.estado}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-slate-900 bg-white"
+                    disabled={isLoading}
+                    required
+                  >
+                    <option value="">Selecione o Estado...</option>
+                    {BRAZIL_STATES.map(st => (
+                      <option key={st.uf} value={st.uf}>{st.name} ({st.uf})</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-900 mb-2">
+                    Cidade *
+                  </label>
+                  <Input
+                    type="text"
+                    name="cidade"
+                    placeholder="Ex: Londrina"
+                    value={formData.cidade}
+                    onChange={handleInputChange}
+                    disabled={isLoading}
+                    required
+                  />
                 </div>
               </div>
 

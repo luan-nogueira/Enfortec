@@ -202,11 +202,19 @@ export default function BecomeSellerForm() {
                   <div className="w-12 h-12 rounded-full bg-red-600/10 flex items-center justify-center border border-red-600/20">
                     <User className="w-5 h-5 text-red-500" />
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Conta Conectada</p>
                     <p className="text-base font-bold text-white leading-tight">{user?.name || user?.email}</p>
                     <p className="text-xs text-slate-400">{user?.email}</p>
                   </div>
+                  {user?.cpf && (
+                    <div className="text-right">
+                      <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">CPF Parcerias</p>
+                      <p className="text-sm font-semibold text-red-400">
+                        ***.{user.cpf.substring(3, 6) || "###"}.{user.cpf.substring(6, 9) || "###"}-**
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Store Name */}

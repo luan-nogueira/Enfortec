@@ -1,12 +1,13 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Star, ShoppingCart, ArrowLeft, Flame, User, Check, Package, Coins } from "lucide-react";
+import { Search, Star, ShoppingCart, ArrowLeft, Flame, User, Check, Package, Coins, MapPin } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { auth, db } from "@/lib/firebase";
 import { collection, onSnapshot, query, orderBy, doc, getDoc, updateDoc } from "firebase/firestore";
 import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
 import {
   Dialog,
   DialogContent,
@@ -16,11 +17,42 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
+const BRAZIL_STATES = [
+  { uf: "AC", name: "Acre" },
+  { uf: "AL", name: "Alagoas" },
+  { uf: "AP", name: "Amapá" },
+  { uf: "AM", name: "Amazonas" },
+  { uf: "BA", name: "Bahia" },
+  { uf: "CE", name: "Ceará" },
+  { uf: "DF", name: "Distrito Federal" },
+  { uf: "ES", name: "Espírito Santo" },
+  { uf: "GO", name: "Goiás" },
+  { uf: "MA", name: "Maranhão" },
+  { uf: "MT", name: "Mato Grosso" },
+  { uf: "MS", name: "Mato Grosso do Sul" },
+  { uf: "MG", name: "Minas Gerais" },
+  { uf: "PA", name: "Pará" },
+  { uf: "PB", name: "Paraíba" },
+  { uf: "PR", name: "Paraná" },
+  { uf: "PE", name: "Pernambuco" },
+  { uf: "PI", name: "Piauí" },
+  { uf: "RJ", name: "Rio de Janeiro" },
+  { uf: "RN", name: "Rio Grande do Norte" },
+  { uf: "RS", name: "Rio Grande do Sul" },
+  { uf: "RO", name: "Rondônia" },
+  { uf: "RR", name: "Roraima" },
+  { uf: "SC", name: "Santa Catarina" },
+  { uf: "SP", name: "São Paulo" },
+  { uf: "SE", name: "Sergipe" },
+  { uf: "TO", name: "Tocantins" }
+];
+
 export default function UsedMarketplace() {
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCondition, setSelectedCondition] = useState<string | null>(null);
+  const [selectedState, setSelectedState] = useState<string | null>(null);
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [checkoutProductId, setCheckoutProductId] = useState<string | null>(null);
@@ -33,12 +65,43 @@ export default function UsedMarketplace() {
   const [useCoins, setUseCoins] = useState(false);
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
 
+  // Estados para cupons no checkout
+  const [couponCode, setCouponCode] = useState("");
+  const [discountPercentage, setDiscountPercentage] = useState(0);
+  const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+
+  const validateCouponMutation = trpc.coupons.validate.useMutation();
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setCouponError(null);
+    setIsValidatingCoupon(true);
+    try {
+      const res = await validateCouponMutation.mutateAsync({ code: couponCode });
+      setDiscountPercentage(res.discountPercentage);
+      setAppliedCoupon(res.code);
+      toast.success(`Cupom ${res.code} aplicado com sucesso!`);
+    } catch (err: any) {
+      setCouponError(err.message || "Cupom inválido.");
+      setDiscountPercentage(0);
+      setAppliedCoupon(null);
+    } finally {
+      setIsValidatingCoupon(false);
+    }
+  };
+
   useEffect(() => {
     if (selectedProduct) {
       setCustomerName(user?.name || "");
       setCustomerEmail(user?.email || "");
       setCustomerPhone(localStorage.getItem("customerPhone") || "");
       setUseCoins(false);
+      setCouponCode("");
+      setDiscountPercentage(0);
+      setAppliedCoupon(null);
+      setCouponError(null);
     }
   }, [selectedProduct, user]);
 
@@ -114,27 +177,28 @@ export default function UsedMarketplace() {
         ? customerPhone 
         : `+55${customerPhone.replace(/\D/g, "")}`;
 
-      const response = await fetch("/api/infinitepay/checkout", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
-          name: `${selectedProduct.name} (Usado)`,
-          price: price,
-          redirectUrl: `${window.location.origin}/minhas-compras`,
-          productType: "used",
-          productId: selectedProduct.id,
-          sellerId: selectedProduct.sellerId || null,
-          coinsToUse: coinsToUse,
-          customer: {
-            name: customerName,
-            email: customerEmail,
-            phone_number: formattedPhone
-          }
-        })
-      });
+          const response = await fetch("/api/infinitepay/checkout", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {})
+            },
+            body: JSON.stringify({
+              name: `${selectedProduct.name} (Usado)`,
+              price: price,
+              redirectUrl: `${window.location.origin}/minhas-compras`,
+              productType: "used",
+              productId: selectedProduct.id,
+              sellerId: selectedProduct.sellerId || null,
+              coinsToUse: coinsToUse,
+              couponCode: appliedCoupon || undefined,
+              customer: {
+                name: customerName,
+                email: customerEmail,
+                phone_number: formattedPhone
+              }
+            })
+          });
 
       const data = await response.json();
       if (response.ok && data.success) {
@@ -219,7 +283,8 @@ export default function UsedMarketplace() {
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.description?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCondition = !selectedCondition || p.condition === selectedCondition;
-    return matchesSearch && matchesCondition;
+    const matchesState = !selectedState || p.estado === selectedState;
+    return matchesSearch && matchesCondition && matchesState;
   });
 
   const conditions = [
@@ -230,8 +295,11 @@ export default function UsedMarketplace() {
   ];
 
   const price = selectedProduct ? parseFloat(selectedProduct.pricePS4 || selectedProduct.pricePS5 || 0) : 0;
-  const coinsToUseVal = useCoins ? Math.min(user?.forteCoins || 0, Math.ceil(price * 10)) : 0;
+  const couponDiscount = appliedCoupon ? price * (discountPercentage / 100) : 0;
+  const priceAfterCoupon = Math.max(0, price - couponDiscount);
+  const coinsToUseVal = useCoins ? Math.min(user?.forteCoins || 0, Math.ceil(priceAfterCoupon * 10)) : 0;
   const coinDiscount = coinsToUseVal * 0.10;
+  const finalPriceVal = Math.max(0, priceAfterCoupon - coinDiscount);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900">
@@ -288,7 +356,7 @@ export default function UsedMarketplace() {
       {/* Filters */}
       <div className="bg-slate-900/50 border-b border-red-600/20">
         <div className="container mx-auto px-4 py-3">
-          <div className="flex gap-1.5 sm:gap-2 flex-wrap">
+          <div className="flex gap-1.5 sm:gap-2 flex-wrap items-center">
             <button
               onClick={() => setSelectedCondition(null)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
@@ -312,6 +380,22 @@ export default function UsedMarketplace() {
                 {condition.label}
               </button>
             ))}
+
+            <span className="w-px h-6 bg-slate-800 mx-2 hidden sm:inline"></span>
+
+            <div className="flex gap-2 items-center">
+              <span className="text-xs text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">📍 Estado:</span>
+              <select
+                value={selectedState || ""}
+                onChange={(e) => setSelectedState(e.target.value || null)}
+                className="px-3 py-1.5 bg-slate-800 text-slate-300 border border-red-600/20 rounded-full text-xs focus:outline-none focus:ring-1 focus:ring-red-500 font-medium"
+              >
+                <option value="">Todos os Estados</option>
+                {BRAZIL_STATES.map(st => (
+                  <option key={st.uf} value={st.uf}>{st.name} ({st.uf})</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
       </div>
@@ -363,6 +447,12 @@ export default function UsedMarketplace() {
                     <h3 className="text-sm sm:text-xl font-black text-white line-clamp-2 sm:line-clamp-1 mb-0.5 sm:mb-1">{product.name}</h3>
                     <p className="text-slate-500 text-[8px] sm:text-[10px] font-bold uppercase tracking-widest">{product.category || "JOGO USADO"}</p>
                   </div>
+
+                  {product.estado && product.cidade && (
+                    <p className="text-[10px] sm:text-xs text-red-400 font-bold flex items-center gap-1 mb-3">
+                      <MapPin className="w-3.5 h-3.5 text-red-500 shrink-0" /> {product.cidade} - {product.estado}
+                    </p>
+                  )}
 
                   <div className="flex items-center gap-1.5 sm:gap-2 my-3 sm:my-6 p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-slate-950/50 border border-red-600/5">
                     <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-red-600/10 flex items-center justify-center border border-red-600/20">
@@ -481,6 +571,45 @@ export default function UsedMarketplace() {
                 </div>
               </div>
 
+              {/* Cupom de Desconto */}
+              <div className="bg-slate-950/40 border border-slate-800 rounded-xl p-3.5 space-y-2.5 mt-4">
+                <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Cupom de Desconto</label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Ex: EFORTE10"
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                    className="bg-slate-950 border-slate-800 focus-visible:ring-red-600 h-10"
+                    disabled={!!appliedCoupon}
+                  />
+                  {appliedCoupon ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setAppliedCoupon(null);
+                        setDiscountPercentage(0);
+                        setCouponCode("");
+                      }}
+                      className="border-red-600/30 text-red-500 hover:bg-red-950 h-10 px-4 text-xs font-bold"
+                    >
+                      Remover
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      onClick={handleApplyCoupon}
+                      disabled={isValidatingCoupon || !couponCode.trim()}
+                      className="bg-red-600 hover:bg-red-700 text-white font-bold h-10 px-4 text-xs"
+                    >
+                      {isValidatingCoupon ? "..." : "Aplicar"}
+                    </Button>
+                  )}
+                </div>
+                {couponError && <p className="text-red-400 text-[10px] mt-1">❌ {couponError}</p>}
+                {appliedCoupon && <p className="text-green-400 text-[10px] mt-1">✅ Cupom {appliedCoupon} aplicado: {discountPercentage}% de desconto!</p>}
+              </div>
+
               {isAuthenticated && user?.forteCoins > 0 && (
                 <div className="bg-red-950/20 border border-red-500/20 rounded-xl p-3.5 space-y-2.5 mt-4">
                   <label className="flex items-center gap-2.5 cursor-pointer select-none">
@@ -509,6 +638,12 @@ export default function UsedMarketplace() {
                   <span>Subtotal:</span>
                   <span>R$ {price.toFixed(2)}</span>
                 </div>
+                {couponDiscount > 0 && (
+                  <div className="flex justify-between text-sm text-green-500">
+                    <span>Desconto Cupom ({discountPercentage}%):</span>
+                    <span>- R$ {couponDiscount.toFixed(2)}</span>
+                  </div>
+                )}
                 {useCoins && coinDiscount > 0 && (
                   <div className="flex justify-between text-sm text-red-500">
                     <span>Desconto ForteCoins:</span>
@@ -517,7 +652,7 @@ export default function UsedMarketplace() {
                 )}
                 <div className="flex justify-between text-lg font-black text-white mt-1 pt-1 border-t border-slate-800">
                   <span>Total Final:</span>
-                  <span>R$ {Math.max(0, price - coinDiscount).toFixed(2)}</span>
+                  <span>R$ {finalPriceVal.toFixed(2)}</span>
                 </div>
               </div>
             </div>

@@ -1,7 +1,7 @@
 import { eq, and, desc } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
-import { InsertUser, users, sellers, products, usedProducts, digitalProducts, orders, reviews, coupons, platformSettings } from "../drizzle/schema";
+import { InsertUser, InsertCoupon, users, sellers, products, usedProducts, digitalProducts, orders, reviews, coupons, platformSettings } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 /**
@@ -39,7 +39,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     };
     const updateSet: Record<string, unknown> = {};
 
-    const textFields = ["name", "email", "loginMethod"] as const;
+    const textFields = ["name", "email", "loginMethod", "cpf"] as const;
     type TextField = (typeof textFields)[number];
 
     const assignNullable = (field: TextField) => {
@@ -51,6 +51,11 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     };
 
     textFields.forEach(assignNullable);
+
+    if (user.forteCoins !== undefined) {
+      values.forteCoins = user.forteCoins;
+      updateSet.forteCoins = user.forteCoins;
+    }
 
     if (user.lastSignedIn !== undefined) {
       values.lastSignedIn = user.lastSignedIn;
@@ -325,6 +330,30 @@ export async function getCouponByCode(code: string) {
   if (!db) return undefined;
   const result = await db.select().from(coupons).where(and(eq(coupons.code, code), eq(coupons.isActive, true))).limit(1);
   return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getAllCoupons() {
+  const db = getDb();
+  if (!db) return [];
+  return db.select().from(coupons).orderBy(desc(coupons.createdAt));
+}
+
+export async function createCoupon(coupon: InsertCoupon) {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+  return db.insert(coupons).values(coupon);
+}
+
+export async function updateCoupon(id: number, updateData: Partial<InsertCoupon>) {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+  return db.update(coupons).set(updateData).where(eq(coupons.id, id));
+}
+
+export async function deleteCoupon(id: number) {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+  return db.delete(coupons).where(eq(coupons.id, id));
 }
 
 // Reviews queries

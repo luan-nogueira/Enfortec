@@ -11,14 +11,57 @@ import {
 import { Flame } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { trpc } from "@/lib/trpc";
+
+function isValidCPF(cpf: string) {
+  const cleanCPF = cpf.replace(/\D/g, "");
+  if (cleanCPF.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(cleanCPF)) return false;
+
+  let sum = 0;
+  let remainder;
+
+  for (let i = 1; i <= 9; i++) {
+    sum += parseInt(cleanCPF.substring(i - 1, i)) * (11 - i);
+  }
+  remainder = (sum * 10) % 11;
+  if (remainder === 10 || remainder === 11) remainder = 0;
+  if (remainder !== parseInt(cleanCPF.substring(9, 10))) return false;
+
+  sum = 0;
+  for (let i = 1; i <= 10; i++) {
+    sum += parseInt(cleanCPF.substring(i - 1, i)) * (12 - i);
+  }
+  remainder = (sum * 10) % 11;
+  if (remainder === 10 || remainder === 11) remainder = 0;
+  if (remainder !== parseInt(cleanCPF.substring(10, 11))) return false;
+
+  return true;
+}
 
 export default function Login() {
   const [, navigate] = useLocation();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [cpf, setCpf] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const updateProfileMutation = trpc.auth.updateProfile.useMutation();
+
+  const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\D/g, "");
+    if (value.length > 11) value = value.substring(0, 11);
+    if (value.length > 9) {
+      value = `${value.substring(0, 3)}.${value.substring(3, 6)}.${value.substring(6, 9)}-${value.substring(9)}`;
+    } else if (value.length > 6) {
+      value = `${value.substring(0, 3)}.${value.substring(3, 6)}.${value.substring(6)}`;
+    } else if (value.length > 3) {
+      value = `${value.substring(0, 3)}.${value.substring(3)}`;
+    }
+    setCpf(value);
+  };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +72,15 @@ export default function Login() {
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
       } else {
+        if (!isValidCPF(cpf)) {
+          setError("CPF inválido. Por favor, insira um CPF válido para se cadastrar.");
+          setLoading(false);
+          return;
+        }
         await createUserWithEmailAndPassword(auth, email, password);
+        // Aguarda propagação da sessão no tRPC
+        await new Promise(r => setTimeout(r, 800));
+        await updateProfileMutation.mutateAsync({ cpf });
       }
       navigate("/");
     } catch (err: any) {
@@ -95,6 +146,21 @@ export default function Login() {
               placeholder="••••••••"
             />
           </div>
+
+          {!isLogin && (
+            <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+              <Label htmlFor="cpf">CPF</Label>
+              <Input 
+                id="cpf" 
+                type="text" 
+                value={cpf}
+                onChange={handleCpfChange}
+                required 
+                className="bg-slate-950 border-red-700/30 focus-visible:ring-red-500"
+                placeholder="000.000.000-00"
+              />
+            </div>
+          )}
 
           <Button 
             type="submit" 

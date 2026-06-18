@@ -66,7 +66,7 @@ const faqs = [
       },
       {
         q: "Como ganho ForteCoins?",
-        a: "Você ganha FC ao: realizar compras, indicar amigos que se cadastram (100 FC por indicação que fizer uma compra), e através de promoções especiais que lançamos periodicamente."
+        a: "Você ganha FC ao: realizar compras, indicar amigos que se cadastram (15 FC por indicação que fizer uma compra), e através de promoções especiais que lançamos periodicamente."
       },
       {
         q: "Os ForteCoins expiram?",

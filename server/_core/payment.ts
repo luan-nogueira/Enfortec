@@ -1,8 +1,9 @@
 import { Express } from "express";
 import axios from "axios";
 import * as db from "../db";
-import { orders, users } from "../../drizzle/schema";
+import { orders, users, coupons } from "../../drizzle/schema";
 import { verifyFirebaseToken } from "./context";
+import { eq } from "drizzle-orm";
 
 export function registerPaymentRoute(app: Express) {
   // Rota de busca automática de capas de jogos no Steam
@@ -86,7 +87,7 @@ export function registerPaymentRoute(app: Express) {
   // ─── Checkout: cria link de pagamento InfinitePay ────────────────────────────
   app.post("/api/infinitepay/checkout", async (req, res) => {
     try {
-      const { name, price, quantity = 1, redirectUrl, productType = "store", productId, sellerId, customer, coinsToUse = 0 } = req.body;
+      const { name, price, quantity = 1, redirectUrl, productType = "store", productId, sellerId, customer, coinsToUse = 0, couponCode } = req.body;
 
       if (!name || price === undefined) {
         return res.status(400).json({ success: false, error: "Nome e preço são obrigatórios." });
@@ -118,10 +119,30 @@ export function registerPaymentRoute(app: Express) {
         }
       }
 
+      // Valida o cupom se fornecido
+      let couponDiscount = 0;
+      let validCouponCode: string | null = null;
+      if (couponCode) {
+        const coupon = await db.getCouponByCode(couponCode.toUpperCase().trim());
+        if (coupon) {
+          const isExpired = coupon.expiresAt && new Date(coupon.expiresAt).getTime() < Date.now();
+          const isExceeded = coupon.maxUses !== null && (coupon.usedCount || 0) >= coupon.maxUses;
+          
+          if (!isExpired && !isExceeded) {
+            couponDiscount = parseFloat(price) * (parseFloat(coupon.discountPercentage) / 100);
+            validCouponCode = coupon.code;
+          } else {
+            console.warn(`[Checkout] Cupom ${couponCode} está expirado ou esgotado.`);
+          }
+        } else {
+          console.warn(`[Checkout] Cupom ${couponCode} não foi encontrado ou está inativo.`);
+        }
+      }
+
       // Calcula o desconto: 10 ForteCoins = R$ 1,00
-      const discount = Number(coinsToUse) * 0.10;
+      const coinsDiscount = Number(coinsToUse) * 0.10;
       const originalPrice = parseFloat(price);
-      const finalPrice = Math.max(0, originalPrice - discount);
+      const finalPrice = Math.max(0, originalPrice - couponDiscount - coinsDiscount);
 
       // Se o desconto cobrir 100% do preço do jogo, finaliza diretamente sem InfinitePay
       if (finalPrice <= 0) {
@@ -160,7 +181,28 @@ export function registerPaymentRoute(app: Express) {
           }
 
           await database.insert(orders).values(insertValues);
-          console.log("[Checkout] Compra 100% paga com moedas registrada com sucesso.");
+          
+          // Deduct coins used and reward 7 coins cashback in PostgreSQL
+          if (buyerId > 0) {
+            const userResult = await database.select().from(users).where(eq(users.id, buyerId)).limit(1);
+            if (userResult.length > 0) {
+              const usr = userResult[0];
+              const netCoins = Math.max(0, (usr.forteCoins || 0) - Number(coinsToUse) + 7);
+              await database.update(users).set({ forteCoins: netCoins }).where(eq(users.id, buyerId));
+              console.log(`[Checkout 100%] updated user ${buyerId} coins: from ${usr.forteCoins} to ${netCoins} (-${coinsToUse} + 7 cashback)`);
+            }
+          }
+
+          // Incrementa usos do cupom se foi utilizado
+          if (validCouponCode) {
+            const couponResult = await database.select().from(coupons).where(eq(coupons.code, validCouponCode)).limit(1);
+            if (couponResult.length > 0) {
+              const cp = couponResult[0];
+              await database.update(coupons).set({ usedCount: (cp.usedCount || 0) + 1 }).where(eq(coupons.id, cp.id));
+            }
+          }
+
+          console.log("[Checkout] Compra 100% paga com moedas/cupom registrada com sucesso.");
           return res.json({ success: true, url: null, paidWithCoins: true });
         } else {
           return res.status(500).json({ success: false, error: "Banco de dados indisponível." });
@@ -170,8 +212,8 @@ export function registerPaymentRoute(app: Express) {
       // Converte preço para centavos (inteiro)
       const priceInCents = Math.round(finalPrice * 100);
 
-      // Constrói order_nsu compacto: buyerId_sellerId_productType_productId_coinsToUse
-      const orderNsu = `${buyerId}_${mysqlSellerId || "null"}_${productType}_${productId || "null"}_${coinsToUse}`;
+      // Constrói order_nsu compacto: buyerId_sellerId_productType_productId_coinsToUse_couponCode
+      const orderNsu = `${buyerId}_${mysqlSellerId || "null"}_${productType}_${productId || "null"}_${coinsToUse}_${validCouponCode || "nocoupon"}`;
 
       const host = req.get("host") || "";
       const protocol = host.includes("localhost") || host.includes("127.0.0.1") ? "http" : "https";
@@ -266,6 +308,7 @@ export function registerPaymentRoute(app: Express) {
       let productType: "store" | "used" | "digital" = "store";
       let productIdString: string | null = null;
       let coinsUsedValue = 0;
+      let couponCodeValue: string | null = null;
 
       if (orderNsu && typeof orderNsu === "string") {
         const parts = orderNsu.split("_");
@@ -278,9 +321,12 @@ export function registerPaymentRoute(app: Express) {
         if (parts.length >= 5) {
           coinsUsedValue = parseInt(parts[4]) || 0;
         }
+        if (parts.length >= 6) {
+          couponCodeValue = parts[5] === "nocoupon" ? null : parts[5];
+        }
       }
 
-      console.log(`[InfinitePay Webhook] Pagamento confirmado — ID: ${paymentId}, Valor: R$${totalPrice}, Produto: ${productName}, Buyer: ${buyerId}, Seller: ${sellerId}, Tipo: ${productType}, Moedas usadas: ${coinsUsedValue}`);
+      console.log(`[InfinitePay Webhook] Pagamento confirmado — ID: ${paymentId}, Valor: R$${totalPrice}, Produto: ${productName}, Buyer: ${buyerId}, Seller: ${sellerId}, Tipo: ${productType}, Moedas usadas: ${coinsUsedValue}, Cupom: ${couponCodeValue}`);
 
       // Registra o pedido no banco com status "pago"
       const database = await db.getDb();
@@ -324,6 +370,27 @@ export function registerPaymentRoute(app: Express) {
         }
 
         await database.insert(orders).values(insertValues);
+
+        // Deduct coins used and reward 7 coins cashback in PostgreSQL
+        if (buyerId > 0) {
+          const userResult = await database.select().from(users).where(eq(users.id, buyerId)).limit(1);
+          if (userResult.length > 0) {
+            const usr = userResult[0];
+            const netCoins = Math.max(0, (usr.forteCoins || 0) - coinsUsedValue + 7);
+            await database.update(users).set({ forteCoins: netCoins }).where(eq(users.id, buyerId));
+            console.log(`[Webhook] updated user ${buyerId} coins: from ${usr.forteCoins} to ${netCoins} (-${coinsUsedValue} + 7 cashback)`);
+          }
+        }
+
+        // Increment coupon count if one was used
+        if (couponCodeValue) {
+          const couponResult = await database.select().from(coupons).where(eq(coupons.code, couponCodeValue)).limit(1);
+          if (couponResult.length > 0) {
+            const cp = couponResult[0];
+            await database.update(coupons).set({ usedCount: (cp.usedCount || 0) + 1 }).where(eq(coupons.id, cp.id));
+            console.log(`[Webhook] incremented coupon ${couponCodeValue} usage count to ${(cp.usedCount || 0) + 1}`);
+          }
+        }
 
         console.log("[InfinitePay Webhook] Pedido registrado no banco com sucesso.");
       } else {

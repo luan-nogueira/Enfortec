@@ -31,6 +31,119 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("usuarios");
 
+  // --- Cupons CRUD ---
+  const { data: dbCoupons, refetch: refetchCoupons } = trpc.coupons.list.useQuery(undefined, {
+    enabled: isAuthenticated && isAdmin,
+  });
+  const createCouponMutation = trpc.coupons.create.useMutation();
+  const updateCouponMutation = trpc.coupons.update.useMutation();
+  const deleteCouponMutation = trpc.coupons.delete.useMutation();
+
+  const [couponCodeForm, setCouponCodeForm] = useState("");
+  const [couponDiscountForm, setCouponDiscountForm] = useState("");
+  const [couponMaxUsesForm, setCouponMaxUsesForm] = useState("");
+  const [couponExpiresForm, setCouponExpiresForm] = useState("");
+  const [showCouponModal, setShowCouponModal] = useState(false);
+
+  // --- Promos CRUD ---
+  const [promosList, setPromosList] = useState<any[]>([]);
+  const [promoTitle, setPromoTitle] = useState("");
+  const [promoImage, setPromoImage] = useState("");
+  const [promoLink, setPromoLink] = useState("");
+  const [promoCountdown, setPromoCountdown] = useState("");
+  const [showPromoModal, setShowPromoModal] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated || !isAdmin) return;
+    const unsubPromos = onSnapshot(collection(db, "promos"), (snap) => {
+      setPromosList(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubPromos();
+  }, [isAuthenticated, isAdmin]);
+
+  const handleCreateCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await createCouponMutation.mutateAsync({
+        code: couponCodeForm.toUpperCase().trim(),
+        discountPercentage: couponDiscountForm,
+        maxUses: couponMaxUsesForm ? parseInt(couponMaxUsesForm) : null,
+        expiresAt: couponExpiresForm ? new Date(couponExpiresForm).toISOString() : null,
+      });
+      toast.success("Cupom criado com sucesso!");
+      refetchCoupons();
+      setShowCouponModal(false);
+      setCouponCodeForm("");
+      setCouponDiscountForm("");
+      setCouponMaxUsesForm("");
+      setCouponExpiresForm("");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao criar cupom.");
+    }
+  };
+
+  const handleToggleCouponActive = async (id: number, currentActive: boolean) => {
+    try {
+      await updateCouponMutation.mutateAsync({ id, isActive: !currentActive });
+      toast.success("Estado do cupom atualizado!");
+      refetchCoupons();
+    } catch (err) {
+      toast.error("Erro ao atualizar cupom.");
+    }
+  };
+
+  const handleDeleteCoupon = async (id: number) => {
+    if (!confirm("Tem certeza que deseja deletar este cupom?")) return;
+    try {
+      await deleteCouponMutation.mutateAsync(id);
+      toast.success("Cupom deletado com sucesso!");
+      refetchCoupons();
+    } catch (err) {
+      toast.error("Erro ao deletar cupom.");
+    }
+  };
+
+  const handleCreatePromo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await addDoc(collection(db, "promos"), {
+        title: promoTitle,
+        imageUrl: promoImage,
+        link: promoLink,
+        expiresAt: promoCountdown ? new Date(promoCountdown).toISOString() : null,
+        isActive: true,
+        createdAt: new Date().toISOString()
+      });
+      toast.success("Promoção de banner criada com sucesso!");
+      setShowPromoModal(false);
+      setPromoTitle("");
+      setPromoImage("");
+      setPromoLink("");
+      setPromoCountdown("");
+    } catch (err) {
+      toast.error("Erro ao criar banner promocional.");
+    }
+  };
+
+  const handleTogglePromoActive = async (id: string, currentActive: boolean) => {
+    try {
+      await updateDoc(doc(db, "promos", id), { isActive: !currentActive });
+      toast.success("Estado do banner atualizado!");
+    } catch (err) {
+      toast.error("Erro ao atualizar banner.");
+    }
+  };
+
+  const handleDeletePromo = async (id: string) => {
+    if (!confirm("Tem certeza que deseja deletar este banner promocional?")) return;
+    try {
+      await deleteDoc(doc(db, "promos", id));
+      toast.success("Banner promocional deletado!");
+    } catch (err) {
+      toast.error("Erro ao deletar banner.");
+    }
+  };
+
   // Delivery Game States
   const [deliverGameOpen, setDeliverGameOpen] = useState(false);
   const [selectedDeliverOrder, setSelectedDeliverOrder] = useState<any>(null);
@@ -669,7 +782,7 @@ export default function AdminDashboard() {
   const handleConfirmPurchase = async (referral: any) => {
     if (referral.status === "pago") return;
     
-    toast(`Confirmar que o usuário indicado (${referral.inviteeName}) efetuou a compra de um jogo? Isso creditará +100 Fortecoins ao padrinho.`, {
+    toast(`Confirmar que o usuário indicado (${referral.inviteeName}) efetuou a compra de um jogo? Isso creditará +15 Fortecoins ao padrinho.`, {
       action: {
         label: "Confirmar",
         onClick: async () => {
@@ -687,9 +800,9 @@ export default function AdminDashboard() {
             if (referrerSnap.exists()) {
               const currentCoins = referrerSnap.data()?.forteCoins ?? 0;
               await updateDoc(referrerRef, {
-                forteCoins: currentCoins + 100
+                forteCoins: currentCoins + 15
               });
-              toast.success(`Sucesso! Compra de jogo confirmada e 100 Fortecoins adicionados ao saldo do padrinho.`);
+              toast.success(`Sucesso! Compra de jogo confirmada e 15 Fortecoins adicionados ao saldo do padrinho.`);
             } else {
               toast.error(`A indicação foi marcada como paga, mas o padrinho correspondente (${referral.referrerId}) não foi localizado no Firestore.`);
             }
@@ -1035,6 +1148,12 @@ export default function AdminDashboard() {
             <TabsTrigger value="vendas" className="data-[state=active]:!bg-red-600 data-[state=active]:!text-white font-bold !h-10 !px-5 !text-sm !rounded-lg !whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 !inline-flex !items-center !justify-center !gap-2">
               📦 Gerenciar Vendas
             </TabsTrigger>
+            <TabsTrigger value="promocoes" className="data-[state=active]:!bg-red-600 data-[state=active]:!text-white font-bold !h-10 !px-5 !text-sm !rounded-lg !whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 !inline-flex !items-center !justify-center !gap-2">
+              📢 Banners Promo
+            </TabsTrigger>
+            <TabsTrigger value="cupons" className="data-[state=active]:!bg-red-600 data-[state=active]:!text-white font-bold !h-10 !px-5 !text-sm !rounded-lg !whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 !inline-flex !items-center !justify-center !gap-2">
+              🎟️ Cupons
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="usuarios">
@@ -1319,7 +1438,7 @@ export default function AdminDashboard() {
                             className="w-full bg-green-600 hover:bg-green-700 font-bold h-9 text-xs rounded-lg flex items-center justify-center gap-2"
                           >
                             <Check className="w-4 h-4" />
-                            Confirmar Compra (Dar +100 FC)
+                            Confirmar Compra (Dar +15 FC)
                           </Button>
                         )}
                       </div>

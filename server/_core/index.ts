@@ -170,6 +170,38 @@ app.use(
 
 async function startServer() {
   console.log("[Server] starting server...");
+
+  // Migrações automáticas de inicialização para o banco Neon (PostgreSQL)
+  const dbUrl = process.env.DATABASE_URL;
+  if (dbUrl) {
+    try {
+      const { neon } = await import("@neondatabase/serverless");
+      const sql = neon(dbUrl);
+      console.log("[Database] Executando migrações de inicialização...");
+      await sql(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "cpf" varchar(18)`);
+      await sql(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "forteCoins" integer DEFAULT 10 NOT NULL`);
+      
+      // Criar tabela de cupons se não existir
+      await sql(`CREATE TABLE IF NOT EXISTS "coupons" (
+        "id" serial PRIMARY KEY,
+        "code" varchar(50) NOT NULL UNIQUE,
+        "discountPercentage" numeric(5, 2) NOT NULL,
+        "maxUses" integer,
+        "usedCount" integer DEFAULT 0,
+        "expiresAt" timestamp,
+        "isActive" boolean DEFAULT true,
+        "createdAt" timestamp DEFAULT now() NOT NULL
+      )`);
+      
+      // Adicionar colunas de localização nos produtos usados
+      await sql(`ALTER TABLE "usedProducts" ADD COLUMN IF NOT EXISTS "estado" varchar(50)`);
+      await sql(`ALTER TABLE "usedProducts" ADD COLUMN IF NOT EXISTS "cidade" varchar(100)`);
+      console.log("[Database] Migrações de inicialização concluídas com sucesso.");
+    } catch (migErr: any) {
+      console.warn("[Database] Aviso: Falha na migração automática de inicialização:", migErr.message);
+    }
+  }
+
   const server = createServer(app);
 
   console.log("[Server] NODE_ENV:", process.env.NODE_ENV);

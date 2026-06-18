@@ -8,9 +8,40 @@ import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc } from "fi
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useLocation } from "wouter";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { Plus, TrendingUp, ShoppingCart, Star, Flame, Trash2 } from "lucide-react";
+import { Plus, TrendingUp, ShoppingCart, Star, Flame, Trash2, Coins } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
+
+const BRAZIL_STATES = [
+  { uf: "AC", name: "Acre" },
+  { uf: "AL", name: "Alagoas" },
+  { uf: "AP", name: "Amapá" },
+  { uf: "AM", name: "Amazonas" },
+  { uf: "BA", name: "Bahia" },
+  { uf: "CE", name: "Ceará" },
+  { uf: "DF", name: "Distrito Federal" },
+  { uf: "ES", name: "Espírito Santo" },
+  { uf: "GO", name: "Goiás" },
+  { uf: "MA", name: "Maranhão" },
+  { uf: "MT", name: "Mato Grosso" },
+  { uf: "MS", name: "Mato Grosso do Sul" },
+  { uf: "MG", name: "Minas Gerais" },
+  { uf: "PA", name: "Pará" },
+  { uf: "PB", name: "Paraíba" },
+  { uf: "PR", name: "Paraná" },
+  { uf: "PE", name: "Pernambuco" },
+  { uf: "PI", name: "Piauí" },
+  { uf: "RJ", name: "Rio de Janeiro" },
+  { uf: "RN", name: "Rio Grande do Norte" },
+  { uf: "RS", name: "Rio Grande do Sul" },
+  { uf: "RO", name: "Rondônia" },
+  { uf: "RR", name: "Roraima" },
+  { uf: "SC", name: "Santa Catarina" },
+  { uf: "SP", name: "São Paulo" },
+  { uf: "SE", name: "Sergipe" },
+  { uf: "TO", name: "Tocantins" }
+];
 
 // Mock data removido ou mantido apenas como exemplo vazio
 const mockEarningsData = [
@@ -33,8 +64,13 @@ export default function SellerDashboard() {
   const [description, setDescription] = useState("");
   const [pricePS4, setPricePS4] = useState("");
   const [pricePS5, setPricePS5] = useState("");
+  const [estado, setEstado] = useState("");
+  const [cidade, setCidade] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const { data: pgUser } = trpc.auth.me.useQuery(undefined, { enabled: isAuthenticated });
+  const createProductMutation = trpc.usedProducts.create.useMutation();
 
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
@@ -58,6 +94,14 @@ export default function SellerDashboard() {
       toast.warning("Por favor, selecione uma foto do produto.");
       return;
     }
+    if (!estado) {
+      toast.warning("Por favor, selecione um Estado.");
+      return;
+    }
+    if (!cidade.trim()) {
+      toast.warning("Por favor, preencha a Cidade.");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -76,12 +120,32 @@ export default function SellerDashboard() {
         sellerId: user?.id,
         sellerName: user?.name || user?.email,
         status: "Ativo",
+        estado,
+        cidade,
         createdAt: new Date().toISOString()
       });
+
+      // 3. Salvar no Postgres (tRPC)
+      try {
+        await createProductMutation.mutateAsync({
+          name,
+          description,
+          price: pricePS4 ? parseFloat(pricePS4) : (pricePS5 ? parseFloat(pricePS5) : 0),
+          condition: "como_novo",
+          images: [downloadUrl],
+          estado,
+          cidade
+        });
+      } catch (pgErr) {
+        console.warn("[SellerDashboard] Falha ao sincronizar com banco Postgres:", pgErr);
+      }
+
       setName("");
       setDescription("");
       setPricePS4("");
       setPricePS5("");
+      setEstado("");
+      setCidade("");
       setImageFile(null);
       setShowAddForm(false);
       
@@ -145,7 +209,7 @@ export default function SellerDashboard() {
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card className="p-6 card-neon">
             <div className="flex justify-between items-start">
               <div>
@@ -174,6 +238,29 @@ export default function SellerDashboard() {
               </div>
               <Star className="w-8 h-8 text-red-500" />
             </div>
+          </Card>
+          <Card className="p-6 card-neon border-red-500/30 flex flex-col justify-between">
+            <div className="flex justify-between items-start mb-2">
+              <div>
+                <p className="text-slate-400 text-xs mb-1">Saldo Eforte (Postgres)</p>
+                <p className="text-xl font-black text-red-500">
+                  R$ {parseFloat(pgUser?.balance || "0.00").toFixed(2).replace('.', ',')}
+                </p>
+              </div>
+              <Coins className="w-6 h-6 text-red-500 animate-pulse" />
+            </div>
+            <Button 
+              size="sm" 
+              onClick={() => {
+                const amount = parseFloat(pgUser?.balance || "0.00").toFixed(2).replace('.', ',');
+                const text = encodeURIComponent(`Olá! Gostaria de solicitar o saque do meu saldo acumulado de R$ ${amount} no painel da Eforte Games.`);
+                window.open(`https://wa.me/554384253691?text=${text}`, "_blank");
+              }}
+              disabled={parseFloat(pgUser?.balance || "0.00") <= 0}
+              className="w-full mt-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs"
+            >
+              Solicitar Saque (WhatsApp)
+            </Button>
           </Card>
         </div>
 
@@ -269,6 +356,26 @@ export default function SellerDashboard() {
                     <div>
                       <Label className="text-slate-300">Preço PS5 (R$)</Label>
                       <Input type="number" step="0.01" value={pricePS5} onChange={e => setPricePS5(e.target.value)} className="bg-slate-900 border-red-600/30 text-white" placeholder="0.00" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-slate-300">Estado (UF) *</Label>
+                      <select
+                        required
+                        value={estado}
+                        onChange={e => setEstado(e.target.value)}
+                        className="w-full h-10 px-3 py-2 bg-slate-900 border border-red-600/30 rounded-md text-white focus:outline-none focus:ring-1 focus:ring-red-500 text-sm"
+                      >
+                        <option value="">Selecione...</option>
+                        {BRAZIL_STATES.map(st => (
+                          <option key={st.uf} value={st.uf}>{st.name} ({st.uf})</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <Label className="text-slate-300">Cidade *</Label>
+                      <Input required value={cidade} onChange={e => setCidade(e.target.value)} className="bg-slate-900 border-red-600/30 text-white" placeholder="Ex: Londrina" />
                     </div>
                   </div>
                   <div>

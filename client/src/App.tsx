@@ -19,6 +19,7 @@ import MyPurchases from "./pages/MyPurchases";
 import FloatingChat from "./components/FloatingChat";
 import MobileBottomNav from "./components/MobileBottomNav";
 import FAQ from "./pages/FAQ";
+import CPFCompletionModal from "./components/CPFCompletionModal";
 
 import { useEffect } from "react";
 import FortecoinsPage from "./pages/FortecoinsPage";
@@ -70,6 +71,7 @@ function App() {
           <Router />
           <FloatingChat />
           <MobileBottomNav />
+          <CPFCompletionModal />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

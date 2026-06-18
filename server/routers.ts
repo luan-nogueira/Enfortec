@@ -5,7 +5,7 @@ import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
 import { getDb } from "./db";
-import { sellers, products, usedProducts, digitalProducts, orders, reviews } from "../drizzle/schema";
+import { users, sellers, products, usedProducts, digitalProducts, orders, reviews, coupons } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 
 export const appRouter = router({
@@ -19,6 +19,26 @@ export const appRouter = router({
         success: true,
       } as const;
     }),
+    updateProfile: protectedProcedure
+      .input(z.object({
+        cpf: z.string().min(11),
+        name: z.string().optional(),
+        forteCoins: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        
+        const updateData: any = {};
+        if (input.cpf) updateData.cpf = input.cpf.replace(/\D/g, "");
+        if (input.name) updateData.name = input.name;
+        if (input.forteCoins !== undefined) updateData.forteCoins = input.forteCoins;
+        
+        await database.update(users)
+          .set(updateData)
+          .where(eq(users.id, ctx.user.id));
+        return { success: true };
+      }),
   }),
 
   // Products Router - for store's own physical products
@@ -72,6 +92,8 @@ export const appRouter = router({
         price: z.number().positive(),
         condition: z.enum(["novo", "como_novo", "bom", "aceitavel"]),
         images: z.array(z.string()).optional(),
+        estado: z.string().optional(),
+        cidade: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const database = await getDb();
@@ -87,6 +109,8 @@ export const appRouter = router({
           price: input.price.toString(),
           condition: input.condition,
           images: input.images || [],
+          estado: input.estado || null,
+          cidade: input.cidade || null,
         });
         return result;
       }),
@@ -172,6 +196,83 @@ export const appRouter = router({
     getBySellerId: publicProcedure
       .input(z.number())
       .query(({ input }) => db.getReviewsBySellerId(input)),
+  }),
+
+  // Coupons Router
+  coupons: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== 'admin') throw new Error("Unauthorized");
+      return db.getAllCoupons();
+    }),
+    create: protectedProcedure
+      .input(z.object({
+        code: z.string().min(1),
+        discountPercentage: z.string().min(1),
+        maxUses: z.number().nullable().optional(),
+        expiresAt: z.string().nullable().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') throw new Error("Unauthorized");
+        const expiresAtDate = input.expiresAt ? new Date(input.expiresAt) : null;
+        return db.createCoupon({
+          code: input.code.toUpperCase().trim(),
+          discountPercentage: input.discountPercentage,
+          maxUses: input.maxUses ?? null,
+          expiresAt: expiresAtDate,
+          isActive: true,
+        });
+      }),
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        isActive: z.boolean().optional(),
+        code: z.string().optional(),
+        discountPercentage: z.string().optional(),
+        maxUses: z.number().nullable().optional(),
+        expiresAt: z.string().nullable().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') throw new Error("Unauthorized");
+        const updateData: any = {};
+        if (input.isActive !== undefined) updateData.isActive = input.isActive;
+        if (input.code !== undefined) updateData.code = input.code.toUpperCase().trim();
+        if (input.discountPercentage !== undefined) updateData.discountPercentage = input.discountPercentage;
+        if (input.maxUses !== undefined) updateData.maxUses = input.maxUses;
+        if (input.expiresAt !== undefined) {
+          updateData.expiresAt = input.expiresAt ? new Date(input.expiresAt) : null;
+        }
+        return db.updateCoupon(input.id, updateData);
+      }),
+    delete: protectedProcedure
+      .input(z.number())
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') throw new Error("Unauthorized");
+        return db.deleteCoupon(input);
+      }),
+    validate: publicProcedure
+      .input(z.object({
+        code: z.string(),
+      }))
+      .mutation(async ({ input }) => {
+        const coupon = await db.getCouponByCode(input.code.toUpperCase().trim());
+        if (!coupon) throw new Error("Cupom inválido ou inativo");
+        
+        // Expiration check
+        if (coupon.expiresAt && new Date(coupon.expiresAt).getTime() < Date.now()) {
+          throw new Error("Cupom expirado");
+        }
+        
+        // Max uses check
+        if (coupon.maxUses !== null && (coupon.usedCount || 0) >= coupon.maxUses) {
+          throw new Error("Cupom esgotado (limite de usos atingido)");
+        }
+        
+        return {
+          id: coupon.id,
+          code: coupon.code,
+          discountPercentage: parseFloat(coupon.discountPercentage),
+        };
+      }),
   }),
 });
 

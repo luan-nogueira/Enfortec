@@ -4,6 +4,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
 
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
@@ -32,6 +33,40 @@ export function useAuth(options?: UseAuthOptions) {
     isCollaborator: false,
   });
 
+  const pgUserQuery = trpc.auth.me.useQuery(undefined, {
+    enabled: state.isAuthenticated && !!auth.currentUser,
+    refetchInterval: 5000,
+  });
+  const pgUser = pgUserQuery.data;
+
+  useEffect(() => {
+    if (state.isAuthenticated && pgUser && auth.currentUser) {
+      const userRef = doc(db, "users", auth.currentUser.uid);
+      getDoc(userRef).then(async (userDoc) => {
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          const updates: any = {};
+          let hasUpdates = false;
+
+          if (pgUser.forteCoins !== undefined && pgUser.forteCoins !== userData.forteCoins) {
+            updates.forteCoins = pgUser.forteCoins;
+            hasUpdates = true;
+          }
+
+          if (pgUser.cpf !== undefined && pgUser.cpf !== userData.cpf) {
+            updates.cpf = pgUser.cpf;
+            hasUpdates = true;
+          }
+
+          if (hasUpdates) {
+            console.log("[Sync] Sincronizando dados Postgres -> Firestore:", updates);
+            await setDoc(userRef, updates, { merge: true });
+          }
+        }
+      });
+    }
+  }, [pgUser, state.isAuthenticated]);
+
   useEffect(() => {
     let unsubscribeUserDoc: (() => void) | null = null;
 
@@ -56,7 +91,7 @@ export function useAuth(options?: UseAuthOptions) {
                   name: user.displayName || user.email?.split('@')[0],
                   role: "user",
                   createdAt: new Date().toISOString(),
-                  forteCoins: 0,
+                  forteCoins: 10,
                   referredBy: validReferrer,
                   loginMethod: isGoogleUser ? "google.com" : "email/password"
                 };
@@ -98,7 +133,7 @@ export function useAuth(options?: UseAuthOptions) {
               const updateFields: any = {};
               
               if (userData?.forteCoins === undefined) {
-                updateFields.forteCoins = 0;
+                updateFields.forteCoins = 10;
                 needsUpdate = true;
               }
 
@@ -129,6 +164,7 @@ export function useAuth(options?: UseAuthOptions) {
                   name: userData?.name || user.email, 
                   email: user.email,
                   forteCoins: finalForteCoins,
+                  cpf: userData?.cpf || null,
                   referredBy: userData?.referredBy || null,
                   loginMethod: finalLoginMethod
                 },
@@ -143,7 +179,7 @@ export function useAuth(options?: UseAuthOptions) {
           } catch (err: any) {
             console.error("Erro ao buscar dados do usuário:", err);
             setState({
-              user: { id: user.uid, name: user.displayName || user.email, email: user.email, forteCoins: 0, referredBy: null, loginMethod: "email/password" },
+              user: { id: user.uid, name: user.displayName || user.email, email: user.email, forteCoins: 10, cpf: null, referredBy: null, loginMethod: "email/password" },
               role: "user",
               loading: false,
               error: err,

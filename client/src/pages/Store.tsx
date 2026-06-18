@@ -7,6 +7,7 @@ import { Search, ShoppingCart, ArrowLeft, Flame, Package, Check, X, Coins } from
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
 import {
   Dialog,
   DialogContent,
@@ -32,12 +33,43 @@ export default function Store() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [useCoins, setUseCoins] = useState(false);
 
+  // Estados para cupons no checkout
+  const [couponCode, setCouponCode] = useState("");
+  const [discountPercentage, setDiscountPercentage] = useState(0);
+  const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+
+  const validateCouponMutation = trpc.coupons.validate.useMutation();
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setCouponError(null);
+    setIsValidatingCoupon(true);
+    try {
+      const res = await validateCouponMutation.mutateAsync({ code: couponCode });
+      setDiscountPercentage(res.discountPercentage);
+      setAppliedCoupon(res.code);
+      toast.success(`Cupom ${res.code} aplicado com sucesso!`);
+    } catch (err: any) {
+      setCouponError(err.message || "Cupom inválido.");
+      setDiscountPercentage(0);
+      setAppliedCoupon(null);
+    } finally {
+      setIsValidatingCoupon(false);
+    }
+  };
+
   useEffect(() => {
     if (selectedProduct) {
       setCustomerName(user?.name || "");
       setCustomerEmail(user?.email || "");
       setCustomerPhone(localStorage.getItem("customerPhone") || "");
       setUseCoins(false);
+      setCouponCode("");
+      setDiscountPercentage(0);
+      setAppliedCoupon(null);
+      setCouponError(null);
     }
   }, [selectedProduct, user]);
 
@@ -149,6 +181,7 @@ export default function Store() {
           productId: selectedProduct.id,
           sellerId: null,
           coinsToUse: coinsToUse,
+          couponCode: appliedCoupon || undefined,
           customer: {
             name: customerName,
             email: customerEmail,
@@ -226,8 +259,11 @@ export default function Store() {
   const price = chosenVersion 
     ? (chosenVersion === "PS4" ? selectedProduct?.pricePS4 : selectedProduct?.pricePS5) || 0
     : 0;
-  const coinsToUseVal = useCoins ? Math.min(user?.forteCoins || 0, Math.ceil(price * 10)) : 0;
+  const couponDiscount = appliedCoupon ? price * (discountPercentage / 100) : 0;
+  const priceAfterCoupon = Math.max(0, price - couponDiscount);
+  const coinsToUseVal = useCoins ? Math.min(user?.forteCoins || 0, Math.ceil(priceAfterCoupon * 10)) : 0;
   const coinDiscount = coinsToUseVal * 0.10;
+  const finalPriceVal = Math.max(0, priceAfterCoupon - coinDiscount);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900">
@@ -491,6 +527,45 @@ export default function Store() {
                   </div>
                 </div>
 
+                {/* Cupom de Desconto */}
+                <div className="bg-slate-950/40 border border-slate-800 rounded-xl p-3.5 space-y-2.5 mt-4 animate-in fade-in duration-200">
+                  <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Cupom de Desconto</label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Ex: EFORTE10"
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                      className="bg-slate-950 border-slate-800 focus-visible:ring-red-600 h-10"
+                      disabled={!!appliedCoupon}
+                    />
+                    {appliedCoupon ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setAppliedCoupon(null);
+                          setDiscountPercentage(0);
+                          setCouponCode("");
+                        }}
+                        className="border-red-600/30 text-red-500 hover:bg-red-950 h-10 px-4 text-xs font-bold"
+                      >
+                        Remover
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        onClick={handleApplyCoupon}
+                        disabled={isValidatingCoupon || !couponCode.trim()}
+                        className="bg-red-600 hover:bg-red-700 text-white font-bold h-10 px-4 text-xs"
+                      >
+                        {isValidatingCoupon ? "..." : "Aplicar"}
+                      </Button>
+                    )}
+                  </div>
+                  {couponError && <p className="text-red-400 text-[10px] mt-1">❌ {couponError}</p>}
+                  {appliedCoupon && <p className="text-green-400 text-[10px] mt-1">✅ Cupom {appliedCoupon} aplicado: {discountPercentage}% de desconto!</p>}
+                </div>
+
                 {isAuthenticated && user?.forteCoins > 0 && (
                   <div className="bg-red-950/20 border border-red-500/20 rounded-xl p-3.5 space-y-2.5 mt-4">
                     <label className="flex items-center gap-2.5 cursor-pointer select-none">
@@ -519,6 +594,12 @@ export default function Store() {
                     <span>Subtotal:</span>
                     <span>R$ {price.toFixed(2)}</span>
                   </div>
+                  {couponDiscount > 0 && (
+                    <div className="flex justify-between text-sm text-green-500">
+                      <span>Desconto Cupom ({discountPercentage}%):</span>
+                      <span>- R$ {couponDiscount.toFixed(2)}</span>
+                    </div>
+                  )}
                   {useCoins && coinDiscount > 0 && (
                     <div className="flex justify-between text-sm text-red-500">
                       <span>Desconto ForteCoins:</span>
@@ -527,7 +608,7 @@ export default function Store() {
                   )}
                   <div className="flex justify-between text-lg font-black text-white mt-1 pt-1 border-t border-slate-800">
                     <span>Total Final:</span>
-                    <span>R$ {Math.max(0, price - coinDiscount).toFixed(2)}</span>
+                    <span>R$ {finalPriceVal.toFixed(2)}</span>
                   </div>
                 </div>
               </div>

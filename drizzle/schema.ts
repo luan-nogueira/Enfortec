@@ -24,6 +24,8 @@ export const users = pgTable("users", {
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
+  cpf: varchar("cpf", { length: 18 }),
+  forteCoins: integer("forteCoins").default(10).notNull(),
   role: roleEnum("role").default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => new Date()),
@@ -79,6 +81,8 @@ export const usedProducts = pgTable("usedProducts", {
   condition: conditionEnum("condition").notNull(),
   images: json("images").$type<string[]>().default([]),
   status: usedStatusEnum("status").default("pendente"),
+  estado: varchar("estado", { length: 50 }),
+  cidade: varchar("cidade", { length: 100 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => new Date()),
 });

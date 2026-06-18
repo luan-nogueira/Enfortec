@@ -237,7 +237,7 @@ export default function FortecoinsPage() {
                 <div>
                   <h3 className="text-lg font-bold text-white">Indique amigos & Ganhe Prêmios</h3>
                   <p className="text-slate-400 text-sm mt-1">
-                    Ganhe <strong className="text-red-500 font-bold">100 Fortecoins</strong> para cada amigo convidado que se cadastrar e realizar a compra de um jogo!
+                    Ganhe <strong className="text-red-500 font-bold">15 Fortecoins</strong> para cada amigo convidado que se cadastrar e realizar a compra de um jogo!
                   </p>
                 </div>
               </div>
@@ -267,7 +267,7 @@ export default function FortecoinsPage() {
               </div>
               <div>
                 <span className="block text-red-500 font-bold text-base mb-0.5">3</span>
-                <span>Ganhe +100 Fortecoins</span>
+                <span>Ganhe +15 Fortecoins</span>
               </div>
             </div>
           </Card>
@@ -344,7 +344,7 @@ export default function FortecoinsPage() {
                       ) : (
                         <span className="flex items-center gap-1 text-[10px] bg-green-500/10 text-green-500 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider border border-green-500/20">
                           <CheckCircle className="w-3 h-3" />
-                          Pago (+100 FC)
+                          Pago (+15 FC)
                         </span>
                       )}
                     </div>

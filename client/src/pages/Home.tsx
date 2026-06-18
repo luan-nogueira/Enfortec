@@ -2,7 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocation } from "wouter";
-import { Zap, Gamepad2, Search, Shield, Package, LayoutGrid, Tag, Coins, LogOut, HelpCircle, Home as HomeIcon } from "lucide-react";
+import { Zap, Gamepad2, Search, Shield, Package, LayoutGrid, Tag, Coins, LogOut, HelpCircle, Home as HomeIcon, Instagram } from "lucide-react";
 import { getLoginUrl } from "@/const";
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
@@ -297,6 +297,19 @@ export default function Home() {
           <p className="text-slate-500 mb-6 max-w-md mx-auto">
             Plataforma segura para negociações de jogos, gift cards e produtos físicos. O dinheiro só é liberado após a confirmação do comprador.
           </p>
+          
+          <div className="flex justify-center gap-4 mb-6">
+            <a 
+              href="https://www.instagram.com/efortegamesdigitais_?igsh=dnl0NW56aHlna29m" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-slate-400 hover:text-red-500 transition-all duration-300 group bg-slate-900/60 border border-slate-800 hover:border-red-600/30 px-5 py-2.5 rounded-xl hover:shadow-[0_0_15px_rgba(239,68,68,0.15)]"
+            >
+              <Instagram className="w-5 h-5 text-red-500 group-hover:scale-110 transition-transform duration-300" />
+              <span className="text-sm font-semibold tracking-wide">@efortegamesdigitais_</span>
+            </a>
+          </div>
+
           <div className="text-slate-600 text-sm">
             <p>&copy; 2026 EFORTE GAMES. Todos os direitos reservados.</p>
           </div>
