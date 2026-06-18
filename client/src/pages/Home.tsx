@@ -2,11 +2,76 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocation } from "wouter";
-import { Zap, Gamepad2, Search, Shield, Package, LayoutGrid, Tag, Coins, LogOut, HelpCircle, Home as HomeIcon, Instagram } from "lucide-react";
+import { Zap, Gamepad2, Search, Shield, Package, LayoutGrid, Tag, Coins, LogOut, HelpCircle, Home as HomeIcon, Instagram, ChevronLeft, ChevronRight } from "lucide-react";
 import { getLoginUrl } from "@/const";
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, query, orderBy, limit } from "firebase/firestore";
+
+const DEFAULT_BANNERS = [
+  {
+    id: "default-fortecoins",
+    title: "💰 Sistema de Fidelidade ForteCoins!",
+    description: "Indique amigos e ganhe 15 ForteCoins! Use suas moedas para resgatar Gift Cards de R$50 e R$100 na nossa loja.",
+    imageUrl: "https://images.unsplash.com/photo-1621761191319-c6fb62004040?q=80&w=1200",
+    link: "/fortecoins",
+    expiresAt: null
+  },
+  {
+    id: "default-digital",
+    title: "🎮 Os Melhores Jogos em Mídia Digital",
+    description: "Ativação rápida e segura. Compre Gift Cards e jogos de PS4/PS5 no precinho com cashback de 7 ForteCoins por compra!",
+    imageUrl: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200",
+    link: "/digital",
+    expiresAt: null
+  },
+  {
+    id: "default-usados",
+    title: "📦 Desapegos e Produtos Físicos Usados",
+    description: "Filtre produtos por Estado (UF) e compre com segurança via saldo garantido em escrow da Eforte Games.",
+    imageUrl: "https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?q=80&w=1200",
+    link: "/usados",
+    expiresAt: null
+  }
+];
+
+function BannerCountdown({ expiresAt }: { expiresAt: string }) {
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+
+  useEffect(() => {
+    const calculateTime = () => {
+      const difference = +new Date(expiresAt) - +new Date();
+      if (difference <= 0) {
+        return { days: 0, hours: 0, minutes: 0, seconds: 0 };
+      }
+      return {
+        days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((difference / 1000 / 60) % 60),
+        seconds: Math.floor((difference / 1000) % 60),
+      };
+    };
+
+    setTimeLeft(calculateTime());
+    const timer = setInterval(() => {
+      setTimeLeft(calculateTime());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [expiresAt]);
+
+  const padZero = (n: number) => n.toString().padStart(2, "0");
+
+  return (
+    <div className="inline-flex gap-2 items-center bg-red-600/30 backdrop-blur-md px-3 py-1.5 rounded-lg border border-red-500/30 text-white font-bold text-[10px] sm:text-xs">
+      <span>OFERTA TERMINA EM:</span>
+      <span className="bg-slate-950/80 px-2 py-0.5 rounded text-red-500 font-mono">{timeLeft.days}D</span>
+      <span className="bg-slate-950/80 px-2 py-0.5 rounded text-red-500 font-mono">{padZero(timeLeft.hours)}h</span>
+      <span className="bg-slate-950/80 px-2 py-0.5 rounded text-red-500 font-mono">{padZero(timeLeft.minutes)}m</span>
+      <span className="bg-slate-950/80 px-2 py-0.5 rounded text-red-500 font-mono">{padZero(timeLeft.seconds)}s</span>
+    </div>
+  );
+}
 
 export default function Home() {
   const { user, isAuthenticated, isAdmin, isCollaborator, logout } = useAuth();
@@ -16,6 +81,44 @@ export default function Home() {
   const [digitalProducts, setDigitalProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [heroSearch, setHeroSearch] = useState("");
+
+  const [promos, setPromos] = useState<any[]>([]);
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  useEffect(() => {
+    const qPromos = query(collection(db, "promos"), orderBy("createdAt", "desc"));
+    const unsubPromos = onSnapshot(qPromos, (snapshot) => {
+      const data = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter((p: any) => p.isActive !== false);
+      setPromos(data);
+    }, (error) => {
+      console.error("Erro ao buscar promos na Home:", error);
+    });
+    return () => unsubPromos();
+  }, []);
+
+  const activeBanners = promos.length > 0 ? promos : DEFAULT_BANNERS;
+
+  useEffect(() => {
+    if (activeBanners.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentSlide(prev => (prev + 1) % activeBanners.length);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [activeBanners.length]);
+
+  useEffect(() => {
+    setCurrentSlide(0);
+  }, [activeBanners.length]);
+
+  const nextSlide = () => {
+    setCurrentSlide(prev => (prev + 1) % activeBanners.length);
+  };
+
+  const prevSlide = () => {
+    setCurrentSlide(prev => (prev - 1 + activeBanners.length) % activeBanners.length);
+  };
 
   useEffect(() => {
     // Buscar usados
@@ -143,21 +246,102 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* Hero / Search Section */}
-      <section className="relative pt-10 sm:pt-20 pb-8 sm:pb-16 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-red-900/20 to-slate-950 z-0 pointer-events-none"></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-red-600/20 blur-[120px] rounded-full pointer-events-none"></div>
-        
-        <div className="container mx-auto px-4 relative z-10 text-center">
-          <h1 className="text-xl sm:text-4xl md:text-6xl font-black mb-2 sm:mb-6 text-white leading-tight">
-            O Maior Marketplace Gamer
-          </h1>
-          <p className="text-xs sm:text-lg md:text-xl text-slate-400 mb-4 sm:mb-10 max-w-2xl mx-auto">
-            Compre e venda jogos, gift cards e produtos físicos. 
-            <strong className="text-red-400 font-semibold ml-1">Pagamento 100% Seguro.</strong>
-          </p>
+      {/* Hero Banner Carousel Section */}
+      <section className="relative pt-6 pb-8 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-red-900/10 to-slate-950 z-0 pointer-events-none"></div>
+        <div className="container mx-auto px-4 relative z-10">
           
-          <div className="max-w-3xl mx-auto flex flex-col sm:flex-row gap-2 relative">
+          {/* Banner Carousel Container */}
+          <div className="relative w-full h-[240px] sm:h-[380px] md:h-[420px] bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-[0_0_30px_rgba(0,0,0,0.5)] group/carousel">
+            
+            {/* Slides */}
+            {activeBanners.map((banner, index) => (
+              <div
+                key={banner.id}
+                onClick={() => navigate(banner.link || "/")}
+                className={`absolute inset-0 w-full h-full cursor-pointer transition-all duration-700 ease-in-out ${
+                  index === currentSlide ? "opacity-100 scale-100 z-10" : "opacity-0 scale-95 pointer-events-none z-0"
+                }`}
+              >
+                {/* Background Image */}
+                {banner.imageUrl ? (
+                  <img
+                    src={banner.imageUrl}
+                    alt={banner.title}
+                    className="w-full h-full object-cover brightness-[0.35] group-hover/carousel:scale-[1.01] transition-transform duration-700"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-red-950 to-slate-900" />
+                )}
+
+                {/* Content Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent flex flex-col justify-end p-6 sm:p-10 text-left">
+                  <div className="max-w-2xl space-y-2 sm:space-y-3">
+                    {/* Countdown Timer if available */}
+                    {banner.expiresAt && <BannerCountdown expiresAt={banner.expiresAt} />}
+                    
+                    <h2 className="text-lg sm:text-2xl md:text-4xl font-black text-white leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                      {banner.title}
+                    </h2>
+                    <p className="text-[10px] sm:text-xs md:text-sm text-slate-300 line-clamp-2 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] max-w-xl">
+                      {banner.description || banner.title}
+                    </p>
+                    
+                    <div className="pt-1">
+                      <Button className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-1.5 sm:px-5 sm:py-2.5 text-[10px] sm:text-xs rounded-xl shadow-[0_0_15px_rgba(220,38,38,0.4)] transition-all hover:scale-105">
+                        Aproveitar Oferta
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* Navigation Arrows */}
+            {activeBanners.length > 1 && (
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    prevSlide();
+                  }}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-950/60 hover:bg-red-600/90 text-white flex items-center justify-center border border-slate-805 hover:border-red-500/30 backdrop-blur-sm transition-all duration-300 opacity-0 group-hover/carousel:opacity-100 z-20"
+                >
+                  <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    nextSlide();
+                  }}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-950/60 hover:bg-red-600/90 text-white flex items-center justify-center border border-slate-805 hover:border-red-500/30 backdrop-blur-sm transition-all duration-300 opacity-0 group-hover/carousel:opacity-100 z-20"
+                >
+                  <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
+                </button>
+              </>
+            )}
+
+            {/* Dot Indicators */}
+            {activeBanners.length > 1 && (
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
+                {activeBanners.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentSlide(i);
+                    }}
+                    className={`w-1.5 h-1.5 rounded-full transition-all ${
+                      i === currentSlide ? "bg-red-500 w-4" : "bg-slate-500/60 hover:bg-slate-400"
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Search bar below the banner */}
+          <div className="max-w-3xl mx-auto mt-6 flex flex-col sm:flex-row gap-2 relative">
             <div className="relative w-full">
               <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-6 sm:h-6 text-slate-500" />
               <Input 
@@ -166,7 +350,7 @@ export default function Home() {
                 value={heroSearch}
                 onChange={(e) => setHeroSearch(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && heroSearch.trim()) navigate(`/digital?search=${encodeURIComponent(heroSearch.trim())}`); }}
-                className="w-full h-11 sm:h-16 pl-9 sm:pl-14 pr-4 bg-slate-900/80 border-slate-700 text-white text-sm sm:text-lg rounded-xl focus:border-red-500 focus:ring-red-500/20 shadow-xl"
+                className="w-full h-11 sm:h-16 pl-9 sm:pl-14 pr-4 bg-slate-900/80 border-slate-800 text-white text-sm sm:text-lg rounded-xl focus:border-red-500 focus:ring-red-500/20 shadow-xl"
               />
             </div>
             <Button
@@ -176,6 +360,7 @@ export default function Home() {
               Buscar
             </Button>
           </div>
+
         </div>
       </section>
 
