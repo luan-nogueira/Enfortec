@@ -105,7 +105,7 @@ export default function Login() {
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md card-neon bg-slate-900 border border-red-700/30 p-8 rounded-xl shadow-2xl">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center text-xl mb-4">🔥</div>
+          <img src="/logo.png" alt="Eforte Games Logo" className="w-12 h-12 object-contain rounded-lg border border-slate-800 bg-slate-950 mb-4 shadow-[0_0_15px_rgba(220,38,38,0.25)]" />
           <h1 className="text-3xl font-black text-neon text-center">
             EFORTE GAMES
           </h1>

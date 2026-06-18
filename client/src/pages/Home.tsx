@@ -193,7 +193,7 @@ export default function Home() {
       <nav className="bg-slate-950/95 backdrop-blur-md border-b border-red-700/20 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-3 flex justify-between items-center">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate("/")}>
-            <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(220,38,38,0.5)]">🔥</div>
+            <img src="/logo.png" alt="Eforte Games Logo" className="w-10 h-10 object-contain rounded-lg shadow-[0_0_15px_rgba(220,38,38,0.3)] border border-slate-800 bg-slate-950" />
             <span className="text-2xl font-black text-white tracking-tight">EFORTE<span className="text-red-500">GAMES</span></span>
           </div>
           
@@ -489,7 +489,7 @@ export default function Home() {
       <footer className="bg-slate-950 border-t border-slate-800 py-12 mt-10 pb-28 lg:pb-12">
         <div className="container mx-auto px-4 text-center">
           <div className="flex items-center justify-center gap-2 mb-6">
-            <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center">🔥</div>
+            <img src="/logo.png" alt="Eforte Games Logo" className="w-8 h-8 object-contain rounded-lg border border-slate-800 bg-slate-950" />
             <span className="text-xl font-bold text-white">EFORTE<span className="text-red-500">GAMES</span></span>
           </div>
           <p className="text-slate-500 mb-6 max-w-md mx-auto">
