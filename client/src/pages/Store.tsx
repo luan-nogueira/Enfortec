@@ -60,6 +60,8 @@ export default function Store() {
     }
   };
 
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+
   useEffect(() => {
     if (selectedProduct) {
       setCustomerName(user?.name || "");
@@ -70,6 +72,7 @@ export default function Store() {
       setDiscountPercentage(0);
       setAppliedCoupon(null);
       setCouponError(null);
+      setAcceptedTerms(false);
     }
   }, [selectedProduct, user]);
 
@@ -589,6 +592,21 @@ export default function Store() {
                   </div>
                 )}
                 
+                {/* Termos de Compra */}
+                <div className="bg-slate-950/40 border border-slate-800 rounded-xl p-3.5 mt-4">
+                  <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={acceptedTerms}
+                      onChange={(e) => setAcceptedTerms(e.target.checked)}
+                      className="w-4 h-4 mt-0.5 rounded border-slate-700 bg-slate-800 text-red-600 focus:ring-red-500"
+                    />
+                    <span className="text-xs text-slate-300 leading-relaxed text-left">
+                      Li e concordo com os <strong className="text-white">Termos de Compra</strong> da Eforte Games. Declaro estar ciente de que a entrega dos dados de acesso ou chave digital ocorrerá em meu painel em até 24 horas úteis.
+                    </span>
+                  </label>
+                </div>
+
                 <div className="pt-2">
                   <div className="flex justify-between text-sm text-slate-400">
                     <span>Subtotal:</span>
@@ -622,9 +640,9 @@ export default function Store() {
               </div>
             )}
             <Button 
-              disabled={!chosenVersion || isProcessingCheckout}
+              disabled={!chosenVersion || isProcessingCheckout || !acceptedTerms}
               onClick={handleFinalizePurchase}
-              className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-12 text-lg btn-neon"
+              className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-12 text-lg btn-neon disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isProcessingCheckout ? "Gerando pagamento..." : "Confirmar e Ir para Checkout"}
             </Button>

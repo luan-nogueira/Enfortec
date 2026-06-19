@@ -35,6 +35,25 @@ const DEFAULT_BANNERS = [
   }
 ];
 
+const DEFAULT_SIDEBAR_TOP = {
+  id: "default-sidebar-top",
+  title: "💥 Revenda seus Jogos Usados!",
+  description: "Anuncie e desapegue daquele jogo antigo de PS4/PS5 com total segurança de escrow da Eforte Games.",
+  imageUrl: "https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?q=80&w=600",
+  link: "/virar-vendedor",
+  expiresAt: null
+};
+
+const DEFAULT_SIDEBAR_BOTTOM = {
+  id: "default-sidebar-bottom",
+  title: "🎁 Resgate Gift Cards com ForteCoins!",
+  description: "Troque suas moedas por códigos Steam, PSN e Xbox na nossa loja de prêmios.",
+  imageUrl: "https://images.unsplash.com/photo-1621761191319-c6fb62004040?q=80&w=600",
+  link: "/fortecoins",
+  expiresAt: null
+};
+
+
 function BannerCountdown({ expiresAt }: { expiresAt: string }) {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
@@ -98,9 +117,14 @@ export default function Home() {
     return () => unsubPromos();
   }, []);
 
+  // Filter promos by position
+  const mainPromos = promos.filter((p: any) => p.position === "main" || !p.position);
+  const sidebarTopPromo = promos.find((p: any) => p.position === "sidebar_top");
+  const sidebarBottomPromo = promos.find((p: any) => p.position === "sidebar_bottom");
+
   // Mix dynamic games from the database into the slides as requested by the user
   const activeBanners = [
-    ...promos,
+    ...mainPromos,
     ...digitalProducts.slice(0, 5).map(game => ({
       id: `game-banner-${game.id}`,
       title: game.name,
@@ -112,6 +136,9 @@ export default function Home() {
   ];
 
   const finalBanners = activeBanners.length > 0 ? activeBanners : DEFAULT_BANNERS;
+
+  const sidebarTopBanner = sidebarTopPromo || DEFAULT_SIDEBAR_TOP;
+  const sidebarBottomBanner = sidebarBottomPromo || DEFAULT_SIDEBAR_BOTTOM;
 
   useEffect(() => {
     if (finalBanners.length <= 1) return;
@@ -264,93 +291,148 @@ export default function Home() {
         <div className="absolute inset-0 bg-gradient-to-b from-red-900/10 to-slate-950 z-0 pointer-events-none"></div>
         <div className="container mx-auto px-4 relative z-10">
           
-          {/* Banner Carousel Container */}
-          <div className="relative w-full h-[240px] sm:h-[380px] md:h-[420px] bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-[0_0_30px_rgba(0,0,0,0.5)] group/carousel">
-            
-            {/* Slides */}
-            {finalBanners.map((banner, index) => (
-              <div
-                key={banner.id}
-                onClick={() => navigate(banner.link || "/")}
-                className={`absolute inset-0 w-full h-full cursor-pointer transition-all duration-700 ease-in-out ${
-                  index === currentSlide ? "opacity-100 scale-100 z-10" : "opacity-0 scale-95 pointer-events-none z-0"
-                }`}
-              >
-                {/* Background Image */}
-                {banner.imageUrl ? (
-                  <img
-                    src={banner.imageUrl}
-                    alt={banner.title}
-                    className="w-full h-full object-cover brightness-[0.35] group-hover/carousel:scale-[1.01] transition-transform duration-700"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-red-950 to-slate-900" />
-                )}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Left side: Banner Carousel Container */}
+            <div className="lg:col-span-2 relative w-full h-[240px] sm:h-[380px] md:h-[420px] bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-[0_0_30px_rgba(0,0,0,0.5)] group/carousel">
+              
+              {/* Slides */}
+              {finalBanners.map((banner, index) => (
+                <div
+                  key={banner.id}
+                  onClick={() => navigate(banner.link || "/")}
+                  className={`absolute inset-0 w-full h-full cursor-pointer transition-all duration-700 ease-in-out ${
+                    index === currentSlide ? "opacity-100 scale-100 z-10" : "opacity-0 scale-95 pointer-events-none z-0"
+                  }`}
+                >
+                  {/* Background Image */}
+                  {banner.imageUrl ? (
+                    <img
+                      src={banner.imageUrl}
+                      alt={banner.title}
+                      className="w-full h-full object-cover brightness-[0.35] group-hover/carousel:scale-[1.01] transition-transform duration-700"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-red-950 to-slate-900" />
+                  )}
 
-                {/* Content Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent flex flex-col justify-end p-6 sm:p-10 text-left">
-                  <div className="max-w-2xl space-y-2 sm:space-y-3">
-                    {/* Countdown Timer if available */}
-                    {banner.expiresAt && <BannerCountdown expiresAt={banner.expiresAt} />}
-                    
-                    <h2 className="text-lg sm:text-2xl md:text-4xl font-black text-white leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-                      {banner.title}
-                    </h2>
-                    <p className="text-[10px] sm:text-xs md:text-sm text-slate-300 line-clamp-2 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] max-w-xl">
-                      {banner.description || banner.title}
-                    </p>
-                    
-                    <div className="pt-1">
-                      <Button className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-1.5 sm:px-5 sm:py-2.5 text-[10px] sm:text-xs rounded-xl shadow-[0_0_15px_rgba(220,38,38,0.4)] transition-all hover:scale-105">
-                        Aproveitar Oferta
-                      </Button>
+                  {/* Content Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent flex flex-col justify-end p-6 sm:p-10 text-left">
+                    <div className="max-w-2xl space-y-2 sm:space-y-3">
+                      {/* Countdown Timer if available */}
+                      {banner.expiresAt && <BannerCountdown expiresAt={banner.expiresAt} />}
+                      
+                      <h2 className="text-lg sm:text-2xl md:text-4xl font-black text-white leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                        {banner.title}
+                      </h2>
+                      <p className="text-[10px] sm:text-xs md:text-sm text-slate-300 line-clamp-2 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] max-w-xl">
+                        {banner.description || banner.title}
+                      </p>
+                      
+                      <div className="pt-1">
+                        <Button className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-1.5 sm:px-5 sm:py-2.5 text-[10px] sm:text-xs rounded-xl shadow-[0_0_15px_rgba(220,38,38,0.4)] transition-all hover:scale-105">
+                          Aproveitar Oferta
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
 
-            {/* Navigation Arrows */}
-            {finalBanners.length > 1 && (
-              <>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    prevSlide();
-                  }}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-950/60 hover:bg-red-600/90 text-white flex items-center justify-center border border-slate-805 hover:border-red-500/30 backdrop-blur-sm transition-all duration-300 opacity-0 group-hover/carousel:opacity-100 z-20"
-                >
-                  <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    nextSlide();
-                  }}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-950/60 hover:bg-red-600/90 text-white flex items-center justify-center border border-slate-805 hover:border-red-500/30 backdrop-blur-sm transition-all duration-300 opacity-0 group-hover/carousel:opacity-100 z-20"
-                >
-                  <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-              </>
-            )}
-
-            {/* Dot Indicators */}
-            {finalBanners.length > 1 && (
-              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
-                {finalBanners.map((_, i) => (
+              {/* Navigation Arrows */}
+              {finalBanners.length > 1 && (
+                <>
                   <button
-                    key={i}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setCurrentSlide(i);
+                      prevSlide();
                     }}
-                    className={`w-1.5 h-1.5 rounded-full transition-all ${
-                      i === currentSlide ? "bg-red-500 w-4" : "bg-slate-500/60 hover:bg-slate-400"
-                    }`}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-950/60 hover:bg-red-600/90 text-white flex items-center justify-center border border-slate-805 hover:border-red-500/30 backdrop-blur-sm transition-all duration-300 opacity-0 group-hover/carousel:opacity-100 z-20"
+                  >
+                    <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      nextSlide();
+                    }}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-950/60 hover:bg-red-600/90 text-white flex items-center justify-center border border-slate-805 hover:border-red-500/30 backdrop-blur-sm transition-all duration-300 opacity-0 group-hover/carousel:opacity-100 z-20"
+                  >
+                    <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </button>
+                </>
+              )}
+
+              {/* Dot Indicators */}
+              {finalBanners.length > 1 && (
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
+                  {finalBanners.map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCurrentSlide(i);
+                      }}
+                      className={`w-1.5 h-1.5 rounded-full transition-all ${
+                        i === currentSlide ? "bg-red-500 w-4" : "bg-slate-500/60 hover:bg-slate-400"
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Right side: Sidebar Banners */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4 lg:h-[420px]">
+              {/* Top Banner Card */}
+              <div
+                onClick={() => navigate(sidebarTopBanner.link || "/")}
+                className="relative h-[130px] sm:h-[180px] lg:h-auto lg:flex-1 bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-lg hover:border-red-500/30 hover:shadow-[0_0_20px_rgba(220,38,38,0.1)] transition-all duration-300 group/sidebar cursor-pointer flex flex-col justify-end p-5"
+              >
+                {sidebarTopBanner.imageUrl ? (
+                  <img
+                    src={sidebarTopBanner.imageUrl}
+                    alt={sidebarTopBanner.title}
+                    className="absolute inset-0 w-full h-full object-cover brightness-[0.4] group-hover/sidebar:scale-[1.02] transition-transform duration-500"
                   />
-                ))}
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-br from-red-950 to-slate-900" />
+                )}
+                <div className="relative z-10 space-y-1 text-left">
+                  {sidebarTopBanner.expiresAt && <BannerCountdown expiresAt={sidebarTopBanner.expiresAt} />}
+                  <h3 className="text-sm sm:text-base lg:text-lg font-black text-white leading-tight drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.8)]">
+                    {sidebarTopBanner.title}
+                  </h3>
+                  <p className="text-[10px] sm:text-xs text-slate-350 line-clamp-2 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] max-w-md">
+                    {sidebarTopBanner.description || sidebarTopBanner.title}
+                  </p>
+                </div>
               </div>
-            )}
+
+              {/* Bottom Banner Card */}
+              <div
+                onClick={() => navigate(sidebarBottomBanner.link || "/")}
+                className="relative h-[130px] sm:h-[180px] lg:h-auto lg:flex-1 bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-lg hover:border-red-500/30 hover:shadow-[0_0_20px_rgba(220,38,38,0.1)] transition-all duration-300 group/sidebar cursor-pointer flex flex-col justify-end p-5"
+              >
+                {sidebarBottomBanner.imageUrl ? (
+                  <img
+                    src={sidebarBottomBanner.imageUrl}
+                    alt={sidebarBottomBanner.title}
+                    className="absolute inset-0 w-full h-full object-cover brightness-[0.4] group-hover/sidebar:scale-[1.02] transition-transform duration-500"
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-br from-red-950 to-slate-900" />
+                )}
+                <div className="relative z-10 space-y-1 text-left">
+                  {sidebarBottomBanner.expiresAt && <BannerCountdown expiresAt={sidebarBottomBanner.expiresAt} />}
+                  <h3 className="text-sm sm:text-base lg:text-lg font-black text-white leading-tight drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.8)]">
+                    {sidebarBottomBanner.title}
+                  </h3>
+                  <p className="text-[10px] sm:text-xs text-slate-350 line-clamp-2 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] max-w-md">
+                    {sidebarBottomBanner.description || sidebarBottomBanner.title}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Search bar below the banner */}

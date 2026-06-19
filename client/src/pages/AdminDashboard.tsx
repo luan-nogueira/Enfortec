@@ -51,6 +51,10 @@ export default function AdminDashboard() {
   const [promoImage, setPromoImage] = useState("");
   const [promoLink, setPromoLink] = useState("");
   const [promoCountdown, setPromoCountdown] = useState("");
+  const [promoPosition, setPromoPosition] = useState<"main" | "sidebar_top" | "sidebar_bottom">("main");
+  const [promoIsActive, setPromoIsActive] = useState(true);
+  const [editingPromoId, setEditingPromoId] = useState<string | null>(null);
+  const [uploadingPromoImage, setUploadingPromoImage] = useState(false);
   const [showPromoModal, setShowPromoModal] = useState(false);
 
   useEffect(() => {
@@ -60,6 +64,46 @@ export default function AdminDashboard() {
     });
     return () => unsubPromos();
   }, [isAuthenticated, isAdmin]);
+
+  const handlePromoImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingPromoImage(true);
+    try {
+      const storageRef = ref(storage, `promos_banners/${Date.now()}_${file.name}`);
+      const snapshot = await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(snapshot.ref);
+      setPromoImage(url);
+      toast.success("Imagem do banner enviada com sucesso!");
+    } catch (error: any) {
+      console.error("Erro ao fazer upload da imagem do banner:", error);
+      toast.error("Erro ao fazer upload da imagem: " + (error.message || error));
+    } finally {
+      setUploadingPromoImage(false);
+    }
+  };
+
+  const resetPromoForm = () => {
+    setPromoTitle("");
+    setPromoImage("");
+    setPromoLink("");
+    setPromoCountdown("");
+    setPromoPosition("main");
+    setPromoIsActive(true);
+    setEditingPromoId(null);
+  };
+
+  const openEditPromo = (promo: any) => {
+    setEditingPromoId(promo.id);
+    setPromoTitle(promo.title || "");
+    setPromoImage(promo.imageUrl || "");
+    setPromoLink(promo.link || "");
+    setPromoCountdown(promo.expiresAt ? new Date(promo.expiresAt).toISOString().substring(0, 16) : "");
+    setPromoPosition(promo.position || "main");
+    setPromoIsActive(promo.isActive ?? true);
+    setShowPromoModal(true);
+  };
 
   const handleCreateCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,23 +149,36 @@ export default function AdminDashboard() {
 
   const handleCreatePromo = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!promoTitle.trim() || !promoImage.trim()) {
+      toast.warning("Título e imagem do banner são obrigatórios.");
+      return;
+    }
     try {
-      await addDoc(collection(db, "promos"), {
-        title: promoTitle,
-        imageUrl: promoImage,
-        link: promoLink,
+      const promoData = {
+        title: promoTitle.trim(),
+        imageUrl: promoImage.trim(),
+        link: promoLink.trim(),
         expiresAt: promoCountdown ? new Date(promoCountdown).toISOString() : null,
-        isActive: true,
-        createdAt: new Date().toISOString()
-      });
-      toast.success("Promoção de banner criada com sucesso!");
+        position: promoPosition,
+        isActive: promoIsActive
+      };
+
+      if (editingPromoId) {
+        await updateDoc(doc(db, "promos", editingPromoId), promoData);
+        toast.success("Banner promocional atualizado com sucesso!");
+      } else {
+        await addDoc(collection(db, "promos"), {
+          ...promoData,
+          isActive: true,
+          createdAt: new Date().toISOString()
+        });
+        toast.success("Banner promocional criado com sucesso!");
+      }
       setShowPromoModal(false);
-      setPromoTitle("");
-      setPromoImage("");
-      setPromoLink("");
-      setPromoCountdown("");
+      resetPromoForm();
     } catch (err) {
-      toast.error("Erro ao criar banner promocional.");
+      console.error(err);
+      toast.error("Erro ao salvar banner promocional.");
     }
   };
 
@@ -186,6 +243,7 @@ export default function AdminDashboard() {
   const [gameImageUrl, setGameImageUrl] = useState("");
   const [gameStock, setGameStock] = useState(999);
   const [gameIsActive, setGameIsActive] = useState(true);
+  const [gameIsPreVenda, setGameIsPreVenda] = useState(false);
   const [gameCoverFit, setGameCoverFit] = useState<"cover" | "contain">("cover");
   const [addingGame, setAddingGame] = useState(false);
   const [editingGameId, setEditingGameId] = useState<string | null>(null);
@@ -621,7 +679,8 @@ export default function AdminDashboard() {
           imageUrl: gameImageUrl.trim(),
           coverFit: gameCoverFit,
           stock: Number(gameStock),
-          isActive: gameIsActive
+          isActive: gameIsActive,
+          isPreVenda: gameIsPreVenda
         });
         toast.success("Jogo atualizado com sucesso!");
       } else {
@@ -633,6 +692,7 @@ export default function AdminDashboard() {
           coverFit: gameCoverFit,
           stock: Number(gameStock),
           isActive: gameIsActive,
+          isPreVenda: gameIsPreVenda,
           type: "jogo",
           description: "Jogo Mídia Digital.",
           createdAt: new Date().toISOString()
@@ -657,6 +717,7 @@ export default function AdminDashboard() {
     setGameCoverFit("cover");
     setGameStock(999);
     setGameIsActive(true);
+    setGameIsPreVenda(false);
     setEditingGameId(null);
   };
 
@@ -669,6 +730,7 @@ export default function AdminDashboard() {
     setGameCoverFit(game.coverFit || "cover");
     setGameStock(game.stock ?? 999);
     setGameIsActive(game.isActive ?? true);
+    setGameIsPreVenda(game.isPreVenda ?? false);
     setShowGameModal(true);
   };
 
@@ -1649,6 +1711,14 @@ export default function AdminDashboard() {
                       )}
                       <div className="absolute top-2 right-2 flex gap-1.5">
                         <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border uppercase tracking-wider ${
+                          p.position === "sidebar_top" ? "bg-purple-500/20 text-purple-400 border-purple-500/30" :
+                          p.position === "sidebar_bottom" ? "bg-blue-500/20 text-blue-400 border-blue-500/30" :
+                          "bg-red-500/20 text-red-400 border-red-500/30"
+                        }`}>
+                          {p.position === "sidebar_top" ? "Lateral Sup" :
+                           p.position === "sidebar_bottom" ? "Lateral Inf" : "Principal"}
+                        </span>
+                        <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border uppercase tracking-wider ${
                           p.isActive 
                           ? "bg-green-500/10 text-green-500 border-green-500/20" 
                           : "bg-red-500/10 text-red-500 border-red-500/20"
@@ -1660,9 +1730,9 @@ export default function AdminDashboard() {
                     
                     <div className="p-5 flex-grow">
                       <h4 className="text-base font-bold text-white mb-2 truncate">{p.title}</h4>
-                      <p className="text-slate-405 text-xs truncate mb-1.5"><strong className="text-slate-500">Link:</strong> {p.link || 'Nenhum'}</p>
+                      <p className="text-slate-400 text-xs truncate mb-1.5"><strong className="text-slate-500 font-bold">Link:</strong> {p.link || 'Nenhum'}</p>
                       {p.expiresAt && (
-                        <p className="text-red-405 text-xs font-semibold flex items-center gap-1.5 mt-2">
+                        <p className="text-red-400 text-xs font-semibold flex items-center gap-1.5 mt-2">
                           <Clock className="w-3.5 h-3.5" />
                           Expira: {new Date(p.expiresAt).toLocaleString("pt-BR")}
                         </p>
@@ -1679,6 +1749,13 @@ export default function AdminDashboard() {
                         }`}
                       >
                         {p.isActive ? "Pausar" : "Ativar"}
+                      </Button>
+                      <Button
+                        onClick={() => openEditPromo(p)}
+                        variant="outline"
+                        className="bg-blue-950/20 hover:bg-blue-950/40 text-blue-400 border-blue-500/30 hover:border-blue-500/50 font-bold h-9 text-xs px-3"
+                      >
+                        <Edit className="w-4 h-4" />
                       </Button>
                       <Button
                         onClick={() => handleDeletePromo(p.id)}
@@ -2027,8 +2104,8 @@ export default function AdminDashboard() {
                 <option value="contain">Mostrar Foto Inteira (Com fundo e sem cortes)</option>
               </select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-2 col-span-1">
                 <Label className="text-xs text-slate-300 font-bold uppercase">Estoque</Label>
                 <Input
                   type="number"
@@ -2039,15 +2116,26 @@ export default function AdminDashboard() {
                   min={0}
                 />
               </div>
-              <div className="space-y-2 flex flex-col justify-end">
-                <label className="flex items-center gap-2 cursor-pointer h-10">
+              <div className="space-y-2 col-span-1 flex flex-col justify-end pb-2">
+                <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={gameIsActive}
                     onChange={(e) => setGameIsActive(e.target.checked)}
                     className="w-4 h-4 rounded border-red-600/20 bg-slate-950 text-red-600 focus:ring-red-500 focus:ring-offset-slate-900"
                   />
-                  <span className="text-xs font-bold text-slate-300 uppercase">Ativo na Loja</span>
+                  <span className="text-[10px] sm:text-xs font-bold text-slate-300 uppercase">Ativo</span>
+                </label>
+              </div>
+              <div className="space-y-2 col-span-1 flex flex-col justify-end pb-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={gameIsPreVenda}
+                    onChange={(e) => setGameIsPreVenda(e.target.checked)}
+                    className="w-4 h-4 rounded border-red-600/20 bg-slate-950 text-red-600 focus:ring-red-500 focus:ring-offset-slate-900"
+                  />
+                  <span className="text-[10px] sm:text-xs font-bold text-slate-300 uppercase font-black text-amber-500">Pré-Venda</span>
                 </label>
               </div>
             </div>
@@ -2368,15 +2456,15 @@ export default function AdminDashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal de Criação de Banner Promocional */}
-      <Dialog open={showPromoModal} onOpenChange={setShowPromoModal}>
+      {/* Modal de Adicionar / Editar Banner Promocional */}
+      <Dialog open={showPromoModal} onOpenChange={(open) => { if (!open) resetPromoForm(); setShowPromoModal(open); }}>
         <DialogContent className="bg-slate-900 border-red-600/30 text-white sm:max-w-[425px] card-neon">
           <DialogHeader>
             <DialogTitle className="text-2xl font-black text-neon flex items-center gap-2">
-              📢 Criar Banner Promo
+              📢 {editingPromoId ? "Editar Banner Promo" : "Criar Banner Promo"}
             </DialogTitle>
             <DialogDescription className="text-slate-400">
-              Cadastre um banner no carrossel de promoções da home.
+              {editingPromoId ? "Edite as informações do banner selecionado." : "Cadastre um banner no carrossel ou na lateral de promoções da home."}
             </DialogDescription>
           </DialogHeader>
 
@@ -2393,16 +2481,55 @@ export default function AdminDashboard() {
               />
             </div>
 
+            <div className="space-y-1.5 border border-red-600/10 p-3 rounded-lg bg-slate-950/20">
+              <div className="space-y-1.5 mb-2">
+                <Label htmlFor="promoImage" className="text-slate-300">URL da Imagem</Label>
+                <Input
+                  id="promoImage"
+                  value={promoImage}
+                  onChange={(e) => setPromoImage(e.target.value)}
+                  placeholder="Ex: https://link.com/imagem.jpg"
+                  required
+                  className="bg-slate-950 border-slate-800 text-white"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-slate-400 font-bold uppercase">Ou Enviar Foto Local</Label>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePromoImageUpload}
+                  disabled={uploadingPromoImage}
+                  className="bg-slate-950 border-red-600/20 text-white cursor-pointer file:bg-red-600 file:text-white file:border-0 file:rounded-md file:px-3 file:py-1 file:mr-3 hover:file:bg-red-700 text-xs"
+                />
+                {uploadingPromoImage && <p className="text-[10px] text-red-500 animate-pulse">Enviando banner...</p>}
+              </div>
+              {promoImage && (
+                <div className="h-20 w-full rounded overflow-hidden border border-red-600/20 relative mt-2 group">
+                  <img src={promoImage} alt="Preview" className="w-full h-full object-cover" />
+                  <button
+                     type="button"
+                     onClick={() => setPromoImage("")}
+                     className="absolute top-1 right-1 bg-red-600 rounded-full p-1 text-white hover:bg-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+            </div>
+
             <div className="space-y-1.5">
-              <Label htmlFor="promoImage" className="text-slate-300">URL da Imagem</Label>
-              <Input
-                id="promoImage"
-                value={promoImage}
-                onChange={(e) => setPromoImage(e.target.value)}
-                placeholder="Ex: https://link.com/imagem.jpg"
-                required
-                className="bg-slate-950 border-slate-800 text-white"
-              />
+              <Label htmlFor="promoPosition" className="text-slate-300">Posição do Banner</Label>
+              <select
+                id="promoPosition"
+                value={promoPosition}
+                onChange={(e) => setPromoPosition(e.target.value as any)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-md h-10 px-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-red-500/50"
+              >
+                <option value="main">Principal (Carrossel Esquerdo)</option>
+                <option value="sidebar_top">Lateral Superior (Direito)</option>
+                <option value="sidebar_bottom">Lateral Inferior (Direito)</option>
+              </select>
             </div>
 
             <div className="space-y-1.5">
@@ -2431,13 +2558,13 @@ export default function AdminDashboard() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setShowPromoModal(false)}
+                onClick={() => { setShowPromoModal(false); resetPromoForm(); }}
                 className="border-slate-700 text-slate-300 hover:bg-slate-800"
               >
                 Cancelar
               </Button>
-              <Button type="submit" className="bg-red-600 hover:bg-red-700 font-bold btn-neon">
-                Salvar Banner
+              <Button type="submit" disabled={uploadingPromoImage} className="bg-red-600 hover:bg-red-700 font-bold btn-neon">
+                {editingPromoId ? "Salvar Alterações" : "Criar Banner"}
               </Button>
             </DialogFooter>
           </form>

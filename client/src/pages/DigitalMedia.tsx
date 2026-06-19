@@ -42,7 +42,11 @@ const GAME_BADGES: Record<string, { label: string; color: string }> = {
   "SHADOW OF MORDOR": { label: "💰 Oferta", color: "bg-green-600" },
 };
 
-function getGameBadge(name: string) {
+function getGameBadge(product: any) {
+  if (product.isPreVenda || product.name?.toLowerCase().includes("pré-venda") || product.name?.toLowerCase().includes("pre-venda") || product.name?.toLowerCase().includes("prevenda")) {
+    return { label: "📅 Pré-Venda", color: "bg-amber-600 shadow-[0_0_10px_rgba(217,119,6,0.5)] border border-amber-500/30" };
+  }
+  const name = product.name || "";
   const key = Object.keys(GAME_BADGES).find(k => name.toUpperCase().includes(k));
   return key ? GAME_BADGES[key] : null;
 }
@@ -60,6 +64,7 @@ export default function DigitalMedia() {
     const params = new URLSearchParams(window.location.search);
     return params.get("genre") || null;
   });
+  const [showPreVenda, setShowPreVenda] = useState(false);
   const [sortOrder, setSortOrder] = useState<"az" | "za" | "asc" | "desc">("az");
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -100,6 +105,8 @@ export default function DigitalMedia() {
     }
   };
 
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+
   useEffect(() => {
     if (selectedProduct) {
       setCustomerName(user?.name || "");
@@ -110,6 +117,7 @@ export default function DigitalMedia() {
       setDiscountPercentage(0);
       setAppliedCoupon(null);
       setCouponError(null);
+      setAcceptedTerms(false);
     }
   }, [selectedProduct, user]);
 
@@ -307,7 +315,12 @@ export default function DigitalMedia() {
       matchesGenre = GENRE_MAP[selectedGenre].some(kw => nameLower.includes(kw));
     }
 
-    return matchesSearch && matchesType && matchesPlatform && matchesGenre;
+    let matchesPreVenda = true;
+    if (showPreVenda) {
+      matchesPreVenda = p.isPreVenda === true || nameLower.includes("pré-venda") || nameLower.includes("pre-venda") || nameLower.includes("prevenda");
+    }
+
+    return matchesSearch && matchesType && matchesPlatform && matchesGenre && matchesPreVenda;
   }).sort((a: any, b: any) => {
     if (sortOrder === "az") return a.name.localeCompare(b.name);
     if (sortOrder === "za") return b.name.localeCompare(a.name);
@@ -461,6 +474,16 @@ export default function DigitalMedia() {
               >
                 🌟 Dual
               </button>
+              <button
+                onClick={() => setShowPreVenda(!showPreVenda)}
+                className={`px-2.5 py-1 rounded-md text-[10px] sm:text-xs font-bold uppercase transition flex items-center gap-1.5 ${
+                  showPreVenda
+                    ? "bg-amber-600 text-white shadow-[0_0_15px_rgba(217,119,6,0.4)] border-amber-500/30"
+                    : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-700"
+                }`}
+              >
+                📅 Pré-Venda
+              </button>
             </div>
           )}
         </div>
@@ -532,7 +555,7 @@ export default function DigitalMedia() {
                     )}
                     {/* Game badge */}
                     {(() => {
-                      const badge = getGameBadge(product.name);
+                      const badge = getGameBadge(product);
                       return badge ? (
                         <div className={`absolute top-1.5 right-1.5 z-10 ${badge.color} text-white text-[7px] sm:text-[9px] font-black px-1.5 sm:px-2 py-0.5 rounded-full uppercase tracking-wider shadow-lg`}>
                           {badge.label}
@@ -723,6 +746,21 @@ export default function DigitalMedia() {
                 </div>
               )}
               
+              {/* Termos de Compra */}
+              <div className="bg-slate-950/40 border border-slate-800 rounded-xl p-3.5 mt-4">
+                <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={acceptedTerms}
+                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                    className="w-4 h-4 mt-0.5 rounded border-slate-700 bg-slate-800 text-red-600 focus:ring-red-500"
+                  />
+                  <span className="text-xs text-slate-300 leading-relaxed text-left">
+                    Li e concordo com os <strong className="text-white">Termos de Compra</strong> da Eforte Games. Declaro estar ciente de que a entrega dos dados de acesso ou chave digital ocorrerá em meu painel em até 24 horas úteis.
+                  </span>
+                </label>
+              </div>
+              
               <div className="pt-2">
                 <div className="flex justify-between text-sm text-slate-400">
                   <span>Subtotal:</span>
@@ -755,9 +793,9 @@ export default function DigitalMedia() {
               </div>
             )}
             <Button 
-              disabled={isProcessingCheckout}
+              disabled={isProcessingCheckout || !acceptedTerms}
               onClick={handleFinalizePurchase}
-              className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-12 text-lg btn-neon"
+              className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-12 text-lg btn-neon disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isProcessingCheckout ? "Gerando pagamento..." : "Confirmar e Ir para Checkout"}
             </Button>
