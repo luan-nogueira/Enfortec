@@ -1,6 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import UserProfileButton from "@/components/UserProfileButton";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, getDoc } from "firebase/firestore";
 import { ArrowLeft, Coins, Copy, Gift, HelpCircle, CheckCircle, Clock, AlertTriangle, LogOut } from "lucide-react";
@@ -185,10 +186,7 @@ export default function FortecoinsPage() {
               <Coins className="w-4 h-4 text-red-500" />
               <span className="font-bold text-white text-sm sm:text-lg">{user.forteCoins} FC</span>
             </div>
-            <Button variant="ghost" onClick={logout} className="text-slate-400 hover:text-red-500 hover:bg-red-950/20 font-bold flex items-center gap-1.5 h-9 px-2 sm:px-4">
-              <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">Sair</span>
-            </Button>
+            <UserProfileButton />
           </div>
         </div>
       </nav>
@@ -273,6 +271,75 @@ export default function FortecoinsPage() {
           </Card>
 
         </div>
+
+        {/* Guia Como Funciona as ForteCoins */}
+        <Card className="bg-slate-900/40 border-slate-800 p-6 mb-10 card-neon">
+          <div className="flex items-center gap-3 border-b border-slate-800 pb-4 mb-6">
+            <div className="w-10 h-10 bg-red-950 border border-red-500/30 rounded-lg flex items-center justify-center text-red-500">
+              <HelpCircle className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-white uppercase tracking-wider">Como funciona o Programa ForteCoins?</h3>
+              <p className="text-slate-400 text-xs sm:text-sm">Entenda como acumular, as regras de expiração e como usar suas moedas virtuais</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Como Ganhar */}
+            <div className="space-y-3 bg-slate-950/40 p-4 rounded-xl border border-slate-800/80">
+              <p className="text-red-500 font-bold text-sm sm:text-base flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-red-950 text-red-500 flex items-center justify-center font-black text-xs">1</span>
+                Como Acumular Moedas
+              </p>
+              <ul className="space-y-2 text-xs sm:text-sm text-slate-350 list-none pl-0">
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500">🛒</span>
+                  <span><strong>Cashback de Compra:</strong> Cada compra realizada de jogo digital na Eforte Games adiciona automaticamente <strong>+7 ForteCoins</strong> na sua carteira.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500">👥</span>
+                  <span><strong>Indique Amigos:</strong> Compartilhe seu link exclusivo. Quando seu amigo se cadastrar e efetuar a primeira compra de jogo, você ganha <strong>+15 ForteCoins</strong>.</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Regras e Validade */}
+            <div className="space-y-3 bg-slate-950/40 p-4 rounded-xl border border-slate-800/80">
+              <p className="text-red-500 font-bold text-sm sm:text-base flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-red-950 text-red-500 flex items-center justify-center font-black text-xs">2</span>
+                Regras e Validade
+              </p>
+              <ul className="space-y-2 text-xs sm:text-sm text-slate-350 list-none pl-0">
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500">⏳</span>
+                  <span><strong>Validade de 90 dias:</strong> As moedas acumuladas expiram após 90 dias da data de ganho e são removidas automaticamente da sua conta.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500">🔐</span>
+                  <span><strong>Conta Google Obrigatória:</strong> Apenas usuários autenticados via login social do Google são elegíveis para ganhar e resgatar prêmios por segurança.</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Como Resgatar */}
+            <div className="space-y-3 bg-slate-950/40 p-4 rounded-xl border border-slate-800/80">
+              <p className="text-red-500 font-bold text-sm sm:text-base flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-red-950 text-red-500 flex items-center justify-center font-black text-xs">3</span>
+                Como Resgatar Prêmios
+              </p>
+              <ul className="space-y-2 text-xs sm:text-sm text-slate-350 list-none pl-0">
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500">🎁</span>
+                  <span><strong>Loja de Resgate:</strong> Troque suas moedas por Gift Cards da Steam, PSN, Xbox, Netflix ou jogos digitais PC logo abaixo.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500">💸</span>
+                  <span><strong>Descontos na Loja:</strong> Use suas moedas diretamente no carrinho de compras da Loja Própria para obter descontos imediatos (10 moedas = R$ 1,00 de desconto).</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </Card>
 
         {/* Rewards Catalog */}
         <h2 className="text-xl sm:text-2xl font-black text-white mb-4 sm:mb-6 flex items-center gap-2 uppercase tracking-tight italic">

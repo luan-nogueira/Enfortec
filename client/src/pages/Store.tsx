@@ -1,9 +1,10 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import UserProfileButton from "@/components/UserProfileButton";
 import { auth, db } from "@/lib/firebase";
 import { collection, onSnapshot, query, orderBy, doc, getDoc, updateDoc } from "firebase/firestore";
-import { Search, ShoppingCart, ArrowLeft, Flame, Package, Check, X, Coins } from "lucide-react";
+import { Search, ShoppingCart, ArrowLeft, Flame, Package, Check, X, Coins, HelpCircle, Shield } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -27,6 +28,9 @@ export default function Store() {
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [chosenVersion, setChosenVersion] = useState<"PS4" | "PS5" | null>(null);
+  const [showGuide, setShowGuide] = useState(true);
+  const [showTermsDialog, setShowTermsDialog] = useState(false);
+  const [termsScrolled, setTermsScrolled] = useState(false);
 
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
@@ -290,14 +294,17 @@ export default function Store() {
               </div>
             </div>
             {isAuthenticated && (
-              <Button 
-                variant="ghost" 
-                className="text-slate-300 hover:text-white hover:bg-slate-900 flex items-center gap-1.5 px-2 sm:px-4"
-                onClick={() => navigate("/fortecoins")}
-              >
-                <Coins className="w-4 h-4 text-red-500" />
-                <span className="text-sm">{user?.forteCoins ?? 0} FC</span>
-              </Button>
+              <div className="flex items-center gap-3">
+                <Button 
+                  variant="ghost" 
+                  className="text-slate-300 hover:text-white hover:bg-slate-900 flex items-center gap-1.5 px-2 sm:px-4"
+                  onClick={() => navigate("/fortecoins")}
+                >
+                  <Coins className="w-4 h-4 text-red-500" />
+                  <span className="text-sm">{user?.forteCoins ?? 0} FC</span>
+                </Button>
+                <UserProfileButton />
+              </div>
             )}
           </div>
           <div className="flex gap-4">
@@ -316,6 +323,74 @@ export default function Store() {
 
       {/* Products Grid */}
       <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-12 pb-24 lg:pb-12">
+        {/* Guia de Funcionamento da Loja */}
+        <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 mb-8 card-neon relative overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-red-950 border border-red-500/30 rounded-lg flex items-center justify-center text-red-500">
+                <HelpCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-black text-white uppercase tracking-wider">Como funciona a Loja da Eforte Games?</h3>
+                <p className="text-slate-400 text-xs sm:text-sm">Passo a passo rápido para realizar sua compra e receber seus jogos</p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowGuide(!showGuide)}
+              className="border-slate-750 hover:bg-slate-800 text-slate-300 w-fit self-end sm:self-auto text-xs"
+            >
+              {showGuide ? "Ocultar Guia" : "Mostrar Guia"}
+            </Button>
+          </div>
+
+          {showGuide && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-in fade-in duration-300">
+              <div className="space-y-1.5">
+                <p className="text-red-500 font-bold text-xs sm:text-sm flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-red-950 text-red-500 flex items-center justify-center font-black text-[10px]">1</span>
+                  Escolha seu Jogo
+                </p>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Selecione a versão desejada (PS4 ou PS5) na vitrine abaixo. Você também pode pechinchar o preço clicando no botão <strong>💸 Pechinchar</strong> para falar direto com nosso suporte no WhatsApp.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <p className="text-red-500 font-bold text-xs sm:text-sm flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-red-950 text-red-500 flex items-center justify-center font-black text-[10px]">2</span>
+                  Pagamento Seguro
+                </p>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Pague com Pix ou Cartão via InfinitePay. Você pode marcar o campo para usar suas <strong>ForteCoins</strong> e obter desconto imediato (cada 10 moedas = R$ 1,00 de desconto).
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <p className="text-red-500 font-bold text-xs sm:text-sm flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-red-950 text-red-500 flex items-center justify-center font-black text-[10px]">3</span>
+                  Ativação Primária/Secundária
+                </p>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  <strong>Primária:</strong> Jogue diretamente no seu perfil pessoal e conquiste troféus.<br />
+                  <strong>Secundária:</strong> Jogue no perfil enviado pela loja (requer conexão constante à internet).
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <p className="text-red-500 font-bold text-xs sm:text-sm flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-red-950 text-red-500 flex items-center justify-center font-black text-[10px]">4</span>
+                  Entrega & Suporte
+                </p>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Os dados de acesso da conta e o guia de instalação são entregues na sua aba <strong>Minhas Compras</strong> em até 24 horas úteis. O suporte completo de instalação é garantido!
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
         {isLoading ? (
           <div className="text-center py-12">
             <p className="text-slate-400 text-lg">Carregando produtos...</p>
@@ -593,18 +668,35 @@ export default function Store() {
                 )}
                 
                 {/* Termos de Compra */}
-                <div className="bg-slate-950/40 border border-slate-800 rounded-xl p-3.5 mt-4">
-                  <label className="flex items-start gap-2.5 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={acceptedTerms}
-                      onChange={(e) => setAcceptedTerms(e.target.checked)}
-                      className="w-4 h-4 mt-0.5 rounded border-slate-700 bg-slate-800 text-red-600 focus:ring-red-500"
-                    />
-                    <span className="text-xs text-slate-300 leading-relaxed text-left">
-                      Li e concordo com os <strong className="text-white">Termos de Compra</strong> da Eforte Games. Declaro estar ciente de que a entrega dos dados de acesso ou chave digital ocorrerá em meu painel em até 24 horas úteis.
-                    </span>
-                  </label>
+                <div className="bg-slate-950/40 border border-slate-800 rounded-xl p-3.5 mt-4 flex items-start gap-2.5">
+                  <input
+                    type="checkbox"
+                    checked={acceptedTerms}
+                    readOnly
+                    onClick={() => {
+                      if (!acceptedTerms) {
+                        setTermsScrolled(false);
+                        setShowTermsDialog(true);
+                      } else {
+                        setAcceptedTerms(false);
+                      }
+                    }}
+                    className="w-4 h-4 mt-0.5 rounded border-slate-700 bg-slate-800 text-red-600 focus:ring-red-500 cursor-pointer"
+                  />
+                  <span className="text-xs text-slate-305 leading-relaxed text-left select-none">
+                    Li e concordo com os{" "}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTermsScrolled(false);
+                        setShowTermsDialog(true);
+                      }}
+                      className="text-red-500 font-bold hover:underline"
+                    >
+                      Termos de Compra
+                    </button>{" "}
+                    da Eforte Games. Declaro estar ciente de que a entrega dos dados de acesso ou chave digital ocorrerá em meu painel em até 24 horas úteis.
+                  </span>
                 </div>
 
                 <div className="pt-2">
@@ -723,6 +815,86 @@ export default function Store() {
               className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-12 text-lg rounded-xl shadow-lg shadow-green-600/20"
             >
               Enviar Proposta de Pechincha
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para leitura obrigatória dos termos de compra */}
+      <Dialog open={showTermsDialog} onOpenChange={(open) => !open && setShowTermsDialog(false)}>
+        <DialogContent className="bg-slate-900 border-red-600/30 text-white sm:max-w-[550px] card-neon flex flex-col max-h-[85vh]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-white flex items-center gap-2">
+              <Shield className="w-5 h-5 text-red-500" />
+              Termos de Compra e Licenciamento
+            </DialogTitle>
+            <DialogDescription className="text-slate-400 text-xs">
+              Role o termo até o final para habilitar o aceite.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div 
+            onScroll={(e) => {
+              const target = e.currentTarget;
+              if (target.scrollHeight - target.scrollTop <= target.clientHeight + 15) {
+                setTermsScrolled(true);
+              }
+            }}
+            className="flex-1 overflow-y-auto pr-2 border border-slate-800 rounded-xl p-4 bg-slate-950/60 text-slate-300 text-xs space-y-4 my-4 select-none max-h-[350px] scrollbar-thin scrollbar-thumb-red-650"
+          >
+            <div className="space-y-4 text-justify">
+              <div className="text-center pb-2 border-b border-slate-800">
+                <h4 className="font-bold text-white uppercase text-xs">
+                  TERMOS DE USO, GARANTIA E LICENCIAMENTO DIGITAL – EFORTEGAMES
+                </h4>
+              </div>
+
+              <section className="space-y-1">
+                <h5 className="font-bold text-white border-l-2 border-red-500 pl-1.5 text-xs">1. DISPOSIÇÕES GERAIS</h5>
+                <p className="text-[11px] leading-relaxed text-slate-400">A EFORTEGAMES comercializa licenças digitais para a plataforma PlayStation. Todas as licenças estão sujeitas às regras técnicas, operacionais e de segurança da fabricante.</p>
+              </section>
+
+              <section className="space-y-1">
+                <h5 className="font-bold text-white border-l-2 border-red-500 pl-1.5 text-xs">2. MODALIDADE PRIMÁRIA</h5>
+                <p className="text-[11px] leading-relaxed text-slate-400"><strong>Direitos:</strong> Permite jogar e conquistar troféus diretamente em sua conta/perfil pessoal.<br/>
+                <strong>Obrigações:</strong> Não alterar e-mail, senha, ID ou dados da conta; não compartilhar a conta com terceiros; não realizar acessos não autorizados.</p>
+              </section>
+
+              <section className="space-y-1">
+                <h5 className="font-bold text-white border-l-2 border-red-500 pl-1.5 text-xs">3. MODALIDADE SECUNDÁRIA</h5>
+                <p className="text-[11px] leading-relaxed text-slate-400"><strong>Direitos:</strong> Permite utilizar o jogo somente a partir do usuário enviado (requer conexão constante à internet).<br/>
+                <strong>Obrigações:</strong> Não alterar dados de login, não compartilhar a conta e não efetuar alterações que comprometam a licença.</p>
+              </section>
+
+              <section className="space-y-1">
+                <h5 className="font-bold text-white border-l-2 border-red-500 pl-1.5 text-xs">4. UTILIZAÇÃO INADEQUADA E DISPOSITIVOS</h5>
+                <p className="text-[11px] leading-relaxed text-slate-400">É expressamente proibido fazer login em celulares, tablets, computadores, browsers ou vincular a conta ao PlayStation App. Acessos não autorizados ou alteração de dados geram bloqueio imediato e anulação da garantia.</p>
+              </section>
+
+              <section className="space-y-1">
+                <h5 className="font-bold text-white border-l-2 border-red-500 pl-1.5 text-xs">5. SUPORTE, GARANTIA E REEMBOLSO</h5>
+                <p className="text-[11px] leading-relaxed text-slate-400">Garantimos a entrega dos dados e o suporte inicial para instalação. A garantia não cobre formatações do console, trocas de HD/SSD ou exclusão manual. Por se tratar de produto digital com entrega imediata, não há reembolso após o envio das credenciais.</p>
+              </section>
+            </div>
+          </div>
+
+          <DialogFooter className="flex flex-col sm:flex-row gap-2 mt-2">
+            <Button
+              variant="ghost"
+              onClick={() => setShowTermsDialog(false)}
+              className="flex-1 text-slate-400 hover:text-white"
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={!termsScrolled}
+              onClick={() => {
+                setAcceptedTerms(true);
+                setShowTermsDialog(false);
+              }}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {!termsScrolled ? "Role até o fim para aceitar" : "Li e concordo com os Termos"}
             </Button>
           </DialogFooter>
         </DialogContent>

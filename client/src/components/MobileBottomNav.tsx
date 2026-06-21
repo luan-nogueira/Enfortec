@@ -1,5 +1,5 @@
 import { useLocation } from "wouter";
-import { HomeIcon, LayoutGrid, Tag, HelpCircle, Zap } from "lucide-react";
+import { Home as HomeIcon, LayoutGrid, ShoppingBag, Flame, Zap } from "lucide-react";
 
 export default function MobileBottomNav() {
   const [location, navigate] = useLocation();
@@ -75,42 +75,42 @@ export default function MobileBottomNav() {
           <span style={{ fontSize: 10, fontWeight: "bold" }}>Categorias</span>
         </button>
 
-        {/* Anúncios */}
+        {/* Minhas Compras */}
         <button
-          onClick={() => scrollTo("anuncios")}
+          onClick={() => navigate("/minhas-compras")}
           style={{
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
             gap: "2px",
             padding: "6px 12px",
-            color: "#94a3b8",
+            color: location === "/minhas-compras" ? "#ef4444" : "#94a3b8",
             background: "none",
             border: "none",
             cursor: "pointer",
           }}
         >
-          <Tag style={{ width: 20, height: 20 }} />
-          <span style={{ fontSize: 10, fontWeight: "bold" }}>Anúncios</span>
+          <ShoppingBag style={{ width: 20, height: 20 }} />
+          <span style={{ fontSize: 10, fontWeight: "bold" }}>Compras</span>
         </button>
 
-        {/* FAQ */}
+        {/* Promoções */}
         <button
-          onClick={() => navigate("/faq")}
+          onClick={() => navigate("/promocoes")}
           style={{
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
             gap: "2px",
             padding: "6px 12px",
-            color: location === "/faq" ? "#ef4444" : "#94a3b8",
+            color: location === "/promocoes" ? "#ef4444" : "#94a3b8",
             background: "none",
             border: "none",
             cursor: "pointer",
           }}
         >
-          <HelpCircle style={{ width: 20, height: 20 }} />
-          <span style={{ fontSize: 10, fontWeight: "bold" }}>FAQ</span>
+          <Flame style={{ width: 20, height: 20 }} />
+          <span style={{ fontSize: 10, fontWeight: "bold" }}>Promoções</span>
         </button>
 
         {/* Revenda */}

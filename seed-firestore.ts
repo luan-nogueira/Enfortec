@@ -47,7 +47,7 @@ const games = [
   { name: "FINAL FANTASY XVI PS5", price: 119.90, platform: "PS5", imageUrl: "https://image.api.playstation.com/vulcan/ap/rnd/202212/1319/3FMiHKAXj0Mx6gjEY16a0X6E.png" },
   { name: "GHOST RECON WILDLANDS PS4/PS5", price: 34.90, platform: "PS4/PS5", imageUrl: "https://image.api.playstation.com/vulcan/img/rnd/202011/0221/5cPbSFBVjS3R8N7RL4v9bCvP.png" },
   { name: "GOD OF WAR 2018 PS4/PS5", price: 59.90, platform: "PS4/PS5", imageUrl: "https://image.api.playstation.com/vulcan/img/rnd/202011/0224/CEJPGKFrHQS2bWM73GBTFoB7.png" },
-  { name: "GOD OF WAR 3 REMASTER PS4/PS5", price: 36.99, platform: "PS4/PS5", imageUrl: "https://image.api.playstation.com/cdn/UP9000/CUSA01399_00/rLAIvMd8sGVkjrFR7VTNQ6mqdl3h91YH.png" },
+  { name: "GOD OF WAR 3 REMASTER PS4/PS5", price: 36.99, platform: "PS4/PS5", imageUrl: "https://image.api.playstation.com/vulcan/ap/rnd/202010/2218/H5R6S6K6W7uUeL172zR2w6jJ.png" },
   { name: "GTA V PS4/PS5", price: 59.90, platform: "PS4/PS5", imageUrl: "https://image.api.playstation.com/vulcan/img/rnd/202011/0221/VVzwK1oEzd5wZJxjsGQrFhMC.png" },
   { name: "HI-FI RUSH PS5", price: 59.90, platform: "PS5", imageUrl: "https://image.api.playstation.com/vulcan/ap/rnd/202303/1521/dGjkNy1lBz0DLHD63mPR2fRy.png" },
   { name: "HOGWARTS LEGACY PS4/PS5", price: 39.90, platform: "PS4/PS5", imageUrl: "https://image.api.playstation.com/vulcan/ap/rnd/202301/1609/jtkIOrGEv3EXmWYRJJWBRQaQ.png" },

@@ -88,6 +88,7 @@ export function registerPaymentRoute(app: Express) {
   app.post("/api/infinitepay/checkout", async (req, res) => {
     try {
       const { name, price, quantity = 1, redirectUrl, productType = "store", productId, sellerId, customer, coinsToUse = 0, couponCode } = req.body;
+      const productNameStr: string = name || "Produto";
 
       if (!name || price === undefined) {
         return res.status(400).json({ success: false, error: "Nome e preço são obrigatórios." });
@@ -170,6 +171,8 @@ export function registerPaymentRoute(app: Express) {
             status: "pago",
             paymentId: `ForteCoins-100%-${Date.now()}`,
             coinsUsed: Number(coinsToUse),
+            productName: productNameStr,
+            firebaseProductId: productId ? String(productId) : null,
           };
 
           if (productType === "store" && productId) {
@@ -213,7 +216,9 @@ export function registerPaymentRoute(app: Express) {
       const priceInCents = Math.round(finalPrice * 100);
 
       // Constrói order_nsu compacto: buyerId_sellerId_productType_productId_coinsToUse_couponCode
-      const orderNsu = `${buyerId}_${mysqlSellerId || "null"}_${productType}_${productId || "null"}_${coinsToUse}_${validCouponCode || "nocoupon"}`;
+      // Codifica o nome do produto em base64 para incluir no NSU sem quebrar o split por "_"
+      const productNameB64 = Buffer.from(productNameStr).toString("base64");
+      const orderNsu = `${buyerId}_${mysqlSellerId || "null"}_${productType}_${productId || "null"}_${coinsToUse}_${validCouponCode || "nocoupon"}_${productNameB64}`;
 
       const host = req.get("host") || "";
       const protocol = host.includes("localhost") || host.includes("127.0.0.1") ? "http" : "https";
@@ -309,6 +314,7 @@ export function registerPaymentRoute(app: Express) {
       let productIdString: string | null = null;
       let coinsUsedValue = 0;
       let couponCodeValue: string | null = null;
+      let productNameFromNsu: string = event?.items?.[0]?.name || event?.description || "Produto Eforte Games";
 
       if (orderNsu && typeof orderNsu === "string") {
         const parts = orderNsu.split("_");
@@ -323,6 +329,11 @@ export function registerPaymentRoute(app: Express) {
         }
         if (parts.length >= 6) {
           couponCodeValue = parts[5] === "nocoupon" ? null : parts[5];
+        }
+        if (parts.length >= 7) {
+          try {
+            productNameFromNsu = Buffer.from(parts[6], "base64").toString("utf-8");
+          } catch { /* mantém o nome padrão */ }
         }
       }
 
@@ -359,6 +370,8 @@ export function registerPaymentRoute(app: Express) {
           status: "pago",
           paymentId: paymentId ? String(paymentId) : null,
           coinsUsed: coinsUsedValue,
+          productName: productNameFromNsu,
+          firebaseProductId: productIdString || null,
         };
 
         if (productType === "store" && productIdString) {

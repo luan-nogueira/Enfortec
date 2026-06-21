@@ -8,8 +8,8 @@ import { db, storage } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, onSnapshot, doc, updateDoc, setDoc, deleteDoc, query, orderBy, serverTimestamp, addDoc, getDoc } from "firebase/firestore";
 import { useLocation } from "wouter";
-import { Shield, User, UserCheck, UserPlus, ArrowLeft, Plus, X, Lock, Mail, Trash2, MessageCircle, Send, Coins, Gift, Check, Clock, LogOut, Gamepad2, Edit } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { Shield, User, UserCheck, UserPlus, ArrowLeft, Plus, X, Lock, Mail, Trash2, MessageCircle, Send, Coins, Gift, Check, Clock, LogOut, Gamepad2, Edit, Menu, BarChart3, Users, ShoppingBag, Tag, Image, Percent, Ban } from "lucide-react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -23,13 +23,93 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer } from "recharts";
 
 export default function AdminDashboard() {
   const { user, isAuthenticated, isAdmin, loading: authLoading, logout } = useAuth();
   const [, navigate] = useLocation();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("usuarios");
+  const [activeTab, setActiveTab] = useState("visao-geral");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Helpers to calculate sales stats
+  const getSalesStats = () => {
+    if (!sales) return { total: 0, today: 0, week: 0, month: 0, count: 0, todayCount: 0, weekCount: 0, monthCount: 0 };
+    
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const oneWeekAgo = now.getTime() - 7 * 24 * 60 * 60 * 1000;
+    const oneMonthAgo = now.getTime() - 30 * 24 * 60 * 60 * 1000;
+    
+    let total = 0;
+    let today = 0;
+    let week = 0;
+    let month = 0;
+    let count = 0;
+    let todayCount = 0;
+    let weekCount = 0;
+    let monthCount = 0;
+    
+    const paidStatuses = ["pago", "enviado", "entregue"];
+    
+    sales.forEach((sale: any) => {
+      if (!paidStatuses.includes(sale.status)) return;
+      
+      const price = parseFloat(sale.totalPrice || "0");
+      const timestamp = new Date(sale.createdAt).getTime();
+      
+      total += price;
+      count += 1;
+      
+      if (timestamp >= startOfToday) {
+        today += price;
+        todayCount += 1;
+      }
+      if (timestamp >= oneWeekAgo) {
+        week += price;
+        weekCount += 1;
+      }
+      if (timestamp >= oneMonthAgo) {
+        month += price;
+        monthCount += 1;
+      }
+    });
+    
+    return { total, today, week, month, count, todayCount, weekCount, monthCount };
+  };
+
+  const getChartData = () => {
+    if (!sales) return [];
+    
+    const days = 7;
+    const data = [];
+    const paidStatuses = ["pago", "enviado", "entregue"];
+    
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+      const endOfDay = startOfDay + 24 * 60 * 60 * 1000;
+      
+      let amount = 0;
+      let count = 0;
+      
+      sales.forEach((sale: any) => {
+        if (!paidStatuses.includes(sale.status)) return;
+        const timestamp = new Date(sale.createdAt).getTime();
+        if (timestamp >= startOfDay && timestamp < endOfDay) {
+          amount += parseFloat(sale.totalPrice || "0");
+          count += 1;
+        }
+      });
+      
+      const label = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+      data.push({ name: label, Faturamento: amount, Vendas: count });
+    }
+    
+    return data;
+  };
 
   // --- Cupons CRUD ---
   const { data: dbCoupons, refetch: refetchCoupons } = trpc.coupons.list.useQuery(undefined, {
@@ -57,6 +137,20 @@ export default function AdminDashboard() {
   const [uploadingPromoImage, setUploadingPromoImage] = useState(false);
   const [showPromoModal, setShowPromoModal] = useState(false);
 
+  // --- Aba Promoções (PromotionsPage Deals) CRUD ---
+  const [dealsList, setDealsList] = useState<any[]>([]);
+  const [dealTitle, setDealTitle] = useState("");
+  const [dealDescription, setDealDescription] = useState("");
+  const [dealCategory, setDealCategory] = useState<"jogo" | "gift_card_playstation" | "gift_card_xbox">("jogo");
+  const [dealPrice, setDealPrice] = useState("");
+  const [dealOldPrice, setDealOldPrice] = useState("");
+  const [dealImageUrl, setDealImageUrl] = useState("");
+  const [dealLink, setDealLink] = useState("");
+  const [dealIsActive, setDealIsActive] = useState(true);
+  const [editingDealId, setEditingDealId] = useState<string | null>(null);
+  const [uploadingDealImage, setUploadingDealImage] = useState(false);
+  const [showDealModal, setShowDealModal] = useState(false);
+
   useEffect(() => {
     if (!isAuthenticated || !isAdmin) return;
     const unsubPromos = onSnapshot(collection(db, "promos"), (snap) => {
@@ -64,6 +158,121 @@ export default function AdminDashboard() {
     });
     return () => unsubPromos();
   }, [isAuthenticated, isAdmin]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !isAdmin) return;
+    const unsubDeals = onSnapshot(collection(db, "promocoes"), (snap) => {
+      setDealsList(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()));
+    });
+    return () => unsubDeals();
+  }, [isAuthenticated, isAdmin]);
+
+  const handleDealImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingDealImage(true);
+    try {
+      const storageRef = ref(storage, `promocoes_images/${Date.now()}_${file.name}`);
+      const snapshot = await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(snapshot.ref);
+      setDealImageUrl(url);
+      toast.success("Imagem da promoção enviada com sucesso!");
+    } catch (error: any) {
+      console.error("Erro ao fazer upload da imagem da promoção:", error);
+      toast.error("Erro ao fazer upload da imagem: " + (error.message || error));
+    } finally {
+      setUploadingDealImage(false);
+    }
+  };
+
+  const resetDealForm = () => {
+    setDealTitle("");
+    setDealDescription("");
+    setDealCategory("jogo");
+    setDealPrice("");
+    setDealOldPrice("");
+    setDealImageUrl("");
+    setDealLink("");
+    setDealIsActive(true);
+    setEditingDealId(null);
+  };
+
+  const openEditDeal = (deal: any) => {
+    setEditingDealId(deal.id);
+    setDealTitle(deal.title || "");
+    setDealDescription(deal.description || "");
+    setDealCategory(deal.category || "jogo");
+    setDealPrice(deal.price ? String(deal.price) : "");
+    setDealOldPrice(deal.oldPrice ? String(deal.oldPrice) : "");
+    setDealImageUrl(deal.imageUrl || "");
+    setDealLink(deal.link || "");
+    setDealIsActive(deal.isActive ?? true);
+    setShowDealModal(true);
+  };
+
+  const handleSaveDeal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!dealTitle.trim() || !dealPrice.trim()) {
+      toast.warning("Título e preço são obrigatórios.");
+      return;
+    }
+
+    try {
+      const dealData = {
+        title: dealTitle.trim(),
+        description: dealDescription.trim(),
+        category: dealCategory,
+        price: Number(dealPrice),
+        oldPrice: dealOldPrice ? Number(dealOldPrice) : null,
+        imageUrl: dealImageUrl.trim(),
+        link: dealLink.trim(),
+        isActive: dealIsActive
+      };
+
+      if (editingDealId) {
+        await updateDoc(doc(db, "promocoes", editingDealId), dealData);
+        toast.success("Promoção atualizada com sucesso!");
+      } else {
+        await addDoc(collection(db, "promocoes"), {
+          ...dealData,
+          createdAt: new Date().toISOString()
+        });
+        toast.success("Promoção criada com sucesso!");
+      }
+      setShowDealModal(false);
+      resetDealForm();
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao salvar promoção.");
+    }
+  };
+
+  const handleToggleDealActive = async (id: string, currentActive: boolean) => {
+    try {
+      await updateDoc(doc(db, "promocoes", id), { isActive: !currentActive });
+      toast.success("Estado da promoção atualizado com sucesso!");
+    } catch (err) {
+      toast.error("Erro ao atualizar estado da promoção.");
+    }
+  };
+
+  const handleDeleteDeal = (dealId: string) => {
+    toast("Tem certeza que deseja excluir permanentemente esta promoção?", {
+      action: {
+        label: "Excluir",
+        onClick: async () => {
+          try {
+            await deleteDoc(doc(db, "promocoes", dealId));
+            toast.success("Promoção excluída com sucesso!");
+          } catch (error) {
+            console.error("Erro ao excluir promoção:", error);
+            toast.error("Erro ao excluir promoção.");
+          }
+        }
+      }
+    });
+  };
 
   const handlePromoImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -221,6 +430,38 @@ export default function AdminDashboard() {
     }
   });
 
+  const updateOrderStatusMutation = trpc.orders.updateStatus.useMutation({
+    onSuccess: () => {
+      refetchSales();
+      toast.success("Status do pedido atualizado com sucesso!");
+    },
+    onError: (err: any) => {
+      toast.error("Erro ao atualizar pedido: " + (err.message || "Erro desconhecido"));
+    }
+  });
+
+  const deleteOrderMutation = trpc.orders.delete.useMutation({
+    onSuccess: () => {
+      refetchSales();
+      toast.success("Pedido excluído permanentemente!");
+    },
+    onError: (err: any) => {
+      toast.error("Erro ao excluir pedido: " + (err.message || "Erro desconhecido"));
+    }
+  });
+
+  const handleUpdateSaleStatus = (orderId: number, status: string) => {
+    if (confirm(`Tem certeza que deseja mudar o status deste pedido para '${status}'?`)) {
+      updateOrderStatusMutation.mutate({ orderId, status });
+    }
+  };
+
+  const handleDeleteSale = (orderId: number) => {
+    if (confirm("Tem certeza que deseja EXCLUIR PERMANENTEMENTE este pedido? Esta ação não pode ser desfeita.")) {
+      deleteOrderMutation.mutate(orderId);
+    }
+  };
+
   const handleDeliverGame = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedDeliverOrder) return;
@@ -240,6 +481,7 @@ export default function AdminDashboard() {
   const [gameName, setGameName] = useState("");
   const [gamePrice, setGamePrice] = useState(0);
   const [gamePlatform, setGamePlatform] = useState("");
+  const [gameCategory, setGameCategory] = useState("");
   const [gameImageUrl, setGameImageUrl] = useState("");
   const [gameStock, setGameStock] = useState(999);
   const [gameIsActive, setGameIsActive] = useState(true);
@@ -497,6 +739,23 @@ export default function AdminDashboard() {
   const [allRedemptions, setAllRedemptions] = useState<any[]>([]);
   const [allPrizes, setAllPrizes] = useState<any[]>([]);
 
+  const menuItems = useMemo(() => [
+    { value: "visao-geral", label: "Visão Geral", icon: BarChart3 },
+    { value: "usuarios", label: "Gerenciar Acessos", icon: Users },
+    { value: "jogos", label: "Gerenciar Jogos", icon: Gamepad2 },
+    { 
+      value: "referrals", 
+      label: "Indicações & Prêmios", 
+      icon: Coins, 
+      badge: (allRedemptions.some(r => r.status === "pendente") || allReferrals.some(r => r.status === "pendente")) 
+    },
+    { value: "premios", label: "Gerenciar Prêmios", icon: Gift },
+    { value: "vendas", label: "Gerenciar Vendas", icon: ShoppingBag },
+    { value: "aba_promocoes", label: "Gerenciar Promoções", icon: Tag },
+    { value: "promocoes", label: "Banners Promo", icon: Image },
+    { value: "cupons", label: "Cupons", icon: Percent }
+  ], [allRedemptions, allReferrals]);
+
   // Modal de prêmios
   const [showPrizeModal, setShowPrizeModal] = useState(false);
   const [prizeName, setPrizeName] = useState("");
@@ -676,6 +935,7 @@ export default function AdminDashboard() {
           name: gameName.trim(),
           price: Number(gamePrice),
           platform: gamePlatform.trim(),
+          category: gameCategory.trim(),
           imageUrl: gameImageUrl.trim(),
           coverFit: gameCoverFit,
           stock: Number(gameStock),
@@ -688,6 +948,7 @@ export default function AdminDashboard() {
           name: gameName.trim(),
           price: Number(gamePrice),
           platform: gamePlatform.trim(),
+          category: gameCategory.trim(),
           imageUrl: gameImageUrl.trim(),
           coverFit: gameCoverFit,
           stock: Number(gameStock),
@@ -713,6 +974,7 @@ export default function AdminDashboard() {
     setGameName("");
     setGamePrice(0);
     setGamePlatform("");
+    setGameCategory("");
     setGameImageUrl("");
     setGameCoverFit("cover");
     setGameStock(999);
@@ -726,6 +988,7 @@ export default function AdminDashboard() {
     setGameName(game.name || "");
     setGamePrice(game.price || 0);
     setGamePlatform(game.platform || "");
+    setGameCategory(game.category || "");
     setGameImageUrl(game.imageUrl || "");
     setGameCoverFit(game.coverFit || "cover");
     setGameStock(game.stock ?? 999);
@@ -817,7 +1080,14 @@ export default function AdminDashboard() {
       setNewUserPassword("");
     } catch (error: any) {
       console.error("Erro ao criar usuário:", error);
-      toast.error("Erro ao criar usuário: " + (error.message || "Erro desconhecido"));
+      const getFriendlyAdminError = (err: any) => {
+        const msg = (err?.message || "").toLowerCase();
+        if (msg.includes("email-already-in-use")) return "Este e-mail já está cadastrado.";
+        if (msg.includes("weak-password")) return "A senha deve ter pelo menos 6 caracteres.";
+        if (msg.includes("invalid-email")) return "O e-mail informado é inválido.";
+        return err?.message || "Erro desconhecido";
+      };
+      toast.error("Erro ao criar usuário: " + getFriendlyAdminError(error));
     } finally {
       if (secondaryApp) await deleteApp(secondaryApp);
       setCreating(false);
@@ -826,7 +1096,7 @@ export default function AdminDashboard() {
 
   const handleDeleteUser = async (userId: string, email: string) => {
     if (email === "luanmnogueira@gmail.com") return;
-    toast(`Tem certeza que deseja remover o acesso de ${email}? (Isso removerá as permissões no Firestore)`, {
+    toast(`Tem certeza que deseja remover o acesso de ${email}? (Isso removerá as permissões de acesso do usuário)`, {
       action: {
         label: "Excluir",
         onClick: async () => {
@@ -866,7 +1136,7 @@ export default function AdminDashboard() {
               });
               toast.success(`Sucesso! Compra de jogo confirmada e 15 Fortecoins adicionados ao saldo do padrinho.`);
             } else {
-              toast.error(`A indicação foi marcada como paga, mas o padrinho correspondente (${referral.referrerId}) não foi localizado no Firestore.`);
+              toast.error(`A indicação foi marcada como paga, mas o padrinho correspondente (${referral.referrerId}) não foi localizado no servidor.`);
             }
           } catch (error) {
             console.error("Erro ao confirmar compra da indicação:", error);
@@ -1116,7 +1386,7 @@ export default function AdminDashboard() {
   ];
 
   const handleSeedGames = async () => {
-    toast(`Isso vai inserir ${GAMES_CATALOG.length} jogos no Firestore. Continuar?`, {
+    toast(`Isso vai carregar ${GAMES_CATALOG.length} jogos no catálogo. Continuar?`, {
       action: {
         label: "Continuar",
         onClick: async () => {
@@ -1164,59 +1434,293 @@ export default function AdminDashboard() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-slate-950 text-slate-200">
-      <div className="bg-slate-900 border-b border-red-600/20 p-6">
-        <div className="container mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="text-slate-400 hover:text-white">
-              <ArrowLeft className="w-6 h-6" />
-            </Button>
-            <h1 className="text-3xl font-black text-neon flex items-center gap-3">
-              <Shield className="w-8 h-8 text-red-600" />
-              Painel do Gestor
-            </h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button onClick={() => setShowCreateModal(true)} className="bg-red-600 hover:bg-red-700 font-bold btn-neon flex items-center gap-2">
-              <Plus className="w-5 h-5" />
-              Criar Novo Acesso
-            </Button>
-            <Button variant="ghost" onClick={logout} className="text-slate-400 hover:text-red-500 hover:bg-red-950/20 font-bold flex items-center gap-2 h-10 px-4">
-              <LogOut className="w-4 h-4" /> Sair
-            </Button>
-          </div>
+  const renderSidebarContent = () => (
+    <div className="flex flex-col h-full bg-slate-900 border-r border-red-600/10 text-slate-200">
+      {/* Brand Header */}
+      <div className="p-6 border-b border-slate-800 flex items-center gap-3">
+        <Shield className="w-8 h-8 text-red-600 animate-pulse" />
+        <div>
+          <h2 className="text-lg font-black text-neon tracking-tight uppercase">Eforte Games</h2>
+          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block">Painel do Gestor</span>
         </div>
       </div>
 
-      <main className="container mx-auto py-12 px-4">
-        <Tabs defaultValue="usuarios" className="w-full" onValueChange={setActiveTab}>
-          <TabsList className="bg-slate-900/60 border border-red-600/20 mb-8 !flex !items-center !justify-start !overflow-x-auto !overflow-y-hidden !max-w-full !h-12 !p-1 !gap-2 !rounded-xl !w-full md:!w-auto">
-            <TabsTrigger value="usuarios" className="data-[state=active]:!bg-red-600 data-[state=active]:!text-white font-bold !h-10 !px-5 !text-sm !rounded-lg !whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 !inline-flex !items-center !justify-center">Gerenciar Acessos</TabsTrigger>
-            <TabsTrigger value="jogos" className="data-[state=active]:!bg-red-600 data-[state=active]:!text-white font-bold !h-10 !px-5 !text-sm !rounded-lg !whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 !inline-flex !items-center !justify-center !gap-2">
-              <Gamepad2 className="w-4 h-4" />
-              Gerenciar Jogos
-            </TabsTrigger>
-            <TabsTrigger value="referrals" className="data-[state=active]:!bg-red-600 data-[state=active]:!text-white font-bold !h-10 !px-5 !text-sm !rounded-lg !whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 !inline-flex !items-center !justify-center !gap-2">
-              Indicações & Prêmios
-              {(allRedemptions.some(r => r.status === "pendente") || allReferrals.some(r => r.status === "pendente")) && (
-                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
+      {/* Nav Options */}
+      <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
+        {menuItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = activeTab === item.value;
+          return (
+            <button
+              key={item.value}
+              onClick={() => {
+                setActiveTab(item.value);
+                setSidebarOpen(false);
+              }}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 group ${
+                isActive
+                  ? "bg-red-655/10 text-red-500 border-l-4 border-red-600 font-bold"
+                  : "text-slate-400 hover:text-white hover:bg-slate-850"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Icon className={`w-4 h-4 transition-colors ${
+                  isActive ? "text-red-500" : "text-slate-500 group-hover:text-red-500"
+                }`} />
+                <span>{item.label}</span>
+              </div>
+              {item.badge && (
+                <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
               )}
-            </TabsTrigger>
-            <TabsTrigger value="premios" className="data-[state=active]:!bg-red-600 data-[state=active]:!text-white font-bold !h-10 !px-5 !text-sm !rounded-lg !whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 !inline-flex !items-center !justify-center !gap-2">
-              <Gift className="w-4 h-4" />
-              Gerenciar Prêmios
-            </TabsTrigger>
-            <TabsTrigger value="vendas" className="data-[state=active]:!bg-red-600 data-[state=active]:!text-white font-bold !h-10 !px-5 !text-sm !rounded-lg !whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 !inline-flex !items-center !justify-center !gap-2">
-              📦 Gerenciar Vendas
-            </TabsTrigger>
-            <TabsTrigger value="promocoes" className="data-[state=active]:!bg-red-600 data-[state=active]:!text-white font-bold !h-10 !px-5 !text-sm !rounded-lg !whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 !inline-flex !items-center !justify-center !gap-2">
-              📢 Banners Promo
-            </TabsTrigger>
-            <TabsTrigger value="cupons" className="data-[state=active]:!bg-red-600 data-[state=active]:!text-white font-bold !h-10 !px-5 !text-sm !rounded-lg !whitespace-nowrap transition-all duration-300 hover:bg-slate-800/80 !inline-flex !items-center !justify-center !gap-2">
-              🎟️ Cupons
-            </TabsTrigger>
-          </TabsList>
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Footer Info */}
+      <div className="p-4 border-t border-slate-800 bg-slate-950/20">
+        <div className="flex items-center gap-3 px-2 py-3 mb-3">
+          <div className="w-9 h-9 rounded-full bg-red-650/10 border border-red-500/20 flex items-center justify-center font-bold text-red-500 uppercase text-sm shrink-0">
+            {user?.name?.charAt(0).toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <p className="font-bold text-white text-xs truncate">{user?.name || "Administrador"}</p>
+            <p className="text-[10px] text-slate-500 truncate">{user?.email}</p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => navigate("/")}
+            className="flex-1 h-9 text-xs border-slate-800 text-slate-400 hover:text-white hover:bg-slate-850 font-bold"
+          >
+            Ir para Home
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={logout}
+            className="h-9 w-9 p-0 text-slate-400 hover:text-red-500 hover:bg-red-950/20 rounded-lg shrink-0"
+            title="Sair da Conta"
+          >
+            <LogOut className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-200 flex">
+      {/* Desktop Sidebar */}
+      <aside className="hidden lg:block w-64 shrink-0 h-screen sticky top-0">
+        {renderSidebarContent()}
+      </aside>
+
+      {/* Mobile Drawer (Sidebar overlay) */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden flex">
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300"
+            onClick={() => setSidebarOpen(false)} 
+          />
+          {/* Drawer Content */}
+          <aside className="relative flex flex-col w-64 h-full z-10 animate-in slide-in-from-left duration-300">
+            {renderSidebarContent()}
+            <button 
+              onClick={() => setSidebarOpen(false)}
+              className="absolute top-4 -right-12 w-9 h-9 bg-slate-900 border border-slate-800 text-slate-400 hover:text-white rounded-full flex items-center justify-center focus:outline-none"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </aside>
+        </div>
+      )}
+
+      {/* Main Content Pane */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Top Header Bar */}
+        <header className="bg-slate-900 border-b border-red-650/10 py-4 px-6 sticky top-0 z-30 backdrop-blur-md bg-opacity-95">
+          <div className="flex justify-between items-center gap-4">
+            <div className="flex items-center gap-4">
+              {/* Hamburger Menu Trigger */}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setSidebarOpen(true)} 
+                className="lg:hidden text-slate-400 hover:text-white hover:bg-slate-800"
+              >
+                <Menu className="w-6 h-6" />
+              </Button>
+
+              <h1 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2.5">
+                <Shield className="w-6 h-6 text-red-600 shrink-0" />
+                {menuItems.find(item => item.value === activeTab)?.label || "Painel do Gestor"}
+              </h1>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <Button onClick={() => setShowCreateModal(true)} className="bg-red-600 hover:bg-red-700 font-bold btn-neon flex items-center gap-1.5 h-9 text-xs sm:h-10 sm:text-sm">
+                <Plus className="w-4 h-4" />
+                Criar Novo Acesso
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        {/* Page Content Body */}
+        <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8 max-w-7xl w-full mx-auto">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsContent value="visao-geral">
+              <div className="space-y-8">
+              {/* KPIs Row */}
+              {(() => {
+                const stats = getSalesStats();
+                const activeCount = users.filter((u: any) => {
+                  if (!u.lastSignedIn) return false;
+                  const lastActive = new Date(u.lastSignedIn).getTime();
+                  return (Date.now() - lastActive) < 15 * 60 * 1000;
+                }).length;
+
+                return (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                      <Card className="bg-slate-900 border-red-600/10 p-6 card-neon">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Faturamento Hoje</p>
+                            <p className="text-2xl font-black text-white">R$ {stats.today.toFixed(2).replace(".", ",")}</p>
+                            <p className="text-[10px] text-slate-500 mt-1 font-semibold">{stats.todayCount} venda(s)</p>
+                          </div>
+                          <Coins className="w-8 h-8 text-red-500" />
+                        </div>
+                      </Card>
+
+                      <Card className="bg-slate-900 border-red-600/10 p-6 card-neon">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Faturamento na Semana</p>
+                            <p className="text-2xl font-black text-white">R$ {stats.week.toFixed(2).replace(".", ",")}</p>
+                            <p className="text-[10px] text-slate-500 mt-1 font-semibold">{stats.weekCount} venda(s)</p>
+                          </div>
+                          <Coins className="w-8 h-8 text-orange-500" />
+                        </div>
+                      </Card>
+
+                      <Card className="bg-slate-900 border-red-600/10 p-6 card-neon">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Faturamento no Mês</p>
+                            <p className="text-2xl font-black text-white">R$ {stats.month.toFixed(2).replace(".", ",")}</p>
+                            <p className="text-[10px] text-slate-500 mt-1 font-semibold">{stats.monthCount} venda(s)</p>
+                          </div>
+                          <Coins className="w-8 h-8 text-yellow-500" />
+                        </div>
+                      </Card>
+
+                      <Card className="bg-slate-900 border-red-600/10 p-6 card-neon">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Faturamento Total</p>
+                            <p className="text-2xl font-black text-red-500">R$ {stats.total.toFixed(2).replace(".", ",")}</p>
+                            <p className="text-[10px] text-slate-500 mt-1 font-semibold">{stats.count} venda(s) concluída(s)</p>
+                          </div>
+                          <Coins className="w-8 h-8 text-red-600 animate-pulse" />
+                        </div>
+                      </Card>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-6 mt-6">
+                      <Card className="bg-slate-900 border-red-600/10 p-6 card-neon flex-1 max-w-sm">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Usuários Cadastrados</p>
+                            <p className="text-2xl font-black text-white">{users.length}</p>
+                          </div>
+                          <User className="w-8 h-8 text-slate-500" />
+                        </div>
+                      </Card>
+
+                      <Card className="bg-slate-900 border-red-600/10 p-6 card-neon flex-1 max-w-sm">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                              <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-ping" />
+                              Usuários Online (15m)
+                            </p>
+                            <p className="text-2xl font-black text-green-500">{Math.max(1, activeCount)}</p>
+                          </div>
+                          <UserCheck className="w-8 h-8 text-green-500" />
+                        </div>
+                      </Card>
+                    </div>
+                  </>
+                );
+              })()}
+
+              {/* Chart Section */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <Card className="lg:col-span-2 bg-slate-900 border-red-600/10 p-6 card-neon">
+                  <h3 className="text-base font-bold text-white mb-6 uppercase tracking-wider flex items-center gap-2">
+                    📈 Faturamento Diário (Últimos 7 Dias)
+                  </h3>
+                  <div className="h-[300px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={getChartData()} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="colorFaturamento" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#ef4444" stopOpacity={0.4}/>
+                            <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" opacity={0.5} />
+                        <XAxis dataKey="name" stroke="#64748b" fontSize={10} tickLine={false} />
+                        <YAxis stroke="#64748b" fontSize={10} tickLine={false} />
+                        <ChartTooltip contentStyle={{ backgroundColor: "#020617", border: "1px solid rgba(220, 38, 38, 0.2)", borderRadius: "8px", color: "#fff" }} />
+                        <Area type="monotone" dataKey="Faturamento" stroke="#ef4444" strokeWidth={2} fillOpacity={1} fill="url(#colorFaturamento)" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </Card>
+
+                <Card className="bg-slate-900 border-red-600/10 p-6 card-neon flex flex-col justify-between">
+                  <div>
+                    <h3 className="text-base font-bold text-white mb-6 uppercase tracking-wider">
+                      📋 Vendas Recentes
+                    </h3>
+                    <div className="space-y-4">
+                      {sales && sales.slice(0, 5).map((sale: any) => (
+                        <div key={sale.id} className="flex justify-between items-center border-b border-slate-800/60 pb-3 last:border-0 last:pb-0">
+                          <div className="max-w-[150px]">
+                            <p className="font-bold text-slate-200 text-sm truncate">{sale.productName}</p>
+                            <p className="text-[10px] text-slate-500 truncate">Comprador: {sale.buyerName}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-black text-red-500 text-sm">R$ {parseFloat(sale.totalPrice || "0").toFixed(2).replace(".", ",")}</p>
+                            <span className={`text-[8px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded ${
+                              sale.status === "entregue" ? "bg-green-500/10 text-green-500" :
+                              sale.status === "pago" || sale.status === "enviado" ? "bg-blue-500/10 text-blue-400 animate-pulse" :
+                              "bg-slate-800 text-slate-400"
+                            }`}>
+                              {sale.status}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                      {(!sales || sales.length === 0) && (
+                        <p className="text-slate-500 text-sm italic text-center py-8">Nenhuma venda registrada.</p>
+                      )}
+                    </div>
+                  </div>
+                  {sales && sales.length > 0 && (
+                    <Button onClick={() => setActiveTab("vendas")} className="w-full bg-slate-950 border border-red-600/20 hover:bg-slate-900 text-xs font-bold mt-4 h-9">
+                      Ver Todas as Vendas
+                    </Button>
+                  )}
+                </Card>
+              </div>
+            </div>
+          </TabsContent>
 
           <TabsContent value="usuarios">
             <h2 className="text-xl font-bold text-white mb-8 border-l-4 border-red-600 pl-4 uppercase tracking-widest text-sm italic">Gestão de Equipe</h2>
@@ -1364,6 +1868,7 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                     <p className="text-xs text-slate-400 mb-1">Plataforma: <span className="text-white font-medium">{game.platform}</span></p>
+                    {game.category && <p className="text-xs text-slate-400 mb-1">Categoria: <span className="text-white font-medium">{game.category}</span></p>}
                     <p className="text-xs text-slate-400 mb-1">Preço: <span className="text-green-400 font-bold">R$ {Number(game.price || 0).toFixed(2)}</span></p>
                     <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-800/50">
                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border ${
@@ -1566,39 +2071,65 @@ export default function AdminDashboard() {
                             </span>
                           </td>
                           <td className="py-3.5 px-4 text-right">
-                            {sale.status === 'pago' ? (
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedDeliverOrder(sale);
-                                  setDeliveryInstructions(
-                                    `Obrigado por adquirir o jogo ${sale.productName}, aqui está o login e senha para acesso a conta:\n\n` +
-                                    `Login: \n` +
-                                    `Senha: \n\n` +
-                                    `Qualquer coisa estaremos a disposição para ajudar no que precisar, você pode entrar em contato conosco pelo chat do site ou pelo nosso WhatsApp: +55 43 8425-3691.`
-                                  );
-                                  setDeliverGameOpen(true);
-                                }}
-                                className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs"
-                              >
-                                Fornecer Jogo
-                              </Button>
-                            ) : (sale.status === 'enviado' || sale.status === 'entregue') ? (
+                            <div className="flex items-center justify-end gap-2">
+                              {sale.status === 'pago' ? (
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedDeliverOrder(sale);
+                                    setDeliveryInstructions(
+                                      `Obrigado por adquirir o jogo ${sale.productName}, aqui está o login e senha para acesso a conta:\n\n` +
+                                      `Login: \n` +
+                                      `Senha: \n\n` +
+                                      `Qualquer coisa estaremos a disposição para ajudar no que precisar, você pode entrar em contato conosco pelo chat do site ou pelo nosso WhatsApp: +55 43 8425-3691.`
+                                    );
+                                    setDeliverGameOpen(true);
+                                  }}
+                                  className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs"
+                                >
+                                  Fornecer Jogo
+                                </Button>
+                              ) : (sale.status === 'enviado' || sale.status === 'entregue') ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setSelectedDeliverOrder(sale);
+                                    setDeliveryInstructions(sale.deliveryDetails || "");
+                                    setDeliverGameOpen(true);
+                                  }}
+                                  className="border-red-600/30 text-red-400 hover:bg-red-950/20 font-bold text-xs"
+                                >
+                                  Ver Entrega
+                                </Button>
+                              ) : (
+                                <span className="text-xs text-slate-600 italic px-2">N/A</span>
+                              )}
+
+                              {/* Cancelar Pedido (Não Fornecer) */}
+                              {sale.status === 'pago' || sale.status === 'pendente' ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleUpdateSaleStatus(sale.id, 'cancelado')}
+                                  title="Não Fornecer (Cancelar Pedido)"
+                                  className="border-slate-700 text-slate-400 hover:text-orange-400 hover:bg-orange-500/10 hover:border-orange-500/30 px-2"
+                                >
+                                  <Ban className="w-4 h-4" />
+                                </Button>
+                              ) : null}
+
+                              {/* Excluir Pedido */}
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => {
-                                  setSelectedDeliverOrder(sale);
-                                  setDeliveryInstructions(sale.deliveryDetails || "");
-                                  setDeliverGameOpen(true);
-                                }}
-                                className="border-red-600/30 text-red-400 hover:bg-red-950/20 font-bold text-xs"
+                                onClick={() => handleDeleteSale(sale.id)}
+                                title="Excluir Pedido"
+                                className="border-slate-700 text-slate-400 hover:text-red-500 hover:bg-red-500/10 hover:border-red-500/30 px-2"
                               >
-                                Ver Entrega
+                                <Trash2 className="w-4 h-4" />
                               </Button>
-                            ) : (
-                              <span className="text-xs text-slate-600 italic">N/A</span>
-                            )}
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -1863,8 +2394,116 @@ export default function AdminDashboard() {
               </div>
             </Card>
           </TabsContent>
+
+          <TabsContent value="aba_promocoes">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  🏷️ Gerenciar Promoções
+                </h3>
+                <p className="text-slate-400 text-sm">
+                  Crie e gerencie as ofertas que aparecem na aba "Promoções" do site.
+                </p>
+              </div>
+              <Button onClick={() => { resetDealForm(); setShowDealModal(true); }} className="bg-red-600 hover:bg-red-700 font-bold btn-neon flex items-center gap-2">
+                <Plus className="w-5 h-5" />
+                Adicionar Promoção
+              </Button>
+            </div>
+
+            <Card className="bg-slate-900 border-red-600/10 p-6 flex flex-col card-neon">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-red-600/20 text-slate-400 text-xs uppercase tracking-wider font-bold">
+                      <th className="py-3 px-4">Imagem</th>
+                      <th className="py-3 px-4">Título</th>
+                      <th className="py-3 px-4">Categoria</th>
+                      <th className="py-3 px-4">Preço</th>
+                      <th className="py-3 px-4">Preço Antigo</th>
+                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dealsList.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-slate-500 italic text-sm">Nenhuma promoção cadastrada no sistema.</td>
+                      </tr>
+                    ) : (
+                      dealsList.map((deal: any) => (
+                        <tr key={deal.id} className="border-b border-slate-800/40 hover:bg-slate-800/10 text-sm">
+                          <td className="py-3 px-4">
+                            <div className="h-10 w-16 rounded bg-slate-950 overflow-hidden border border-slate-800 flex items-center justify-center">
+                              {deal.imageUrl ? (
+                                <img src={deal.imageUrl} alt={deal.title} className="w-full h-full object-cover" />
+                              ) : (
+                                <span className="text-[10px] text-slate-600 font-bold">Sem imagem</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="font-bold text-white max-w-[200px] truncate" title={deal.title}>{deal.title}</div>
+                            {deal.description && <div className="text-xs text-slate-500 max-w-[200px] truncate" title={deal.description}>{deal.description}</div>}
+                          </td>
+                          <td className="py-3.5 px-4 font-semibold text-slate-300">
+                            {deal.category === 'jogo' ? 'Jogos' :
+                             deal.category === 'gift_card_playstation' ? 'Gift Card PlayStation' :
+                             deal.category === 'gift_card_xbox' ? 'Gift Card Xbox' : deal.category}
+                          </td>
+                          <td className="py-3.5 px-4 font-bold text-green-400">
+                            R$ {Number(deal.price || 0).toFixed(2).replace(".", ",")}
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-400 font-semibold">
+                            {deal.oldPrice ? `R$ ${Number(deal.oldPrice).toFixed(2).replace(".", ",")}` : "-"}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border
+                              ${deal.isActive 
+                                ? "bg-green-500/10 text-green-500 border-green-500/20" 
+                                : "bg-red-500/10 text-red-500 border-red-500/20"}`}>
+                              {deal.isActive ? "Ativo" : "Inativo"}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                onClick={() => handleToggleDealActive(deal.id, deal.isActive)}
+                                className={`font-bold h-8 text-xs ${
+                                  deal.isActive 
+                                    ? "bg-slate-850 hover:bg-slate-800 text-slate-350"
+                                    : "bg-green-600 hover:bg-green-700 text-white"
+                                }`}
+                              >
+                                {deal.isActive ? "Pausar" : "Ativar"}
+                              </Button>
+                              <Button
+                                onClick={() => openEditDeal(deal)}
+                                variant="outline"
+                                className="bg-blue-950/20 hover:bg-blue-950/40 text-blue-400 border-blue-500/30 hover:border-blue-500/50 font-bold h-8 text-xs px-2.5"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                onClick={() => handleDeleteDeal(deal.id)}
+                                variant="outline"
+                                className="bg-red-950/20 hover:bg-red-950/40 text-red-400 border-red-500/30 hover:border-red-500/50 font-bold h-8 text-xs px-2.5"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </TabsContent>
         </Tabs>
       </main>
+    </div>
 
       {/* Modal de Criação de Usuário */}
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
@@ -2034,16 +2673,47 @@ export default function AdminDashboard() {
                 required
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label className="text-xs text-slate-300 font-bold uppercase">Plataforma</Label>
                 <Input
                   value={gamePlatform}
                   onChange={(e) => setGamePlatform(e.target.value)}
-                  placeholder="Ex: PS4/PS5"
+                  placeholder="Selecione abaixo ou digite..."
                   className="bg-slate-950 border-red-600/20 text-white"
                   required
                 />
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {["PS5", "PS4", "PS4/PS5"].map(plat => (
+                    <span 
+                      key={plat} 
+                      onClick={() => setGamePlatform(plat)}
+                      className={`text-[10px] px-2 py-0.5 rounded cursor-pointer transition-colors border ${gamePlatform === plat ? "bg-red-600/20 text-red-400 border-red-500/50 font-bold" : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800"}`}
+                    >
+                      {plat}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-slate-300 font-bold uppercase">Categoria</Label>
+                <Input
+                  value={gameCategory}
+                  onChange={(e) => setGameCategory(e.target.value)}
+                  placeholder="Selecione abaixo ou digite..."
+                  className="bg-slate-950 border-red-600/20 text-white"
+                />
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {["Ação", "Aventura", "RPG", "Esportes", "Corrida", "Tiro / FPS", "Pré Venda"].map(cat => (
+                    <span 
+                      key={cat} 
+                      onClick={() => setGameCategory(cat)}
+                      className={`text-[10px] px-2 py-0.5 rounded cursor-pointer transition-colors border ${gameCategory === cat ? "bg-red-600/20 text-red-400 border-red-500/50 font-bold" : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800"}`}
+                    >
+                      {cat}
+                    </span>
+                  ))}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label className="text-xs text-slate-300 font-bold uppercase">Preço (R$)</Label>
@@ -2413,7 +3083,7 @@ export default function AdminDashboard() {
               {isSavingBatch && (
                 <div className="space-y-1.5">
                   <div className="flex justify-between text-xs text-red-400 font-bold">
-                    <span>Salvando jogos no Firestore...</span>
+                    <span>Salvando jogos no catálogo...</span>
                     <span>{batchSaveProgress}%</span>
                   </div>
                   <div className="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden border border-red-600/10">
@@ -2646,6 +3316,132 @@ export default function AdminDashboard() {
               </Button>
               <Button type="submit" className="bg-red-600 hover:bg-red-700 font-bold btn-neon">
                 Criar Cupom
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Adicionar / Editar Promoção */}
+      <Dialog open={showDealModal} onOpenChange={(open) => {
+        if (!open) resetDealForm();
+        setShowDealModal(open);
+      }}>
+        <DialogContent className="bg-slate-900 border-red-600/30 text-white max-w-md card-neon">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2 text-neon">
+              <Gift className="text-red-500" /> {editingDealId ? "Editar Promoção" : "Cadastrar Nova Promoção"}
+            </DialogTitle>
+            <DialogDescription className="text-slate-400 text-xs">
+              Preencha as informações do produto em oferta que ficará disponível na aba de Promoções.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSaveDeal} className="space-y-4 my-2">
+            <div className="space-y-2">
+              <Label className="text-xs text-slate-300 font-bold uppercase">Título da Promoção</Label>
+              <Input
+                value={dealTitle}
+                onChange={(e) => setDealTitle(e.target.value)}
+                placeholder="Ex: FIFA 26 Ultimate Edition"
+                className="bg-slate-950 border-red-600/20 text-white"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-slate-300 font-bold uppercase">Descrição / Detalhes</Label>
+              <textarea
+                value={dealDescription}
+                onChange={(e) => setDealDescription(e.target.value)}
+                placeholder="Ex: Acesso imediato à conta compartilhada com instruções passo a passo..."
+                className="w-full h-20 p-3 bg-slate-950 border border-red-600/20 rounded-md text-sm text-white focus:outline-none focus:ring-1 focus:ring-red-500/50"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-slate-300 font-bold uppercase">Categoria</Label>
+              <select
+                value={dealCategory}
+                onChange={(e) => setDealCategory(e.target.value as any)}
+                className="w-full bg-slate-950 border border-red-600/20 rounded-md h-10 px-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-red-500/50"
+              >
+                <option value="jogo">Jogos</option>
+                <option value="gift_card_playstation">Gift Card PlayStation</option>
+                <option value="gift_card_xbox">Gift Card Xbox</option>
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs text-slate-300 font-bold uppercase">Preço Promocional (R$)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={dealPrice}
+                  onChange={(e) => setDealPrice(e.target.value)}
+                  placeholder="Ex: 59.90"
+                  className="bg-slate-950 border-red-600/20 text-white"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-slate-300 font-bold uppercase">Preço Antigo (R$ - Opcional)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={dealOldPrice}
+                  onChange={(e) => setDealOldPrice(e.target.value)}
+                  placeholder="Ex: 120.00"
+                  className="bg-slate-950 border-red-600/20 text-white"
+                />
+              </div>
+            </div>
+            <div className="space-y-4 border border-red-600/10 p-3 rounded-lg bg-slate-950/20">
+              <div className="space-y-2">
+                <Label className="text-xs text-slate-300 font-bold uppercase">URL da Imagem da Promoção</Label>
+                <Input
+                  value={dealImageUrl}
+                  onChange={(e) => setDealImageUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="bg-slate-950 border-red-600/20 text-white"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-slate-300 font-bold uppercase">Ou Enviar Foto Local</Label>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleDealImageUpload}
+                  disabled={uploadingDealImage}
+                  className="bg-slate-950 border-red-600/20 text-white cursor-pointer file:bg-red-600 file:text-white file:border-0 file:rounded-md file:px-3 file:py-1 file:mr-3 hover:file:bg-red-700 text-xs"
+                />
+                {uploadingDealImage && <p className="text-xs text-red-500 animate-pulse">Enviando imagem...</p>}
+              </div>
+              {dealImageUrl && (
+                <div className="h-20 w-32 rounded overflow-hidden border border-red-600/20 relative group">
+                  <img src={dealImageUrl} alt="Preview" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setDealImageUrl("")}
+                    className="absolute top-1 right-1 bg-red-600 rounded-full p-1 text-white hover:bg-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-slate-300 font-bold uppercase">Link do Botão (Opcional)</Label>
+              <Input
+                value={dealLink}
+                onChange={(e) => setDealLink(e.target.value)}
+                placeholder="Ex: /digital ou link externo. Se vazio, redireciona ao WhatsApp."
+                className="bg-slate-950 border-red-600/20 text-white"
+              />
+            </div>
+            <DialogFooter className="mt-6">
+              <Button type="button" variant="ghost" onClick={() => { setShowDealModal(false); resetDealForm(); }} className="text-slate-400 hover:text-white">
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={uploadingDealImage} className="bg-red-600 hover:bg-red-700 font-bold px-6 btn-neon">
+                {uploadingDealImage ? "Aguarde..." : (editingDealId ? "Salvar Alterações" : "Criar Promoção")}
               </Button>
             </DialogFooter>
           </form>

@@ -9,6 +9,7 @@ import Store from "./pages/Store";
 import UsedMarketplace from "./pages/UsedMarketplace";
 import DigitalMedia from "./pages/DigitalMedia";
 import AdminDashboard from "./pages/AdminDashboard";
+import PromotionsPage from "./pages/PromotionsPage";
 import SellerDashboard from "./pages/SellerDashboard";
 import BecomeSellerForm from "./pages/BecomeSellerForm";
 import AddUsedProduct from "./pages/AddUsedProduct";
@@ -20,6 +21,8 @@ import FloatingChat from "./components/FloatingChat";
 import MobileBottomNav from "./components/MobileBottomNav";
 import FAQ from "./pages/FAQ";
 import CPFCompletionModal from "./components/CPFCompletionModal";
+import TermsAcceptanceModal from "./components/TermsAcceptanceModal";
+import TermsFortecoins from "./pages/TermsFortecoins";
 
 import { useEffect } from "react";
 import FortecoinsPage from "./pages/FortecoinsPage";
@@ -32,6 +35,7 @@ function Router() {
         <Route path={"/loja"} component={Store} />
         <Route path={"/usados"} component={UsedMarketplace} />
         <Route path={"/digital"} component={DigitalMedia} />
+        <Route path={"/promocoes"} component={PromotionsPage} />
         <Route path={"/admin"} component={AdminDashboard} />
         <Route path={"/vendedor"} component={SellerDashboard} />
         <Route path={"/virar-vendedor"} component={BecomeSellerForm} />
@@ -42,6 +46,7 @@ function Router() {
         <Route path={"/colaborador"} component={CollaboratorDashboard} />
         <Route path={"/minhas-compras"} component={MyPurchases} />
         <Route path={"/fortecoins"} component={FortecoinsPage} />
+        <Route path={"/termos"} component={TermsFortecoins} />
         <Route path={"/faq"} component={FAQ} />
         <Route path={"/404"} component={NotFound} />
         {/* Final fallback route */}
@@ -72,6 +77,7 @@ function App() {
           <FloatingChat />
           <MobileBottomNav />
           <CPFCompletionModal />
+          <TermsAcceptanceModal />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

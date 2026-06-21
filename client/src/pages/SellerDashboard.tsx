@@ -155,7 +155,7 @@ export default function SellerDashboard() {
       toast.success("Produto anunciado com sucesso!");
     } catch (error) {
       console.error(error);
-      toast.error("Erro ao anunciar produto. Verifique as permissões de Storage e Firestore.");
+      toast.error("Erro ao anunciar produto. Verifique os dados de acesso e a conexão com o servidor.");
     } finally {
       setLoading(false);
     }

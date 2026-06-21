@@ -118,7 +118,7 @@ export default function CollaboratorDashboard() {
       cancelEdit();
     } catch (error) {
       console.error("Erro ao salvar produto:", error);
-      toast.error("Erro ao salvar produto. Verifique as permissões do Firestore/Storage.");
+      toast.error("Erro ao salvar produto. Verifique os dados de acesso e a conexão com o servidor.");
     } finally {
       setLoading(false);
     }

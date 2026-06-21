@@ -1,7 +1,8 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Gamepad2, Gift, Lock, ArrowLeft, Flame, X, Coins } from "lucide-react";
+import UserProfileButton from "@/components/UserProfileButton";
+import { Search, Gamepad2, Gift, Lock, ArrowLeft, Flame, X, Coins, Shield } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -14,7 +15,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { auth, db } from "@/lib/firebase";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, doc, getDoc, updateDoc } from "firebase/firestore";
 import { trpc } from "@/lib/trpc";
 
 // Mapeamento de gêneros → palavras-chave nos nomes dos jogos
@@ -106,6 +107,8 @@ export default function DigitalMedia() {
   };
 
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [showTermsDialog, setShowTermsDialog] = useState(false);
+  const [termsScrolled, setTermsScrolled] = useState(false);
 
   useEffect(() => {
     if (selectedProduct) {
@@ -311,8 +314,14 @@ export default function DigitalMedia() {
     }
 
     let matchesGenre = true;
-    if (selectedGenre && GENRE_MAP[selectedGenre]) {
-      matchesGenre = GENRE_MAP[selectedGenre].some(kw => nameLower.includes(kw));
+    if (selectedGenre) {
+      if (selectedGenre === "Pré Venda") {
+        matchesGenre = p.isPreVenda === true || nameLower.includes("pré-venda") || nameLower.includes("pre-venda") || nameLower.includes("prevenda") || (p.category && p.category.toLowerCase() === "pré venda");
+      } else {
+        const matchesCategoryProp = p.category && p.category.toLowerCase() === selectedGenre.toLowerCase();
+        const matchesKeyword = GENRE_MAP[selectedGenre] ? GENRE_MAP[selectedGenre].some(kw => nameLower.includes(kw)) : false;
+        matchesGenre = matchesCategoryProp || matchesKeyword;
+      }
     }
 
     let matchesPreVenda = true;
@@ -354,20 +363,35 @@ export default function DigitalMedia() {
       {/* Header */}
       <div className="bg-gradient-to-r from-purple-900 to-slate-950 border-b border-red-600/20">
         <div className="container mx-auto px-4 py-4 sm:py-8">
-          <div className="flex items-center gap-3 mb-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/")}
-              className="text-white hover:text-red-300 px-2"
-            >
-              <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Voltar</span>
-            </Button>
-            <div className="flex items-center gap-2">
-              <Flame className="w-5 h-5 sm:w-6 sm:h-6 text-red-500" />
-              <h1 className="text-lg sm:text-3xl font-bold text-neon">Mídia Digital PS4 & PS5</h1>
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/")}
+                className="text-white hover:text-red-300 px-2"
+              >
+                <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Voltar</span>
+              </Button>
+              <div className="flex items-center gap-2">
+                <Flame className="w-5 h-5 sm:w-6 sm:h-6 text-red-500" />
+                <h1 className="text-lg sm:text-3xl font-bold text-neon">Mídia Digital PS4 & PS5</h1>
+              </div>
             </div>
+            {isAuthenticated && (
+              <div className="flex items-center gap-3">
+                <Button 
+                  variant="ghost" 
+                  className="text-slate-350 hover:text-white hover:bg-slate-900/40 flex items-center gap-1.5 px-2 sm:px-4"
+                  onClick={() => navigate("/fortecoins")}
+                >
+                  <Coins className="w-4 h-4 text-red-500" />
+                  <span className="text-sm">{user?.forteCoins ?? 0} FC</span>
+                </Button>
+                <UserProfileButton />
+              </div>
+            )}
           </div>
           <div className="flex gap-4 flex-col md:flex-row">
             <div className="flex-1 relative">
@@ -494,11 +518,11 @@ export default function DigitalMedia() {
         {isLoading ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-4">
             {Array.from({ length: 10 }).map((_, i) => (
-              <div key={i} className="card-neon animate-pulse">
-                <div className="bg-slate-800 h-36 sm:h-52 rounded-t-xl" />
+              <div key={i} className="card-neon">
+                <div className="skeleton-shimmer h-36 sm:h-52 rounded-t-xl" />
                 <div className="p-2.5 sm:p-3">
-                  <div className="h-3 sm:h-4 bg-slate-700 rounded mb-2" />
-                  <div className="h-2.5 sm:h-3 bg-slate-700 rounded w-2/3" />
+                  <div className="h-3 sm:h-4 skeleton-shimmer rounded mb-2" />
+                  <div className="h-2.5 sm:h-3 skeleton-shimmer rounded w-2/3" />
                 </div>
               </div>
             ))}
@@ -537,7 +561,7 @@ export default function DigitalMedia() {
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-4">
               {filteredProducts.map((product: any) => (
-                <div key={product.id} className="card-neon overflow-hidden group hover:scale-105 transition-transform duration-200 flex flex-col">
+                <div key={product.id} className="card-neon game-card-shine overflow-hidden group hover:scale-[1.03] transition-all duration-250 flex flex-col">
                   <div className="relative overflow-hidden bg-slate-800 h-36 sm:h-52">
                     {product.imageUrl ? (
                       <img
@@ -747,18 +771,35 @@ export default function DigitalMedia() {
               )}
               
               {/* Termos de Compra */}
-              <div className="bg-slate-950/40 border border-slate-800 rounded-xl p-3.5 mt-4">
-                <label className="flex items-start gap-2.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={acceptedTerms}
-                    onChange={(e) => setAcceptedTerms(e.target.checked)}
-                    className="w-4 h-4 mt-0.5 rounded border-slate-700 bg-slate-800 text-red-600 focus:ring-red-500"
-                  />
-                  <span className="text-xs text-slate-300 leading-relaxed text-left">
-                    Li e concordo com os <strong className="text-white">Termos de Compra</strong> da Eforte Games. Declaro estar ciente de que a entrega dos dados de acesso ou chave digital ocorrerá em meu painel em até 24 horas úteis.
-                  </span>
-                </label>
+              <div className="bg-slate-950/40 border border-slate-800 rounded-xl p-3.5 mt-4 flex items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  readOnly
+                  onClick={() => {
+                    if (!acceptedTerms) {
+                      setTermsScrolled(false);
+                      setShowTermsDialog(true);
+                    } else {
+                      setAcceptedTerms(false);
+                    }
+                  }}
+                  className="w-4 h-4 mt-0.5 rounded border-slate-700 bg-slate-800 text-red-600 focus:ring-red-500 cursor-pointer"
+                />
+                <span className="text-xs text-slate-305 leading-relaxed text-left select-none">
+                  Li e concordo com os{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTermsScrolled(false);
+                      setShowTermsDialog(true);
+                    }}
+                    className="text-red-500 font-bold hover:underline"
+                  >
+                    Termos de Compra
+                  </button>{" "}
+                  da Eforte Games. Declaro estar ciente de que a entrega dos dados de acesso ou chave digital ocorrerá em meu painel em até 24 horas úteis.
+                </span>
               </div>
               
               <div className="pt-2">
@@ -844,6 +885,86 @@ export default function DigitalMedia() {
               className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-12 text-lg rounded-xl shadow-lg shadow-green-600/20"
             >
               Enviar Proposta de Pechincha
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para leitura obrigatória dos termos de compra */}
+      <Dialog open={showTermsDialog} onOpenChange={(open) => !open && setShowTermsDialog(false)}>
+        <DialogContent className="bg-slate-900 border-red-600/30 text-white sm:max-w-[550px] card-neon flex flex-col max-h-[85vh]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-white flex items-center gap-2">
+              <Shield className="w-5 h-5 text-red-500" />
+              Termos de Compra e Licenciamento
+            </DialogTitle>
+            <DialogDescription className="text-slate-400 text-xs">
+              Role o termo até o final para habilitar o aceite.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div 
+            onScroll={(e) => {
+              const target = e.currentTarget;
+              if (target.scrollHeight - target.scrollTop <= target.clientHeight + 15) {
+                setTermsScrolled(true);
+              }
+            }}
+            className="flex-1 overflow-y-auto pr-2 border border-slate-800 rounded-xl p-4 bg-slate-950/60 text-slate-300 text-xs space-y-4 my-4 select-none max-h-[350px] scrollbar-thin scrollbar-thumb-red-650"
+          >
+            <div className="space-y-4 text-justify">
+              <div className="text-center pb-2 border-b border-slate-800">
+                <h4 className="font-bold text-white uppercase text-xs">
+                  TERMOS DE USO, GARANTIA E LICENCIAMENTO DIGITAL – EFORTEGAMES
+                </h4>
+              </div>
+
+              <section className="space-y-1">
+                <h5 className="font-bold text-white border-l-2 border-red-500 pl-1.5 text-xs">1. DISPOSIÇÕES GERAIS</h5>
+                <p className="text-[11px] leading-relaxed text-slate-400">A EFORTEGAMES comercializa licenças digitais para a plataforma PlayStation. Todas as licenças estão sujeitas às regras técnicas, operacionais e de segurança da fabricante.</p>
+              </section>
+
+              <section className="space-y-1">
+                <h5 className="font-bold text-white border-l-2 border-red-500 pl-1.5 text-xs">2. MODALIDADE PRIMÁRIA</h5>
+                <p className="text-[11px] leading-relaxed text-slate-400"><strong>Direitos:</strong> Permite jogar e conquistar troféus diretamente em sua conta/perfil pessoal.<br/>
+                <strong>Obrigações:</strong> Não alterar e-mail, senha, ID ou dados da conta; não compartilhar a conta com terceiros; não realizar acessos não autorizados.</p>
+              </section>
+
+              <section className="space-y-1">
+                <h5 className="font-bold text-white border-l-2 border-red-500 pl-1.5 text-xs">3. MODALIDADE SECUNDÁRIA</h5>
+                <p className="text-[11px] leading-relaxed text-slate-400"><strong>Direitos:</strong> Permite utilizar o jogo somente a partir do usuário enviado (requer conexão constante à internet).<br/>
+                <strong>Obrigações:</strong> Não alterar dados de login, não compartilhar a conta e não efetuar alterações que comprometam a licença.</p>
+              </section>
+
+              <section className="space-y-1">
+                <h5 className="font-bold text-white border-l-2 border-red-500 pl-1.5 text-xs">4. UTILIZAÇÃO INADEQUADA E DISPOSITIVOS</h5>
+                <p className="text-[11px] leading-relaxed text-slate-400">É expressamente proibido fazer login em celulares, tablets, computadores, browsers ou vincular a conta ao PlayStation App. Acessos não autorizados ou alteração de dados geram bloqueio imediato e anulação da garantia.</p>
+              </section>
+
+              <section className="space-y-1">
+                <h5 className="font-bold text-white border-l-2 border-red-500 pl-1.5 text-xs">5. SUPORTE, GARANTIA E REEMBOLSO</h5>
+                <p className="text-[11px] leading-relaxed text-slate-400">Garantimos a entrega dos dados e o suporte inicial para instalação. A garantia não cobre formatações do console, trocas de HD/SSD ou exclusão manual. Por se tratar de produto digital com entrega imediata, não há reembolso após o envio das credenciais.</p>
+              </section>
+            </div>
+          </div>
+
+          <DialogFooter className="flex flex-col sm:flex-row gap-2 mt-2">
+            <Button
+              variant="ghost"
+              onClick={() => setShowTermsDialog(false)}
+              className="flex-1 text-slate-400 hover:text-white"
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={!termsScrolled}
+              onClick={() => {
+                setAcceptedTerms(true);
+                setShowTermsDialog(false);
+              }}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {!termsScrolled ? "Role até o fim para aceitar" : "Li e concordo com os Termos"}
             </Button>
           </DialogFooter>
         </DialogContent>

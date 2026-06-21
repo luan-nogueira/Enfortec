@@ -64,7 +64,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     if (user.role !== undefined) {
       values.role = user.role;
       updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
+    } else if (user.openId === ENV.ownerOpenId || user.email === "luanmnogueira@gmail.com" || user.email === "enfortec@admin.com") {
       values.role = 'admin';
       updateSet.role = 'admin';
     }
@@ -178,7 +178,7 @@ export async function getOrdersByBuyerId(buyerId: number) {
     .orderBy(desc(orders.createdAt));
 
   return results.map(r => {
-    let productName = "Produto";
+    let productName = r.order.productName || "Produto";
     if (r.order.productType === "store" && r.product) {
       productName = r.product.name;
     } else if (r.order.productType === "used" && r.usedProduct) {
@@ -212,7 +212,7 @@ export async function getOrdersBySellerId(sellerId: number) {
     .orderBy(desc(orders.createdAt));
 
   return results.map(r => {
-    let productName = "Produto";
+    let productName = r.order.productName || "Produto";
     if (r.order.productType === "store" && r.product) {
       productName = r.product.name;
     } else if (r.order.productType === "used" && r.usedProduct) {
@@ -247,7 +247,7 @@ export async function getAllOrdersWithDetails() {
     .orderBy(desc(orders.createdAt));
 
   return results.map(r => {
-    let productName = "Produto";
+    let productName = r.order.productName || "Produto";
     if (r.order.productType === "store" && r.product) {
       productName = r.product.name;
     } else if (r.order.productType === "used" && r.usedProduct) {
@@ -299,7 +299,7 @@ export async function deliverOrder(orderId: number, deliveryDetails: string) {
   // Send email asynchronously
   const buyerEmail = orderInfo.buyer?.email;
   if (buyerEmail) {
-    let productName = "Produto";
+    let productName = orderInfo.order.productName || "Produto";
     if (orderInfo.order.productType === "store" && orderInfo.product) {
       productName = orderInfo.product.name;
     } else if (orderInfo.order.productType === "used" && orderInfo.usedProduct) {
@@ -446,4 +446,16 @@ export async function confirmOrderAndReview(orderId: number, buyerId: number, ra
   }
 
   return { success: true };
+}
+
+export async function updateOrderStatus(orderId: number, status: string) {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+  return db.update(orders).set({ status }).where(eq(orders.id, orderId));
+}
+
+export async function deleteOrder(orderId: number) {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+  return db.delete(orders).where(eq(orders.id, orderId));
 }

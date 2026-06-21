@@ -119,7 +119,8 @@
   }
   body {
     @apply bg-background text-foreground;
-    background: linear-gradient(135deg, #0a0a0a 0%, #1a0a0a 100%);
+    background: linear-gradient(135deg, #0a0a0a 0%, #180505 50%, #0a0a0a 100%);
+    min-height: 100vh;
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
@@ -132,7 +133,57 @@
   input[type="radio"]:not(:disabled) {
     @apply cursor-pointer;
   }
+
+  /* Custom thin scrollbar */
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #0a0a0a;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(220, 20, 60, 0.35);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(220, 20, 60, 0.65);
+  }
+
+  /* Smooth scroll */
+  html {
+    scroll-behavior: smooth;
+  }
 }
+
+/* ── Keyframe Animations ─────────────────────────────────────────── */
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 15px rgba(220, 20, 60, 0.3); }
+  50% { box-shadow: 0 0 35px rgba(220, 20, 60, 0.7), 0 0 60px rgba(220, 20, 60, 0.2); }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ── Component Classes ───────────────────────────────────────────── */
 
 @layer components {
   .container {
@@ -163,37 +214,156 @@
     }
   }
 
-  /* Eforte Games Vermelho e Preto Styles */
+  /* ── Premium Neon Button ── */
   .btn-neon {
     @apply bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white font-bold py-2 px-6 rounded transition-all duration-300;
-    box-shadow: 0 0 15px rgba(220, 20, 60, 0.5);
+    box-shadow: 0 0 15px rgba(220, 20, 60, 0.4), inset 0 1px 0 rgba(255,255,255,0.08);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-neon::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.07), transparent);
+    transition: left 0.5s ease;
+  }
+
+  .btn-neon:hover::before {
+    left: 100%;
   }
 
   .btn-neon:hover {
-    box-shadow: 0 0 25px rgba(220, 20, 60, 0.8), 0 0 40px rgba(220, 20, 60, 0.4);
+    box-shadow: 0 0 28px rgba(220, 20, 60, 0.65), 0 0 55px rgba(220, 20, 60, 0.25), inset 0 1px 0 rgba(255,255,255,0.12);
+    transform: translateY(-1px);
   }
 
+  .btn-neon:active {
+    transform: translateY(0px);
+    box-shadow: 0 0 12px rgba(220, 20, 60, 0.4);
+  }
+
+  /* ── Premium Card ── */
   .card-neon {
-    @apply bg-slate-900 border border-red-700/30 rounded-lg;
-    box-shadow: 0 0 15px rgba(220, 20, 60, 0.2);
+    @apply bg-slate-900 border border-red-700/20 rounded-xl;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(220,20,60,0.04);
+    transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card-neon::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(220,20,60,0.35), transparent);
+    opacity: 0;
+    transition: opacity 0.28s ease;
+    pointer-events: none;
   }
 
   .card-neon:hover {
-    box-shadow: 0 0 25px rgba(220, 20, 60, 0.4);
-    border-color: rgba(220, 20, 60, 0.6);
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5), 0 0 25px rgba(220, 20, 60, 0.2), 0 0 0 1px rgba(220,20,60,0.28);
+    border-color: rgba(220, 20, 60, 0.35);
+    transform: translateY(-2px);
   }
 
+  .card-neon:hover::before {
+    opacity: 1;
+  }
+
+  /* ── Game card shine on hover ── */
+  .game-card-shine {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .game-card-shine::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -60%;
+    width: 30%;
+    height: 200%;
+    background: linear-gradient(to right, transparent, rgba(255,255,255,0.05), transparent);
+    transform: rotate(15deg);
+    transition: left 0.55s ease;
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  .game-card-shine:hover::after {
+    left: 130%;
+  }
+
+  /* ── Text Neon ── */
   .text-neon {
     @apply text-red-500;
-    text-shadow: 0 0 10px rgba(220, 20, 60, 0.6);
+    text-shadow: 0 0 12px rgba(220, 20, 60, 0.55);
   }
 
   .neon-glow {
-    text-shadow: 0 0 10px rgba(220, 20, 60, 0.8), 0 0 20px rgba(220, 20, 60, 0.6);
+    text-shadow: 0 0 10px rgba(220, 20, 60, 0.8), 0 0 20px rgba(220, 20, 60, 0.5);
   }
 
   .neon-border {
     border-color: #DC143C;
     box-shadow: 0 0 10px rgba(220, 20, 60, 0.5), inset 0 0 10px rgba(220, 20, 60, 0.1);
+  }
+
+  /* ── Gradient text ── */
+  .gradient-text-red {
+    background: linear-gradient(135deg, #ff5555 0%, #DC143C 50%, #ff4444 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* ── Skeleton shimmer ── */
+  .skeleton-shimmer {
+    background: linear-gradient(90deg, #1a1f2e 25%, #222840 50%, #1a1f2e 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  /* ── Float animation ── */
+  .float-animation {
+    animation: float-slow 4s ease-in-out infinite;
+  }
+
+  /* ── Glow pulse ── */
+  .glow-pulse {
+    animation: glow-pulse 2.5s ease-in-out infinite;
+  }
+
+  /* ── Slide up animation ── */
+  .slide-up {
+    animation: slide-up 0.45s ease-out forwards;
+  }
+
+  /* ── Fade in ── */
+  .fade-in {
+    animation: fade-in 0.5s ease-out forwards;
+  }
+
+  /* ── Hide scrollbar utility ── */
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* ── Input glow on focus ── */
+  input:focus, textarea:focus {
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
   }
 }

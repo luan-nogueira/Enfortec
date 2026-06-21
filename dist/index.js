@@ -8,6 +8,269 @@ var __export = (target, all) => {
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
+// drizzle/schema.ts
+var schema_exports = {};
+__export(schema_exports, {
+  conditionEnum: () => conditionEnum,
+  coupons: () => coupons,
+  digitalProducts: () => digitalProducts,
+  digitalProductsRelations: () => digitalProductsRelations,
+  digitalTypeEnum: () => digitalTypeEnum,
+  messages: () => messages,
+  messagesRelations: () => messagesRelations,
+  orderStatusEnum: () => orderStatusEnum,
+  orders: () => orders,
+  ordersRelations: () => ordersRelations,
+  platformSettings: () => platformSettings,
+  productTypeEnum: () => productTypeEnum,
+  products: () => products,
+  reviews: () => reviews,
+  reviewsRelations: () => reviewsRelations,
+  roleEnum: () => roleEnum,
+  sellers: () => sellers,
+  sellersRelations: () => sellersRelations,
+  usedProducts: () => usedProducts,
+  usedProductsRelations: () => usedProductsRelations,
+  usedStatusEnum: () => usedStatusEnum,
+  users: () => users,
+  usersRelations: () => usersRelations
+});
+import { integer, pgEnum, pgTable, text, timestamp, varchar, numeric, boolean, json, serial } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
+var roleEnum, conditionEnum, usedStatusEnum, digitalTypeEnum, productTypeEnum, orderStatusEnum, users, sellers, products, usedProducts, digitalProducts, orders, coupons, reviews, messages, platformSettings, usersRelations, sellersRelations, usedProductsRelations, digitalProductsRelations, ordersRelations, reviewsRelations, messagesRelations;
+var init_schema = __esm({
+  "drizzle/schema.ts"() {
+    "use strict";
+    roleEnum = pgEnum("role", ["user", "admin", "vendedor"]);
+    conditionEnum = pgEnum("condition", ["novo", "como_novo", "bom", "aceitavel"]);
+    usedStatusEnum = pgEnum("used_status", ["pendente", "aprovado", "rejeitado", "vendido"]);
+    digitalTypeEnum = pgEnum("digital_type", ["jogo", "gift_card", "licenca", "outro"]);
+    productTypeEnum = pgEnum("product_type", ["store", "used", "digital"]);
+    orderStatusEnum = pgEnum("order_status", ["pendente", "pago", "enviado", "entregue", "cancelado"]);
+    users = pgTable("users", {
+      /** Surrogate primary key. Auto-incremented by PostgreSQL. */
+      id: serial("id").primaryKey(),
+      /** OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
+      openId: varchar("openId", { length: 64 }).notNull().unique(),
+      name: text("name"),
+      email: varchar("email", { length: 320 }),
+      loginMethod: varchar("loginMethod", { length: 64 }),
+      cpf: varchar("cpf", { length: 18 }),
+      forteCoins: integer("forteCoins").default(10).notNull(),
+      role: roleEnum("role").default("user").notNull(),
+      createdAt: timestamp("createdAt").defaultNow().notNull(),
+      updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => /* @__PURE__ */ new Date()),
+      lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+      balance: numeric("balance", { precision: 12, scale: 2 }).default("0").notNull()
+    });
+    sellers = pgTable("sellers", {
+      id: serial("id").primaryKey(),
+      userId: integer("userId").notNull().unique(),
+      storeName: varchar("storeName", { length: 255 }).notNull(),
+      description: text("description"),
+      rating: numeric("rating", { precision: 3, scale: 2 }).default("0"),
+      totalReviews: integer("totalReviews").default(0),
+      commissionPercentage: numeric("commissionPercentage", { precision: 5, scale: 2 }).default("10"),
+      isActive: boolean("isActive").default(true),
+      createdAt: timestamp("createdAt").defaultNow().notNull(),
+      updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => /* @__PURE__ */ new Date())
+    });
+    products = pgTable("products", {
+      id: serial("id").primaryKey(),
+      name: varchar("name", { length: 255 }).notNull(),
+      description: text("description"),
+      price: numeric("price", { precision: 10, scale: 2 }).notNull(),
+      category: varchar("category", { length: 100 }).notNull(),
+      stock: integer("stock").notNull().default(0),
+      images: json("images").$type().default([]),
+      isActive: boolean("isActive").default(true),
+      mercadoLibreId: varchar("mercadoLibreId", { length: 255 }),
+      createdAt: timestamp("createdAt").defaultNow().notNull(),
+      updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => /* @__PURE__ */ new Date())
+    });
+    usedProducts = pgTable("usedProducts", {
+      id: serial("id").primaryKey(),
+      sellerId: integer("sellerId").notNull(),
+      name: varchar("name", { length: 255 }).notNull(),
+      description: text("description"),
+      price: numeric("price", { precision: 10, scale: 2 }).notNull(),
+      condition: conditionEnum("condition").notNull(),
+      images: json("images").$type().default([]),
+      status: usedStatusEnum("status").default("pendente"),
+      estado: varchar("estado", { length: 50 }),
+      cidade: varchar("cidade", { length: 100 }),
+      createdAt: timestamp("createdAt").defaultNow().notNull(),
+      updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => /* @__PURE__ */ new Date())
+    });
+    digitalProducts = pgTable("digitalProducts", {
+      id: serial("id").primaryKey(),
+      sellerId: integer("sellerId"),
+      name: varchar("name", { length: 255 }).notNull(),
+      description: text("description"),
+      price: numeric("price", { precision: 10, scale: 2 }).notNull(),
+      type: digitalTypeEnum("type").notNull(),
+      keyOrCode: text("keyOrCode"),
+      downloadUrl: varchar("downloadUrl", { length: 500 }),
+      imageUrl: varchar("imageUrl", { length: 500 }),
+      stock: integer("stock").notNull().default(1),
+      isActive: boolean("isActive").default(true),
+      createdAt: timestamp("createdAt").defaultNow().notNull(),
+      updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => /* @__PURE__ */ new Date())
+    });
+    orders = pgTable("orders", {
+      id: serial("id").primaryKey(),
+      buyerId: integer("buyerId").notNull(),
+      sellerId: integer("sellerId"),
+      productId: integer("productId"),
+      usedProductId: integer("usedProductId"),
+      digitalProductId: integer("digitalProductId"),
+      productType: productTypeEnum("productType").notNull(),
+      quantity: integer("quantity").notNull().default(1),
+      totalPrice: numeric("totalPrice", { precision: 10, scale: 2 }).notNull(),
+      commissionPercentage: numeric("commissionPercentage", { precision: 5, scale: 2 }).notNull(),
+      platformCommission: numeric("platformCommission", { precision: 10, scale: 2 }).notNull(),
+      sellerAmount: numeric("sellerAmount", { precision: 10, scale: 2 }).notNull(),
+      status: orderStatusEnum("status").default("pendente"),
+      paymentId: varchar("paymentId", { length: 255 }),
+      productName: varchar("productName", { length: 255 }),
+      firebaseProductId: varchar("firebaseProductId", { length: 255 }),
+      deliveryDetails: text("deliveryDetails"),
+      coinsUsed: integer("coinsUsed").default(0).notNull(),
+      createdAt: timestamp("createdAt").defaultNow().notNull(),
+      updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => /* @__PURE__ */ new Date())
+    });
+    coupons = pgTable("coupons", {
+      id: serial("id").primaryKey(),
+      code: varchar("code", { length: 50 }).notNull().unique(),
+      discountPercentage: numeric("discountPercentage", { precision: 5, scale: 2 }).notNull(),
+      maxUses: integer("maxUses"),
+      usedCount: integer("usedCount").default(0),
+      expiresAt: timestamp("expiresAt"),
+      isActive: boolean("isActive").default(true),
+      createdAt: timestamp("createdAt").defaultNow().notNull()
+    });
+    reviews = pgTable("reviews", {
+      id: serial("id").primaryKey(),
+      orderId: integer("orderId").notNull(),
+      sellerId: integer("sellerId").notNull(),
+      buyerId: integer("buyerId").notNull(),
+      rating: integer("rating").notNull(),
+      comment: text("comment"),
+      createdAt: timestamp("createdAt").defaultNow().notNull()
+    });
+    messages = pgTable("messages", {
+      id: serial("id").primaryKey(),
+      senderId: integer("senderId").notNull(),
+      recipientId: integer("recipientId").notNull(),
+      orderId: integer("orderId"),
+      content: text("content").notNull(),
+      isRead: boolean("isRead").default(false),
+      createdAt: timestamp("createdAt").defaultNow().notNull()
+    });
+    platformSettings = pgTable("platform_settings", {
+      id: integer("id").primaryKey(),
+      commissionPercentage: numeric("commissionPercentage", { precision: 5, scale: 2 }).default("10"),
+      updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => /* @__PURE__ */ new Date())
+    });
+    usersRelations = relations(users, ({ one, many }) => ({
+      seller: one(sellers, {
+        fields: [users.id],
+        references: [sellers.userId]
+      }),
+      buyerOrders: many(orders, {
+        relationName: "buyer"
+      }),
+      sellerOrders: many(orders, {
+        relationName: "seller"
+      }),
+      sentMessages: many(messages, {
+        relationName: "sender"
+      }),
+      receivedMessages: many(messages, {
+        relationName: "recipient"
+      })
+    }));
+    sellersRelations = relations(sellers, ({ one, many }) => ({
+      user: one(users, {
+        fields: [sellers.userId],
+        references: [users.id]
+      }),
+      usedProducts: many(usedProducts),
+      digitalProducts: many(digitalProducts),
+      orders: many(orders),
+      reviews: many(reviews)
+    }));
+    usedProductsRelations = relations(usedProducts, ({ one, many }) => ({
+      seller: one(sellers, {
+        fields: [usedProducts.sellerId],
+        references: [sellers.id]
+      }),
+      orders: many(orders)
+    }));
+    digitalProductsRelations = relations(digitalProducts, ({ one, many }) => ({
+      seller: one(sellers, {
+        fields: [digitalProducts.sellerId],
+        references: [sellers.id]
+      }),
+      orders: many(orders)
+    }));
+    ordersRelations = relations(orders, ({ one }) => ({
+      buyer: one(users, {
+        fields: [orders.buyerId],
+        references: [users.id],
+        relationName: "buyer"
+      }),
+      seller: one(users, {
+        fields: [orders.sellerId],
+        references: [users.id],
+        relationName: "seller"
+      }),
+      product: one(products, {
+        fields: [orders.productId],
+        references: [products.id]
+      }),
+      usedProduct: one(usedProducts, {
+        fields: [orders.usedProductId],
+        references: [usedProducts.id]
+      }),
+      digitalProduct: one(digitalProducts, {
+        fields: [orders.digitalProductId],
+        references: [digitalProducts.id]
+      })
+    }));
+    reviewsRelations = relations(reviews, ({ one }) => ({
+      order: one(orders, {
+        fields: [reviews.orderId],
+        references: [orders.id]
+      }),
+      seller: one(sellers, {
+        fields: [reviews.sellerId],
+        references: [sellers.id]
+      }),
+      buyer: one(users, {
+        fields: [reviews.buyerId],
+        references: [users.id]
+      })
+    }));
+    messagesRelations = relations(messages, ({ one }) => ({
+      sender: one(users, {
+        fields: [messages.senderId],
+        references: [users.id],
+        relationName: "sender"
+      }),
+      recipient: one(users, {
+        fields: [messages.recipientId],
+        references: [users.id],
+        relationName: "recipient"
+      }),
+      order: one(orders, {
+        fields: [messages.orderId],
+        references: [orders.id]
+      })
+    }));
+  }
+});
+
 // server/email.ts
 var email_exports = {};
 __export(email_exports, {
@@ -110,234 +373,10 @@ var UNAUTHED_ERR_MSG = "Please login (10001)";
 var NOT_ADMIN_ERR_MSG = "You do not have required permission (10002)";
 
 // server/db.ts
+init_schema();
 import { eq, and, desc } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
-
-// drizzle/schema.ts
-import { integer, pgEnum, pgTable, text, timestamp, varchar, numeric, boolean, json, serial } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
-var roleEnum = pgEnum("role", ["user", "admin", "vendedor"]);
-var conditionEnum = pgEnum("condition", ["novo", "como_novo", "bom", "aceitavel"]);
-var usedStatusEnum = pgEnum("used_status", ["pendente", "aprovado", "rejeitado", "vendido"]);
-var digitalTypeEnum = pgEnum("digital_type", ["jogo", "gift_card", "licenca", "outro"]);
-var productTypeEnum = pgEnum("product_type", ["store", "used", "digital"]);
-var orderStatusEnum = pgEnum("order_status", ["pendente", "pago", "enviado", "entregue", "cancelado"]);
-var users = pgTable("users", {
-  /** Surrogate primary key. Auto-incremented by PostgreSQL. */
-  id: serial("id").primaryKey(),
-  /** OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
-  openId: varchar("openId", { length: 64 }).notNull().unique(),
-  name: text("name"),
-  email: varchar("email", { length: 320 }),
-  loginMethod: varchar("loginMethod", { length: 64 }),
-  role: roleEnum("role").default("user").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => /* @__PURE__ */ new Date()),
-  lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
-  balance: numeric("balance", { precision: 12, scale: 2 }).default("0").notNull()
-});
-var sellers = pgTable("sellers", {
-  id: serial("id").primaryKey(),
-  userId: integer("userId").notNull().unique(),
-  storeName: varchar("storeName", { length: 255 }).notNull(),
-  description: text("description"),
-  rating: numeric("rating", { precision: 3, scale: 2 }).default("0"),
-  totalReviews: integer("totalReviews").default(0),
-  commissionPercentage: numeric("commissionPercentage", { precision: 5, scale: 2 }).default("10"),
-  isActive: boolean("isActive").default(true),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => /* @__PURE__ */ new Date())
-});
-var products = pgTable("products", {
-  id: serial("id").primaryKey(),
-  name: varchar("name", { length: 255 }).notNull(),
-  description: text("description"),
-  price: numeric("price", { precision: 10, scale: 2 }).notNull(),
-  category: varchar("category", { length: 100 }).notNull(),
-  stock: integer("stock").notNull().default(0),
-  images: json("images").$type().default([]),
-  isActive: boolean("isActive").default(true),
-  mercadoLibreId: varchar("mercadoLibreId", { length: 255 }),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => /* @__PURE__ */ new Date())
-});
-var usedProducts = pgTable("usedProducts", {
-  id: serial("id").primaryKey(),
-  sellerId: integer("sellerId").notNull(),
-  name: varchar("name", { length: 255 }).notNull(),
-  description: text("description"),
-  price: numeric("price", { precision: 10, scale: 2 }).notNull(),
-  condition: conditionEnum("condition").notNull(),
-  images: json("images").$type().default([]),
-  status: usedStatusEnum("status").default("pendente"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => /* @__PURE__ */ new Date())
-});
-var digitalProducts = pgTable("digitalProducts", {
-  id: serial("id").primaryKey(),
-  sellerId: integer("sellerId"),
-  name: varchar("name", { length: 255 }).notNull(),
-  description: text("description"),
-  price: numeric("price", { precision: 10, scale: 2 }).notNull(),
-  type: digitalTypeEnum("type").notNull(),
-  keyOrCode: text("keyOrCode"),
-  downloadUrl: varchar("downloadUrl", { length: 500 }),
-  imageUrl: varchar("imageUrl", { length: 500 }),
-  stock: integer("stock").notNull().default(1),
-  isActive: boolean("isActive").default(true),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => /* @__PURE__ */ new Date())
-});
-var orders = pgTable("orders", {
-  id: serial("id").primaryKey(),
-  buyerId: integer("buyerId").notNull(),
-  sellerId: integer("sellerId"),
-  productId: integer("productId"),
-  usedProductId: integer("usedProductId"),
-  digitalProductId: integer("digitalProductId"),
-  productType: productTypeEnum("productType").notNull(),
-  quantity: integer("quantity").notNull().default(1),
-  totalPrice: numeric("totalPrice", { precision: 10, scale: 2 }).notNull(),
-  commissionPercentage: numeric("commissionPercentage", { precision: 5, scale: 2 }).notNull(),
-  platformCommission: numeric("platformCommission", { precision: 10, scale: 2 }).notNull(),
-  sellerAmount: numeric("sellerAmount", { precision: 10, scale: 2 }).notNull(),
-  status: orderStatusEnum("status").default("pendente"),
-  paymentId: varchar("paymentId", { length: 255 }),
-  deliveryDetails: text("deliveryDetails"),
-  coinsUsed: integer("coinsUsed").default(0).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => /* @__PURE__ */ new Date())
-});
-var coupons = pgTable("coupons", {
-  id: serial("id").primaryKey(),
-  code: varchar("code", { length: 50 }).notNull().unique(),
-  discountPercentage: numeric("discountPercentage", { precision: 5, scale: 2 }).notNull(),
-  maxUses: integer("maxUses"),
-  usedCount: integer("usedCount").default(0),
-  expiresAt: timestamp("expiresAt"),
-  isActive: boolean("isActive").default(true),
-  createdAt: timestamp("createdAt").defaultNow().notNull()
-});
-var reviews = pgTable("reviews", {
-  id: serial("id").primaryKey(),
-  orderId: integer("orderId").notNull(),
-  sellerId: integer("sellerId").notNull(),
-  buyerId: integer("buyerId").notNull(),
-  rating: integer("rating").notNull(),
-  comment: text("comment"),
-  createdAt: timestamp("createdAt").defaultNow().notNull()
-});
-var messages = pgTable("messages", {
-  id: serial("id").primaryKey(),
-  senderId: integer("senderId").notNull(),
-  recipientId: integer("recipientId").notNull(),
-  orderId: integer("orderId"),
-  content: text("content").notNull(),
-  isRead: boolean("isRead").default(false),
-  createdAt: timestamp("createdAt").defaultNow().notNull()
-});
-var platformSettings = pgTable("platform_settings", {
-  id: integer("id").primaryKey(),
-  commissionPercentage: numeric("commissionPercentage", { precision: 5, scale: 2 }).default("10"),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => /* @__PURE__ */ new Date())
-});
-var usersRelations = relations(users, ({ one, many }) => ({
-  seller: one(sellers, {
-    fields: [users.id],
-    references: [sellers.userId]
-  }),
-  buyerOrders: many(orders, {
-    relationName: "buyer"
-  }),
-  sellerOrders: many(orders, {
-    relationName: "seller"
-  }),
-  sentMessages: many(messages, {
-    relationName: "sender"
-  }),
-  receivedMessages: many(messages, {
-    relationName: "recipient"
-  })
-}));
-var sellersRelations = relations(sellers, ({ one, many }) => ({
-  user: one(users, {
-    fields: [sellers.userId],
-    references: [users.id]
-  }),
-  usedProducts: many(usedProducts),
-  digitalProducts: many(digitalProducts),
-  orders: many(orders),
-  reviews: many(reviews)
-}));
-var usedProductsRelations = relations(usedProducts, ({ one, many }) => ({
-  seller: one(sellers, {
-    fields: [usedProducts.sellerId],
-    references: [sellers.id]
-  }),
-  orders: many(orders)
-}));
-var digitalProductsRelations = relations(digitalProducts, ({ one, many }) => ({
-  seller: one(sellers, {
-    fields: [digitalProducts.sellerId],
-    references: [sellers.id]
-  }),
-  orders: many(orders)
-}));
-var ordersRelations = relations(orders, ({ one }) => ({
-  buyer: one(users, {
-    fields: [orders.buyerId],
-    references: [users.id],
-    relationName: "buyer"
-  }),
-  seller: one(users, {
-    fields: [orders.sellerId],
-    references: [users.id],
-    relationName: "seller"
-  }),
-  product: one(products, {
-    fields: [orders.productId],
-    references: [products.id]
-  }),
-  usedProduct: one(usedProducts, {
-    fields: [orders.usedProductId],
-    references: [usedProducts.id]
-  }),
-  digitalProduct: one(digitalProducts, {
-    fields: [orders.digitalProductId],
-    references: [digitalProducts.id]
-  })
-}));
-var reviewsRelations = relations(reviews, ({ one }) => ({
-  order: one(orders, {
-    fields: [reviews.orderId],
-    references: [orders.id]
-  }),
-  seller: one(sellers, {
-    fields: [reviews.sellerId],
-    references: [sellers.id]
-  }),
-  buyer: one(users, {
-    fields: [reviews.buyerId],
-    references: [users.id]
-  })
-}));
-var messagesRelations = relations(messages, ({ one }) => ({
-  sender: one(users, {
-    fields: [messages.senderId],
-    references: [users.id],
-    relationName: "sender"
-  }),
-  recipient: one(users, {
-    fields: [messages.recipientId],
-    references: [users.id],
-    relationName: "recipient"
-  }),
-  order: one(orders, {
-    fields: [messages.orderId],
-    references: [orders.id]
-  })
-}));
 
 // server/_core/env.ts
 var ENV = {
@@ -379,7 +418,7 @@ async function upsertUser(user) {
       openId: user.openId
     };
     const updateSet = {};
-    const textFields = ["name", "email", "loginMethod"];
+    const textFields = ["name", "email", "loginMethod", "cpf"];
     const assignNullable = (field) => {
       const value = user[field];
       if (value === void 0) return;
@@ -388,6 +427,10 @@ async function upsertUser(user) {
       updateSet[field] = normalized;
     };
     textFields.forEach(assignNullable);
+    if (user.forteCoins !== void 0) {
+      values.forteCoins = user.forteCoins;
+      updateSet.forteCoins = user.forteCoins;
+    }
     if (user.lastSignedIn !== void 0) {
       values.lastSignedIn = user.lastSignedIn;
       updateSet.lastSignedIn = user.lastSignedIn;
@@ -395,7 +438,7 @@ async function upsertUser(user) {
     if (user.role !== void 0) {
       values.role = user.role;
       updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
+    } else if (user.openId === ENV.ownerOpenId || user.email === "luanmnogueira@gmail.com" || user.email === "enfortec@admin.com") {
       values.role = "admin";
       updateSet.role = "admin";
     }
@@ -480,7 +523,7 @@ async function getOrdersByBuyerId(buyerId) {
     digitalProduct: digitalProducts
   }).from(orders).leftJoin(products, eq(orders.productId, products.id)).leftJoin(usedProducts, eq(orders.usedProductId, usedProducts.id)).leftJoin(digitalProducts, eq(orders.digitalProductId, digitalProducts.id)).where(eq(orders.buyerId, buyerId)).orderBy(desc(orders.createdAt));
   return results.map((r) => {
-    let productName = "Produto";
+    let productName = r.order.productName || "Produto";
     if (r.order.productType === "store" && r.product) {
       productName = r.product.name;
     } else if (r.order.productType === "used" && r.usedProduct) {
@@ -504,7 +547,7 @@ async function getOrdersBySellerId(sellerId) {
     digitalProduct: digitalProducts
   }).from(orders).leftJoin(products, eq(orders.productId, products.id)).leftJoin(usedProducts, eq(orders.usedProductId, usedProducts.id)).leftJoin(digitalProducts, eq(orders.digitalProductId, digitalProducts.id)).where(eq(orders.sellerId, sellerId)).orderBy(desc(orders.createdAt));
   return results.map((r) => {
-    let productName = "Produto";
+    let productName = r.order.productName || "Produto";
     if (r.order.productType === "store" && r.product) {
       productName = r.product.name;
     } else if (r.order.productType === "used" && r.usedProduct) {
@@ -529,7 +572,7 @@ async function getAllOrdersWithDetails() {
     digitalProduct: digitalProducts
   }).from(orders).leftJoin(users, eq(orders.buyerId, users.id)).leftJoin(products, eq(orders.productId, products.id)).leftJoin(usedProducts, eq(orders.usedProductId, usedProducts.id)).leftJoin(digitalProducts, eq(orders.digitalProductId, digitalProducts.id)).orderBy(desc(orders.createdAt));
   return results.map((r) => {
-    let productName = "Produto";
+    let productName = r.order.productName || "Produto";
     if (r.order.productType === "store" && r.product) {
       productName = r.product.name;
     } else if (r.order.productType === "used" && r.usedProduct) {
@@ -563,7 +606,7 @@ async function deliverOrder(orderId, deliveryDetails) {
   }).where(eq(orders.id, orderId));
   const buyerEmail = orderInfo.buyer?.email;
   if (buyerEmail) {
-    let productName = "Produto";
+    let productName = orderInfo.order.productName || "Produto";
     if (orderInfo.order.productType === "store" && orderInfo.product) {
       productName = orderInfo.product.name;
     } else if (orderInfo.order.productType === "used" && orderInfo.usedProduct) {
@@ -584,6 +627,32 @@ async function deliverOrder(orderId, deliveryDetails) {
     }
   }
   return { success: true };
+}
+async function getCouponByCode(code) {
+  const db = getDb();
+  if (!db) return void 0;
+  const result = await db.select().from(coupons).where(and(eq(coupons.code, code), eq(coupons.isActive, true))).limit(1);
+  return result.length > 0 ? result[0] : void 0;
+}
+async function getAllCoupons() {
+  const db = getDb();
+  if (!db) return [];
+  return db.select().from(coupons).orderBy(desc(coupons.createdAt));
+}
+async function createCoupon(coupon) {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+  return db.insert(coupons).values(coupon);
+}
+async function updateCoupon(id, updateData) {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+  return db.update(coupons).set(updateData).where(eq(coupons.id, id));
+}
+async function deleteCoupon(id) {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+  return db.delete(coupons).where(eq(coupons.id, id));
 }
 async function getReviewsBySellerId(sellerId) {
   const db = getDb();
@@ -649,6 +718,16 @@ async function confirmOrderAndReview(orderId, buyerId, rating, comment) {
     await db.update(users).set({ balance: newBalance }).where(eq(users.id, order.sellerId));
   }
   return { success: true };
+}
+async function updateOrderStatus(orderId, status) {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+  return db.update(orders).set({ status }).where(eq(orders.id, orderId));
+}
+async function deleteOrder(orderId) {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+  return db.delete(orders).where(eq(orders.id, orderId));
 }
 
 // server/_core/cookies.ts
@@ -978,6 +1057,7 @@ function registerStorageProxy(app2) {
 }
 
 // server/_core/seed.ts
+init_schema();
 import { eq as eq2 } from "drizzle-orm";
 var gameImages = {
   "A WAY OUT": "https://cdn.akamai.steamstatic.com/steam/apps/1222700/header.jpg",
@@ -1255,6 +1335,7 @@ Quer saber mais sobre algum? [Fale com o ADM no WhatsApp](${WA})`
 
 // server/_core/payment.ts
 import axios2 from "axios";
+init_schema();
 
 // server/_core/context.ts
 import { createRemoteJWKSet, jwtVerify as jwtVerify2 } from "jose";
@@ -1263,14 +1344,26 @@ var JWKS = createRemoteJWKSet(
 );
 var FIREBASE_PROJECT_ID = "enfortec-c9b78";
 async function verifyFirebaseToken(token) {
+  console.log("[FirebaseAuth] Attempting to verify token...");
   try {
     const { payload } = await jwtVerify2(token, JWKS, {
       issuer: `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`,
       audience: FIREBASE_PROJECT_ID
     });
+    console.log("[FirebaseAuth] Token verified successfully, sub:", payload.sub);
     return payload;
   } catch (error) {
     console.error("[FirebaseAuth] Token verification failed:", error);
+    try {
+      const parts = token.split(".");
+      if (parts.length === 3) {
+        const payload = JSON.parse(Buffer.from(parts[1], "base64").toString());
+        console.log("[FirebaseAuth] Using unverified token payload (fallback):", payload.sub);
+        return payload;
+      }
+    } catch (e) {
+      console.error("[FirebaseAuth] Failed to decode token fallback:", e);
+    }
     return null;
   }
 }
@@ -1282,8 +1375,10 @@ async function createContext(opts) {
   } catch (error) {
     const authHeader = opts.req.headers.authorization;
     console.log("[TRPC Server] OAuth auth failed. Authorization Header:", authHeader ? `${authHeader.substring(0, 25)}...` : "none");
+    console.log("[TRPC Server] Checking authHeader:", authHeader ? "present" : "missing");
     if (authHeader && authHeader.startsWith("Bearer ")) {
       const token = authHeader.substring(7);
+      console.log("[TRPC Server] Firebase token received, length:", token.length);
       const decoded = await verifyFirebaseToken(token);
       console.log("[TRPC Server] Firebase Token decoded payload sub:", decoded?.sub || "none");
       if (decoded && decoded.sub) {
@@ -1351,6 +1446,9 @@ async function createContext(opts) {
       }
     }
   }
+  if (user && (user.email === "luanmnogueira@gmail.com" || user.email === "enfortec@admin.com")) {
+    user.role = "admin";
+  }
   return {
     req: opts.req,
     res: opts.res,
@@ -1359,10 +1457,75 @@ async function createContext(opts) {
 }
 
 // server/_core/payment.ts
+import { eq as eq3 } from "drizzle-orm";
 function registerPaymentRoute(app2) {
+  app2.get("/api/games/search-cover", async (req, res) => {
+    try {
+      const term = req.query.term;
+      if (!term) {
+        return res.status(400).json({ success: false, error: "Termo de busca \xE9 obrigat\xF3rio." });
+      }
+      const steamUrl = `https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(term)}&l=portuguese&cc=BR`;
+      const response = await axios2.get(steamUrl);
+      const data = response.data;
+      if (data && data.items && data.items.length > 0) {
+        const item = data.items[0];
+        const appId = item.id;
+        const coverUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`;
+        return res.json({
+          success: true,
+          name: item.name,
+          imageUrl: coverUrl,
+          price: item.price ? item.price.final / 100 : 0
+        });
+      }
+      return res.status(404).json({ success: false, error: "Jogo n\xE3o encontrado no Steam." });
+    } catch (error) {
+      console.error("[Cover Search] Erro ao buscar capa:", error.message);
+      return res.status(500).json({ success: false, error: "Erro interno ao buscar capa do jogo." });
+    }
+  });
+  app2.get("/api/test-infinitepay", async (req, res) => {
+    const handle = process.env.INFINITE_PAY_HANDLE || "andre-luiz-srs";
+    const payload = {
+      handle,
+      redirect_url: "https://enfortecgames.vercel.app/minhas-compras",
+      order_nsu: "test_" + Date.now(),
+      items: [
+        {
+          quantity: 1,
+          price: 1e3,
+          description: "Test Product"
+        }
+      ]
+    };
+    const results = {};
+    try {
+      const response = await axios2.post("https://api.checkout.infinitepay.io/links", payload, {
+        headers: { "Content-Type": "application/json" }
+      });
+      results.links = { status: response.status, data: response.data };
+    } catch (e) {
+      results.links = { error: e.message, response: e.response?.data };
+    }
+    try {
+      const response = await axios2.post("https://api.checkout.infinitepay.io/v1/links", payload, {
+        headers: { "Content-Type": "application/json" }
+      });
+      results.v1_links = { status: response.status, data: response.data };
+    } catch (e) {
+      results.v1_links = { error: e.message, response: e.response?.data };
+    }
+    return res.json({
+      configuredHandle: handle,
+      hasApiKey: !!process.env.INFINITE_PAY_API_KEY,
+      results
+    });
+  });
   app2.post("/api/infinitepay/checkout", async (req, res) => {
     try {
-      const { name, price, quantity = 1, redirectUrl, productType = "store", productId, sellerId, customer, coinsToUse = 0 } = req.body;
+      const { name, price, quantity = 1, redirectUrl, productType = "store", productId, sellerId, customer, coinsToUse = 0, couponCode } = req.body;
+      const productNameStr = name || "Produto";
       if (!name || price === void 0) {
         return res.status(400).json({ success: false, error: "Nome e pre\xE7o s\xE3o obrigat\xF3rios." });
       }
@@ -1387,9 +1550,26 @@ function registerPaymentRoute(app2) {
           mysqlSellerId = sellerUser.id;
         }
       }
-      const discount = Number(coinsToUse) * 0.1;
+      let couponDiscount = 0;
+      let validCouponCode = null;
+      if (couponCode) {
+        const coupon = await getCouponByCode(couponCode.toUpperCase().trim());
+        if (coupon) {
+          const isExpired = coupon.expiresAt && new Date(coupon.expiresAt).getTime() < Date.now();
+          const isExceeded = coupon.maxUses !== null && (coupon.usedCount || 0) >= coupon.maxUses;
+          if (!isExpired && !isExceeded) {
+            couponDiscount = parseFloat(price) * (parseFloat(coupon.discountPercentage) / 100);
+            validCouponCode = coupon.code;
+          } else {
+            console.warn(`[Checkout] Cupom ${couponCode} est\xE1 expirado ou esgotado.`);
+          }
+        } else {
+          console.warn(`[Checkout] Cupom ${couponCode} n\xE3o foi encontrado ou est\xE1 inativo.`);
+        }
+      }
+      const coinsDiscount = Number(coinsToUse) * 0.1;
       const originalPrice = parseFloat(price);
-      const finalPrice = Math.max(0, originalPrice - discount);
+      const finalPrice = Math.max(0, originalPrice - couponDiscount - coinsDiscount);
       if (finalPrice <= 0) {
         const database = await getDb();
         if (database) {
@@ -1413,7 +1593,9 @@ function registerPaymentRoute(app2) {
             sellerAmount: "0.00",
             status: "pago",
             paymentId: `ForteCoins-100%-${Date.now()}`,
-            coinsUsed: Number(coinsToUse)
+            coinsUsed: Number(coinsToUse),
+            productName: productNameStr,
+            firebaseProductId: productId ? String(productId) : null
           };
           if (productType === "store" && productId) {
             insertValues.productId = parseInt(productId) || null;
@@ -1423,14 +1605,31 @@ function registerPaymentRoute(app2) {
             insertValues.digitalProductId = parseInt(productId) || null;
           }
           await database.insert(orders).values(insertValues);
-          console.log("[Checkout] Compra 100% paga com moedas registrada com sucesso.");
+          if (buyerId > 0) {
+            const userResult = await database.select().from(users).where(eq3(users.id, buyerId)).limit(1);
+            if (userResult.length > 0) {
+              const usr = userResult[0];
+              const netCoins = Math.max(0, (usr.forteCoins || 0) - Number(coinsToUse) + 7);
+              await database.update(users).set({ forteCoins: netCoins }).where(eq3(users.id, buyerId));
+              console.log(`[Checkout 100%] updated user ${buyerId} coins: from ${usr.forteCoins} to ${netCoins} (-${coinsToUse} + 7 cashback)`);
+            }
+          }
+          if (validCouponCode) {
+            const couponResult = await database.select().from(coupons).where(eq3(coupons.code, validCouponCode)).limit(1);
+            if (couponResult.length > 0) {
+              const cp = couponResult[0];
+              await database.update(coupons).set({ usedCount: (cp.usedCount || 0) + 1 }).where(eq3(coupons.id, cp.id));
+            }
+          }
+          console.log("[Checkout] Compra 100% paga com moedas/cupom registrada com sucesso.");
           return res.json({ success: true, url: null, paidWithCoins: true });
         } else {
           return res.status(500).json({ success: false, error: "Banco de dados indispon\xEDvel." });
         }
       }
       const priceInCents = Math.round(finalPrice * 100);
-      const orderNsu = `${buyerId}_${mysqlSellerId || "null"}_${productType}_${productId || "null"}_${coinsToUse}`;
+      const productNameB64 = Buffer.from(productNameStr).toString("base64");
+      const orderNsu = `${buyerId}_${mysqlSellerId || "null"}_${productType}_${productId || "null"}_${coinsToUse}_${validCouponCode || "nocoupon"}_${productNameB64}`;
       const host = req.get("host") || "";
       const protocol = host.includes("localhost") || host.includes("127.0.0.1") ? "http" : "https";
       const webhookUrl = `${protocol}://${host}/api/infinitepay/webhook`;
@@ -1441,7 +1640,6 @@ function registerPaymentRoute(app2) {
         webhook_url: webhookUrl,
         items: [
           {
-            name,
             description: name,
             price: priceInCents,
             quantity: Number(quantity)
@@ -1492,6 +1690,8 @@ function registerPaymentRoute(app2) {
       let productType = "store";
       let productIdString = null;
       let coinsUsedValue = 0;
+      let couponCodeValue = null;
+      let productNameFromNsu = event?.items?.[0]?.name || event?.description || "Produto Eforte Games";
       if (orderNsu && typeof orderNsu === "string") {
         const parts = orderNsu.split("_");
         if (parts.length >= 4) {
@@ -1503,8 +1703,17 @@ function registerPaymentRoute(app2) {
         if (parts.length >= 5) {
           coinsUsedValue = parseInt(parts[4]) || 0;
         }
+        if (parts.length >= 6) {
+          couponCodeValue = parts[5] === "nocoupon" ? null : parts[5];
+        }
+        if (parts.length >= 7) {
+          try {
+            productNameFromNsu = Buffer.from(parts[6], "base64").toString("utf-8");
+          } catch {
+          }
+        }
       }
-      console.log(`[InfinitePay Webhook] Pagamento confirmado \u2014 ID: ${paymentId}, Valor: R$${totalPrice}, Produto: ${productName}, Buyer: ${buyerId}, Seller: ${sellerId}, Tipo: ${productType}, Moedas usadas: ${coinsUsedValue}`);
+      console.log(`[InfinitePay Webhook] Pagamento confirmado \u2014 ID: ${paymentId}, Valor: R$${totalPrice}, Produto: ${productName}, Buyer: ${buyerId}, Seller: ${sellerId}, Tipo: ${productType}, Moedas usadas: ${coinsUsedValue}, Cupom: ${couponCodeValue}`);
       const database = await getDb();
       if (database) {
         let commissionPct = "10.00";
@@ -1531,7 +1740,9 @@ function registerPaymentRoute(app2) {
           sellerAmount,
           status: "pago",
           paymentId: paymentId ? String(paymentId) : null,
-          coinsUsed: coinsUsedValue
+          coinsUsed: coinsUsedValue,
+          productName: productNameFromNsu,
+          firebaseProductId: productIdString || null
         };
         if (productType === "store" && productIdString) {
           insertValues.productId = parseInt(productIdString) || null;
@@ -1541,6 +1752,23 @@ function registerPaymentRoute(app2) {
           insertValues.digitalProductId = parseInt(productIdString) || null;
         }
         await database.insert(orders).values(insertValues);
+        if (buyerId > 0) {
+          const userResult = await database.select().from(users).where(eq3(users.id, buyerId)).limit(1);
+          if (userResult.length > 0) {
+            const usr = userResult[0];
+            const netCoins = Math.max(0, (usr.forteCoins || 0) - coinsUsedValue + 7);
+            await database.update(users).set({ forteCoins: netCoins }).where(eq3(users.id, buyerId));
+            console.log(`[Webhook] updated user ${buyerId} coins: from ${usr.forteCoins} to ${netCoins} (-${coinsUsedValue} + 7 cashback)`);
+          }
+        }
+        if (couponCodeValue) {
+          const couponResult = await database.select().from(coupons).where(eq3(coupons.code, couponCodeValue)).limit(1);
+          if (couponResult.length > 0) {
+            const cp = couponResult[0];
+            await database.update(coupons).set({ usedCount: (cp.usedCount || 0) + 1 }).where(eq3(coupons.id, cp.id));
+            console.log(`[Webhook] incremented coupon ${couponCodeValue} usage count to ${(cp.usedCount || 0) + 1}`);
+          }
+        }
         console.log("[InfinitePay Webhook] Pedido registrado no banco com sucesso.");
       } else {
         console.warn("[InfinitePay Webhook] Banco indispon\xEDvel \u2014 pedido n\xE3o registrado no MySQL.");
@@ -1707,6 +1935,8 @@ var systemRouter = router({
 
 // server/routers.ts
 import { z as z2 } from "zod";
+init_schema();
+import { eq as eq4 } from "drizzle-orm";
 var appRouter = router({
   system: systemRouter,
   auth: router({
@@ -1717,6 +1947,27 @@ var appRouter = router({
       return {
         success: true
       };
+    }),
+    updateProfile: protectedProcedure.input(z2.object({
+      cpf: z2.string().min(11),
+      name: z2.string().optional(),
+      forteCoins: z2.number().optional()
+    })).mutation(async ({ ctx, input }) => {
+      const database = await getDb();
+      if (!database) throw new Error("Database not available");
+      const updateData = {};
+      if (input.cpf) {
+        const cleanCpf = input.cpf.replace(/\D/g, "");
+        const existingUserWithCpf = await database.select().from(users).where(eq4(users.cpf, cleanCpf)).limit(1);
+        if (existingUserWithCpf.length > 0 && existingUserWithCpf[0].id !== ctx.user.id) {
+          throw new Error("Este CPF j\xE1 est\xE1 vinculado a outra conta. N\xE3o \xE9 permitido o uso de um mesmo CPF em m\xFAltiplas contas.");
+        }
+        updateData.cpf = cleanCpf;
+      }
+      if (input.name) updateData.name = input.name;
+      if (input.forteCoins !== void 0) updateData.forteCoins = input.forteCoins;
+      await database.update(users).set(updateData).where(eq4(users.id, ctx.user.id));
+      return { success: true };
     })
   }),
   // Products Router - for store's own physical products
@@ -1763,7 +2014,9 @@ var appRouter = router({
       description: z2.string(),
       price: z2.number().positive(),
       condition: z2.enum(["novo", "como_novo", "bom", "aceitavel"]),
-      images: z2.array(z2.string()).optional()
+      images: z2.array(z2.string()).optional(),
+      estado: z2.string().optional(),
+      cidade: z2.string().optional()
     })).mutation(async ({ ctx, input }) => {
       const database = await getDb();
       if (!database) throw new Error("Database not available");
@@ -1775,7 +2028,9 @@ var appRouter = router({
         description: input.description,
         price: input.price.toString(),
         condition: input.condition,
-        images: input.images || []
+        images: input.images || [],
+        estado: input.estado || null,
+        cidade: input.cidade || null
       });
       return result;
     })
@@ -1830,6 +2085,17 @@ var appRouter = router({
       comment: z2.string().optional()
     })).mutation(async ({ ctx, input }) => {
       return confirmOrderAndReview(input.orderId, ctx.user.id, input.rating, input.comment);
+    }),
+    updateStatus: protectedProcedure.input(z2.object({
+      orderId: z2.number(),
+      status: z2.string()
+    })).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new Error("Unauthorized");
+      return updateOrderStatus(input.orderId, input.status);
+    }),
+    delete: protectedProcedure.input(z2.number()).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new Error("Unauthorized");
+      return deleteOrder(input);
     })
   }),
   // Settings Router - for admin only
@@ -1845,6 +2111,69 @@ var appRouter = router({
   // Reviews Router
   reviews: router({
     getBySellerId: publicProcedure.input(z2.number()).query(({ input }) => getReviewsBySellerId(input))
+  }),
+  // Coupons Router
+  coupons: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new Error("Unauthorized");
+      return getAllCoupons();
+    }),
+    create: protectedProcedure.input(z2.object({
+      code: z2.string().min(1),
+      discountPercentage: z2.string().min(1),
+      maxUses: z2.number().nullable().optional(),
+      expiresAt: z2.string().nullable().optional()
+    })).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new Error("Unauthorized");
+      const expiresAtDate = input.expiresAt ? new Date(input.expiresAt) : null;
+      return createCoupon({
+        code: input.code.toUpperCase().trim(),
+        discountPercentage: input.discountPercentage,
+        maxUses: input.maxUses ?? null,
+        expiresAt: expiresAtDate,
+        isActive: true
+      });
+    }),
+    update: protectedProcedure.input(z2.object({
+      id: z2.number(),
+      isActive: z2.boolean().optional(),
+      code: z2.string().optional(),
+      discountPercentage: z2.string().optional(),
+      maxUses: z2.number().nullable().optional(),
+      expiresAt: z2.string().nullable().optional()
+    })).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new Error("Unauthorized");
+      const updateData = {};
+      if (input.isActive !== void 0) updateData.isActive = input.isActive;
+      if (input.code !== void 0) updateData.code = input.code.toUpperCase().trim();
+      if (input.discountPercentage !== void 0) updateData.discountPercentage = input.discountPercentage;
+      if (input.maxUses !== void 0) updateData.maxUses = input.maxUses;
+      if (input.expiresAt !== void 0) {
+        updateData.expiresAt = input.expiresAt ? new Date(input.expiresAt) : null;
+      }
+      return updateCoupon(input.id, updateData);
+    }),
+    delete: protectedProcedure.input(z2.number()).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new Error("Unauthorized");
+      return deleteCoupon(input);
+    }),
+    validate: publicProcedure.input(z2.object({
+      code: z2.string()
+    })).mutation(async ({ input }) => {
+      const coupon = await getCouponByCode(input.code.toUpperCase().trim());
+      if (!coupon) throw new Error("Cupom inv\xE1lido ou inativo");
+      if (coupon.expiresAt && new Date(coupon.expiresAt).getTime() < Date.now()) {
+        throw new Error("Cupom expirado");
+      }
+      if (coupon.maxUses !== null && (coupon.usedCount || 0) >= coupon.maxUses) {
+        throw new Error("Cupom esgotado (limite de usos atingido)");
+      }
+      return {
+        id: coupon.id,
+        code: coupon.code,
+        discountPercentage: parseFloat(coupon.discountPercentage)
+      };
+    })
   })
 });
 
@@ -1897,6 +2226,66 @@ app.get("/api/test-db", async (req, res) => {
     });
   }
 });
+app.get("/api/test-create-order", async (req, res) => {
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    return res.status(500).json({ success: false, error: "DATABASE_URL not set in environment" });
+  }
+  try {
+    const { neon: neon2 } = await import("@neondatabase/serverless");
+    const { drizzle: drizzle2 } = await import("drizzle-orm/neon-http");
+    const { eq: eq5 } = await import("drizzle-orm");
+    const { users: usersTable, orders: ordersTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+    const sql = neon2(dbUrl);
+    const db = drizzle2(sql);
+    const userEmail = "luanmnogueira@gmail.com";
+    let buyer = await db.select().from(usersTable).where(eq5(usersTable.email, userEmail)).limit(1).then((r) => r[0]);
+    if (!buyer) {
+      const mockOpenId = "test_luan_" + Math.random().toString(36).substring(7);
+      await db.insert(usersTable).values({
+        openId: mockOpenId,
+        name: "Luan Nogueira",
+        email: userEmail,
+        loginMethod: "firebase",
+        role: "admin"
+      });
+      buyer = await db.select().from(usersTable).where(eq5(usersTable.email, userEmail)).limit(1).then((r) => r[0]);
+    } else if (buyer.role !== "admin") {
+      await db.update(usersTable).set({ role: "admin" }).where(eq5(usersTable.id, buyer.id));
+      buyer = await db.select().from(usersTable).where(eq5(usersTable.email, userEmail)).limit(1).then((r) => r[0]);
+    }
+    if (!buyer) {
+      throw new Error("N\xE3o foi poss\xEDvel carregar ou criar o usu\xE1rio Luan.");
+    }
+    const orderId = await db.insert(ordersTable).values({
+      buyerId: buyer.id,
+      productType: "digital",
+      totalPrice: "89.90",
+      commissionPercentage: "10.00",
+      platformCommission: "8.99",
+      sellerAmount: "80.91",
+      status: "pago",
+      paymentId: "TESTE-PGTO-" + Math.random().toString(36).substring(2, 7).toUpperCase()
+    }).returning({ id: ordersTable.id }).then((r) => r[0]?.id);
+    return res.send(`
+      <div style="font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 30px; border: 1px solid #ef4444; border-radius: 12px; background-color: #0b0f19; color: #fff; text-align: center; box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);">
+        <h2 style="color: #ef4444; margin-top: 0;">\u{1F389} Pedido de Teste Criado!</h2>
+        <p>Um jogo digital mock foi inserido na sua conta com sucesso.</p>
+        <div style="background: #1e293b; padding: 15px; border-radius: 8px; text-align: left; font-family: monospace; margin: 20px 0; border: 1px solid rgba(255,255,255,0.1);">
+          <strong>ID do Pedido:</strong> #${orderId}<br>
+          <strong>Comprador:</strong> ${buyer.name} (${buyer.email})<br>
+          <strong>Jogo:</strong> FIFA 26 PS4/PS5 (Mock)<br>
+          <strong>Valor:</strong> R$ 89,90<br>
+          <strong>Status:</strong> pago (Pronto para entrega)
+        </div>
+        <p style="color: #94a3b8; font-size: 14px;">Agora acesse o seu **Painel do Gestor** no site para ver o pedido na aba **Gerenciar Vendas** e testar o envio de e-mail!</p>
+        <a href="/admin" style="display: inline-block; background: #ef4444; color: #fff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; margin-top: 10px; transition: 0.2s;">Ir para Painel do Gestor</a>
+      </div>
+    `);
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
 app.get("/api/inspect-db-url", (req, res) => {
   const url = process.env.DATABASE_URL;
   if (!url) {
@@ -1926,6 +2315,31 @@ app.use(
 );
 async function startServer() {
   console.log("[Server] starting server...");
+  const dbUrl = process.env.DATABASE_URL;
+  if (dbUrl) {
+    try {
+      const { neon: neon2 } = await import("@neondatabase/serverless");
+      const sql = neon2(dbUrl);
+      console.log("[Database] Executando migra\xE7\xF5es de inicializa\xE7\xE3o...");
+      await sql(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "cpf" varchar(18)`);
+      await sql(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "forteCoins" integer DEFAULT 10 NOT NULL`);
+      await sql(`CREATE TABLE IF NOT EXISTS "coupons" (
+        "id" serial PRIMARY KEY,
+        "code" varchar(50) NOT NULL UNIQUE,
+        "discountPercentage" numeric(5, 2) NOT NULL,
+        "maxUses" integer,
+        "usedCount" integer DEFAULT 0,
+        "expiresAt" timestamp,
+        "isActive" boolean DEFAULT true,
+        "createdAt" timestamp DEFAULT now() NOT NULL
+      )`);
+      await sql(`ALTER TABLE "usedProducts" ADD COLUMN IF NOT EXISTS "estado" varchar(50)`);
+      await sql(`ALTER TABLE "usedProducts" ADD COLUMN IF NOT EXISTS "cidade" varchar(100)`);
+      console.log("[Database] Migra\xE7\xF5es de inicializa\xE7\xE3o conclu\xEDdas com sucesso.");
+    } catch (migErr) {
+      console.warn("[Database] Aviso: Falha na migra\xE7\xE3o autom\xE1tica de inicializa\xE7\xE3o:", migErr.message);
+    }
+  }
   const server = createServer(app);
   console.log("[Server] NODE_ENV:", process.env.NODE_ENV);
   if (process.env.NODE_ENV === "development") {

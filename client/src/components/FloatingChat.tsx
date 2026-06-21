@@ -375,10 +375,10 @@ export default function FloatingChat() {
         {!isOpen && (
           <Button
             onClick={() => setIsOpen(true)}
-            className="w-16 h-16 rounded-full bg-red-600 hover:bg-red-700 shadow-[0_8px_30px_rgba(220,38,38,0.5)] flex items-center justify-center p-0 transition-all hover:scale-110 active:scale-95 group relative"
+            className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-red-600 hover:bg-red-700 shadow-[0_8px_30px_rgba(220,38,38,0.5)] flex items-center justify-center p-0 transition-all hover:scale-110 active:scale-95 group relative"
           >
-            <MessageCircle className="w-8 h-8 text-white group-hover:rotate-12 transition-transform" />
-            <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 border-2 border-slate-950 rounded-full animate-pulse" />
+            <MessageCircle className="w-6 h-6 sm:w-8 sm:h-8 text-white group-hover:rotate-12 transition-transform" />
+            <div className="absolute -top-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 bg-green-500 border-2 border-slate-950 rounded-full animate-pulse" />
           </Button>
         )}
 

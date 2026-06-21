@@ -126,6 +126,8 @@ export const orders = pgTable("orders", {
   sellerAmount: numeric("sellerAmount", { precision: 10, scale: 2 }).notNull(),
   status: orderStatusEnum("status").default("pendente"),
   paymentId: varchar("paymentId", { length: 255 }),
+  productName: varchar("productName", { length: 255 }),
+  firebaseProductId: varchar("firebaseProductId", { length: 255 }),
   deliveryDetails: text("deliveryDetails"),
   coinsUsed: integer("coinsUsed").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

@@ -53,7 +53,7 @@ const games: Array<{ name: string; price: string; imageUrl: string }> = [
   { name: "FINAL FANTASY XVI PS5", price: "119.90", imageUrl: "https://image.api.playstation.com/vulcan/ap/rnd/202212/1319/3FMiHKAXj0Mx6gjEY16a0X6E.png" },
   { name: "GHOST RECON WILDLANDS PS4/PS5", price: "34.90", imageUrl: "https://image.api.playstation.com/vulcan/img/rnd/202011/0221/5cPbSFBVjS3R8N7RL4v9bCvP.png" },
   { name: "GOD OF WAR 2018 PS4/PS5", price: "59.90", imageUrl: "https://image.api.playstation.com/vulcan/img/rnd/202011/0224/CEJPGKFrHQS2bWM73GBTFoB7.png" },
-  { name: "GOD OF WAR 3 REMASTER PS4/PS5", price: "36.99", imageUrl: "https://image.api.playstation.com/cdn/UP9000/CUSA01399_00/rLAIvMd8sGVkjrFR7VTNQ6mqdl3h91YH.png" },
+  { name: "GOD OF WAR 3 REMASTER PS4/PS5", price: "36.99", imageUrl: "https://image.api.playstation.com/vulcan/ap/rnd/202010/2218/H5R6S6K6W7uUeL172zR2w6jJ.png" },
   { name: "GTA V PS4/PS5", price: "59.90", imageUrl: "https://image.api.playstation.com/vulcan/img/rnd/202011/0221/VVzwK1oEzd5wZJxjsGQrFhMC.png" },
   { name: "HELLBLADE 2 PS5", price: "70.00", imageUrl: "https://image.api.playstation.com/vulcan/ap/rnd/202405/2319/5e4d3c2b1a0f9e8d7c6b5a4938271605f4e3d2c1b0a9f8e.png" },
   { name: "HI-FI RUSH PS5", price: "59.90", imageUrl: "https://image.api.playstation.com/vulcan/ap/rnd/202303/1521/ba05d5b7a09e77571e4e0f1f2e2b8e5e6f3c4d1a2b3c4d5.png" },

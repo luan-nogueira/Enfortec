@@ -39,6 +39,33 @@ function isValidCPF(cpf: string) {
   return true;
 }
 
+function getFriendlyAuthError(err: any): string {
+  const code = err?.code || "";
+  const msg = (err?.message || "").toLowerCase();
+  
+  if (code === "auth/invalid-credential" || msg.includes("auth/invalid-credential") ||
+      code === "auth/wrong-password" || msg.includes("auth/wrong-password") ||
+      code === "auth/user-not-found" || msg.includes("auth/user-not-found")) {
+    return "E-mail ou senha incorretos.";
+  }
+  if (code === "auth/email-already-in-use" || msg.includes("auth/email-already-in-use")) {
+    return "Este e-mail já está cadastrado.";
+  }
+  if (code === "auth/weak-password" || msg.includes("auth/weak-password")) {
+    return "A senha deve ter pelo menos 6 caracteres.";
+  }
+  if (code === "auth/invalid-email" || msg.includes("auth/invalid-email")) {
+    return "O endereço de e-mail informado é inválido.";
+  }
+  if (code === "auth/popup-closed-by-user" || msg.includes("auth/popup-closed-by-user")) {
+    return "O login com o Google foi cancelado.";
+  }
+  if (code === "auth/network-request-failed" || msg.includes("auth/network-request-failed")) {
+    return "Falha na conexão com a internet. Verifique sua rede.";
+  }
+  return err?.message || "Ocorreu um erro na autenticação.";
+}
+
 export default function Login() {
   const [, navigate] = useLocation();
   const [isLogin, setIsLogin] = useState(true);
@@ -84,7 +111,7 @@ export default function Login() {
       }
       navigate("/");
     } catch (err: any) {
-      setError(err.message || "Erro na autenticação.");
+      setError(getFriendlyAuthError(err));
     } finally {
       setLoading(false);
     }
@@ -97,7 +124,7 @@ export default function Login() {
       await signInWithPopup(auth, provider);
       navigate("/");
     } catch (err: any) {
-      setError(err.message || "Erro ao fazer login com o Google.");
+      setError(getFriendlyAuthError(err));
     }
   };
 

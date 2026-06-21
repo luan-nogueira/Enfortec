@@ -138,7 +138,7 @@ export function useAuth(options?: UseAuthOptions) {
               }
 
               // Inserir 10.000 moedas para teste do admin apenas uma vez
-              if ((user.email === "luanmnogueira@gmail.com" || user.email === "temp_admin@enfortec.com") && !userData?.hasSeededTestingCoins) {
+              if ((user.email === "luanmnogueira@gmail.com" || user.email === "enfortec@admin.com" || user.email === "temp_admin@enfortec.com") && !userData?.hasSeededTestingCoins) {
                 updateFields.forteCoins = 10000;
                 updateFields.hasSeededTestingCoins = true;
                 needsUpdate = true;
@@ -154,7 +154,88 @@ export function useAuth(options?: UseAuthOptions) {
                 return;
               }
 
-              const role = userData?.role || (user.email === "luanmnogueira@gmail.com" ? "admin" : "user");
+              // 1. Inicializar ou carregar histórico de moedas para controle de expiração de 90 dias
+              let coinsHistory = userData?.coinsHistory || [];
+              let hasCoinsHistoryChanges = false;
+              let currentCoinsVal = userData?.forteCoins ?? 0;
+
+              if (!userData?.coinsHistory) {
+                coinsHistory = [{
+                  id: "initial_balance_" + Date.now(),
+                  amount: currentCoinsVal,
+                  createdAt: userData?.createdAt || new Date().toISOString(),
+                  expired: false
+                }];
+                hasCoinsHistoryChanges = true;
+              }
+
+              // 2. Calcular a soma de moedas ativas no histórico
+              let activeCoinsSum = coinsHistory.filter((h: any) => !h.expired).reduce((sum: number, h: any) => sum + h.amount, 0);
+
+              // 3. Sincronizar se moedas foram ganhas ou gastas
+              if (currentCoinsVal > activeCoinsSum) {
+                const diff = currentCoinsVal - activeCoinsSum;
+                coinsHistory = [
+                  ...coinsHistory,
+                  {
+                    id: "earn_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+                    amount: diff,
+                    createdAt: new Date().toISOString(),
+                    expired: false
+                  }
+                ];
+                hasCoinsHistoryChanges = true;
+              } else if (currentCoinsVal < activeCoinsSum) {
+                let toConsume = activeCoinsSum - currentCoinsVal;
+                coinsHistory = coinsHistory.map((h: any) => {
+                  if (h.expired || toConsume <= 0) return h;
+                  if (h.amount <= toConsume) {
+                    toConsume -= h.amount;
+                    return { ...h, amount: 0, expired: true };
+                  } else {
+                    const remaining = h.amount - toConsume;
+                    toConsume = 0;
+                    return { ...h, amount: remaining };
+                  }
+                });
+                hasCoinsHistoryChanges = true;
+              }
+
+              // 4. Verificar expiração de 90 dias
+              const NINETY_DAYS = 90 * 24 * 60 * 60 * 1000;
+              const nowTime = Date.now();
+              let expiredCount = 0;
+              
+              coinsHistory = coinsHistory.map((h: any) => {
+                if (!h.expired && h.amount > 0) {
+                  const createdTime = new Date(h.createdAt).getTime();
+                  if (createdTime + NINETY_DAYS < nowTime) {
+                    expiredCount += h.amount;
+                    return { ...h, amount: 0, expired: true, expiredAt: new Date().toISOString() };
+                  }
+                }
+                return h;
+              });
+
+              if (expiredCount > 0) {
+                currentCoinsVal = Math.max(0, currentCoinsVal - expiredCount);
+                hasCoinsHistoryChanges = true;
+                
+                setTimeout(() => {
+                  toast.warning(`${expiredCount} ForteCoins expiraram por limite de validade de 90 dias.`);
+                }, 1000);
+              }
+
+              // 5. Salvar no Firestore se houver mudanças no histórico ou saldo
+              if (hasCoinsHistoryChanges) {
+                await setDoc(userRef, {
+                  forteCoins: currentCoinsVal,
+                  coinsHistory
+                }, { merge: true });
+                return;
+              }
+
+              const role = userData?.role || ((user.email === "luanmnogueira@gmail.com" || user.email === "enfortec@admin.com") ? "admin" : "user");
               const finalForteCoins = userData?.forteCoins ?? 0;
               const finalLoginMethod = userData?.loginMethod ?? (isGoogleUser ? "google.com" : "email/password");
 
@@ -166,26 +247,38 @@ export function useAuth(options?: UseAuthOptions) {
                   forteCoins: finalForteCoins,
                   cpf: userData?.cpf || null,
                   referredBy: userData?.referredBy || null,
-                  loginMethod: finalLoginMethod
+                  loginMethod: finalLoginMethod,
+                  acceptedForteCoinsTerms: userData?.acceptedForteCoinsTerms || false,
+                  acceptedGamesTerms: userData?.acceptedGamesTerms || false
                 },
                 role: role,
                 loading: false,
                 error: null,
                 isAuthenticated: true,
-                isAdmin: role === "admin" || user.email === "luanmnogueira@gmail.com",
-                isCollaborator: role === "collaborator" || role === "admin" || user.email === "luanmnogueira@gmail.com",
+                isAdmin: role === "admin" || user.email === "luanmnogueira@gmail.com" || user.email === "enfortec@admin.com",
+                isCollaborator: role === "collaborator" || role === "admin" || user.email === "luanmnogueira@gmail.com" || user.email === "enfortec@admin.com",
               });
             });
           } catch (err: any) {
             console.error("Erro ao buscar dados do usuário:", err);
             setState({
-              user: { id: user.uid, name: user.displayName || user.email, email: user.email, forteCoins: 10, cpf: null, referredBy: null, loginMethod: "email/password" },
+              user: { 
+                id: user.uid, 
+                name: user.displayName || user.email, 
+                email: user.email, 
+                forteCoins: 10, 
+                cpf: null, 
+                referredBy: null, 
+                loginMethod: "email/password",
+                acceptedForteCoinsTerms: false,
+                acceptedGamesTerms: false
+              },
               role: "user",
               loading: false,
               error: err,
               isAuthenticated: true,
-              isAdmin: false,
-              isCollaborator: false,
+              isAdmin: user.email === "luanmnogueira@gmail.com" || user.email === "enfortec@admin.com",
+              isCollaborator: user.email === "luanmnogueira@gmail.com" || user.email === "enfortec@admin.com",
             });
           }
         } else {

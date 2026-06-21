@@ -8,6 +8,7 @@ import { getDb } from "./db";
 import { users, sellers, products, usedProducts, digitalProducts, orders, reviews, coupons } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 
+import { TRPCError } from "@trpc/server";
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -30,7 +31,17 @@ export const appRouter = router({
         if (!database) throw new Error("Database not available");
         
         const updateData: any = {};
-        if (input.cpf) updateData.cpf = input.cpf.replace(/\D/g, "");
+        if (input.cpf) {
+          const cleanCpf = input.cpf.replace(/\D/g, "");
+          
+          // Check if CPF is already used by someone else
+          const existingUserWithCpf = await database.select().from(users).where(eq(users.cpf, cleanCpf)).limit(1);
+          if (existingUserWithCpf.length > 0 && existingUserWithCpf[0].id !== ctx.user.id) {
+            throw new Error("Este CPF já está vinculado a outra conta. Não é permitido o uso de um mesmo CPF em múltiplas contas.");
+          }
+          
+          updateData.cpf = cleanCpf;
+        }
         if (input.name) updateData.name = input.name;
         if (input.forteCoins !== undefined) updateData.forteCoins = input.forteCoins;
         
@@ -155,7 +166,7 @@ export const appRouter = router({
       return seller ? db.getOrdersBySellerId(seller.userId) : [];
     }),
     listAll: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== 'admin') throw new Error("Unauthorized");
+      if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
       return db.getAllOrdersWithDetails();
     }),
     deliverOrder: protectedProcedure
@@ -164,7 +175,7 @@ export const appRouter = router({
         deliveryDetails: z.string().min(1),
       }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== 'admin') throw new Error("Unauthorized");
+        if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
         return db.deliverOrder(input.orderId, input.deliveryDetails);
       }),
     confirmAndReview: protectedProcedure
@@ -176,6 +187,21 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         return db.confirmOrderAndReview(input.orderId, ctx.user.id, input.rating, input.comment);
       }),
+    updateStatus: protectedProcedure
+      .input(z.object({
+        orderId: z.number(),
+        status: z.string(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+        return db.updateOrderStatus(input.orderId, input.status);
+      }),
+    delete: protectedProcedure
+      .input(z.number())
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+        return db.deleteOrder(input);
+      }),
   }),
 
   // Settings Router - for admin only
@@ -186,7 +212,7 @@ export const appRouter = router({
         commissionPercentage: z.string(),
       }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== 'admin') throw new Error("Unauthorized");
+        if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
         return db.updatePlatformSettings(input.commissionPercentage);
       }),
   }),
@@ -201,7 +227,7 @@ export const appRouter = router({
   // Coupons Router
   coupons: router({
     list: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== 'admin') throw new Error("Unauthorized");
+      if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
       return db.getAllCoupons();
     }),
     create: protectedProcedure
@@ -212,7 +238,7 @@ export const appRouter = router({
         expiresAt: z.string().nullable().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== 'admin') throw new Error("Unauthorized");
+        if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
         const expiresAtDate = input.expiresAt ? new Date(input.expiresAt) : null;
         return db.createCoupon({
           code: input.code.toUpperCase().trim(),
@@ -232,7 +258,7 @@ export const appRouter = router({
         expiresAt: z.string().nullable().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== 'admin') throw new Error("Unauthorized");
+        if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
         const updateData: any = {};
         if (input.isActive !== undefined) updateData.isActive = input.isActive;
         if (input.code !== undefined) updateData.code = input.code.toUpperCase().trim();
@@ -246,7 +272,7 @@ export const appRouter = router({
     delete: protectedProcedure
       .input(z.number())
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== 'admin') throw new Error("Unauthorized");
+        if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
         return db.deleteCoupon(input);
       }),
     validate: publicProcedure

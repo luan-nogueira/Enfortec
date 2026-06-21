@@ -46,6 +46,41 @@ registerSeedRoute(app);
 registerAiRoute(app);
 registerPaymentRoute(app);
 
+app.get("/api/migrate-db", async (req, res) => {
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) return res.status(500).json({ error: "DATABASE_URL not set in environment" });
+  try {
+    const { neon } = await import("@neondatabase/serverless");
+    const sql = neon(dbUrl);
+    
+    await sql.query(`CREATE TABLE IF NOT EXISTS "digitalProducts" (
+      "id" serial PRIMARY KEY,
+      "sellerId" integer,
+      "name" varchar(255) NOT NULL,
+      "description" text,
+      "price" numeric(10, 2) NOT NULL,
+      "type" varchar(50) NOT NULL,
+      "keyOrCode" text,
+      "downloadUrl" varchar(500),
+      "imageUrl" varchar(500),
+      "stock" integer NOT NULL DEFAULT 1,
+      "isActive" boolean DEFAULT true,
+      "createdAt" timestamp DEFAULT now() NOT NULL,
+      "updatedAt" timestamp DEFAULT now() NOT NULL
+    )`);
+    
+    await sql.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "digitalProductId" integer`);
+    await sql.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "firebaseProductId" varchar(255)`);
+    await sql.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "deliveryDetails" text`);
+    await sql.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "coinsUsed" integer DEFAULT 0 NOT NULL`);
+    await sql.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "productName" varchar(255)`);
+
+    return res.json({ success: true, message: "Migração das tabelas concluída com sucesso na Vercel!" });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.get("/api/test-db", async (req, res) => {
   const dbUrl = process.env.DATABASE_URL;
   if (!dbUrl) {
@@ -178,11 +213,11 @@ async function startServer() {
       const { neon } = await import("@neondatabase/serverless");
       const sql = neon(dbUrl);
       console.log("[Database] Executando migrações de inicialização...");
-      await sql(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "cpf" varchar(18)`);
-      await sql(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "forteCoins" integer DEFAULT 10 NOT NULL`);
+      await sql.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "cpf" varchar(18)`);
+      await sql.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "forteCoins" integer DEFAULT 10 NOT NULL`);
       
       // Criar tabela de cupons se não existir
-      await sql(`CREATE TABLE IF NOT EXISTS "coupons" (
+      await sql.query(`CREATE TABLE IF NOT EXISTS "coupons" (
         "id" serial PRIMARY KEY,
         "code" varchar(50) NOT NULL UNIQUE,
         "discountPercentage" numeric(5, 2) NOT NULL,
@@ -194,8 +229,8 @@ async function startServer() {
       )`);
       
       // Adicionar colunas de localização nos produtos usados
-      await sql(`ALTER TABLE "usedProducts" ADD COLUMN IF NOT EXISTS "estado" varchar(50)`);
-      await sql(`ALTER TABLE "usedProducts" ADD COLUMN IF NOT EXISTS "cidade" varchar(100)`);
+      await sql.query(`ALTER TABLE "usedProducts" ADD COLUMN IF NOT EXISTS "estado" varchar(50)`);
+      await sql.query(`ALTER TABLE "usedProducts" ADD COLUMN IF NOT EXISTS "cidade" varchar(100)`);
       console.log("[Database] Migrações de inicialização concluídas com sucesso.");
     } catch (migErr: any) {
       console.warn("[Database] Aviso: Falha na migração automática de inicialização:", migErr.message);
