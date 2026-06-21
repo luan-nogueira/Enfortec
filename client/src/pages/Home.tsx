@@ -132,15 +132,12 @@ export default function Home() {
   const sidebarTopPromo = promos.find((p: any) => p.position === "sidebar_top");
   const sidebarBottomPromo = promos.find((p: any) => p.position === "sidebar_bottom");
 
-  const FALLBACK_GAME_IMAGE = "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200";
+  // Imagem escura e neutra de um controle (evita fotos aleatórias de pessoas quando a imagem original quebra)
+  const FALLBACK_GAME_IMAGE = "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?q=80&w=1200";
 
   // Mix dynamic games from the database into the slides as requested by the user
   const dbGameBanners = digitalProducts.map(game => {
     let imageUrl = game.imageUrl;
-    // Corrigir imagem do God of War 3 Remastered que estava exibindo Ragnarok no CDN
-    if (game.name === "GOD OF WAR 3 REMASTER PS4/PS5") {
-      imageUrl = "https://image.api.playstation.com/vulcan/ap/rnd/202010/2218/H5R6S6K6W7uUeL172zR2w6jJ.png";
-    }
     return {
       id: `game-banner-${game.id}`,
       title: game.name,
