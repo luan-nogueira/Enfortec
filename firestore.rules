@@ -3,6 +3,14 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.email == "luanmnogueira@gmail.com" || 
+        request.auth.token.email == "enfortec@admin.com" ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin"
+      );
+    }
+
     // Digital products - public read, admin write only
     match /digital_products/{doc} {
       allow read: if true;
@@ -21,9 +29,9 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
 
-    // Users - can only read/write own data
+    // Users - admin can read/write all, users can read/write own data
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if request.auth != null && (request.auth.uid == userId || isAdmin());
     }
 
     // Referrals - authenticated read/write

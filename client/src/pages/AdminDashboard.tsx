@@ -1052,32 +1052,49 @@ export default function AdminDashboard() {
     }
 
     setCreating(true);
-    let secondaryApp;
     try {
-      // Técnica da instância secundária para não deslogar o Admin
-      secondaryApp = initializeApp(firebaseConfig, `Secondary-${Date.now()}`);
-      const secondaryAuth = getAuth(secondaryApp);
+      // Verifica se o usuário já existe no banco de dados localmente carregado
+      const existingUser = users.find(u => u.email.toLowerCase() === newUserEmail.toLowerCase());
       
-      // 1. Criar no Firebase Auth
-      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, newUserEmail, newUserPassword);
-      const uid = userCredential.user.uid;
+      if (existingUser) {
+        // Usuário já existe, apenas promove ele para o novo cargo
+        await updateDoc(doc(db, "users", existingUser.id), {
+          role: newUserRole
+        });
+        toast.success(`O usuário ${existingUser.email} já tinha cadastro e agora foi promovido para ${newUserRole}!`);
+        setShowCreateModal(false);
+        setNewUserName("");
+        setNewUserEmail("");
+        setNewUserPassword("");
+        setCreating(false);
+        return;
+      }
 
-      // 2. Criar documento no Firestore
-      await setDoc(doc(db, "users", uid), {
-        uid,
-        email: newUserEmail,
-        name: newUserName,
-        role: newUserRole,
-        createdAt: new Date().toISOString()
-      });
+      // Se não existe, cria um novo usuário no Firebase Auth
+      let secondaryApp;
+      try {
+        secondaryApp = initializeApp(firebaseConfig, `Secondary-${Date.now()}`);
+        const secondaryAuth = getAuth(secondaryApp);
+        
+        const userCredential = await createUserWithEmailAndPassword(secondaryAuth, newUserEmail, newUserPassword);
+        const uid = userCredential.user.uid;
 
-      toast.success(`Usuário ${newUserName} criado com sucesso como ${newUserRole}!`);
-      setShowCreateModal(false);
-      
-      // Limpar campos
-      setNewUserName("");
-      setNewUserEmail("");
-      setNewUserPassword("");
+        await setDoc(doc(db, "users", uid), {
+          uid,
+          email: newUserEmail,
+          name: newUserName,
+          role: newUserRole,
+          createdAt: new Date().toISOString()
+        });
+
+        toast.success(`Usuário ${newUserName} criado com sucesso como ${newUserRole}!`);
+        setShowCreateModal(false);
+        setNewUserName("");
+        setNewUserEmail("");
+        setNewUserPassword("");
+      } finally {
+        if (secondaryApp) await deleteApp(secondaryApp);
+      }
     } catch (error: any) {
       console.error("Erro ao criar usuário:", error);
       const getFriendlyAdminError = (err: any) => {
@@ -1087,9 +1104,8 @@ export default function AdminDashboard() {
         if (msg.includes("invalid-email")) return "O e-mail informado é inválido.";
         return err?.message || "Erro desconhecido";
       };
-      toast.error("Erro ao criar usuário: " + getFriendlyAdminError(error));
+      toast.error("Erro ao processar usuário: " + getFriendlyAdminError(error));
     } finally {
-      if (secondaryApp) await deleteApp(secondaryApp);
       setCreating(false);
     }
   };
@@ -1725,7 +1741,7 @@ export default function AdminDashboard() {
           <TabsContent value="usuarios">
             <h2 className="text-xl font-bold text-white mb-8 border-l-4 border-red-600 pl-4 uppercase tracking-widest text-sm italic">Gestão de Equipe</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {users.map((u) => (
+              {users.filter(u => u.role === 'admin' || u.role === 'collaborator' || u.email === 'luanmnogueira@gmail.com').map((u) => (
                 <Card key={u.id} className="bg-slate-900/40 backdrop-blur-md border-red-600/10 p-6 hover:border-red-600/40 hover:shadow-[0_8px_30px_rgb(0,0,0,0.5)] transition-all duration-500 card-neon relative overflow-hidden group">
                   <div className="absolute top-0 right-0 w-24 h-24 bg-red-600/5 rounded-full blur-2xl group-hover:bg-red-600/10 transition-all duration-500" />
                   <div className="flex items-start justify-between mb-4 relative z-10">
