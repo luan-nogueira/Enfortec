@@ -647,7 +647,7 @@ export default function DigitalMedia() {
 
       {/* Modal de Confirmação de Compra */}
       <Dialog open={!!selectedProduct} onOpenChange={(open) => !open && setSelectedProduct(null)}>
-        <DialogContent className="bg-slate-900 border-red-600/30 text-white sm:max-w-[425px] card-neon">
+        <DialogContent className="bg-slate-900 border-red-600/30 text-white sm:max-w-[425px] card-neon max-h-[90vh] overflow-y-auto scrollbar-thin scrollbar-thumb-red-600/50">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold text-neon flex items-center gap-2">🎮 Confirmar Compra</DialogTitle>
             <DialogDescription className="text-slate-400">
@@ -846,7 +846,7 @@ export default function DigitalMedia() {
 
       {/* Modal de Pechincha */}
       <Dialog open={!!selectedBargainProduct} onOpenChange={(open) => !open && setSelectedBargainProduct(null)}>
-        <DialogContent className="bg-slate-900 border-red-600/30 text-white sm:max-w-[425px] card-neon">
+        <DialogContent className="bg-slate-900 border-red-600/30 text-white sm:max-w-[425px] card-neon max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold text-neon flex items-center gap-2">💸 Fazer uma Pechincha</DialogTitle>
             <DialogDescription className="text-slate-400">
@@ -906,7 +906,7 @@ export default function DigitalMedia() {
           <div 
             onScroll={(e) => {
               const target = e.currentTarget;
-              if (target.scrollHeight - target.scrollTop <= target.clientHeight + 15) {
+              if (target.scrollHeight - target.scrollTop <= target.clientHeight + 50) {
                 setTermsScrolled(true);
               }
             }}
