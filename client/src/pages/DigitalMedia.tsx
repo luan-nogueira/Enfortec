@@ -647,7 +647,7 @@ export default function DigitalMedia() {
 
       {/* Modal de Confirmação de Compra */}
       <Dialog open={!!selectedProduct} onOpenChange={(open) => !open && setSelectedProduct(null)}>
-        <DialogContent className="bg-slate-900 border-red-600/30 text-white sm:max-w-[425px] card-neon max-h-[90vh] overflow-y-auto scrollbar-thin scrollbar-thumb-red-600/50">
+        <DialogContent className="bg-slate-900 border-red-600/30 text-white sm:max-w-[425px] card-neon max-h-[85dvh] overflow-y-auto scrollbar-thin scrollbar-thumb-red-600/50">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold text-neon flex items-center gap-2">🎮 Confirmar Compra</DialogTitle>
             <DialogDescription className="text-slate-400">
@@ -827,7 +827,7 @@ export default function DigitalMedia() {
             </div>
           </div>
 
-          <DialogFooter className="flex flex-col gap-3">
+          <DialogFooter className="flex flex-col gap-3 pb-4 sm:pb-0">
             {checkoutError && (
               <div className="w-full bg-red-950/60 border border-red-500/40 rounded-xl px-4 py-3 text-sm text-red-300">
                 ⚠️ {checkoutError}
@@ -846,7 +846,7 @@ export default function DigitalMedia() {
 
       {/* Modal de Pechincha */}
       <Dialog open={!!selectedBargainProduct} onOpenChange={(open) => !open && setSelectedBargainProduct(null)}>
-        <DialogContent className="bg-slate-900 border-red-600/30 text-white sm:max-w-[425px] card-neon max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-slate-900 border-red-600/30 text-white sm:max-w-[425px] card-neon max-h-[85dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold text-neon flex items-center gap-2">💸 Fazer uma Pechincha</DialogTitle>
             <DialogDescription className="text-slate-400">
@@ -878,7 +878,7 @@ export default function DigitalMedia() {
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="pb-4 sm:pb-0">
             <Button 
               disabled={!bargainOffer.trim()}
               onClick={handleFinalizeBargain}
