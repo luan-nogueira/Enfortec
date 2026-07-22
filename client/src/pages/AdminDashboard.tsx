@@ -25,7 +25,162 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer } from "recharts";
 
+function PlatinadorAdminTab() {
+  const [gameTitle, setGameTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [rewardCoins, setRewardCoins] = useState("500");
+  const [imageUrl, setImageUrl] = useState("");
+  const [platform, setPlatform] = useState("PS4 / PS5");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const challengesQuery = trpc.platinador.listChallenges.useQuery();
+  const submissionsQuery = trpc.platinador.adminListSubmissions.useQuery();
+
+  const createChallengeMutation = trpc.platinador.adminCreateChallenge.useMutation({
+    onSuccess: () => {
+      toast.success("Desafio de platina cadastrado com sucesso!");
+      setGameTitle("");
+      setDescription("");
+      setImageUrl("");
+      setIsSubmitting(false);
+      challengesQuery.refetch();
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Erro ao criar desafio");
+      setIsSubmitting(false);
+    },
+  });
+
+  const approveMutation = trpc.platinador.adminApproveSubmission.useMutation({
+    onSuccess: (data: any) => {
+      toast.success(data.message);
+      submissionsQuery.refetch();
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Erro ao aprovar platina");
+    },
+  });
+
+  const rejectMutation = trpc.platinador.adminRejectSubmission.useMutation({
+    onSuccess: (data: any) => {
+      toast.success(data.message);
+      submissionsQuery.refetch();
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Erro ao rejeitar");
+    },
+  });
+
+  const handleCreateChallenge = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!gameTitle.trim()) return toast.error("Insira o nome do jogo");
+    setIsSubmitting(true);
+    createChallengeMutation.mutate({
+      gameTitle: gameTitle.trim(),
+      description: description.trim(),
+      platform,
+      imageUrl: imageUrl.trim() || undefined,
+      rewardCoins: Number(rewardCoins) || 500,
+    });
+  };
+
+  return (
+    <div className="space-y-8">
+      <Card className="bg-[#121212] border-red-600/30 p-6 shadow-xl">
+        <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+          <Trophy className="text-red-500" /> Cadastrar Novo Desafio de Platina
+        </h3>
+        <form onSubmit={handleCreateChallenge} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label className="text-xs text-slate-300 font-bold uppercase">Nome do Jogo *</Label>
+            <Input value={gameTitle} onChange={(e) => setGameTitle(e.target.value)} placeholder="Ex: God of War Ragnarök" className="bg-slate-950 border-red-600/20 text-white mt-1" required />
+          </div>
+          <div>
+            <Label className="text-xs text-slate-300 font-bold uppercase">Plataforma</Label>
+            <Input value={platform} onChange={(e) => setPlatform(e.target.value)} placeholder="Ex: PS4 / PS5" className="bg-slate-950 border-red-600/20 text-white mt-1" />
+          </div>
+          <div>
+            <Label className="text-xs text-slate-300 font-bold uppercase">Recompensa em ForteCoins *</Label>
+            <Input type="number" value={rewardCoins} onChange={(e) => setRewardCoins(e.target.value)} placeholder="Ex: 500" className="bg-slate-950 border-red-600/20 text-white mt-1" required />
+          </div>
+          <div>
+            <Label className="text-xs text-slate-300 font-bold uppercase">URL da Imagem da Capa</Label>
+            <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." className="bg-slate-950 border-red-600/20 text-white mt-1" />
+          </div>
+          <div className="md:col-span-2">
+            <Label className="text-xs text-slate-300 font-bold uppercase">Descrição do Desafio</Label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex: Conquiste todos os troféus..." className="w-full h-20 p-3 bg-slate-950 border border-red-600/20 rounded-md text-sm text-white focus:outline-none focus:ring-1 focus:ring-red-500/50 mt-1" />
+          </div>
+          <div className="md:col-span-2 flex justify-end">
+            <Button type="submit" disabled={isSubmitting} className="bg-red-600 hover:bg-red-700 font-bold px-6 btn-neon text-white">
+              {isSubmitting ? "Cadastrando..." : "Publicar Desafio no Clube"}
+            </Button>
+          </div>
+        </form>
+      </Card>
+
+      <Card className="bg-[#121212] border-red-600/30 p-6 shadow-xl">
+        <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+          <Coins className="text-amber-400" /> Comprovações de Platina para Aprovação
+        </h3>
+        {submissionsQuery.isLoading ? (
+          <p className="text-slate-400 text-sm">Carregando solicitações...</p>
+        ) : !submissionsQuery.data || submissionsQuery.data.length === 0 ? (
+          <p className="text-slate-400 text-sm py-4">Nenhuma comprovação enviada no momento.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-slate-300">
+              <thead className="bg-slate-950 text-xs text-slate-400 uppercase">
+                <tr>
+                  <th className="p-3">ID / Data</th>
+                  <th className="text-white p-3">PSN ID</th>
+                  <th className="p-3">Desafio</th>
+                  <th className="p-3">Comprovante</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3 text-right">Ação</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {submissionsQuery.data.map((sub: any) => (
+                  <tr key={sub.id} className="hover:bg-slate-800/40">
+                    <td className="p-3 text-xs">#{sub.id}<br /><span className="text-[10px] text-slate-500">{new Date(sub.submittedAt).toLocaleDateString("pt-BR")}</span></td>
+                    <td className="p-3 font-bold text-white">{sub.psnId}</td>
+                    <td className="p-3 text-xs text-slate-400">#{sub.challengeId}</td>
+                    <td className="p-3">
+                      <a href={sub.proofUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline flex items-center gap-1">
+                        Ver Foto <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </td>
+                    <td className="p-3">
+                      {sub.status === "aprovado" && <span className="bg-emerald-500/20 text-emerald-400 text-xs px-2 py-1 rounded font-bold">Aprovado (+{sub.coinsAwarded} Coins)</span>}
+                      {sub.status === "pendente" && <span className="bg-amber-500/20 text-amber-400 text-xs px-2 py-1 rounded font-bold">Pendente</span>}
+                      {sub.status === "rejeitado" && <span className="bg-red-500/20 text-red-400 text-xs px-2 py-1 rounded font-bold">Rejeitado</span>}
+                    </td>
+                    <td className="p-3 text-right">
+                      {sub.status === "pendente" && (
+                        <div className="flex gap-2 justify-end">
+                          <Button size="sm" onClick={() => approveMutation.mutate({ submissionId: sub.id, coinsToAward: 500 })} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold">
+                            Aprovar (+500 Coins)
+                          </Button>
+                          <Button size="sm" variant="destructive" onClick={() => { const reason = prompt("Motivo da rejeição:") || "Foto ilegível"; rejectMutation.mutate({ submissionId: sub.id, adminNotes: reason }); }} className="text-xs font-bold">
+                            Rejeitar
+                          </Button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
+
   const { user, isAuthenticated, isAdmin, loading: authLoading, logout } = useAuth();
   const [, navigate] = useLocation();
   const [users, setUsers] = useState<any[]>([]);
@@ -3527,239 +3682,6 @@ export default function AdminDashboard() {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
-  );
-}
-
-function PlatinadorAdminTab() {
-  const [gameTitle, setGameTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [rewardCoins, setRewardCoins] = useState("500");
-  const [imageUrl, setImageUrl] = useState("");
-  const [platform, setPlatform] = useState("PS4 / PS5");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const challengesQuery = trpc.platinador.listChallenges.useQuery();
-  const submissionsQuery = trpc.platinador.adminListSubmissions.useQuery();
-
-  const createChallengeMutation = trpc.platinador.adminCreateChallenge.useMutation({
-    onSuccess: () => {
-      toast.success("Desafio de platina cadastrado com sucesso!");
-      setGameTitle("");
-      setDescription("");
-      setImageUrl("");
-      setIsSubmitting(false);
-      challengesQuery.refetch();
-    },
-    onError: (err: any) => {
-      toast.error(err.message || "Erro ao criar desafio");
-      setIsSubmitting(false);
-    },
-  });
-
-  const approveMutation = trpc.platinador.adminApproveSubmission.useMutation({
-    onSuccess: (data: any) => {
-      toast.success(data.message);
-      submissionsQuery.refetch();
-    },
-    onError: (err: any) => {
-      toast.error(err.message || "Erro ao aprovar platina");
-    },
-  });
-
-  const rejectMutation = trpc.platinador.adminRejectSubmission.useMutation({
-    onSuccess: (data: any) => {
-      toast.success(data.message);
-      submissionsQuery.refetch();
-    },
-    onError: (err: any) => {
-      toast.error(err.message || "Erro ao rejeitar");
-    },
-  });
-
-  const handleCreateChallenge = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!gameTitle.trim()) return toast.error("Insira o nome do jogo");
-    setIsSubmitting(true);
-    createChallengeMutation.mutate({
-      gameTitle: gameTitle.trim(),
-      description: description.trim(),
-      platform,
-      imageUrl: imageUrl.trim() || undefined,
-      rewardCoins: Number(rewardCoins) || 500,
-    });
-  };
-
-  return (
-    <div className="space-y-8">
-      {/* CARD 1: CADASTRAR NOVO JOGO / DESAFIO */}
-      <Card className="bg-[#121212] border-red-600/30 p-6 shadow-xl">
-        <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-          <Trophy className="text-red-500" /> Cadastrar Novo Desafio de Platina
-        </h3>
-
-        <form onSubmit={handleCreateChallenge} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <Label className="text-xs text-slate-300 font-bold uppercase">Nome do Jogo *</Label>
-            <Input
-              value={gameTitle}
-              onChange={(e) => setGameTitle(e.target.value)}
-              placeholder="Ex: God of War Ragnarök"
-              className="bg-slate-950 border-red-600/20 text-white mt-1"
-              required
-            />
-          </div>
-
-          <div>
-            <Label className="text-xs text-slate-300 font-bold uppercase">Plataforma</Label>
-            <Input
-              value={platform}
-              onChange={(e) => setPlatform(e.target.value)}
-              placeholder="Ex: PS4 / PS5"
-              className="bg-slate-950 border-red-600/20 text-white mt-1"
-            />
-          </div>
-
-          <div>
-            <Label className="text-xs text-slate-300 font-bold uppercase">Recompensa em ForteCoins *</Label>
-            <Input
-              type="number"
-              value={rewardCoins}
-              onChange={(e) => setRewardCoins(e.target.value)}
-              placeholder="Ex: 500"
-              className="bg-slate-950 border-red-600/20 text-white mt-1"
-              required
-            />
-          </div>
-
-          <div>
-            <Label className="text-xs text-slate-300 font-bold uppercase">URL da Imagem da Capa</Label>
-            <Input
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://..."
-              className="bg-slate-950 border-red-600/20 text-white mt-1"
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <Label className="text-xs text-slate-300 font-bold uppercase">Descrição do Desafio</Label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Ex: Conquiste todos os troféus incluindo a vitória na arena..."
-              className="w-full h-20 p-3 bg-slate-950 border border-red-600/20 rounded-md text-sm text-white focus:outline-none focus:ring-1 focus:ring-red-500/50 mt-1"
-            />
-          </div>
-
-          <div className="md:col-span-2 flex justify-end">
-            <Button type="submit" disabled={isSubmitting} className="bg-red-600 hover:bg-red-700 font-bold px-6 btn-neon text-white">
-              {isSubmitting ? "Cadastrando..." : "Publicar Desafio no Clube"}
-            </Button>
-          </div>
-        </form>
-      </Card>
-
-      {/* CARD 2: COMPROVAÇÕES ENVIADAS PELOS USUÁRIOS */}
-      <Card className="bg-[#121212] border-red-600/30 p-6 shadow-xl">
-        <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-          <Coins className="text-amber-400" /> Comprovações de Platina para Aprovação
-        </h3>
-
-        {submissionsQuery.isLoading ? (
-          <p className="text-slate-400 text-sm">Carregando solicitações...</p>
-        ) : !submissionsQuery.data || submissionsQuery.data.length === 0 ? (
-          <p className="text-slate-400 text-sm py-4">Nenhuma comprovação enviada no momento.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-300">
-              <thead className="bg-slate-950 text-xs text-slate-400 uppercase">
-                <tr>
-                  <th className="p-3">ID / Data</th>
-                  <th className="p-3">PSN ID</th>
-                  <th className="p-3">Desafio ID</th>
-                  <th className="p-3">Comprovante</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3 text-right">Ação</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800">
-                {submissionsQuery.data.map((sub: any) => (
-                  <tr key={sub.id} className="hover:bg-slate-800/40">
-                    <td className="p-3 text-xs">
-                      #{sub.id} <br />
-                      <span className="text-[10px] text-slate-500">
-                        {new Date(sub.submittedAt).toLocaleDateString("pt-BR")}
-                      </span>
-                    </td>
-                    <td className="p-3 font-bold text-white">{sub.psnId}</td>
-                    <td className="p-3 text-xs text-slate-400">Desafio #{sub.challengeId}</td>
-                    <td className="p-3">
-                      <a
-                        href={sub.proofUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-blue-400 hover:underline flex items-center gap-1"
-                      >
-                        Ver Foto <ExternalLink className="w-3 h-3" />
-                      </a>
-                    </td>
-                    <td className="p-3">
-                      {sub.status === "aprovado" && (
-                        <span className="bg-emerald-500/20 text-emerald-400 text-xs px-2 py-1 rounded font-bold">
-                          Aprovado (+{sub.coinsAwarded} Coins)
-                        </span>
-                      )}
-                      {sub.status === "pendente" && (
-                        <span className="bg-amber-500/20 text-amber-400 text-xs px-2 py-1 rounded font-bold">
-                          Pendente
-                        </span>
-                      )}
-                      {sub.status === "rejeitado" && (
-                        <span className="bg-red-500/20 text-red-400 text-xs px-2 py-1 rounded font-bold">
-                          Rejeitado
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-3 text-right">
-                      {sub.status === "pendente" && (
-                        <div className="flex gap-2 justify-end">
-                          <Button
-                            size="sm"
-                            onClick={() =>
-                              approveMutation.mutate({
-                                submissionId: sub.id,
-                                coinsToAward: 500,
-                              })
-                            }
-                            className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold"
-                          >
-                            Aprovar (+500 Coins)
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => {
-                              const reason = prompt("Motivo da rejeição:") || "Foto ilegível ou PSN ID não bate";
-                              rejectMutation.mutate({
-                                submissionId: sub.id,
-                                adminNotes: reason,
-                              });
-                            }}
-                            className="text-xs font-bold"
-                          >
-                            Rejeitar
-                          </Button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
     </div>
   );
 }
