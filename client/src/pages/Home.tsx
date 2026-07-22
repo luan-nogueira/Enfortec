@@ -295,6 +295,7 @@ export default function Home() {
             <a href="/faq" className="text-slate-300 hover:text-white font-medium transition flex items-center gap-2"><HelpCircle className="w-4 h-4" /> FAQ</a>
             <a href="/avaliacoes" className="text-slate-300 hover:text-white font-medium transition flex items-center gap-2"><Star className="w-4 h-4 text-yellow-500" /> Avaliações</a>
             <a href="/promocoes" className="text-slate-300 hover:text-white font-medium transition flex items-center gap-2"><Flame className="w-4 h-4 text-red-500" /> Promoções</a>
+            <a href="/platinador" className="text-amber-400 hover:text-amber-300 font-bold transition flex items-center gap-2"><Trophy className="w-4 h-4 text-amber-400" /> Clube Platinador</a>
             <a href="/virar-vendedor" className="text-slate-300 hover:text-white font-medium transition flex items-center gap-2"><Zap className="w-4 h-4 text-red-500" /> Revendedor</a>
             <span className="w-px h-6 bg-slate-800"></span>
             

@@ -9,13 +9,19 @@ export function registerPaymentRoute(app: Express) {
   // Rota de busca automática de capas de jogos no Steam
   app.get("/api/games/search-cover", async (req, res) => {
     try {
-      const term = req.query.term as string;
-      if (!term) {
+      const rawTerm = req.query.term as string;
+      if (!rawTerm) {
         return res.status(400).json({ success: false, error: "Termo de busca é obrigatório." });
       }
 
+      // Limpa marcas de plataforma e formato para evitar falsos positivos no Steam (ex: "GTA V PS4/PS5" -> "GTA V")
+      const term = rawTerm
+        .replace(/\b(PS4\/PS5|PS5|PS4|XBOX|PC)\b/gi, "")
+        .replace(/\b(MÍDIA|MIDIA|DIGITAL|CONTA|COMPARTILHADA|PRIMÁRIA|SECUNDÁRIA)\b/gi, "")
+        .trim();
+
       // Consulta a API de busca pública do Steam
-      const steamUrl = `https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(term)}&l=portuguese&cc=BR`;
+      const steamUrl = `https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(term || rawTerm)}&l=portuguese&cc=BR`;
       const response = await axios.get(steamUrl);
       const data = response.data;
 

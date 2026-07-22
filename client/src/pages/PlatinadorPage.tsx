@@ -79,13 +79,37 @@ export default function PlatinadorPage() {
     updatePsnMutation.mutate({ psnId: psnInput.trim() });
   };
 
-  const handleSubscribe = () => {
+  const handleSubscribe = async () => {
     if (!user) {
       window.location.href = getLoginUrl();
       return;
     }
     setIsSubscribing(true);
-    subscribeMutation.mutate();
+    try {
+      const idToken = user.firebaseUser ? await user.firebaseUser.getIdToken() : "";
+      const res = await fetch("/api/infinitepay/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        },
+        body: JSON.stringify({
+          name: "Assinatura Clube Platinador - R$ 15/mês",
+          price: 15.00,
+          quantity: 1,
+          productType: "platinador",
+          redirectUrl: `${window.location.origin}/platinador`
+        })
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        subscribeMutation.mutate();
+      }
+    } catch {
+      subscribeMutation.mutate();
+    }
   };
 
   const handleSubmitProof = (e: React.FormEvent) => {
@@ -161,17 +185,17 @@ export default function PlatinadorPage() {
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-8 space-y-12">
         {/* HERO SECTION */}
-        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1c080e] via-[#121212] to-[#0a0a0a] border border-[#dc143c]/30 p-8 lg:p-12 shadow-2xl shadow-[#dc143c]/10">
+        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1c080e] via-[#121212] to-[#0a0a0a] border border-[#dc143c]/30 p-5 sm:p-8 lg:p-12 shadow-2xl shadow-[#dc143c]/10">
           <div className="absolute -top-24 -right-24 w-96 h-96 bg-[#dc143c]/15 rounded-full blur-3xl pointer-events-none" />
           <div className="relative z-10 grid lg:grid-cols-12 gap-8 items-center">
             <div className="lg:col-span-7 space-y-6">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#dc143c]/10 border border-[#dc143c]/30 text-[#ff4d6d] text-xs font-bold uppercase tracking-wider">
                 <Sparkles className="w-3.5 h-3.5" /> Clube Exclusivo de Troféus
               </div>
-              <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-tight">
+              <h1 className="text-2xl sm:text-5xl font-black tracking-tight leading-tight">
                 Jogue, Platine e Ganhe <span className="text-[#dc143c] drop-shadow-[0_0_15px_rgba(220,20,60,0.5)]">Descontos Reais</span> na Loja!
               </h1>
-              <p className="text-gray-300 text-base sm:text-lg leading-relaxed">
+              <p className="text-gray-300 text-sm sm:text-lg leading-relaxed">
                 Faça parte do <strong className="text-white">Clube do Platinador Eforte Games</strong> por apenas <span className="text-emerald-400 font-extrabold">R$ 15,00/mês</span>. Tenha acesso a um <strong className="text-[#ff4d6d]">Grupo VIP de WhatsApp</strong>, cumpra desafios semanais na PSN e acumule <strong className="text-amber-400">ForteCoins</strong> para abater em qualquer jogo ou produto!
               </p>
 
@@ -180,9 +204,9 @@ export default function PlatinadorPage() {
                   <Button
                     onClick={handleSubscribe}
                     disabled={isSubscribing}
-                    className="bg-gradient-to-r from-[#dc143c] to-[#ff4d6d] hover:from-[#b01030] hover:to-[#dc143c] text-white font-extrabold text-base px-8 py-6 rounded-2xl shadow-xl shadow-[#dc143c]/30 transition-all hover:scale-105"
+                    className="w-full sm:w-auto bg-gradient-to-r from-[#dc143c] to-[#ff4d6d] hover:from-[#b01030] hover:to-[#dc143c] text-white font-extrabold text-sm sm:text-base px-5 sm:px-8 py-4 sm:py-6 rounded-2xl shadow-xl shadow-[#dc143c]/30 transition-all hover:scale-105 whitespace-normal h-auto text-center flex items-center justify-center"
                   >
-                    <Trophy className="w-5 h-5 mr-2" />
+                    <Trophy className="w-5 h-5 mr-2 shrink-0" />
                     {isSubscribing ? "Processando..." : "Assinar Clube Platinador — R$ 15,00/mês"}
                   </Button>
                 ) : (
