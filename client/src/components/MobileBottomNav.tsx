@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
+import { Badge } from "@/components/ui/badge";
 import {
   Home as HomeIcon,
   ShoppingBag,
