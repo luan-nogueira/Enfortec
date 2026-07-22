@@ -2,18 +2,17 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocation } from "wouter";
-import { Zap, Gamepad2, Search, Shield, Package, LayoutGrid, Tag, Coins, LogOut, HelpCircle, Home as HomeIcon, Instagram, ChevronLeft, ChevronRight, ShieldCheck, Sparkles, PlusCircle, Swords, Compass, Trophy, Gauge, Crosshair, Flame } from "lucide-react";
+import { Zap, Gamepad2, Search, Shield, Package, LayoutGrid, Tag, Coins, LogOut, HelpCircle, Home as HomeIcon, Instagram, ChevronLeft, ChevronRight, ShieldCheck, Sparkles, PlusCircle, Swords, Compass, Trophy, Gauge, Crosshair, Flame, ShoppingCart, Star } from "lucide-react";
 import { getLoginUrl } from "@/const";
 import UserProfileButton from "@/components/UserProfileButton";
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, query, orderBy, limit } from "firebase/firestore";
-
-const DEFAULT_BANNERS = [
+const DEFAULT_MAIN_BANNERS = [
   {
     id: "default-fortecoins",
     title: "💰 Sistema de Fidelidade ForteCoins!",
-    description: "Indique amigos e ganhe 15 ForteCoins! Use suas moedas para resgatar Gift Cards de R$50 e R$100 na nossa loja.",
+    description: "Indique amigos e ganhe 15 ForteCoins! Use suas moedas para abater no valor das suas compras no nosso marketplace.",
     imageUrl: "https://images.unsplash.com/photo-1621761191319-c6fb62004040?q=80&w=1200",
     link: "/fortecoins",
     expiresAt: null
@@ -29,7 +28,7 @@ const DEFAULT_BANNERS = [
   {
     id: "default-usados",
     title: "📦 Desapegos e Produtos Físicos Usados",
-    description: "Filtre produtos por Estado (UF) e compre com segurança via saldo garantido em escrow da Eforte Games.",
+    description: "Filtre produtos por Estado e Cidade. Compre e venda com a comunidade local com segurança.",
     imageUrl: "https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?q=80&w=1200",
     link: "/usados",
     expiresAt: null
@@ -47,8 +46,8 @@ const DEFAULT_SIDEBAR_TOP = {
 
 const DEFAULT_SIDEBAR_BOTTOM = {
   id: "default-sidebar-bottom",
-  title: "🎁 Resgate Gift Cards com ForteCoins!",
-  description: "Troque suas moedas por códigos Steam, PSN e Xbox na nossa loja de prêmios.",
+  title: "🎁 Acumule ForteCoins!",
+  description: "Faça compras e avaliações para ganhar moedas e usar como desconto nas próximas compras.",
   imageUrl: "https://images.unsplash.com/photo-1621761191319-c6fb62004040?q=80&w=600",
   link: "/fortecoins",
   expiresAt: null
@@ -153,7 +152,7 @@ export default function Home() {
       id: "popular-gow-ragnarok",
       title: "GOD OF WAR RAGNARÖK PS4/PS5",
       description: "💥 Vivencie a jornada épica de Kratos e Atreus pelos Nove Reinos. Jogo de Mídia Digital com ativação imediata e 7 ForteCoins de cashback!",
-      imageUrl: "https://image.api.playstation.com/vulcan/ap/rnd/202207/1210/457q9vI358s9K3wJp0mN.png",
+      imageUrl: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200",
       link: `/digital?search=${encodeURIComponent("God of War Ragnarök")}`,
       expiresAt: null
     },
@@ -161,7 +160,7 @@ export default function Home() {
       id: "popular-gta5",
       title: "GRAND THEFT AUTO V: PREMIUM EDITION PS4/PS5",
       description: "💥 Explore o submundo do crime em Los Santos. Compre no precinho a mídia digital e garanta 7 ForteCoins de cashback!",
-      imageUrl: "https://image.api.playstation.com/vulcan/ap/rnd/202203/0912/o4U4e7z7e3s7K2wJ.png",
+      imageUrl: "https://images.unsplash.com/photo-1511512578047-dfb367046420?q=80&w=1200",
       link: `/digital?search=${encodeURIComponent("GTA V")}`,
       expiresAt: null
     },
@@ -169,7 +168,7 @@ export default function Home() {
       id: "popular-spider-man-2",
       title: "MARVEL'S SPIDER-MAN 2 PS5",
       description: "💥 Balance por Nova York como Peter Parker e Miles Morales. Gráficos incríveis no PS5 com 7 ForteCoins de cashback!",
-      imageUrl: "https://image.api.playstation.com/vulcan/ap/rnd/202306/1219/c77d0130dbb6a03c8c78c3c138f6bdf6fd6a5e1e12ea996b.png",
+      imageUrl: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=1200",
       link: `/digital?search=${encodeURIComponent("Spider-Man 2")}`,
       expiresAt: null
     },
@@ -177,7 +176,7 @@ export default function Home() {
       id: "popular-elden-ring",
       title: "ELDEN RING PS4/PS5",
       description: "💥 Levante-se, Maculado, e seja guiado pela graça para brandir o poder do Anel Prístino. Adquira no precinho com 7 ForteCoins de cashback!",
-      imageUrl: "https://image.api.playstation.com/vulcan/ap/rnd/202110/2000/a8H6S5K5W7uUeL172zR2w6jJ.png",
+      imageUrl: "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?q=80&w=1200",
       link: `/digital?search=${encodeURIComponent("Elden Ring")}`,
       expiresAt: null
     },
@@ -185,7 +184,7 @@ export default function Home() {
       id: "popular-mortal-kombat-1",
       title: "MORTAL KOMBAT 1 PS5",
       description: "💥 Descubra um Universo Mortal Kombat renascido, criado pelo Deus do Fogo Liu Kang. Lute pela justiça com 7 ForteCoins de cashback!",
-      imageUrl: "https://image.api.playstation.com/vulcan/ap/rnd/202305/1800/6f3b06e864705bd0cbb6bd211e9a263158bdf6ea2dca2c12.png",
+      imageUrl: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=1200",
       link: `/digital?search=${encodeURIComponent("Mortal Kombat 1")}`,
       expiresAt: null
     }
@@ -198,7 +197,6 @@ export default function Home() {
       !dbGameBanners.some(dbGame => dbGame.title.toLowerCase().includes(fallback.title.toLowerCase()))
     )
   ];
-
   const finalBanners = activeBanners.length > 0 ? activeBanners : DEFAULT_BANNERS;
 
   const sidebarTopBanner = sidebarTopPromo || DEFAULT_SIDEBAR_TOP;
@@ -293,7 +291,9 @@ export default function Home() {
           <div className="hidden lg:flex items-center gap-8">
             <a href="#categorias" className="text-slate-300 hover:text-white font-medium transition flex items-center gap-2"><LayoutGrid className="w-4 h-4" /> Categorias</a>
             <a href="#anuncios" className="text-slate-300 hover:text-white font-medium transition flex items-center gap-2"><Tag className="w-4 h-4" /> Anúncios</a>
+            <a href="/usados" className="text-slate-300 hover:text-white font-medium transition flex items-center gap-2"><ShoppingCart className="w-4 h-4 text-blue-500" /> Desapegos</a>
             <a href="/faq" className="text-slate-300 hover:text-white font-medium transition flex items-center gap-2"><HelpCircle className="w-4 h-4" /> FAQ</a>
+            <a href="/avaliacoes" className="text-slate-300 hover:text-white font-medium transition flex items-center gap-2"><Star className="w-4 h-4 text-yellow-500" /> Avaliações</a>
             <a href="/promocoes" className="text-slate-300 hover:text-white font-medium transition flex items-center gap-2"><Flame className="w-4 h-4 text-red-500" /> Promoções</a>
             <a href="/virar-vendedor" className="text-slate-300 hover:text-white font-medium transition flex items-center gap-2"><Zap className="w-4 h-4 text-red-500" /> Revendedor</a>
             <span className="w-px h-6 bg-slate-800"></span>
@@ -702,7 +702,7 @@ export default function Home() {
                       <img 
                         src={listing.imageUrl || listing.images[0]} 
                         alt={listing.name} 
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                        className={`w-full h-full ${listing.coverFit === 'contain' ? 'object-contain bg-slate-900/60 p-2' : 'object-cover'} group-hover:scale-105 transition-transform duration-500`} 
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-slate-600 bg-slate-800/50">

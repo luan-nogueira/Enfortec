@@ -23,6 +23,8 @@ import FAQ from "./pages/FAQ";
 import CPFCompletionModal from "./components/CPFCompletionModal";
 import TermsAcceptanceModal from "./components/TermsAcceptanceModal";
 import TermsFortecoins from "./pages/TermsFortecoins";
+import Reviews from "./pages/Reviews";
+import PlatinadorPage from "./pages/PlatinadorPage";
 
 import { useEffect } from "react";
 import FortecoinsPage from "./pages/FortecoinsPage";
@@ -36,6 +38,7 @@ function Router() {
         <Route path={"/usados"} component={UsedMarketplace} />
         <Route path={"/digital"} component={DigitalMedia} />
         <Route path={"/promocoes"} component={PromotionsPage} />
+        <Route path={"/platinador"} component={PlatinadorPage} />
         <Route path={"/admin"} component={AdminDashboard} />
         <Route path={"/vendedor"} component={SellerDashboard} />
         <Route path={"/virar-vendedor"} component={BecomeSellerForm} />
@@ -48,6 +51,7 @@ function Router() {
         <Route path={"/fortecoins"} component={FortecoinsPage} />
         <Route path={"/termos"} component={TermsFortecoins} />
         <Route path={"/faq"} component={FAQ} />
+        <Route path={"/avaliacoes"} component={Reviews} />
         <Route path={"/404"} component={NotFound} />
         {/* Final fallback route */}
         <Route component={NotFound} />

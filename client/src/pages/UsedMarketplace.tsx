@@ -2,11 +2,11 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import UserProfileButton from "@/components/UserProfileButton";
-import { Search, Star, ShoppingCart, ArrowLeft, Flame, User, Check, Package, Coins, MapPin, Shield } from "lucide-react";
+import { Search, Star, ShoppingCart, ArrowLeft, Flame, User, Check, Package, Coins, MapPin, Shield, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { auth, db } from "@/lib/firebase";
-import { collection, onSnapshot, query, orderBy, doc, getDoc, updateDoc } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import {
@@ -54,6 +54,14 @@ export default function UsedMarketplace() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCondition, setSelectedCondition] = useState<string | null>(null);
   const [selectedState, setSelectedState] = useState<string | null>(null);
+  
+  // Localização do Comprador
+  const [buyerCep, setBuyerCep] = useState("");
+  const [buyerEstado, setBuyerEstado] = useState<string | null>(null);
+  const [buyerCidade, setBuyerCidade] = useState<string | null>(null);
+  const [buyerBairro, setBuyerBairro] = useState<string | null>(null);
+  const [isSearchingCep, setIsSearchingCep] = useState(false);
+
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [checkoutProductId, setCheckoutProductId] = useState<string | null>(null);
@@ -65,6 +73,24 @@ export default function UsedMarketplace() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [useCoins, setUseCoins] = useState(false);
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
+
+  const isAdmin = user?.email === "luanmnogueira@gmail.com" || user?.email === "enfortec@admin.com" || user?.role === "admin";
+
+  const handleDeleteProduct = async (id: string) => {
+    toast("Deletar este anúncio?", {
+      action: {
+        label: "Deletar",
+        onClick: async () => {
+          try {
+            await deleteDoc(doc(db, "used_products", id));
+            toast.success("Anúncio deletado com sucesso!");
+          } catch (error) {
+            toast.error("Erro ao deletar anúncio.");
+          }
+        }
+      }
+    });
+  };
 
   // Estados para cupons no checkout
   const [couponCode, setCouponCode] = useState("");
@@ -285,12 +311,71 @@ export default function UsedMarketplace() {
     return () => unsubscribe();
   }, []);
 
+  const handleBuyerCepChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\D/g, "");
+    if (value.length > 5) {
+      value = value.replace(/^(\d{5})(\d)/, "$1-$2");
+    }
+    if (value.length > 9) {
+      value = value.slice(0, 9);
+    }
+    setBuyerCep(value);
+
+    if (value.length === 9) {
+      const cleanCep = value.replace("-", "");
+      try {
+        setIsSearchingCep(true);
+        const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+        const data = await response.json();
+
+        if (!data.erro) {
+          setBuyerEstado(data.uf);
+          setBuyerCidade(data.localidade);
+          setBuyerBairro(data.bairro);
+          toast.success(`Mostrando produtos em ${data.bairro}, ${data.localidade} - ${data.uf}`);
+        } else {
+          toast.error("CEP não encontrado");
+          setBuyerEstado(null);
+          setBuyerCidade(null);
+          setBuyerBairro(null);
+        }
+      } catch (error) {
+        toast.error("Erro ao buscar CEP");
+      } finally {
+        setIsSearchingCep(false);
+      }
+    } else if (value.length === 0) {
+      setBuyerEstado(null);
+      setBuyerCidade(null);
+      setBuyerBairro(null);
+    }
+  };
+
   const filteredProducts = products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.description?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCondition = !selectedCondition || p.condition === selectedCondition;
-    const matchesState = !selectedState || p.estado === selectedState;
-    return matchesSearch && matchesCondition && matchesState;
+    
+    // Filtro por CEP (Bairro/Cidade/Estado) se o usuário digitou o CEP, ou filtro por estado selecionado manualmente
+    let matchesLocation = true;
+    if (buyerBairro && buyerCidade) {
+      // Se buscou por CEP, mostra produtos do mesmo Bairro ou no mínimo mesma Cidade
+      const sameBairro = p.bairro?.toLowerCase() === buyerBairro.toLowerCase();
+      const sameCidade = p.cidade?.toLowerCase() === buyerCidade.toLowerCase();
+      matchesLocation = sameBairro || sameCidade;
+    } else if (selectedState) {
+      matchesLocation = p.estado === selectedState;
+    }
+
+    return matchesSearch && matchesCondition && matchesLocation;
+  });
+
+  const sortedProducts = [...filteredProducts].sort((a, b) => {
+    const isABoosted = Boolean(a.boostedUntil && new Date(a.boostedUntil).getTime() > Date.now());
+    const isBBoosted = Boolean(b.boostedUntil && new Date(b.boostedUntil).getTime() > Date.now());
+    if (isABoosted && !isBBoosted) return -1;
+    if (!isABoosted && isBBoosted) return 1;
+    return 0; // ambos turbinados ou nenhum turbinado, mantém a ordem original (createdAt decrescente)
   });
 
   const conditions = [
@@ -359,6 +444,28 @@ export default function UsedMarketplace() {
               </Button>
             )}
           </div>
+
+          {/* Busca Local por CEP */}
+          <div className="mt-4 flex gap-2 flex-col sm:flex-row items-center">
+            <div className="flex-1 relative max-w-sm">
+              <MapPin className="absolute left-3 top-3 w-4 h-4 sm:w-5 sm:h-5 text-red-500/50" />
+              <Input
+                placeholder="Digite seu CEP para busca local"
+                value={buyerCep}
+                onChange={handleBuyerCepChange}
+                disabled={isSearchingCep}
+                className="pl-9 sm:pl-10 bg-slate-900 border-red-600/30 text-white placeholder:text-slate-500 h-10"
+              />
+            </div>
+            {buyerBairro && buyerCidade && (
+              <div className="text-sm text-slate-300 flex items-center gap-2">
+                <span className="text-red-500 font-semibold flex items-center">
+                  <Check className="w-4 h-4 mr-1" /> Localização ativa:
+                </span>
+                {buyerBairro}, {buyerCidade} - {buyerEstado}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -415,16 +522,20 @@ export default function UsedMarketplace() {
           <div className="text-center py-12">
             <p className="text-slate-400 text-lg">Carregando produtos...</p>
           </div>
-        ) : filteredProducts.length === 0 ? (
+        ) : sortedProducts.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-slate-400 text-lg">Nenhum produto encontrado</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
-            {filteredProducts.map((product) => (
+            {sortedProducts.map((product) => (
               <div
                 key={product.id}
-                className="group relative bg-slate-900/40 rounded-2xl sm:rounded-3xl border border-red-600/10 overflow-hidden hover:border-red-600/40 transition-all duration-500 hover:shadow-[0_20px_50px_rgba(220,38,38,0.15)] flex flex-col h-full"
+                className={`group relative bg-slate-900/40 rounded-2xl sm:rounded-3xl border overflow-hidden transition-all duration-500 flex flex-col h-full ${
+                  Boolean(product.boostedUntil && new Date(product.boostedUntil).getTime() > Date.now())
+                    ? 'border-yellow-500/50 shadow-[0_0_20px_rgba(234,179,8,0.2)] hover:border-yellow-400 hover:shadow-[0_0_30px_rgba(234,179,8,0.4)]'
+                    : 'border-red-600/10 hover:border-red-600/40 hover:shadow-[0_20px_50px_rgba(220,38,38,0.15)]'
+                }`}
               >
                 {/* Image Section */}
                 <div className="relative h-32 sm:h-48 overflow-hidden bg-slate-950">
@@ -441,7 +552,12 @@ export default function UsedMarketplace() {
                   )}
                   
                   {/* Badge */}
-                  <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10">
+                  <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10 flex gap-1 sm:gap-2 flex-col items-end">
+                    {Boolean(product.boostedUntil && new Date(product.boostedUntil).getTime() > Date.now()) && (
+                      <span className="bg-yellow-500 text-slate-950 text-[8px] sm:text-[10px] px-2 py-0.5 sm:px-3 sm:py-1.5 rounded-full font-black uppercase tracking-wider shadow-xl border border-white/10 flex items-center gap-1">
+                        <Star className="w-2.5 h-2.5 fill-slate-950" /> DESTAQUE
+                      </span>
+                    )}
                     <span className="bg-red-600 text-white text-[8px] sm:text-[10px] px-2 py-0.5 sm:px-3 sm:py-1.5 rounded-full font-black uppercase tracking-wider shadow-xl border border-white/10">
                       USADO
                     </span>
@@ -455,13 +571,18 @@ export default function UsedMarketplace() {
                   <div>
                     <h3 className="text-sm sm:text-xl font-black text-white line-clamp-2 sm:line-clamp-1 mb-0.5 sm:mb-1">{product.name}</h3>
                     <p className="text-slate-500 text-[8px] sm:text-[10px] font-bold uppercase tracking-widest">{product.category || "JOGO USADO"}</p>
+                    {product.bairro && product.cidade ? (
+                      <span className="flex items-center text-[10px] sm:text-xs text-slate-400 max-w-[50%] truncate">
+                        <MapPin className="w-3 h-3 mr-1" />
+                        {product.bairro}, {product.cidade}
+                      </span>
+                    ) : product.cidade ? (
+                      <span className="flex items-center text-[10px] sm:text-xs text-slate-400 max-w-[50%] truncate">
+                        <MapPin className="w-3 h-3 mr-1" />
+                        {product.cidade}
+                      </span>
+                    ) : null}
                   </div>
-
-                  {product.estado && product.cidade && (
-                    <p className="text-[10px] sm:text-xs text-red-400 font-bold flex items-center gap-1 mb-3">
-                      <MapPin className="w-3.5 h-3.5 text-red-500 shrink-0" /> {product.cidade} - {product.estado}
-                    </p>
-                  )}
 
                   <div className="flex items-center gap-1.5 sm:gap-2 my-3 sm:my-6 p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-slate-950/50 border border-red-600/5">
                     <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-red-600/10 flex items-center justify-center border border-red-600/20">
@@ -489,6 +610,15 @@ export default function UsedMarketplace() {
                     </div>
 
                     <div className="flex flex-col gap-1.5 sm:gap-2">
+                      {(isAdmin || user?.id === product.sellerId) && (
+                        <Button
+                          onClick={() => handleDeleteProduct(product.id)}
+                          className="w-full bg-slate-800 hover:bg-red-800 text-slate-300 font-bold text-xs sm:text-sm h-10 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center gap-1.5 sm:gap-2 border border-red-500/20"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                          Apagar Anúncio
+                        </Button>
+                      )}
                       <Button 
                         onClick={() => handleBuyClick(product)}
                         disabled={isProcessingCheckout && selectedProduct?.id === product.id}

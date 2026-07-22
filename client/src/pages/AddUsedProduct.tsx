@@ -46,8 +46,10 @@ export default function AddUsedProduct() {
     price: "",
     condition: "como_novo" as const,
     images: [] as string[],
+    cep: "",
     estado: "",
     cidade: "",
+    bairro: "",
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -59,16 +61,62 @@ export default function AddUsedProduct() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    
+    // Auto-formatação de CEP
+    if (name === "cep") {
+      let cepFormatado = value.replace(/\D/g, "");
+      if (cepFormatado.length > 5) {
+        cepFormatado = cepFormatado.replace(/^(\d{5})(\d)/, "$1-$2");
+      }
+      if (cepFormatado.length > 9) {
+        cepFormatado = cepFormatado.slice(0, 9);
+      }
+      
+      setFormData(prev => ({ ...prev, [name]: cepFormatado }));
+
+      if (cepFormatado.length === 9) {
+        fetchCep(cepFormatado);
+      }
+      return;
+    }
+
     setFormData(prev => ({
       ...prev,
       [name]: value,
     }));
   };
 
+  const fetchCep = async (cep: string) => {
+    const cleanCep = cep.replace(/\D/g, "");
+    if (cleanCep.length !== 8) return;
+
+    try {
+      setIsLoading(true);
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      const data = await response.json();
+
+      if (!data.erro) {
+        setFormData(prev => ({
+          ...prev,
+          estado: data.uf,
+          cidade: data.localidade,
+          bairro: data.bairro,
+        }));
+        toast.success("Localização preenchida pelo CEP!");
+      } else {
+        toast.error("CEP não encontrado");
+      }
+    } catch (error) {
+      toast.error("Erro ao buscar CEP");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name.trim() || !formData.description.trim() || !formData.price || !formData.estado || !formData.cidade.trim()) {
+    if (!formData.name.trim() || !formData.description.trim() || !formData.price || !formData.cep.trim() || !formData.estado || !formData.cidade.trim() || !formData.bairro.trim()) {
       toast.error("Preencha todos os campos obrigatórios");
       return;
     }
@@ -86,8 +134,10 @@ export default function AddUsedProduct() {
         price: parseFloat(formData.price),
         condition: formData.condition,
         images: formData.images,
+        cep: formData.cep.trim(),
         estado: formData.estado,
         cidade: formData.cidade.trim(),
+        bairro: formData.bairro.trim(),
       });
       toast.success("Produto adicionado com sucesso!");
       navigate("/vendedor");
@@ -214,6 +264,20 @@ export default function AddUsedProduct() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-semibold text-slate-900 mb-2">
+                    CEP *
+                  </label>
+                  <Input
+                    type="text"
+                    name="cep"
+                    placeholder="00000-000"
+                    value={formData.cep}
+                    onChange={handleInputChange}
+                    disabled={isLoading}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-900 mb-2">
                     Estado (UF) *
                   </label>
                   <select
@@ -230,6 +294,9 @@ export default function AddUsedProduct() {
                     ))}
                   </select>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-semibold text-slate-900 mb-2">
                     Cidade *
@@ -239,6 +306,20 @@ export default function AddUsedProduct() {
                     name="cidade"
                     placeholder="Ex: Londrina"
                     value={formData.cidade}
+                    onChange={handleInputChange}
+                    disabled={isLoading}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-900 mb-2">
+                    Bairro *
+                  </label>
+                  <Input
+                    type="text"
+                    name="bairro"
+                    placeholder="Ex: Centro"
+                    value={formData.bairro}
                     onChange={handleInputChange}
                     disabled={isLoading}
                     required

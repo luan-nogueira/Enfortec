@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { db, storage } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useLocation } from "wouter";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
@@ -66,11 +66,14 @@ export default function SellerDashboard() {
   const [pricePS5, setPricePS5] = useState("");
   const [estado, setEstado] = useState("");
   const [cidade, setCidade] = useState("");
+  const [cep, setCep] = useState("");
+  const [bairro, setBairro] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
   const { data: pgUser } = trpc.auth.me.useQuery(undefined, { enabled: isAuthenticated });
   const createProductMutation = trpc.usedProducts.create.useMutation();
+  // const boostProductMutation = trpc.usedProducts.boost.useMutation();
 
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
@@ -88,10 +91,62 @@ export default function SellerDashboard() {
     return () => unsubscribe();
   }, [isAuthenticated, user?.id]);
 
+  const handleCepChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\D/g, "");
+    if (value.length > 5) {
+      value = value.replace(/^(\d{5})(\d)/, "$1-$2");
+    }
+    if (value.length > 9) {
+      value = value.slice(0, 9);
+    }
+    setCep(value);
+
+    if (value.length === 9) {
+      const cleanCep = value.replace("-", "");
+      try {
+        setLoading(true);
+        const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+        const data = await response.json();
+
+        if (!data.erro) {
+          setEstado(data.uf);
+          setCidade(data.localidade);
+          setBairro(data.bairro);
+          toast.success("Localização preenchida pelo CEP!");
+        } else {
+          toast.error("CEP não encontrado");
+        }
+      } catch (error) {
+        toast.error("Erro ao buscar CEP");
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Bloqueio de produtos digitais
+    const digitalKeywords = [
+      "digital", "conta", "primária", "primaria", "secundária", "secundaria", 
+      "chave", "código", "codigo", "gift card", "giftcard", "pin", "key", 
+      "download", "online", "acesso", "login", "senha"
+    ];
+    const textToCheck = `${name} ${description}`.toLowerCase();
+    const isDigital = digitalKeywords.some(keyword => textToCheck.includes(keyword));
+
+    if (isDigital) {
+      toast.error("Anúncios de Mídia Digital ou Contas não são permitidos. O Portal de Desapego é apenas para produtos físicos (mídia física, consoles, acessórios).");
+      return;
+    }
+
     if (!imageFile) {
       toast.warning("Por favor, selecione uma foto do produto.");
+      return;
+    }
+    if (!cep.trim()) {
+      toast.warning("Por favor, preencha o CEP.");
       return;
     }
     if (!estado) {
@@ -100,6 +155,10 @@ export default function SellerDashboard() {
     }
     if (!cidade.trim()) {
       toast.warning("Por favor, preencha a Cidade.");
+      return;
+    }
+    if (!bairro.trim()) {
+      toast.warning("Por favor, preencha o Bairro.");
       return;
     }
 
@@ -120,8 +179,10 @@ export default function SellerDashboard() {
         sellerId: user?.id,
         sellerName: user?.name || user?.email,
         status: "Ativo",
+        cep,
         estado,
         cidade,
+        bairro,
         createdAt: new Date().toISOString()
       });
 
@@ -133,8 +194,10 @@ export default function SellerDashboard() {
           price: pricePS4 ? parseFloat(pricePS4) : (pricePS5 ? parseFloat(pricePS5) : 0),
           condition: "como_novo",
           images: [downloadUrl],
+          cep,
           estado,
-          cidade
+          cidade,
+          bairro
         });
       } catch (pgErr) {
         console.warn("[SellerDashboard] Falha ao sincronizar com banco Postgres:", pgErr);
@@ -144,8 +207,10 @@ export default function SellerDashboard() {
       setDescription("");
       setPricePS4("");
       setPricePS5("");
+      setCep("");
       setEstado("");
       setCidade("");
+      setBairro("");
       setImageFile(null);
       setShowAddForm(false);
       
@@ -171,6 +236,55 @@ export default function SellerDashboard() {
             toast.success("Anúncio deletado com sucesso!");
           } catch (error) {
             toast.error("Erro ao deletar anúncio.");
+          }
+        }
+      }
+    });
+  };
+
+  const handleBoostProduct = async (product: any) => {
+    if (!user?.id) return;
+
+    if (Boolean(product.boostedUntil && new Date(product.boostedUntil).getTime() > Date.now())) {
+      toast.info(`Este produto já está turbinado até ${new Date(product.boostedUntil).toLocaleDateString()}!`);
+      return;
+    }
+
+    toast("Deseja turbinar este anúncio por 10 ForteCoins? Ele ficará em destaque por 3 dias.", {
+      action: {
+        label: "Turbinar (10 FC)",
+        onClick: async () => {
+          try {
+            setLoading(true);
+            const userRef = doc(db, "users", user.id);
+            const userSnap = await getDoc(userRef);
+            const currentCoins = userSnap.data()?.forteCoins ?? 0;
+
+            if (currentCoins < 10) {
+              toast.error("Você não tem ForteCoins suficientes (necessário 10 FC).");
+              return;
+            }
+
+            // Deduz as moedas
+            await updateDoc(userRef, {
+              forteCoins: currentCoins - 10
+            });
+
+            // Adiciona 3 dias
+            const boostedUntilDate = new Date();
+            boostedUntilDate.setDate(boostedUntilDate.getDate() + 3);
+
+            // Atualiza Firebase
+            await updateDoc(doc(db, "used_products", product.id), {
+              boostedUntil: boostedUntilDate.toISOString()
+            });
+
+            toast.success("Anúncio turbinado com sucesso! ⭐");
+          } catch (error) {
+            console.error("Erro ao turbinar:", error);
+            toast.error("Erro ao turbinar o anúncio.");
+          } finally {
+            setLoading(false);
           }
         }
       }
@@ -358,26 +472,56 @@ export default function SellerDashboard() {
                       <Input type="number" step="0.01" value={pricePS5} onChange={e => setPricePS5(e.target.value)} className="bg-slate-900 border-red-600/30 text-white" placeholder="0.00" />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-slate-300">Estado (UF) *</Label>
-                      <select
-                        required
-                        value={estado}
-                        onChange={e => setEstado(e.target.value)}
-                        className="w-full h-10 px-3 py-2 bg-slate-900 border border-red-600/30 rounded-md text-white focus:outline-none focus:ring-1 focus:ring-red-500 text-sm"
-                      >
-                        <option value="">Selecione...</option>
-                        {BRAZIL_STATES.map(st => (
-                          <option key={st.uf} value={st.uf}>{st.name} ({st.uf})</option>
-                        ))}
-                      </select>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div>
+                        <Label className="text-slate-300">CEP *</Label>
+                        <Input
+                          value={cep}
+                          onChange={handleCepChange}
+                          placeholder="00000-000"
+                          disabled={loading}
+                          required
+                          className="bg-slate-900 border-slate-700"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-slate-300">Estado (UF) *</Label>
+                        <select
+                          value={estado}
+                          onChange={(e) => setEstado(e.target.value)}
+                          className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-red-500"
+                          disabled={loading}
+                          required
+                        >
+                          <option value="">Selecione...</option>
+                          {BRAZIL_STATES.map(st => (
+                            <option key={st.uf} value={st.uf}>{st.name} ({st.uf})</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <Label className="text-slate-300">Cidade *</Label>
+                        <Input
+                          value={cidade}
+                          onChange={(e) => setCidade(e.target.value)}
+                          placeholder="Ex: Londrina"
+                          disabled={loading}
+                          required
+                          className="bg-slate-900 border-slate-700"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-slate-300">Bairro *</Label>
+                        <Input
+                          value={bairro}
+                          onChange={(e) => setBairro(e.target.value)}
+                          placeholder="Ex: Centro"
+                          disabled={loading}
+                          required
+                          className="bg-slate-900 border-slate-700"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <Label className="text-slate-300">Cidade *</Label>
-                      <Input required value={cidade} onChange={e => setCidade(e.target.value)} className="bg-slate-900 border-red-600/30 text-white" placeholder="Ex: Londrina" />
-                    </div>
-                  </div>
                   <div>
                     <Label className="text-slate-300">Foto do Produto</Label>
                     <Input 
@@ -421,21 +565,47 @@ export default function SellerDashboard() {
                   </div>
                   <div className="p-6">
                     <div className="flex justify-between items-start mb-2">
-                      <h3 className="text-lg font-bold text-white line-clamp-1">{product.name}</h3>
+                      <div className="flex flex-col">
+                        <h3 className="text-lg font-bold text-white line-clamp-1">{product.name}</h3>
+                        {Boolean(product.boostedUntil && new Date(product.boostedUntil).getTime() > Date.now()) && (
+                          <span className="text-[10px] text-yellow-500 font-bold uppercase tracking-widest flex items-center gap-1 mt-1">
+                            <Star className="w-3 h-3 fill-yellow-500" /> Destaque até {new Date(product.boostedUntil).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
                       <Button variant="ghost" size="icon" className="text-slate-500 hover:text-red-500 -mt-2 -mr-2" onClick={() => handleDeleteProduct(product.id)}>
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
                     <p className="text-slate-400 text-sm mb-4 line-clamp-2 min-h-[40px]">{product.description}</p>
-                    <div className="flex justify-between items-center pt-4 border-t border-red-600/10">
-                      <div className="flex flex-col text-red-500 font-bold text-sm">
-                        {product.pricePS4 ? <span>PS4: R$ {product.pricePS4.toFixed(2)}</span> : null}
-                        {product.pricePS5 ? <span>PS5: R$ {product.pricePS5.toFixed(2)}</span> : null}
-                        {!product.pricePS4 && !product.pricePS5 && <span>Sob Consulta</span>}
+                    <div className="flex flex-col gap-3 pt-4 border-t border-red-600/10">
+                      <div className="flex justify-between items-center">
+                        <div className="flex flex-col text-red-500 font-bold text-sm">
+                          {product.pricePS4 ? <span>PS4: R$ {product.pricePS4.toFixed(2)}</span> : null}
+                          {product.pricePS5 ? <span>PS5: R$ {product.pricePS5.toFixed(2)}</span> : null}
+                          {!product.pricePS4 && !product.pricePS5 && <span>Sob Consulta</span>}
+                        </div>
+                        <span className="text-xs bg-red-600/20 text-red-400 px-3 py-1 rounded-full font-medium">
+                          {product.status}
+                        </span>
                       </div>
-                      <span className="text-xs bg-red-600/20 text-red-400 px-3 py-1 rounded-full font-medium">
-                        {product.status}
-                      </span>
+                      
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        disabled={loading || Boolean(product.boostedUntil && new Date(product.boostedUntil).getTime() > Date.now())}
+                        onClick={() => handleBoostProduct(product)}
+                        className={`w-full text-xs font-bold ${
+                          Boolean(product.boostedUntil && new Date(product.boostedUntil).getTime() > Date.now())
+                          ? 'border-yellow-500/50 text-yellow-500 bg-yellow-500/10'
+                          : 'border-yellow-600/30 text-yellow-500 hover:bg-yellow-600/10'
+                        }`}
+                      >
+                        <Flame className="w-3.5 h-3.5 mr-1.5" />
+                        {Boolean(product.boostedUntil && new Date(product.boostedUntil).getTime() > Date.now()) 
+                          ? 'Anúncio Turbinado' 
+                          : 'Turbinar Anúncio (10 FC)'}
+                      </Button>
                     </div>
                   </div>
                 </Card>

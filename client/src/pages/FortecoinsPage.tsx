@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import UserProfileButton from "@/components/UserProfileButton";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, getDoc } from "firebase/firestore";
-import { ArrowLeft, Coins, Copy, Gift, HelpCircle, CheckCircle, Clock, AlertTriangle, LogOut } from "lucide-react";
+import { ArrowLeft, Coins, Copy, Gift, HelpCircle, CheckCircle, Clock, AlertTriangle, LogOut, MessageCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -196,7 +196,7 @@ export default function FortecoinsPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-10">
           
           {/* Card 1: Balance Wallet */}
-          <Card className="bg-slate-900/60 border-red-600/20 backdrop-blur-md p-6 flex flex-col justify-between card-neon md:col-span-1">
+          <Card className="bg-slate-900/60 border-red-600/20 backdrop-blur-md p-6 flex flex-col justify-between card-neon md:col-span-1 h-fit">
             <div>
               <p className="text-slate-400 text-sm font-bold uppercase tracking-wider mb-2">Seu Saldo</p>
               <div className="flex items-center gap-4 my-4">
@@ -233,7 +233,7 @@ export default function FortecoinsPage() {
             <div>
               <div className="flex justify-between items-start">
                 <div>
-                  <h3 className="text-lg font-bold text-white">Indique amigos & Ganhe Prêmios</h3>
+                  <h3 className="text-lg font-bold text-white">Compartilhe para ganhar desconto</h3>
                   <p className="text-slate-400 text-sm mt-1">
                     Ganhe <strong className="text-red-500 font-bold">15 Fortecoins</strong> para cada amigo convidado que se cadastrar e realizar a compra de um jogo!
                   </p>
@@ -266,6 +266,24 @@ export default function FortecoinsPage() {
               <div>
                 <span className="block text-red-500 font-bold text-base mb-0.5">3</span>
                 <span>Ganhe +15 Fortecoins</span>
+              </div>
+            </div>
+
+            <div className="mt-5 pt-4 border-t border-slate-800">
+              <label className="text-[10px] text-green-500 font-bold uppercase tracking-wider block mb-1.5 flex items-center gap-1.5">
+                <MessageCircle className="w-3.5 h-3.5" /> Comunidade VIP
+              </label>
+              <div className="bg-slate-950/50 border border-green-500/20 p-3 rounded-lg flex flex-col sm:flex-row items-center gap-3">
+                <p className="text-[11px] sm:text-xs text-slate-300 font-medium flex-1 m-0">
+                  Entre no nosso grupo do WhatsApp para ficar por dentro das promoções em primeira mão!
+                </p>
+                <Button 
+                  onClick={() => window.open("https://chat.whatsapp.com/GczvlmlbhRk4rPak1pcaL3?s=cl&p=a&ilr=2", "_blank")} 
+                  className="w-full sm:w-auto bg-[#25D366] hover:bg-[#1ebd5b] text-white font-bold h-8 sm:h-9 px-3 sm:px-4 rounded-lg flex items-center justify-center gap-1.5 shadow-md shadow-green-500/20 transition-all shrink-0 text-[10px] sm:text-xs"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  Entrar no Grupo
+                </Button>
               </div>
             </div>
           </Card>

@@ -206,11 +206,17 @@ export default function MyPurchases() {
               </div>
 
               <div className="space-y-3">
-                <label className="text-sm font-medium text-slate-300">Deixe um Comentário (Opcional)</label>
+                <div className="flex justify-between items-center">
+                  <label className="text-sm font-medium text-slate-300">Deixe um Comentário (Opcional)</label>
+                  <span className={`text-xs ${comment.length >= 20 ? 'text-red-400 font-bold' : 'text-slate-500'}`}>
+                    {comment.length}/20
+                  </span>
+                </div>
                 <Textarea 
-                  placeholder="Como foi sua experiência de compra? O vendedor foi rápido?"
+                  placeholder="Até 20 caracteres."
                   value={comment}
-                  onChange={(e) => setComment(e.target.value)}
+                  onChange={(e) => setComment(e.target.value.slice(0, 20))}
+                  maxLength={20}
                   className="bg-slate-950 border-slate-800 resize-none h-24"
                 />
               </div>

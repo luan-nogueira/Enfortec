@@ -13,6 +13,9 @@ export const usedStatusEnum = pgEnum("used_status", ["pendente", "aprovado", "re
 export const digitalTypeEnum = pgEnum("digital_type", ["jogo", "gift_card", "licenca", "outro"]);
 export const productTypeEnum = pgEnum("product_type", ["store", "used", "digital"]);
 export const orderStatusEnum = pgEnum("order_status", ["pendente", "pago", "enviado", "entregue", "cancelado"]);
+export const subscriptionStatusEnum = pgEnum("subscription_status", ["ativa", "cancelada", "expirada", "pendente"]);
+export const challengeStatusEnum = pgEnum("challenge_status", ["ativo", "encerrado", "brevemente"]);
+export const submissionStatusEnum = pgEnum("submission_status", ["pendente", "aprovado", "rejeitado"]);
 
 // ─── Tables ───────────────────────────────────────────────────────────────────
 
@@ -25,6 +28,7 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   cpf: varchar("cpf", { length: 18 }),
+  psnId: varchar("psnId", { length: 100 }),
   forteCoins: integer("forteCoins").default(10).notNull(),
   role: roleEnum("role").default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -83,6 +87,9 @@ export const usedProducts = pgTable("usedProducts", {
   status: usedStatusEnum("status").default("pendente"),
   estado: varchar("estado", { length: 50 }),
   cidade: varchar("cidade", { length: 100 }),
+  cep: varchar("cep", { length: 9 }),
+  bairro: varchar("bairro", { length: 100 }),
+  boostedUntil: timestamp("boostedUntil"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => new Date()),
 });
@@ -184,11 +191,61 @@ export type InsertMessage = typeof messages.$inferInsert;
 export const platformSettings = pgTable("platform_settings", {
   id: integer("id").primaryKey(),
   commissionPercentage: numeric("commissionPercentage", { precision: 5, scale: 2 }).default("10"),
+  vipWhatsappUrl: varchar("vipWhatsappUrl", { length: 500 }).default("https://chat.whatsapp.com/Gkx7ExampleVipLink"),
   updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => new Date()),
 });
 
 export type PlatformSettings = typeof platformSettings.$inferSelect;
 export type InsertPlatformSettings = typeof platformSettings.$inferInsert;
+
+// Platinador Subscriptions table
+export const platinadorSubscriptions = pgTable("platinador_subscriptions", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull().unique(),
+  status: subscriptionStatusEnum("status").default("ativa").notNull(),
+  planName: varchar("planName", { length: 100 }).default("Clube Platinador VIP").notNull(),
+  price: numeric("price", { precision: 10, scale: 2 }).default("15.00").notNull(),
+  startsAt: timestamp("startsAt").defaultNow().notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  paymentId: varchar("paymentId", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type PlatinadorSubscription = typeof platinadorSubscriptions.$inferSelect;
+export type InsertPlatinadorSubscription = typeof platinadorSubscriptions.$inferInsert;
+
+// Platinum Challenges table
+export const platinumChallenges = pgTable("platinum_challenges", {
+  id: serial("id").primaryKey(),
+  gameTitle: varchar("gameTitle", { length: 255 }).notNull(),
+  description: text("description"),
+  platform: varchar("platform", { length: 50 }).default("PS4 / PS5").notNull(),
+  imageUrl: varchar("imageUrl", { length: 500 }),
+  rewardCoins: integer("rewardCoins").default(500).notNull(),
+  status: challengeStatusEnum("status").default("ativo").notNull(),
+  deadline: timestamp("deadline"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type PlatinumChallenge = typeof platinumChallenges.$inferSelect;
+export type InsertPlatinumChallenge = typeof platinumChallenges.$inferInsert;
+
+// Platinum Submissions table
+export const platinumSubmissions = pgTable("platinum_submissions", {
+  id: serial("id").primaryKey(),
+  challengeId: integer("challengeId").notNull(),
+  userId: integer("userId").notNull(),
+  psnId: varchar("psnId", { length: 100 }).notNull(),
+  proofUrl: text("proofUrl").notNull(),
+  status: submissionStatusEnum("status").default("pendente").notNull(),
+  coinsAwarded: integer("coinsAwarded").default(0).notNull(),
+  adminNotes: text("adminNotes"),
+  submittedAt: timestamp("submittedAt").defaultNow().notNull(),
+  reviewedAt: timestamp("reviewedAt"),
+});
+
+export type PlatinumSubmission = typeof platinumSubmissions.$inferSelect;
+export type InsertPlatinumSubmission = typeof platinumSubmissions.$inferInsert;
 
 // ─── Relations ────────────────────────────────────────────────────────────────
 

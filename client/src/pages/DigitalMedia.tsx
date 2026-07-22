@@ -569,7 +569,11 @@ export default function DigitalMedia() {
                         alt={product.name}
                         className={`w-full h-full ${product.coverFit === 'contain' ? 'object-contain bg-slate-900/60 p-2' : 'object-cover'} group-hover:scale-110 transition-transform duration-500`}
                         onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
+                          const target = e.currentTarget as HTMLImageElement;
+                          if (!target.dataset.fallbackApplied) {
+                            target.dataset.fallbackApplied = "true";
+                            target.src = "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=800";
+                          }
                         }}
                       />
                     ) : (

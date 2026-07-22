@@ -11,11 +11,11 @@ const faqs = [
     items: [
       {
         q: "Quais formas de pagamento são aceitas?",
-        a: "Aceitamos Pix, Cartão de Crédito (parcelado em até 12x) e Boleto Bancário. Todos os pagamentos são processados com segurança via Mercado Pago."
+        a: "Aceitamos Pix, Cartão de Crédito (parcelado em até 12x) e Boleto Bancário. Todos os pagamentos são processados com segurança via InfinitePay."
       },
       {
         q: "É seguro comprar aqui?",
-        a: "Sim! Utilizamos criptografia SSL e o sistema antifraude do Mercado Pago. Sua compra tem garantia total — se não receber o produto, você é reembolsado."
+        a: "Sim! Utilizamos criptografia SSL e o sistema antifraude da InfinitePay. Sua compra tem garantia total — se não receber o produto, você é reembolsado."
       },
       {
         q: "O pagamento é processado imediatamente?",

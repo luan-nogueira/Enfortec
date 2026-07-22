@@ -459,3 +459,46 @@ export async function deleteOrder(orderId: number) {
   if (!db) throw new Error("Database not available");
   return db.delete(orders).where(eq(orders.id, orderId));
 }
+
+export async function getRecentReviews() {
+  const db = getDb();
+  if (!db) return [];
+  
+  const results = await db.select({
+    review: reviews,
+    buyer: users,
+    order: orders,
+    product: products,
+    digitalProduct: digitalProducts,
+    usedProduct: usedProducts,
+  })
+  .from(reviews)
+  .leftJoin(users, eq(reviews.buyerId, users.id))
+  .leftJoin(orders, eq(reviews.orderId, orders.id))
+  .leftJoin(products, eq(orders.productId, products.id))
+  .leftJoin(digitalProducts, eq(orders.digitalProductId, digitalProducts.id))
+  .leftJoin(usedProducts, eq(orders.usedProductId, usedProducts.id))
+  .orderBy(desc(reviews.createdAt))
+  .limit(50);
+
+  return results.map(r => {
+    let productName = r.order?.productName || "Produto";
+    if (r.order?.productType === "store" && r.product) {
+      productName = r.product.name;
+    } else if (r.order?.productType === "used" && r.usedProduct) {
+      productName = r.usedProduct.name;
+    } else if (r.order?.productType === "digital" && r.digitalProduct) {
+      productName = r.digitalProduct.name;
+    }
+    
+    return {
+      id: r.review.id,
+      rating: r.review.rating,
+      comment: r.review.comment,
+      createdAt: r.review.createdAt,
+      buyerName: r.buyer?.name || "Cliente",
+      productName: productName,
+    };
+  });
+}
+
