@@ -281,31 +281,33 @@ export default function Home() {
     <div className="min-h-screen bg-slate-950">
       {/* Navigation */}
       <nav className="nav-glass sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-3 flex justify-between items-center">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate("/")}>
-            <img src="/logo.png" alt="Eforte Games Logo" className="w-10 h-10 object-contain rounded-lg shadow-[0_0_15px_rgba(220,38,38,0.3)] border border-slate-800 bg-slate-950" />
-            <span className="text-2xl font-black text-white tracking-tight">EFORTE<span className="text-red-500">GAMES</span></span>
+        <div className="max-w-[1600px] mx-auto px-4 py-3 flex justify-between items-center gap-4">
+          <div className="flex items-center gap-2.5 cursor-pointer shrink-0" onClick={() => navigate("/")}>
+            <img src="/logo.png" alt="Eforte Games Logo" className="w-9 h-9 object-contain rounded-lg shadow-[0_0_15px_rgba(220,38,38,0.3)] border border-slate-800 bg-slate-950" />
+            <span className="text-xl sm:text-2xl font-black text-white tracking-tight shrink-0">EFORTE<span className="text-red-500">GAMES</span></span>
           </div>
           
           {/* Desktop Nav Links */}
-          <div className="hidden lg:flex items-center gap-8">
-            <a href="#categorias" className="text-slate-300 hover:text-white font-medium transition flex items-center gap-2"><LayoutGrid className="w-4 h-4" /> Categorias</a>
-            <a href="#anuncios" className="text-slate-300 hover:text-white font-medium transition flex items-center gap-2"><Tag className="w-4 h-4" /> Anúncios</a>
-            <a href="/usados" className="text-slate-300 hover:text-white font-medium transition flex items-center gap-2"><ShoppingCart className="w-4 h-4 text-blue-500" /> Desapegos</a>
-            <a href="/faq" className="text-slate-300 hover:text-white font-medium transition flex items-center gap-2"><HelpCircle className="w-4 h-4" /> FAQ</a>
-            <a href="/avaliacoes" className="text-slate-300 hover:text-white font-medium transition flex items-center gap-2"><Star className="w-4 h-4 text-yellow-500" /> Avaliações</a>
-            <a href="/promocoes" className="text-slate-300 hover:text-white font-medium transition flex items-center gap-2"><Flame className="w-4 h-4 text-red-500" /> Promoções</a>
-            <a href="/platinador" className="text-amber-400 hover:text-amber-300 font-bold transition flex items-center gap-2"><Trophy className="w-4 h-4 text-amber-400" /> Clube Platinador</a>
-            <a href="/virar-vendedor" className="text-slate-300 hover:text-white font-medium transition flex items-center gap-2"><Zap className="w-4 h-4 text-red-500" /> Revendedor</a>
-            <span className="w-px h-6 bg-slate-800"></span>
-            
+          <div className="hidden lg:flex items-center gap-3 xl:gap-5 text-xs xl:text-sm font-medium">
+            <a href="#categorias" className="text-slate-300 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap"><LayoutGrid className="w-3.5 h-3.5 text-slate-400" /> Categorias</a>
+            <a href="#anuncios" className="text-slate-300 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap"><Tag className="w-3.5 h-3.5 text-slate-400" /> Anúncios</a>
+            <a href="/usados" className="text-slate-300 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap"><ShoppingCart className="w-3.5 h-3.5 text-blue-500" /> Desapegos</a>
+            <a href="/faq" className="text-slate-300 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap"><HelpCircle className="w-3.5 h-3.5 text-slate-400" /> FAQ</a>
+            <a href="/avaliacoes" className="text-slate-300 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap"><Star className="w-3.5 h-3.5 text-yellow-500" /> Avaliações</a>
+            <a href="/promocoes" className="text-slate-300 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap"><Flame className="w-3.5 h-3.5 text-red-500" /> Promoções</a>
+            <a href="/platinador" className="text-amber-400 hover:text-amber-300 font-bold transition flex items-center gap-1.5 whitespace-nowrap"><Trophy className="w-3.5 h-3.5 text-amber-400" /> Clube Platinador</a>
+            <a href="/virar-vendedor" className="text-slate-300 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap"><Zap className="w-3.5 h-3.5 text-red-500" /> Revendedor</a>
+          </div>
+          
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="hidden xl:block w-px h-6 bg-slate-800 mr-1"></span>
             {isAuthenticated ? (
-              <div className="flex items-center gap-3">
-                <Button variant="ghost" className="text-slate-300 hover:text-white hover:bg-slate-900" onClick={() => navigate("/fortecoins")}>
-                  <Coins className="w-4 h-4 mr-2 text-red-500" /> {user?.forteCoins ?? 0} FC
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white hover:bg-slate-900 text-xs px-2.5 h-8" onClick={() => navigate("/fortecoins")}>
+                  <Coins className="w-3.5 h-3.5 mr-1.5 text-red-500" /> {user?.forteCoins ?? 0} FC
                 </Button>
-                <Button variant="ghost" className="text-slate-300 hover:text-white hover:bg-slate-900" onClick={() => navigate("/minhas-compras")}>
-                  <Package className="w-4 h-4 mr-2" /> Minhas Compras
+                <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white hover:bg-slate-900 text-xs px-2.5 h-8" onClick={() => navigate("/minhas-compras")}>
+                  <Package className="w-3.5 h-3.5 mr-1.5" /> Minhas Compras
                 </Button>
                 <UserProfileButton />
               </div>
