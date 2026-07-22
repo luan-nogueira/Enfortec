@@ -1654,16 +1654,10 @@ export default function AdminDashboard() {
                 setActiveTab(item.value);
                 setSidebarOpen(false);
               }}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 group ${
-                isActive
-                  ? "bg-red-655/10 text-red-500 border-l-4 border-red-600 font-bold"
-                  : "text-slate-400 hover:text-white hover:bg-slate-850"
-              }`}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 group ${isActive ? "bg-red-655/10 text-red-500 border-l-4 border-red-600 font-bold" : "text-slate-400 hover:text-white hover:bg-slate-850"}`}
             >
               <div className="flex items-center gap-3">
-                <Icon className={`w-4 h-4 transition-colors ${
-                  isActive ? "text-red-500" : "text-slate-500 group-hover:text-red-500"
-                }`} />
+                <Icon className={`w-4 h-4 transition-colors ${isActive ? "text-red-500" : "text-slate-500 group-hover:text-red-500"}`} />
                 <span>{item.label}</span>
               </div>
               {item.badge && (
@@ -1894,11 +1888,7 @@ export default function AdminDashboard() {
                           </div>
                           <div className="text-right">
                             <p className="font-black text-red-500 text-sm">R$ {parseFloat(sale.totalPrice || "0").toFixed(2).replace(".", ",")}</p>
-                            <span className={`text-[8px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded ${
-                              sale.status === "entregue" ? "bg-green-500/10 text-green-500" :
-                              sale.status === "pago" || sale.status === "enviado" ? "bg-blue-500/10 text-blue-400 animate-pulse" :
-                              "bg-slate-800 text-slate-400"
-                            }`}>
+                            <span className={`text-[8px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded ${sale.status === "entregue" ? "bg-green-500/10 text-green-500" : sale.status === "pago" || sale.status === "enviado" ? "bg-blue-500/10 text-blue-400 animate-pulse" : "bg-slate-800 text-slate-400"}`}>
                               {sale.status}
                             </span>
                           </div>
@@ -1935,11 +1925,7 @@ export default function AdminDashboard() {
                         <p className="text-xs text-slate-500">{u.email}</p>
                       </div>
                     </div>
-                    <div className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all duration-300 ${
-                      u.role === 'admin' ? 'bg-red-500/10 text-red-400 border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.15)]' :
-                      u.role === 'collaborator' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.15)]' :
-                      'bg-slate-800/80 text-slate-400 border-slate-700/50'
-                    }`}>
+                    <div className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all duration-300 ${u.role === 'admin' ? 'bg-red-500/10 text-red-400 border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.15)]' : u.role === 'collaborator' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.15)]' : 'bg-slate-800/80 text-slate-400 border-slate-700/50'}`}>
                       {u.role}
                     </div>
                     {u.email !== 'luanmnogueira@gmail.com' && (
@@ -1993,11 +1979,7 @@ export default function AdminDashboard() {
                       <>
                         <Button 
                           onClick={() => handleToggleCollaborator(u.id, u.role)}
-                          className={`w-full flex items-center justify-center gap-2 font-bold h-10 ${
-                            u.role === 'collaborator' 
-                            ? "bg-blue-600/20 hover:bg-blue-600/30 text-blue-400" 
-                            : "bg-slate-800 hover:bg-slate-700 text-white"
-                          }`}
+                          className={`w-full flex items-center justify-center gap-2 font-bold h-10 ${u.role === 'collaborator' ? "bg-blue-600/20 hover:bg-blue-600/30 text-blue-400" : "bg-slate-800 hover:bg-slate-700 text-white"}`}
                         >
                           {u.role === 'collaborator' ? <UserCheck className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
                           {u.role === 'collaborator' ? "Remover Colaborador" : "Tornar Colaborador"}
@@ -2005,11 +1987,7 @@ export default function AdminDashboard() {
                         
                         <Button 
                           onClick={() => handleToggleAdmin(u.id, u.role)}
-                          className={`w-full flex items-center justify-center gap-2 font-bold h-10 ${
-                            u.role === 'admin' 
-                            ? "bg-red-600 hover:bg-red-700 text-white" 
-                            : "bg-slate-800 hover:bg-slate-700 text-slate-300"
-                          }`}
+                          className={`w-full flex items-center justify-center gap-2 font-bold h-10 ${u.role === 'admin' ? "bg-red-600 hover:bg-red-700 text-white" : "bg-slate-800 hover:bg-slate-700 text-slate-300"}`}
                         >
                           <Shield className="w-4 h-4" />
                           {u.role === 'admin' ? "Remover Gestor" : "Tornar Gestor"}
@@ -2068,11 +2046,7 @@ export default function AdminDashboard() {
                     {game.category && <p className="text-xs text-slate-400 mb-1">Categoria: <span className="text-white font-medium">{game.category}</span></p>}
                     <p className="text-xs text-slate-400 mb-1">Preço: <span className="text-green-400 font-bold">R$ {Number(game.price || 0).toFixed(2)}</span></p>
                     <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-800/50">
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border ${
-                        game.isActive 
-                        ? "bg-green-500/10 text-green-500 border-green-500/20" 
-                        : "bg-red-500/10 text-red-500 border-red-500/20"
-                      }`}>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border ${game.isActive ? "bg-green-500/10 text-green-500 border-green-500/20" : "bg-red-500/10 text-red-500 border-red-500/20"}`}>
                         {game.isActive ? "Ativo" : "Inativo"}
                       </span>
                       <span className="text-[10px] text-slate-500 font-medium bg-slate-900 px-2 py-0.5 rounded">
@@ -2258,12 +2232,7 @@ export default function AdminDashboard() {
                           </td>
                           <td className="py-3.5 px-4 font-bold text-red-500">R$ {Number(sale.totalPrice).toFixed(2)}</td>
                           <td className="py-3.5 px-4">
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-black uppercase tracking-wider border
-                              ${sale.status === 'pendente' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' :
-                                sale.status === 'pago' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
-                                sale.status === 'enviado' ? 'bg-purple-500/10 text-purple-500 border-purple-500/20' :
-                                sale.status === 'entregue' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
-                                'bg-red-500/10 text-red-500 border-red-500/20'}`}>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-black uppercase tracking-wider border ${sale.status === 'pendente' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' : sale.status === 'pago' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : sale.status === 'enviado' ? 'bg-purple-500/10 text-purple-500 border-purple-500/20' : sale.status === 'entregue' ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
                               {sale.status}
                             </span>
                           </td>
@@ -2383,11 +2352,7 @@ export default function AdminDashboard() {
                     <div className="flex gap-2 pt-4 border-t border-slate-800 mt-auto">
                       <Button
                       onClick={() => handleTogglePrizeStatus(p.id, p.isActive, p.stock)}
-                      className={`flex-1 font-bold h-9 text-xs ${
-                        p.isActive 
-                          ? "bg-slate-800 hover:bg-slate-700 text-slate-300"
-                          : "bg-green-600 hover:bg-green-700 text-white"
-                      }`}
+                      className={`flex-1 font-bold h-9 text-xs ${p.isActive ? "bg-slate-800 hover:bg-slate-700 text-slate-300" : "bg-green-600 hover:bg-green-700 text-white"}`}
                     >
                       {p.isActive ? "Pausar" : "Ativar"}
                     </Button>
@@ -2443,19 +2408,11 @@ export default function AdminDashboard() {
                         <div className="w-full h-full flex items-center justify-center text-slate-600">Sem Imagem</div>
                       )}
                       <div className="absolute top-2 right-2 flex gap-1.5">
-                        <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border uppercase tracking-wider ${
-                          p.position === "sidebar_top" ? "bg-purple-500/20 text-purple-400 border-purple-500/30" :
-                          p.position === "sidebar_bottom" ? "bg-blue-500/20 text-blue-400 border-blue-500/30" :
-                          "bg-red-500/20 text-red-400 border-red-500/30"
-                        }`}>
+                        <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border uppercase tracking-wider ${p.position === "sidebar_top" ? "bg-purple-500/20 text-purple-400 border-purple-500/30" : p.position === "sidebar_bottom" ? "bg-blue-500/20 text-blue-400 border-blue-500/30" : "bg-red-500/20 text-red-400 border-red-500/30"}`}>
                           {p.position === "sidebar_top" ? "Lateral Sup" :
                            p.position === "sidebar_bottom" ? "Lateral Inf" : "Principal"}
                         </span>
-                        <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border uppercase tracking-wider ${
-                          p.isActive 
-                          ? "bg-green-500/10 text-green-500 border-green-500/20" 
-                          : "bg-red-500/10 text-red-500 border-red-500/20"
-                        }`}>
+                        <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border uppercase tracking-wider ${p.isActive ? "bg-green-500/10 text-green-500 border-green-500/20" : "bg-red-500/10 text-red-500 border-red-500/20"}`}>
                           {p.isActive ? "Ativo" : "Inativo"}
                         </span>
                       </div>
@@ -2475,11 +2432,7 @@ export default function AdminDashboard() {
                     <div className="p-5 pt-0 flex gap-2 border-t border-slate-850/60 mt-2">
                       <Button
                         onClick={() => handleTogglePromoActive(p.id, p.isActive)}
-                        className={`flex-1 font-bold h-9 text-xs ${
-                          p.isActive 
-                            ? "bg-slate-800 hover:bg-slate-700 text-slate-300"
-                            : "bg-green-600 hover:bg-green-700 text-white"
-                        }`}
+                        className={`flex-1 font-bold h-9 text-xs ${p.isActive ? "bg-slate-800 hover:bg-slate-700 text-slate-300" : "bg-green-600 hover:bg-green-700 text-white"}`}
                       >
                         {p.isActive ? "Pausar" : "Ativar"}
                       </Button>
@@ -2568,11 +2521,7 @@ export default function AdminDashboard() {
                             <div className="flex justify-end gap-2">
                               <Button
                                 onClick={() => handleToggleCouponActive(coupon.id, coupon.isActive)}
-                                className={`font-bold h-8 text-xs ${
-                                  coupon.isActive 
-                                    ? "bg-slate-850 hover:bg-slate-800 text-slate-350"
-                                    : "bg-green-600 hover:bg-green-700 text-white"
-                                }`}
+                                className={`font-bold h-8 text-xs ${coupon.isActive ? "bg-slate-800 hover:bg-slate-700 text-slate-400" : "bg-green-600 hover:bg-green-700 text-white"}`}
                               >
                                 {coupon.isActive ? "Desativar" : "Ativar"}
                               </Button>
@@ -2665,11 +2614,7 @@ export default function AdminDashboard() {
                             <div className="flex justify-end gap-2">
                               <Button
                                 onClick={() => handleToggleDealActive(deal.id, deal.isActive)}
-                                className={`font-bold h-8 text-xs ${
-                                  deal.isActive 
-                                    ? "bg-slate-850 hover:bg-slate-800 text-slate-350"
-                                    : "bg-green-600 hover:bg-green-700 text-white"
-                                }`}
+                                className={`font-bold h-8 text-xs ${deal.isActive ? "bg-slate-800 hover:bg-slate-700 text-slate-400" : "bg-green-600 hover:bg-green-700 text-white"}`}
                               >
                                 {deal.isActive ? "Pausar" : "Ativar"}
                               </Button>
