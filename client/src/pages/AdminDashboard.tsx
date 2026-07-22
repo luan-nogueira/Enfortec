@@ -2560,10 +2560,7 @@ export default function AdminDashboard() {
                               : "Nunca"}
                           </td>
                           <td className="py-3.5 px-4">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border
-                              ${coupon.isActive 
-                                ? "bg-green-500/10 text-green-500 border-green-500/20" 
-                                : "bg-red-500/10 text-red-500 border-red-500/20"}`}>
+                            <span className={coupon.isActive ? "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border bg-green-500/10 text-green-500 border-green-500/20" : "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border bg-red-500/10 text-red-500 border-red-500/20"}>
                               {coupon.isActive ? "Ativo" : "Inativo"}
                             </span>
                           </td>
@@ -2660,10 +2657,7 @@ export default function AdminDashboard() {
                             {deal.oldPrice ? `R$ ${Number(deal.oldPrice).toFixed(2).replace(".", ",")}` : "-"}
                           </td>
                           <td className="py-3.5 px-4">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border
-                              ${deal.isActive 
-                                ? "bg-green-500/10 text-green-500 border-green-500/20" 
-                                : "bg-red-500/10 text-red-500 border-red-500/20"}`}>
+                            <span className={deal.isActive ? "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border bg-green-500/10 text-green-500 border-green-500/20" : "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border bg-red-500/10 text-red-500 border-red-500/20"}>
                               {deal.isActive ? "Ativo" : "Inativo"}
                             </span>
                           </td>
@@ -3676,7 +3670,7 @@ export default function AdminDashboard() {
                 Cancelar
               </Button>
               <Button type="submit" disabled={uploadingDealImage} className="bg-red-600 hover:bg-red-700 font-bold px-6 btn-neon">
-                {uploadingDealImage ? "Aguarde..." : (editingDealId ? "Salvar Alterações" : "Criar Promoção")}
+                {uploadingDealImage ? "Aguarde..." : editingDealId ? "Salvar" : "Criar"}
               </Button>
             </DialogFooter>
           </form>
