@@ -2545,6 +2545,8 @@ export default function AdminDashboard() {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </Card>
           </TabsContent>
 
           {/* Aba Clube Platinador */}
@@ -2553,7 +2555,6 @@ export default function AdminDashboard() {
           </TabsContent>
         </Tabs>
       </main>
-    </div>
 
       {/* Modal de Criação de Usuário */}
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
