@@ -635,6 +635,8 @@ export default function AdminDashboard() {
   const [showGameModal, setShowGameModal] = useState(false);
   const [gameName, setGameName] = useState("");
   const [gamePrice, setGamePrice] = useState(0);
+  const [gamePricePrimary, setGamePricePrimary] = useState<string | number>("");
+  const [gamePriceSecondary, setGamePriceSecondary] = useState<string | number>("");
   const [gamePlatform, setGamePlatform] = useState("");
   const [gameCategory, setGameCategory] = useState("");
   const [gameImageUrl, setGameImageUrl] = useState("");
@@ -645,6 +647,32 @@ export default function AdminDashboard() {
   const [addingGame, setAddingGame] = useState(false);
   const [editingGameId, setEditingGameId] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [isSearchingCover, setIsSearchingCover] = useState(false);
+
+  const handleSearchCoverAuto = async (overrideTerm?: string) => {
+    const term = overrideTerm || gameName;
+    if (!term || term.trim().length < 2) {
+      toast.warning("Digite o nome do jogo para buscar a capa.");
+      return;
+    }
+    setIsSearchingCover(true);
+    try {
+      const res = await fetch(`/api/games/search-cover?term=${encodeURIComponent(term.trim())}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.imageUrl) {
+          setGameImageUrl(data.imageUrl);
+          toast.success("Capa encontrada automaticamente na internet!");
+        } else {
+          toast.info("Capa não encontrada automaticamente.");
+        }
+      }
+    } catch (err) {
+      console.error("Erro ao buscar capa:", err);
+    } finally {
+      setIsSearchingCover(false);
+    }
+  };
 
   const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -730,6 +758,8 @@ export default function AdminDashboard() {
 
       let name = "";
       let price = 0;
+      let pricePrimary = 0;
+      let priceSecondary: number | null = null;
       let platform = "PS4/PS5";
       let stock = 999;
 
@@ -737,9 +767,18 @@ export default function AdminDashboard() {
       if (text.includes(";")) {
         const parts = text.split(";");
         name = parts[0]?.trim() || "";
-        price = parts[1] ? parseFloat(parts[1].trim().replace(",", ".")) : 0;
-        platform = parts[2]?.trim() || "PS4/PS5";
-        stock = parts[3] ? parseInt(parts[3].trim()) : 999;
+        if (parts.length >= 5) {
+          pricePrimary = parts[1] ? parseFloat(parts[1].trim().replace(",", ".")) : 0;
+          priceSecondary = parts[2] ? parseFloat(parts[2].trim().replace(",", ".")) : null;
+          platform = parts[3]?.trim() || "PS4/PS5";
+          stock = parts[4] ? parseInt(parts[4].trim()) : 999;
+          price = pricePrimary;
+        } else {
+          pricePrimary = parts[1] ? parseFloat(parts[1].trim().replace(",", ".")) : 0;
+          platform = parts[2]?.trim() || "PS4/PS5";
+          stock = parts[3] ? parseInt(parts[3].trim()) : 999;
+          price = pricePrimary;
+        }
       } else {
         // Caso B: Parse inteligente do texto corrido (ex: "A Plague Tale Requiem PS5 74 90")
         let nameAndPlatform = text;
@@ -750,14 +789,17 @@ export default function AdminDashboard() {
         if (doubleNumberRegex.test(text)) {
           const match = text.match(doubleNumberRegex);
           price = parseFloat(`${match[1]}.${match[2]}`);
+          pricePrimary = price;
           nameAndPlatform = text.replace(doubleNumberRegex, "").trim();
         } else if (singlePriceRegex.test(text)) {
           const match = text.match(singlePriceRegex);
           price = parseFloat(match[1].replace(",", "."));
+          pricePrimary = price;
           nameAndPlatform = text.replace(singlePriceRegex, "").trim();
         } else if (simpleIntRegex.test(text)) {
           const match = text.match(simpleIntRegex);
           price = parseFloat(match[1]);
+          pricePrimary = price;
           nameAndPlatform = text.replace(simpleIntRegex, "").trim();
         }
 
@@ -774,6 +816,7 @@ export default function AdminDashboard() {
         // Se o preço for 0, mas estivermos na promoção secundária ou semelhante, podemos dar um valor padrão como 33.30
         if (price === 0) {
           price = 33.30;
+          pricePrimary = 33.30;
         }
       }
 
@@ -782,6 +825,8 @@ export default function AdminDashboard() {
           id: `batch-${index}-${Date.now()}`,
           name,
           price: isNaN(price) ? 33.30 : price,
+          pricePrimary: isNaN(pricePrimary) ? 33.30 : pricePrimary,
+          priceSecondary: priceSecondary,
           platform: platform || "PS4/PS5",
           stock: isNaN(stock) ? 999 : stock,
           imageUrl: "",
@@ -1089,36 +1134,46 @@ export default function AdminDashboard() {
       return;
     }
     setAddingGame(true);
+
+    const pricePrimaryVal = gamePricePrimary !== "" ? Number(gamePricePrimary) : Number(gamePrice);
+    const priceSecondaryVal = gamePriceSecondary !== "" ? Number(gamePriceSecondary) : null;
+    const itemType = (gameCategory === "Assinaturas" || gameCategory === "assinatura") ? "assinatura" : "jogo";
+
     try {
       if (editingGameId) {
         await updateDoc(doc(db, "digital_products", editingGameId), {
           name: gameName.trim(),
-          price: Number(gamePrice),
+          price: pricePrimaryVal,
+          pricePrimary: pricePrimaryVal,
+          priceSecondary: priceSecondaryVal,
           platform: gamePlatform.trim(),
           category: gameCategory.trim(),
+          type: itemType,
           imageUrl: gameImageUrl.trim(),
           coverFit: gameCoverFit,
           stock: Number(gameStock),
           isActive: gameIsActive,
           isPreVenda: gameIsPreVenda
         });
-        toast.success("Jogo atualizado com sucesso!");
+        toast.success("Produto/Jogo atualizado com sucesso!");
       } else {
         await addDoc(collection(db, "digital_products"), {
           name: gameName.trim(),
-          price: Number(gamePrice),
+          price: pricePrimaryVal,
+          pricePrimary: pricePrimaryVal,
+          priceSecondary: priceSecondaryVal,
           platform: gamePlatform.trim(),
           category: gameCategory.trim(),
+          type: itemType,
           imageUrl: gameImageUrl.trim(),
           coverFit: gameCoverFit,
           stock: Number(gameStock),
           isActive: gameIsActive,
           isPreVenda: gameIsPreVenda,
-          type: "jogo",
-          description: "Jogo Mídia Digital.",
+          description: "Mídia Digital Eforte Games.",
           createdAt: new Date().toISOString()
         });
-        toast.success("Jogo cadastrado com sucesso!");
+        toast.success("Produto/Jogo cadastrado com sucesso!");
       }
       setShowGameModal(false);
       resetGameForm();
@@ -1133,6 +1188,8 @@ export default function AdminDashboard() {
   const resetGameForm = () => {
     setGameName("");
     setGamePrice(0);
+    setGamePricePrimary("");
+    setGamePriceSecondary("");
     setGamePlatform("");
     setGameCategory("");
     setGameImageUrl("");
@@ -1147,6 +1204,8 @@ export default function AdminDashboard() {
     setEditingGameId(game.id);
     setGameName(game.name || "");
     setGamePrice(game.price || 0);
+    setGamePricePrimary(game.pricePrimary ?? game.price_primary ?? game.price ?? "");
+    setGamePriceSecondary(game.priceSecondary ?? game.price_secondary ?? "");
     setGamePlatform(game.platform || "");
     setGameCategory(game.category || "");
     setGameImageUrl(game.imageUrl || "");
@@ -2839,18 +2898,31 @@ export default function AdminDashboard() {
           </DialogHeader>
           <form onSubmit={handleSaveGame} className="space-y-4 my-2">
             <div className="space-y-2">
-              <Label className="text-xs text-slate-300 font-bold uppercase">Nome do Jogo</Label>
+              <div className="flex justify-between items-center">
+                <Label className="text-xs text-slate-300 font-bold uppercase">Nome do Jogo / Produto *</Label>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => handleSearchCoverAuto()}
+                  disabled={isSearchingCover || !gameName.trim()}
+                  className="h-7 px-2.5 bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-500/40 font-bold text-[10px] flex items-center gap-1"
+                >
+                  {isSearchingCover ? "🔍 Buscando..." : "✨ Buscar Capa Net"}
+                </Button>
+              </div>
               <Input
                 value={gameName}
                 onChange={(e) => setGameName(e.target.value)}
-                placeholder="Ex: God of War Ragnarok"
+                onBlur={() => { if (!gameImageUrl && gameName.trim().length >= 3) handleSearchCoverAuto(gameName); }}
+                placeholder="Ex: God of War Ragnarok ou PS Plus Essential 12 Meses"
                 className="bg-slate-950 border-red-600/20 text-white"
                 required
               />
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label className="text-xs text-slate-300 font-bold uppercase">Plataforma</Label>
+                <Label className="text-xs text-slate-300 font-bold uppercase">Plataforma *</Label>
                 <Input
                   value={gamePlatform}
                   onChange={(e) => setGamePlatform(e.target.value)}
@@ -2859,7 +2931,7 @@ export default function AdminDashboard() {
                   required
                 />
                 <div className="flex flex-wrap gap-1 mt-1">
-                  {["PS5", "PS4", "PS4/PS5"].map(plat => (
+                  {["PS5", "PS4", "PS4/PS5", "Xbox", "PC"].map(plat => (
                     <span 
                       key={plat} 
                       onClick={() => setGamePlatform(plat)}
@@ -2879,7 +2951,7 @@ export default function AdminDashboard() {
                   className="bg-slate-950 border-red-600/20 text-white"
                 />
                 <div className="flex flex-wrap gap-1 mt-1">
-                  {["Ação", "Aventura", "RPG", "Esportes", "Corrida", "Tiro / FPS", "Pré Venda"].map(cat => (
+                  {["Ação", "Aventura", "RPG", "Esportes", "Corrida", "Tiro / FPS", "Assinaturas", "Pré Venda"].map(cat => (
                     <span 
                       key={cat} 
                       onClick={() => setGameCategory(cat)}
@@ -2890,17 +2962,41 @@ export default function AdminDashboard() {
                   ))}
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-slate-300 font-bold uppercase">Preço (R$)</Label>
+            </div>
+
+            {/* Preços: Primária vs Secundária */}
+            <div className="grid grid-cols-2 gap-3 bg-slate-950/60 p-3 rounded-lg border border-red-600/20">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-slate-300 font-bold uppercase flex items-center gap-1">
+                  <span>👤 Preço Primária (R$) *</span>
+                </Label>
                 <Input
                   type="number"
                   step="0.01"
-                  value={gamePrice}
-                  onChange={(e) => setGamePrice(Number(e.target.value))}
+                  value={gamePricePrimary}
+                  onChange={(e) => {
+                    setGamePricePrimary(e.target.value);
+                    setGamePrice(Number(e.target.value));
+                  }}
                   placeholder="Ex: 150.00"
-                  className="bg-slate-950 border-red-600/20 text-white"
+                  className="bg-slate-950 border-red-600/30 text-white font-bold"
                   min={0}
                   required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs text-slate-400 font-bold uppercase flex items-center gap-1">
+                  <span>👥 Preço Secundária (R$)</span>
+                </Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={gamePriceSecondary}
+                  onChange={(e) => setGamePriceSecondary(e.target.value)}
+                  placeholder="Ex: 90.00 (Opcional)"
+                  className="bg-slate-950 border-slate-800 text-white font-bold"
+                  min={0}
                 />
               </div>
             </div>
