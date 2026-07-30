@@ -411,7 +411,7 @@ export default function UsedMarketplace() {
               </Button>
               <div className="flex items-center gap-2">
                 <Flame className="w-5 h-5 sm:w-6 sm:h-6 text-red-500" />
-                <h1 className="text-base sm:text-3xl font-bold text-neon">Marketplace de Usados</h1>
+                <h1 className="text-base sm:text-3xl font-bold text-neon">Revenda de Jogos Físicos, Consoles e Acessórios 📦</h1>
               </div>
             </div>
             {isAuthenticated && (
@@ -428,20 +428,31 @@ export default function UsedMarketplace() {
               </div>
             )}
           </div>
+
+          {/* Intermediary Guarantee Banner */}
+          <div className="mb-3 p-3 bg-red-950/30 border border-red-600/30 rounded-xl flex items-center justify-between text-xs text-slate-300">
+            <div className="flex items-center gap-2">
+              <Shield className="w-4 h-4 text-red-500 shrink-0" />
+              <span>
+                <strong>Garantia Intermediada Eforte (8% taxa)</strong>: O valor fica retido na loja e só é liberado ao vendedor após o comprador receber e avaliar o item.
+              </span>
+            </div>
+          </div>
+
           <div className="flex gap-2 flex-col sm:flex-row">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-3 w-4 h-4 sm:w-5 sm:h-5 text-red-500/50" />
               <Input
-                placeholder="Buscar produtos usados..."
+                placeholder="Buscar jogos em disco, consoles ou acessórios..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-9 sm:pl-10 bg-slate-900 border-red-600/30 text-white placeholder:text-slate-500 h-10"
               />
             </div>
             {isAuthenticated && (
-              <Button onClick={() => navigate("/vendedor")} className="bg-red-600 hover:bg-red-700 text-white font-black btn-neon text-xs sm:text-sm h-10">
+              <Button onClick={() => navigate("/vendedor/novo-produto-usado")} className="bg-red-600 hover:bg-red-700 text-white font-black btn-neon text-xs sm:text-sm h-10">
                 <Package className="w-4 h-4 mr-1.5" />
-                Vender meu Produto
+                Anunciar Físico / Console
               </Button>
             )}
           </div>
@@ -538,13 +549,13 @@ export default function UsedMarketplace() {
                     : 'border-red-600/10 hover:border-red-600/40 hover:shadow-[0_20px_50px_rgba(220,38,38,0.15)]'
                 }`}
               >
-                {/* Image Section */}
-                <div className="relative h-32 sm:h-48 overflow-hidden bg-slate-950">
+                {/* Image Section with vertical case cover aspect ratio */}
+                <div className="relative aspect-[3/4] w-full overflow-hidden bg-slate-950 flex items-center justify-center">
                   {product.imageUrl ? (
                     <img 
                       src={product.imageUrl} 
                       alt={product.name} 
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-slate-800">

@@ -322,46 +322,19 @@ export default function SellerDashboard() {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="p-6 card-neon">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-slate-400 text-sm mb-2">Total em Anúncios</p>
-                <p className="text-3xl font-bold text-white">
-                  R$ {usedProducts.reduce((acc, p) => acc + (p.pricePS4 || p.pricePS5 || 0), 0).toFixed(2)}
-                </p>
+        {/* KPI Cards (Saldo Escrow vs Liberado & Reputação) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {/* Card 1: Saldo Liberado */}
+          <Card className="p-6 card-neon border-emerald-500/30 flex flex-col justify-between">
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">💰 Saldo Liberado (Saque PIX)</p>
+                <Coins className="w-5 h-5 text-emerald-400" />
               </div>
-              <TrendingUp className="w-8 h-8 text-green-500" />
-            </div>
-          </Card>
-          <Card className="p-6 card-neon">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-slate-400 text-sm mb-2">Produtos Ativos</p>
-                <p className="text-3xl font-bold text-white">{usedProducts?.length || 0}</p>
-              </div>
-              <ShoppingCart className="w-8 h-8 text-blue-500" />
-            </div>
-          </Card>
-          <Card className="p-6 card-neon">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-slate-400 text-sm mb-2">Reputação</p>
-                <p className="text-3xl font-bold text-white">Novo Vendedor</p>
-              </div>
-              <Star className="w-8 h-8 text-red-500" />
-            </div>
-          </Card>
-          <Card className="p-6 card-neon border-red-500/30 flex flex-col justify-between">
-            <div className="flex justify-between items-start mb-2">
-              <div>
-                <p className="text-slate-400 text-xs mb-1">Saldo Eforte (Postgres)</p>
-                <p className="text-xl font-black text-red-500">
-                  R$ {parseFloat(pgUser?.balance || "0.00").toFixed(2).replace('.', ',')}
-                </p>
-              </div>
-              <Coins className="w-6 h-6 text-red-500 animate-pulse" />
+              <p className="text-2xl font-black text-emerald-400">
+                R$ {parseFloat(pgUser?.balance || "0.00").toFixed(2).replace('.', ',')}
+              </p>
+              <p className="text-[10px] text-slate-500 mt-1">Disponível para transferência imediata</p>
             </div>
             <Button 
               size="sm" 
@@ -371,10 +344,59 @@ export default function SellerDashboard() {
                 window.open(`https://wa.me/554384253691?text=${text}`, "_blank");
               }}
               disabled={parseFloat(pgUser?.balance || "0.00") <= 0}
-              className="w-full mt-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs"
+              className="w-full mt-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs"
             >
-              Solicitar Saque (WhatsApp)
+              Solicitar Saque (PIX)
             </Button>
+          </Card>
+
+          {/* Card 2: Saldo Retido em Escrow */}
+          <Card className="p-6 card-neon border-amber-500/30 flex flex-col justify-between">
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">🔒 Saldo Retido (Escrow)</p>
+                <span className="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded border border-amber-500/30 font-bold">Garantia</span>
+              </div>
+              <p className="text-2xl font-black text-amber-400">
+                R$ 0,00
+              </p>
+              <p className="text-[10px] text-slate-400 mt-1 leading-tight">
+                Valor retido até confirmação de entrega e avaliação do comprador (menos comissão).
+              </p>
+            </div>
+            <div className="text-[10px] text-slate-500 pt-2 border-t border-slate-800">
+              Taxa de comissão: 8% (Físicos) / 10% (Digitais)
+            </div>
+          </Card>
+
+          {/* Card 3: Produtos Ativos */}
+          <Card className="p-6 card-neon flex flex-col justify-between">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">📦 Anúncios Ativos</p>
+                <p className="text-2xl font-black text-white">{usedProducts?.length || 0} itens</p>
+              </div>
+              <ShoppingCart className="w-6 h-6 text-blue-400" />
+            </div>
+            <p className="text-[10px] text-slate-500 mt-2">
+              Valor acumulado: R$ {usedProducts.reduce((acc, p) => acc + (p.pricePS4 || p.pricePS5 || p.price || 0), 0).toFixed(2)}
+            </p>
+          </Card>
+
+          {/* Card 4: Reputação da Loja & Selo Verificado */}
+          <Card className="p-6 card-neon border-red-500/30 flex flex-col justify-between">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">⭐ Status da Loja</p>
+                <p className="text-xl font-black text-white flex items-center gap-1">
+                  Vendedor <span className="text-red-500">Verificado</span>
+                </p>
+              </div>
+              <Star className="w-6 h-6 text-amber-400 fill-amber-400" />
+            </div>
+            <div className="mt-2 text-[10px] text-emerald-400 font-bold bg-emerald-950/40 p-1.5 rounded border border-emerald-800/40 flex items-center gap-1">
+              ✓ Conta com Proteção Antigolpe Eforte
+            </div>
           </Card>
         </div>
 

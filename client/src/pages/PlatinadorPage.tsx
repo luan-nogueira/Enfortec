@@ -94,8 +94,8 @@ export default function PlatinadorPage() {
           "Authorization": `Bearer ${idToken}`
         },
         body: JSON.stringify({
-          name: "Assinatura Clube Platinador - R$ 15/mês",
-          price: 15.00,
+          name: "Assinatura Clube Platinador - R$ 35/mês",
+          price: 35.00,
           quantity: 1,
           productType: "platinador",
           redirectUrl: `${window.location.origin}/platinador`
@@ -185,18 +185,23 @@ export default function PlatinadorPage() {
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-8 space-y-12">
         {/* HERO SECTION */}
-        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1c080e] via-[#121212] to-[#0a0a0a] border border-[#dc143c]/30 p-5 sm:p-8 lg:p-12 shadow-2xl shadow-[#dc143c]/10">
-          <div className="absolute -top-24 -right-24 w-96 h-96 bg-[#dc143c]/15 rounded-full blur-3xl pointer-events-none" />
+        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#2a060d] via-[#140508] to-[#0a0a0a] border border-[#dc143c]/40 p-5 sm:p-8 lg:p-12 shadow-2xl shadow-[#dc143c]/20">
+          {/* Background Gaming Art & Trophy Glow */}
+          <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1400')] bg-cover bg-center opacity-10 mix-blend-overlay pointer-events-none" />
+          <div className="absolute -top-24 -right-24 w-96 h-96 bg-[#dc143c]/20 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute top-1/2 left-1/3 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+
           <div className="relative z-10 grid lg:grid-cols-12 gap-8 items-center">
             <div className="lg:col-span-7 space-y-6">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#dc143c]/10 border border-[#dc143c]/30 text-[#ff4d6d] text-xs font-bold uppercase tracking-wider">
-                <Sparkles className="w-3.5 h-3.5" /> Clube Exclusivo de Troféus
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#dc143c]/20 border border-[#dc143c]/50 text-[#ff4d6d] text-xs font-black uppercase tracking-wider shadow-lg">
+                <Trophy className="w-4 h-4 text-amber-400 animate-bounce" /> 🏆 Clube do Platinador Eforte Games
               </div>
               <h1 className="text-2xl sm:text-5xl font-black tracking-tight leading-tight">
-                Jogue, Platine e Ganhe <span className="text-[#dc143c] drop-shadow-[0_0_15px_rgba(220,20,60,0.5)]">Descontos Reais</span> na Loja!
+                Jogue, Platine e Ganhe <span className="text-[#dc143c] drop-shadow-[0_0_15px_rgba(220,20,60,0.6)]">Prêmios & Descontos!</span>
               </h1>
-              <p className="text-gray-300 text-sm sm:text-lg leading-relaxed">
-                Faça parte do <strong className="text-white">Clube do Platinador Eforte Games</strong> por apenas <span className="text-emerald-400 font-extrabold">R$ 15,00/mês</span>. Tenha acesso a um <strong className="text-[#ff4d6d]">Grupo VIP de WhatsApp</strong>, cumpra desafios semanais na PSN e acumule <strong className="text-amber-400">ForteCoins</strong> para abater em qualquer jogo ou produto!
+              <p className="text-gray-200 text-sm sm:text-lg leading-relaxed">
+                Faça parte do <strong className="text-white">Clube do Platinador Eforte Games</strong> por apenas <span className="text-amber-400 font-black text-xl">R$ 35,00/mês</span>!
+                Tenha acesso ao <strong className="text-[#ff4d6d]">Grupo VIP Exclusivo com 2 Sorteios por mês</strong> de jogos (Conta Primária ou Secundária), cumpra <strong className="text-amber-400">desafios semanais de platinas</strong> na PSN e acumule <strong className="text-amber-400">ForteCoins</strong> para abater nas suas compras!
               </p>
 
               <div className="flex flex-wrap gap-4 pt-2">
@@ -204,10 +209,10 @@ export default function PlatinadorPage() {
                   <Button
                     onClick={handleSubscribe}
                     disabled={isSubscribing}
-                    className="w-full sm:w-auto bg-gradient-to-r from-[#dc143c] to-[#ff4d6d] hover:from-[#b01030] hover:to-[#dc143c] text-white font-extrabold text-sm sm:text-base px-5 sm:px-8 py-4 sm:py-6 rounded-2xl shadow-xl shadow-[#dc143c]/30 transition-all hover:scale-105 whitespace-normal h-auto text-center flex items-center justify-center"
+                    className="w-full sm:w-auto bg-gradient-to-r from-[#dc143c] via-[#ff2a55] to-[#dc143c] hover:from-[#b01030] hover:to-[#dc143c] text-white font-extrabold text-sm sm:text-base px-6 sm:px-8 py-4 sm:py-6 rounded-2xl shadow-xl shadow-[#dc143c]/40 transition-all hover:scale-105 whitespace-normal h-auto text-center flex items-center justify-center border border-[#ff4d6d]/30"
                   >
-                    <Trophy className="w-5 h-5 mr-2 shrink-0" />
-                    {isSubscribing ? "Processando..." : "Assinar Clube Platinador — R$ 15,00/mês"}
+                    <Trophy className="w-5 h-5 mr-2 shrink-0 text-amber-400" />
+                    {isSubscribing ? "Processando..." : "Assinar Clube Platinador — R$ 35,00/mês"}
                   </Button>
                 ) : (
                   <div className="flex flex-wrap items-center gap-3">
@@ -273,7 +278,7 @@ export default function PlatinadorPage() {
                     <div className="flex justify-between text-xs">
                       <span className="text-gray-400">Status da Assinatura:</span>
                       <span className={isSubscribed ? "text-emerald-400 font-bold" : "text-amber-400 font-bold"}>
-                        {isSubscribed ? "Ativa (R$ 15/mês)" : "Não Assinado"}
+                        {isSubscribed ? "Ativa (R$ 35/mês)" : "Não Assinado"}
                       </span>
                     </div>
                     <div className="flex justify-between text-xs">
@@ -296,7 +301,7 @@ export default function PlatinadorPage() {
               Como funciona o <span className="text-[#dc143c]">Clube Platinador</span>?
             </h2>
             <p className="text-gray-400 text-sm max-w-2xl mx-auto">
-              Ganhe prêmios e economize nos seus próximos jogos em apenas 4 passos simples
+              Ganhe prêmios, participe de sorteios e economize nos seus próximos jogos em 4 passos simples
             </p>
           </div>
 
@@ -305,9 +310,9 @@ export default function PlatinadorPage() {
               <div className="w-10 h-10 rounded-xl bg-[#dc143c]/10 text-[#dc143c] flex items-center justify-center font-black text-lg">
                 1
               </div>
-              <h3 className="font-bold text-white text-base">Assine por R$ 15/mês</h3>
+              <h3 className="font-bold text-white text-base">Assine por R$ 35/mês</h3>
               <p className="text-gray-400 text-xs leading-relaxed">
-                Faça parte do clube mensal e garante benefícios exclusivos e acesso imediato.
+                Faça parte do clube mensal e garanta benefícios exclusivos e acesso imediato aos sorteios.
               </p>
             </div>
 
@@ -315,9 +320,9 @@ export default function PlatinadorPage() {
               <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-black text-lg">
                 2
               </div>
-              <h3 className="font-bold text-white text-base">Entre no Grupo VIP</h3>
+              <h3 className="font-bold text-white text-base">Grupo VIP + 2 Sorteios/mês</h3>
               <p className="text-gray-400 text-xs leading-relaxed">
-                Troque dicas de troféus, guias de platina e receba os jogos desafiados do mês em primeira mão.
+                Acesse o grupo VIP no WhatsApp e concorra a 2 sorteios mensais de jogos (Primária ou Secundária).
               </p>
             </div>
 

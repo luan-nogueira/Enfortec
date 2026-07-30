@@ -13,6 +13,9 @@ export default function SellDigitalProduct() {
     name: "",
     description: "",
     price: "",
+    priceSecondary: "",
+    hasPrimary: true,
+    hasSecondary: true,
     type: "jogo" as "jogo" | "gift_card" | "licenca" | "outro",
     keyOrCode: "",
     downloadUrl: "",
@@ -32,23 +35,23 @@ export default function SellDigitalProduct() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name.trim() || !formData.description.trim() || !formData.price) {
+    if (!formData.name.trim() || !formData.description.trim()) {
       toast.error("Preencha todos os campos obrigatórios");
       return;
     }
 
-    if (parseFloat(formData.price) <= 0) {
-      toast.error("O preço deve ser maior que zero");
+    if (formData.hasPrimary && (!formData.price || parseFloat(formData.price) <= 0)) {
+      toast.error("Insira o valor da Conta Primária");
       return;
     }
 
-    if (formData.type === "jogo" && !formData.downloadUrl.trim()) {
-      toast.error("URL de download é obrigatória para jogos");
+    if (formData.hasSecondary && (!formData.priceSecondary || parseFloat(formData.priceSecondary) <= 0)) {
+      toast.error("Insira o valor da Conta Secundária");
       return;
     }
 
-    if ((formData.type === "gift_card" || formData.type === "licenca") && !formData.keyOrCode.trim()) {
-      toast.error("Código/Chave é obrigatória para este tipo de produto");
+    if (!formData.hasPrimary && !formData.hasSecondary) {
+      toast.error("Selecione pelo menos um tipo de conta (Primária ou Secundária)");
       return;
     }
 
@@ -57,12 +60,14 @@ export default function SellDigitalProduct() {
       await createProductMutation.mutateAsync({
         name: formData.name.trim(),
         description: formData.description.trim(),
-        price: parseFloat(formData.price),
+        price: formData.hasPrimary ? parseFloat(formData.price) : parseFloat(formData.priceSecondary),
+        pricePrimary: formData.hasPrimary ? parseFloat(formData.price) : undefined,
+        priceSecondary: formData.hasSecondary ? parseFloat(formData.priceSecondary) : undefined,
         type: formData.type,
         keyOrCode: formData.keyOrCode.trim() || undefined,
         downloadUrl: formData.downloadUrl.trim() || undefined,
       });
-      toast.success("Produto digital adicionado com sucesso!");
+      toast.success("Anúncio publicado com sucesso!");
       navigate("/digital");
     } catch (error) {
       toast.error("Erro ao adicionar produto. Tente novamente.");
@@ -74,42 +79,42 @@ export default function SellDigitalProduct() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center max-w-md">
-          <h1 className="text-2xl font-bold text-slate-900 mb-4">Acesso Negado</h1>
-          <p className="text-slate-600 mb-6">Você precisa estar logado para vender produtos digitais.</p>
-          <Button onClick={() => navigate("/")}>Voltar para Home</Button>
+      <div className="min-h-screen flex items-center justify-center bg-slate-950">
+        <div className="text-center max-w-md bg-slate-900 border border-slate-800 p-8 rounded-2xl">
+          <h1 className="text-2xl font-bold text-white mb-4">Acesso Negado</h1>
+          <p className="text-slate-400 mb-6">Você precisa estar logado para cadastrar ou vender.</p>
+          <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={() => navigate("/")}>Voltar para Home</Button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 py-12">
+    <div className="min-h-screen bg-slate-950 text-white py-12">
       <div className="container mx-auto px-4">
         <div className="max-w-2xl mx-auto">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">Vender Produto Digital</h1>
-            <p className="text-slate-600">Compartilhe seus jogos, gift cards ou licenças e ganhe dinheiro</p>
+            <h1 className="text-3xl font-black text-white mb-2 uppercase">VENDER MINHA CONTA EFORTEGAMES 🎮</h1>
+            <p className="text-slate-400">Cadastre suas contas Primárias ou Secundárias de jogos digitais e assinaturas</p>
           </div>
 
           {/* Form Card */}
-          <div className="bg-white rounded-lg shadow-sm p-8">
+          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-xl p-8">
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Product Type */}
               <div>
-                <label className="block text-sm font-semibold text-slate-900 mb-2">
-                  Tipo de Produto *
+                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                  Tipo de Produto Digital *
                 </label>
                 <select
                   name="type"
                   value={formData.type}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-red-600 text-sm"
                   disabled={isLoading}
                 >
-                  <option value="jogo">Jogo Digital</option>
+                  <option value="jogo">Jogo Digital (PS4 / PS5)</option>
                   <option value="assinatura">Assinatura (PS Plus, Game Pass, etc.)</option>
                   <option value="gift_card">Gift Card</option>
                   <option value="licenca">Licença de Software</option>
@@ -119,8 +124,8 @@ export default function SellDigitalProduct() {
 
               {/* Product Name */}
               <div>
-                <label className="block text-sm font-semibold text-slate-900 mb-2">
-                  Nome do Produto *
+                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                  Nome do Jogo / Item *
                 </label>
                 <Input
                   type="text"
@@ -134,64 +139,88 @@ export default function SellDigitalProduct() {
                   value={formData.name}
                   onChange={handleInputChange}
                   disabled={isLoading}
+                  className="bg-slate-950 border-slate-800 text-white rounded-xl"
                   required
                 />
               </div>
 
               {/* Description */}
               <div>
-                <label className="block text-sm font-semibold text-slate-900 mb-2">
-                  Descrição *
+                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                  Descrição Detalhada *
                 </label>
                 <textarea
                   name="description"
-                  placeholder="Descreva seu produto digital em detalhes..."
+                  placeholder="Descreva seu jogo ou produto digital em detalhes..."
                   value={formData.description}
                   onChange={handleInputChange}
                   rows={4}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-red-600 text-sm"
                   disabled={isLoading}
                   required
                 />
               </div>
 
-              {/* Price */}
-              <div>
-                <label className="block text-sm font-semibold text-slate-900 mb-2">
-                  {formData.type === "jogo" || formData.type === "assinatura" ? "Preço Principal / Conta Primária (R$) *" : "Preço (R$) *"}
-                </label>
-                <Input
-                  type="number"
-                  name="price"
-                  placeholder="0.00"
-                  step="0.01"
-                  min="0"
-                  value={formData.price}
-                  onChange={handleInputChange}
-                  disabled={isLoading}
-                  required
-                />
-              </div>
-
-              {/* Secondary Account Price (for games and subscriptions) */}
+              {/* Toggles for Primary & Secondary accounts */}
               {(formData.type === "jogo" || formData.type === "assinatura") && (
-                <div>
-                  <label className="block text-sm font-semibold text-slate-900 mb-2">
-                    Preço Conta Secundária (R$) <span className="text-slate-500 font-normal">(Opcional)</span>
-                  </label>
-                  <Input
-                    type="number"
-                    name="priceSecondary"
-                    placeholder="Ex: 70.00"
-                    step="0.01"
-                    min="0"
-                    value={formData.priceSecondary || ""}
-                    onChange={handleInputChange}
-                    disabled={isLoading}
-                  />
-                  <p className="text-xs text-slate-500 mt-1">
-                    Defina um valor menor para clientes que comprarem opção de Conta Secundária.
-                  </p>
+                <div className="bg-slate-950 border border-slate-800 p-5 rounded-2xl space-y-4">
+                  <span className="text-xs font-bold text-red-500 uppercase tracking-wider block">
+                    Opções de Licença Disponíveis (Marque 1 ou ambas)
+                  </span>
+
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.hasPrimary}
+                        onChange={(e) => setFormData(prev => ({ ...prev, hasPrimary: e.target.checked }))}
+                        className="w-4 h-4 accent-red-600 rounded"
+                      />
+                      <span className="text-sm font-bold text-white">Disponibilizar Conta Primária</span>
+                    </label>
+                    {formData.hasPrimary && (
+                      <div className="pl-7">
+                        <Input
+                          type="number"
+                          name="price"
+                          placeholder="Valor Conta Primária (R$)"
+                          step="0.01"
+                          min="0"
+                          value={formData.price}
+                          onChange={handleInputChange}
+                          disabled={isLoading}
+                          className="bg-slate-900 border-slate-800 text-white rounded-xl text-sm"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-3 pt-2 border-t border-slate-900">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.hasSecondary}
+                        onChange={(e) => setFormData(prev => ({ ...prev, hasSecondary: e.target.checked }))}
+                        className="w-4 h-4 accent-red-600 rounded"
+                      />
+                      <span className="text-sm font-bold text-white">Disponibilizar Conta Secundária</span>
+                    </label>
+                    {formData.hasSecondary && (
+                      <div className="pl-7">
+                        <Input
+                          type="number"
+                          name="priceSecondary"
+                          placeholder="Valor Conta Secundária (R$)"
+                          step="0.01"
+                          min="0"
+                          value={formData.priceSecondary}
+                          onChange={handleInputChange}
+                          disabled={isLoading}
+                          className="bg-slate-900 border-slate-800 text-white rounded-xl text-sm"
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 

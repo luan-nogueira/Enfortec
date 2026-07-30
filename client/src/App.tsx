@@ -18,6 +18,7 @@ import Login from "./pages/Login";
 import CollaboratorDashboard from "./pages/CollaboratorDashboard";
 import MyPurchases from "./pages/MyPurchases";
 import FloatingChat from "./components/FloatingChat";
+import SocialProofToast from "./components/SocialProofToast";
 import MobileBottomNav from "./components/MobileBottomNav";
 import FAQ from "./pages/FAQ";
 import CPFCompletionModal from "./components/CPFCompletionModal";
@@ -25,6 +26,7 @@ import TermsAcceptanceModal from "./components/TermsAcceptanceModal";
 import TermsFortecoins from "./pages/TermsFortecoins";
 import Reviews from "./pages/Reviews";
 import PlatinadorPage from "./pages/PlatinadorPage";
+import JogueComEconomia from "./pages/JogueComEconomia";
 
 import { useEffect } from "react";
 import FortecoinsPage from "./pages/FortecoinsPage";
@@ -37,6 +39,7 @@ function Router() {
         <Route path={"/loja"} component={Store} />
         <Route path={"/usados"} component={UsedMarketplace} />
         <Route path={"/digital"} component={DigitalMedia} />
+        <Route path={"/jogue-com-economia"} component={JogueComEconomia} />
         <Route path={"/promocoes"} component={PromotionsPage} />
         <Route path={"/platinador"} component={PlatinadorPage} />
         <Route path={"/admin"} component={AdminDashboard} />
@@ -59,7 +62,6 @@ function Router() {
     </WouterRouter>
   );
 }
-
 function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -79,6 +81,7 @@ function App() {
           <Toaster />
           <Router />
           <FloatingChat />
+          <SocialProofToast />
           <MobileBottomNav />
           <CPFCompletionModal />
           <TermsAcceptanceModal />

@@ -76,7 +76,7 @@ export default function MobileBottomNav() {
       title: "Clube & Benefícios",
       items: [
         {
-          label: "Área do Platinador (R$ 15/mês)",
+          label: "Área do Platinador (R$ 35/mês)",
           icon: Trophy,
           path: "/platinador",
           color: "text-[#dc143c]",
@@ -100,13 +100,20 @@ export default function MobileBottomNav() {
       title: "Marketplace & Produtos",
       items: [
         {
+          label: "Jogue com Economia",
+          icon: Zap,
+          path: "/jogue-com-economia",
+          color: "text-red-500",
+          badge: "OFERTAS",
+        },
+        {
           label: "Loja Oficial (Físicos)",
           icon: ShoppingBag,
           path: "/loja",
           color: "text-blue-400",
         },
         {
-          label: "Desapegos Usados",
+          label: "Desapegos Físicos & Consoles",
           icon: Package,
           path: "/usados",
           color: "text-emerald-400",

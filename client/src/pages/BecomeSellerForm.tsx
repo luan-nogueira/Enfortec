@@ -164,7 +164,7 @@ export default function BecomeSellerForm() {
                   : "text-slate-400 hover:text-white hover:bg-slate-800/30"
               }`}
             >
-              Vender Minha Conta
+              Vender MINHA CONTA EFORTEGAMES
             </button>
           </div>
 
@@ -257,9 +257,9 @@ export default function BecomeSellerForm() {
                 <div className="bg-red-950/20 border border-red-600/20 p-5 rounded-2xl flex items-start gap-3">
                   <Info className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-black text-red-400 uppercase tracking-wider">Taxa de Comissão Eforte</p>
+                    <p className="text-sm font-black text-red-400 uppercase tracking-wider">Taxa de Comissão Eforte (10%) & Intermediação Segura</p>
                     <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                      Cobramos uma comissão padrão de <strong>6%</strong> sobre as vendas de produtos para manter a infraestrutura, suporte técnico e a intermediação segura dos pagamentos.
+                      Cobramos uma comissão padrão de <strong>10%</strong> sobre as vendas ativas. Em contas de terceiros intermediadas pela loja, o pagamento do comprador fica retido em escrow até a validação e avaliação. Após a aprovação do cliente, o valor é liberado ao vendedor menos a comissão de 10%. Negociações feitas de forma direta e sem intermediação do site são de risco exclusivo das partes.
                     </p>
                   </div>
                 </div>
@@ -290,7 +290,7 @@ export default function BecomeSellerForm() {
             <div className="bg-slate-900/60 backdrop-blur-md border border-red-600/20 rounded-3xl p-8 shadow-2xl card-neon space-y-6">
               <div className="text-center max-w-lg mx-auto">
                 <Store className="w-16 h-16 text-red-600 mx-auto mb-4 animate-bounce" />
-                <h2 className="text-2xl font-black text-white uppercase tracking-tight">Queremos Comprar sua Conta!</h2>
+                <h2 className="text-2xl font-black text-white uppercase tracking-tight">VENDER MINHA CONTA EFORTEGAMES</h2>
                 <p className="text-sm text-slate-400 mt-2">
                   Sabia que você pode ganhar dinheiro revendendo suas contas de jogos para a <strong>Eforte Games</strong>? Nós compramos de volta para revender aos nossos clientes.
                 </p>

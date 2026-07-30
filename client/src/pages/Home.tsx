@@ -37,10 +37,10 @@ const DEFAULT_MAIN_BANNERS = [
 
 const DEFAULT_SIDEBAR_TOP = {
   id: "default-sidebar-top",
-  title: "💥 Revenda seus Jogos Usados!",
-  description: "Anuncie e desapegue daquele jogo antigo de PS4/PS5 com total segurança de escrow da Eforte Games.",
+  title: "🎮 Revenda seus jogos digitais",
+  description: "Anuncie e desapegue dos seus jogos em mídia digital de PS4 e PS5 com total segurança de escrow da Eforte Games.",
   imageUrl: "https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?q=80&w=600",
-  link: "/virar-vendedor",
+  link: "/digital/vender",
   expiresAt: null
 };
 
@@ -100,6 +100,8 @@ export default function Home() {
   const [digitalProducts, setDigitalProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [heroSearch, setHeroSearch] = useState("");
+  const [activeListingTab, setActiveListingTab] = useState<"todos" | "digital" | "usado" | "assinatura">("todos");
+  const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
 
   const [promos, setPromos] = useState<any[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -291,9 +293,10 @@ export default function Home() {
           {/* Desktop Nav Links */}
           <div className="hidden lg:flex items-center gap-3 xl:gap-5 text-xs xl:text-sm font-medium">
             <a href="#categorias" className="text-slate-300 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap"><LayoutGrid className="w-3.5 h-3.5 text-slate-400" /> Categorias</a>
+            <a href="/jogue-com-economia" className="text-red-400 hover:text-red-300 font-bold transition flex items-center gap-1.5 whitespace-nowrap"><Zap className="w-3.5 h-3.5 text-red-500 animate-pulse" /> Jogue com Economia</a>
             <a href="/digital?type=assinatura" className="text-amber-400 hover:text-amber-300 font-bold transition flex items-center gap-1.5 whitespace-nowrap"><Sparkles className="w-3.5 h-3.5 text-amber-400" /> Assinaturas</a>
             <a href="#anuncios" className="text-slate-300 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap"><Tag className="w-3.5 h-3.5 text-slate-400" /> Anúncios</a>
-            <a href="/usados" className="text-slate-300 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap"><ShoppingCart className="w-3.5 h-3.5 text-blue-500" /> Desapegos</a>
+            <a href="/usados" className="text-slate-300 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap"><ShoppingCart className="w-3.5 h-3.5 text-blue-500" /> Desapegos Físicos</a>
             <a href="/faq" className="text-slate-300 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap"><HelpCircle className="w-3.5 h-3.5 text-slate-400" /> FAQ</a>
             <a href="/avaliacoes" className="text-slate-300 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap"><Star className="w-3.5 h-3.5 text-yellow-500" /> Avaliações</a>
             <a href="/promocoes" className="text-slate-300 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap"><Flame className="w-3.5 h-3.5 text-red-500" /> Promoções</a>
@@ -529,11 +532,11 @@ export default function Home() {
             </Button>
           </div>
 
-          {/* Quick Search Pills */}
-          <div className="max-w-4xl mx-auto mt-4 px-4 pb-4">
+          {/* Quick Search Pills & Console Filter Pills */}
+          <div className="max-w-4xl mx-auto mt-4 px-4 pb-4 space-y-3">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-xs text-slate-400">
               <span className="font-bold text-slate-500 shrink-0">Buscas populares:</span>
-              <div className="flex sm:flex-wrap items-center gap-2 overflow-x-auto sm:overflow-visible w-full sm:w-auto py-2 scrollbar-none justify-start sm:justify-center -mx-4 px-4 sm:mx-0 sm:px-0 snap-x">
+              <div className="flex sm:flex-wrap items-center gap-2 overflow-x-auto sm:overflow-visible w-full sm:w-auto py-1 scrollbar-none justify-start sm:justify-center -mx-4 px-4 sm:mx-0 sm:px-0 snap-x">
                 {[
                   { label: "PS Plus Extra", query: "PS Plus" },
                   { label: "Game Pass", query: "Game Pass" },
@@ -552,6 +555,30 @@ export default function Home() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Platform Console Pills (Requirement 2) */}
+            <div className="flex items-center justify-center gap-2 pt-2 border-t border-slate-800/80 flex-wrap">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mr-1">Filtrar Console:</span>
+              {[
+                { id: null, label: "🎮 Todos Consoles" },
+                { id: "PS5", label: "🔵 PS5" },
+                { id: "PS4", label: "🔷 PS4" },
+                { id: "Xbox", label: "🟢 Xbox" },
+                { id: "Switch", label: "🔴 Switch" },
+              ].map((plat) => (
+                <button
+                  key={plat.label}
+                  onClick={() => setSelectedPlatform(plat.id)}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                    selectedPlatform === plat.id
+                      ? "bg-red-600 text-white shadow-lg shadow-red-600/30"
+                      : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800"
+                  }`}
+                >
+                  {plat.label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -677,26 +704,94 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Physical Products Prominent Banner (Requirement 9) */}
+      <section className="py-8 bg-slate-950">
+        <div className="container mx-auto px-4">
+          <div 
+            onClick={() => navigate("/usados")}
+            className="relative rounded-3xl overflow-hidden bg-gradient-to-r from-slate-900 via-red-950/40 to-slate-900 border border-red-600/30 p-6 sm:p-10 shadow-2xl cursor-pointer hover:border-red-500 transition-all group"
+          >
+            <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?q=80&w=1200')] bg-cover bg-center opacity-20 mix-blend-overlay group-hover:scale-105 transition-transform duration-700 pointer-events-none" />
+            <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-6">
+              <div className="space-y-2 text-center sm:text-left">
+                <span className="bg-red-600/30 text-red-400 border border-red-500/40 text-[10px] sm:text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full inline-block">
+                  📦 Espaço de Desapegos Físicos
+                </span>
+                <h2 className="text-xl sm:text-3xl font-black text-white uppercase tracking-tight">
+                  Revenda seus Jogos Físicos, Consoles e Acessórios!
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-300 max-w-xl">
+                  Encontre e venda mídias físicas em disco de PS4/PS5, videogames, controles originais e colecionáveis com a <strong>Garantia Intermediada Eforte Games (8%)</strong>.
+                </p>
+              </div>
+
+              <Button className="bg-red-600 hover:bg-red-700 text-white font-black text-xs sm:text-sm px-6 py-3 rounded-xl shadow-lg shrink-0">
+                Ver Mídias Físicas & Consoles →
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Recent Listings (Anúncios) */}
       <section id="anuncios" className="py-8 sm:py-16">
         <div className="container mx-auto px-4">
-          <div className="flex justify-between items-end mb-5 sm:mb-8">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-5 sm:mb-8 gap-4">
             <div>
               <h2 className="text-xl sm:text-3xl font-bold text-white mb-1 sm:mb-2 flex items-center gap-2 sm:gap-3">
                 <Tag className="text-red-500 w-5 h-5 sm:w-8 sm:h-8" /> Últimos Anúncios
               </h2>
-              <p className="text-slate-400 text-xs sm:text-base">Descubra as melhores ofertas da comunidade.</p>
+              <p className="text-slate-400 text-xs sm:text-base">Filtre por tipo de produto para não misturar anúncios.</p>
             </div>
-            <Button variant="outline" className="border-slate-700 text-slate-300 hover:bg-slate-800 hidden md:flex" onClick={() => navigate("/digital")}>
-              Ver todos
-            </Button>
+
+            {/* Tab Filter Control (Requirement 1) */}
+            <div className="flex items-center gap-1 sm:gap-2 bg-slate-900 p-1 rounded-xl border border-slate-800 self-stretch sm:self-auto overflow-x-auto">
+              {[
+                { id: "todos", label: "Todos" },
+                { id: "digital", label: "🎮 Jogos Digitais" },
+                { id: "usado", label: "📦 Físicos & Consoles" },
+                { id: "assinatura", label: "⭐ Assinaturas" },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveListingTab(tab.id as any)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
+                    activeListingTab === tab.id
+                      ? "bg-red-600 text-white shadow-md"
+                      : "text-slate-400 hover:text-white hover:bg-slate-800"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="flex lg:grid lg:grid-cols-4 xl:grid-cols-5 overflow-x-auto lg:overflow-x-visible gap-4 pb-4 lg:pb-0 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            {allListings.length > 0 ? allListings.map((listing: any) => {
+            {allListings.filter((listing: any) => {
+              if (selectedPlatform && !listing.name?.toLowerCase().includes(selectedPlatform.toLowerCase()) && listing.platform !== selectedPlatform) {
+                return false;
+              }
+              if (activeListingTab === "digital") return listing._type === 'digital' && listing.type !== 'assinatura';
+              if (activeListingTab === "usado") return listing._type === 'used';
+              if (activeListingTab === "assinatura") return listing.type === 'assinatura';
+              return true;
+            }).length > 0 ? allListings.filter((listing: any) => {
+              if (selectedPlatform && !listing.name?.toLowerCase().includes(selectedPlatform.toLowerCase()) && listing.platform !== selectedPlatform) {
+                return false;
+              }
+              if (activeListingTab === "digital") return listing._type === 'digital' && listing.type !== 'assinatura';
+              if (activeListingTab === "usado") return listing._type === 'used';
+              if (activeListingTab === "assinatura") return listing.type === 'assinatura';
+              return true;
+            }).map((listing: any) => {
               const priceValue = listing._type === 'used'
-                ? (listing.pricePS4 || listing.pricePS5 || 0)
+                ? (listing.pricePS4 || listing.pricePS5 || listing.price || 0)
                 : (listing.price || 0);
+
+              const isAssinatura = listing.type === 'assinatura';
+              const isDigital = listing._type === 'digital' && !isAssinatura;
+
               return (
                 <div 
                   key={`${listing._type}-${listing.id}`}
@@ -716,14 +811,28 @@ export default function Home() {
                       </div>
                     )}
                     <div className={`absolute top-1.5 left-1.5 sm:top-2 sm:left-2 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded text-[8px] sm:text-[10px] uppercase font-bold text-white shadow-md backdrop-blur-sm ${
-                      listing._type === 'digital' 
-                        ? 'bg-gradient-to-r from-red-650 to-red-500 border border-red-500/30' 
-                        : 'bg-slate-950/80 border border-slate-800'
+                      isAssinatura
+                        ? 'bg-amber-600 border border-amber-500/30'
+                        : isDigital 
+                          ? 'bg-red-600 border border-red-500/30' 
+                          : 'bg-blue-600 border border-blue-500/30'
                     }`}>
-                      {listing._type === 'digital' ? 'Mídia Digital' : 'Usado'}
+                      {isAssinatura ? '⭐ Assinatura VIP' : isDigital ? '🎮 Mídia Digital' : '📦 Mídia Física / Console'}
+                    </div>
+
+                    {/* Verified & Cashback Badges */}
+                    <div className="absolute bottom-1.5 right-1.5 flex flex-col items-end gap-1">
+                      <span className="bg-amber-500/90 text-slate-950 text-[7px] sm:text-[9px] font-black px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">
+                        🎁 +7 FC
+                      </span>
                     </div>
                   </div>
                   <div className="p-3 sm:p-4 flex flex-col flex-grow">
+                    <div className="flex items-center gap-1 mb-1">
+                      <span className="text-[9px] font-bold text-green-400 bg-green-950/60 px-1.5 py-0.5 rounded border border-green-800/40 flex items-center gap-1">
+                        <ShieldCheck className="w-2.5 h-2.5" /> Verificado
+                      </span>
+                    </div>
                     <h3 className="text-white font-medium text-xs sm:text-base line-clamp-2 mb-1.5 sm:mb-2 group-hover:text-red-400 transition-colors">
                       {listing.name}
                     </h3>
@@ -753,9 +862,9 @@ export default function Home() {
                 </div>
               );
             }) : (
-              <div className="col-span-full py-20 text-center">
-                <Tag className="w-16 h-16 text-slate-700 mx-auto mb-4" />
-                <h3 className="text-xl text-slate-400">Nenhum anúncio encontrado ainda.</h3>
+              <div className="col-span-full py-16 text-center bg-slate-900/50 rounded-2xl border border-slate-800">
+                <Tag className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                <h3 className="text-lg font-bold text-slate-400">Nenhum anúncio nesta categoria.</h3>
               </div>
             )}
           </div>
