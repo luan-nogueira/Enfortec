@@ -65,56 +65,27 @@ export async function createContext(
       
       if (decoded && decoded.sub) {
         const uid = decoded.sub;
-        const email = decoded.email as string | undefined;
+        const email = (decoded.email as string | undefined)?.toLowerCase().trim();
         const name = (decoded.name as string | undefined) || email?.split("@")[0] || "User";
         
         try {
-          user = (await db.getUserByOpenId(uid)) || null;
-          console.log("[TRPC Server] Database user lookup result (by openId):", user ? `found (id: ${user.id})` : "not found");
+          user = (await db.getUserByOpenId(uid)) || (email ? await db.getUserByEmail(email) : undefined) || null;
+          console.log("[TRPC Server] Database user lookup result:", user ? `found (id: ${user.id}, openId: ${user.openId})` : "not found");
           
-          if (!user) {
-            try {
-              console.log("[TRPC Server] User not found in database, upserting...");
-              await db.upsertUser({
-                openId: uid,
-                name: name,
-                email: email,
-                loginMethod: "firebase",
-                lastSignedIn: new Date(),
-              });
-              user = (await db.getUserByOpenId(uid)) || null;
-              console.log("[TRPC Server] User upsert complete, user id:", user?.id);
-            } catch (dbError) {
-              console.error("[FirebaseAuth] Failed to upsert user in database:", dbError);
-            }
-          } else {
-            try {
-              await db.upsertUser({
-                openId: uid,
-                lastSignedIn: new Date(),
-              });
-            } catch (e) {
-              console.error("[FirebaseAuth] Failed to update user lastSignedIn:", e);
-            }
-          }
-        } catch (dbErr) {
-          console.error("[TRPC Server] Database user lookup failed, falling back to local mock user:", dbErr);
-          user = {
-            id: 999999,
+          await db.upsertUser({
             openId: uid,
             name: name,
-            email: email || null,
-            loginMethod: "firebase_fallback",
-            role: "user",
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            email: email,
+            loginMethod: "firebase",
             lastSignedIn: new Date(),
-            balance: "0.00",
-          };
+          });
+          
+          user = (await db.getUserByOpenId(uid)) || (email ? await db.getUserByEmail(email) : undefined) || null;
+        } catch (dbErr) {
+          console.error("[TRPC Server] User auth processing error:", dbErr);
         }
         
         if (!user) {
-          console.log("[TRPC Server] SQL database unreachable or user not found, using Firebase user fallback.");
           user = {
             id: 999999,
             openId: uid,

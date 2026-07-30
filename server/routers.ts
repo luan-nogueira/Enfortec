@@ -54,20 +54,21 @@ export const appRouter = router({
         if (input.forteCoins !== undefined) updateData.forteCoins = input.forteCoins;
         
         try {
-          if (ctx.user.id && ctx.user.id !== 999999) {
-            await database.update(users)
-              .set(updateData)
-              .where(eq(users.id, ctx.user.id));
-          } else if (ctx.user.openId) {
-            await database.insert(users).values({
+          if (ctx.user.openId) {
+            await db.upsertUser({
               openId: ctx.user.openId,
               name: ctx.user.name || input.name || "User",
               email: ctx.user.email,
               ...updateData
-            }).onConflictDoUpdate({
-              target: users.openId,
-              set: updateData
             });
+          } else if (ctx.user.id && ctx.user.id !== 999999) {
+            await database.update(users)
+              .set(updateData)
+              .where(eq(users.id, ctx.user.id));
+          } else if (ctx.user.email) {
+            await database.update(users)
+              .set(updateData)
+              .where(sql`LOWER(${users.email}) = LOWER(${ctx.user.email.trim()})`);
           }
         } catch (dbErr: any) {
           console.error("[updateProfile] Error updating user profile in database:", dbErr);

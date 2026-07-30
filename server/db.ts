@@ -1,4 +1,4 @@
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { InsertUser, InsertCoupon, users, sellers, products, usedProducts, digitalProducts, orders, reviews, coupons, platformSettings } from "../drizzle/schema";
@@ -14,8 +14,8 @@ export function getDb() {
     return null;
   }
   try {
-    const sql = neon(process.env.DATABASE_URL);
-    return drizzle(sql);
+    const sqlClient = neon(process.env.DATABASE_URL);
+    return drizzle(sqlClient);
   } catch (error: any) {
     console.warn("[Database] Falha ao inicializar banco:", error.message);
     return null;
@@ -34,65 +34,60 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   }
 
   try {
-    const values: InsertUser = {
-      openId: user.openId,
-    };
-    const updateSet: Record<string, unknown> = {};
-
-    const textFields = ["name", "email", "loginMethod", "cpf"] as const;
-    type TextField = (typeof textFields)[number];
-
-    const assignNullable = (field: TextField) => {
-      const value = user[field];
-      if (value === undefined) return;
-      const normalized = value ?? null;
-      values[field] = normalized;
-      updateSet[field] = normalized;
-    };
-
-    textFields.forEach(assignNullable);
-
-    if (user.forteCoins !== undefined) {
-      values.forteCoins = user.forteCoins;
-      updateSet.forteCoins = user.forteCoins;
-    }
-
-    if (user.lastSignedIn !== undefined) {
-      values.lastSignedIn = user.lastSignedIn;
-      updateSet.lastSignedIn = user.lastSignedIn;
-    }
+    const userEmailLower = user.email?.toLowerCase().trim();
     const ADMIN_EMAILS = [
       "luanmnogueira@gmail.com",
       "enfortec@admin.com",
       "luiz220190@hotmail.com",
       "sandrinhooperfectt@gmail.com"
     ];
-    const userEmailLower = user.email?.toLowerCase();
 
-    if (user.role !== undefined) {
-      values.role = user.role;
-      updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId || (userEmailLower && ADMIN_EMAILS.includes(userEmailLower))) {
-      values.role = 'admin';
-      updateSet.role = 'admin';
+    const isAdmin = user.openId === ENV.ownerOpenId || (userEmailLower && ADMIN_EMAILS.includes(userEmailLower));
+    const roleToSet = user.role || (isAdmin ? 'admin' : 'user');
+
+    // Busca se já existe por openId ou por email
+    let existingUser = await db.select().from(users).where(eq(users.openId, user.openId)).limit(1).then(r => r[0]);
+    if (!existingUser && userEmailLower) {
+      existingUser = await db.select().from(users).where(sql`LOWER(${users.email}) = ${userEmailLower}`).limit(1).then(r => r[0]);
     }
 
-    if (!values.lastSignedIn) {
-      values.lastSignedIn = new Date();
-    }
+    if (existingUser) {
+      const updateData: any = {
+        openId: user.openId,
+        lastSignedIn: user.lastSignedIn || new Date(),
+        role: isAdmin ? 'admin' : existingUser.role
+      };
+      if (user.name) updateData.name = user.name;
+      if (user.email) updateData.email = user.email;
+      if (user.cpf) updateData.cpf = user.cpf;
+      if (user.forteCoins !== undefined) updateData.forteCoins = user.forteCoins;
+      if (user.loginMethod) updateData.loginMethod = user.loginMethod;
 
-    if (Object.keys(updateSet).length === 0) {
-      updateSet.lastSignedIn = new Date();
-    }
+      await db.update(users).set(updateData).where(eq(users.id, existingUser.id));
+    } else {
+      const insertData: any = {
+        openId: user.openId,
+        name: user.name || "User",
+        email: user.email || null,
+        loginMethod: user.loginMethod || "firebase",
+        role: roleToSet,
+        lastSignedIn: user.lastSignedIn || new Date(),
+        forteCoins: user.forteCoins ?? 10
+      };
+      if (user.cpf) insertData.cpf = user.cpf;
 
-    // PostgreSQL: onConflictDoUpdate (replaces MySQL's onDuplicateKeyUpdate)
-    await db.insert(users).values(values).onConflictDoUpdate({
-      target: users.openId,
-      set: updateSet,
-    });
+      await db.insert(users).values(insertData).onConflictDoUpdate({
+        target: users.openId,
+        set: {
+          name: user.name || "User",
+          email: user.email || null,
+          role: roleToSet,
+          lastSignedIn: user.lastSignedIn || new Date()
+        }
+      });
+    }
   } catch (error) {
     console.error("[Database] Failed to upsert user:", error);
-    throw error;
   }
 }
 
@@ -108,7 +103,20 @@ export async function getUserByOpenId(openId: string) {
 
     return result.length > 0 ? result[0] : undefined;
   } catch (error) {
-    console.error("[Database Error] getUserByOpenId failed:", error);
+    console.error("[Database] Failed to get user by openId:", error);
+    return undefined;
+  }
+}
+
+export async function getUserByEmail(email: string) {
+  try {
+    const db = getDb();
+    if (!db || !email) return undefined;
+    const cleanEmail = email.toLowerCase().trim();
+    const result = await db.select().from(users).where(sql`LOWER(${users.email}) = ${cleanEmail}`).limit(1);
+    return result.length > 0 ? result[0] : undefined;
+  } catch (error) {
+    console.error("[Database] Failed to get user by email:", error);
     return undefined;
   }
 }
