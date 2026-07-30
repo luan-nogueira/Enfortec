@@ -243,7 +243,7 @@ export default function SellDigitalProduct() {
               <div className="bg-purple-50 border border-purple-200 p-4 rounded-lg">
                 <p className="text-sm font-semibold text-purple-900 mb-2">Comissão da Plataforma</p>
                 <p className="text-sm text-purple-800">
-                  A plataforma cobra uma comissão de 15% sobre o valor final da venda.
+                  A plataforma cobra uma comissão de 6% sobre o valor final da venda.
                 </p>
               </div>
 

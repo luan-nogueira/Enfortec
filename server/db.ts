@@ -378,8 +378,8 @@ export async function getPlatformSettings() {
   const result = await db.select().from(platformSettings).where(eq(platformSettings.id, 1)).limit(1);
   if (result.length === 0) {
     // Initialize singleton row if not exists
-    await db.insert(platformSettings).values({ id: 1, commissionPercentage: "10" }).onConflictDoNothing();
-    return { id: 1, commissionPercentage: "10" };
+    await db.insert(platformSettings).values({ id: 1, commissionPercentage: "6" }).onConflictDoNothing();
+    return { id: 1, commissionPercentage: "6" };
   }
   return result[0];
 }

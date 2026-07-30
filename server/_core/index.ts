@@ -85,7 +85,13 @@ app.get("/api/migrate-db", async (req, res) => {
     await sql.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "coinsUsed" integer DEFAULT 0 NOT NULL`);
     await sql.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "productName" varchar(255)`);
 
-    return res.json({ success: true, message: "Migração das tabelas concluída com sucesso na Vercel!" });
+    await sql.query(`CREATE TABLE IF NOT EXISTS "platformSettings" (
+      "id" serial PRIMARY KEY,
+      "commissionPercentage" varchar(10) NOT NULL DEFAULT '6.00'
+    )`);
+    await sql.query(`INSERT INTO "platformSettings" (id, "commissionPercentage") VALUES (1, '6.00') ON CONFLICT (id) DO UPDATE SET "commissionPercentage" = '6.00'`);
+
+    return res.json({ success: true, message: "Migração das tabelas e comissão de 6% concluída com sucesso na Vercel!" });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }

@@ -164,7 +164,7 @@ export function registerPaymentRoute(app: Express) {
       if (finalPrice <= 0) {
         const database = await db.getDb();
         if (database) {
-          let commissionPct = "10.00";
+          let commissionPct = "6.00";
           try {
             const settings = await db.getPlatformSettings();
             if (settings?.commissionPercentage) {
@@ -359,7 +359,7 @@ export function registerPaymentRoute(app: Express) {
       const database = await db.getDb();
       if (database) {
         // Tenta obter a comissão real do banco
-        let commissionPct = "10.00";
+        let commissionPct = "6.00";
         try {
           const settings = await db.getPlatformSettings();
           if (settings?.commissionPercentage) {

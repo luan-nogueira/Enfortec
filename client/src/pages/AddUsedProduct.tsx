@@ -350,7 +350,7 @@ export default function AddUsedProduct() {
               <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
                 <p className="text-sm font-semibold text-blue-900 mb-2">Comissão da Plataforma</p>
                 <p className="text-sm text-blue-800">
-                  A plataforma cobra uma comissão de 10% sobre o valor final da venda.
+                  A plataforma cobra uma comissão de 6% sobre o valor final da venda.
                 </p>
               </div>
 

@@ -259,7 +259,7 @@ export default function BecomeSellerForm() {
                   <div>
                     <p className="text-sm font-black text-red-400 uppercase tracking-wider">Taxa de Comissão Eforte</p>
                     <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                      Cobramos uma comissão padrão de <strong>10%</strong> sobre as vendas de produtos usados para manter a infraestrutura, suporte técnico e a intermediação segura dos pagamentos.
+                      Cobramos uma comissão padrão de <strong>6%</strong> sobre as vendas de produtos para manter a infraestrutura, suporte técnico e a intermediação segura dos pagamentos.
                     </p>
                   </div>
                 </div>
