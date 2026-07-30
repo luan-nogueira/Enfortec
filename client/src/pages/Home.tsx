@@ -268,6 +268,7 @@ export default function Home() {
   }).slice(0, 12);
 
   const categories = [
+    { name: "Assinaturas", icon: Sparkles, color: "from-amber-500 to-yellow-600" },
     { name: "Ação", icon: Swords, color: "from-red-500 to-red-600" },
     { name: "Aventura", icon: Compass, color: "from-blue-500 to-blue-600" },
     { name: "RPG", icon: Shield, color: "from-purple-500 to-purple-600" },
@@ -290,6 +291,7 @@ export default function Home() {
           {/* Desktop Nav Links */}
           <div className="hidden lg:flex items-center gap-3 xl:gap-5 text-xs xl:text-sm font-medium">
             <a href="#categorias" className="text-slate-300 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap"><LayoutGrid className="w-3.5 h-3.5 text-slate-400" /> Categorias</a>
+            <a href="/digital?type=assinatura" className="text-amber-400 hover:text-amber-300 font-bold transition flex items-center gap-1.5 whitespace-nowrap"><Sparkles className="w-3.5 h-3.5 text-amber-400" /> Assinaturas</a>
             <a href="#anuncios" className="text-slate-300 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap"><Tag className="w-3.5 h-3.5 text-slate-400" /> Anúncios</a>
             <a href="/usados" className="text-slate-300 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap"><ShoppingCart className="w-3.5 h-3.5 text-blue-500" /> Desapegos</a>
             <a href="/faq" className="text-slate-300 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap"><HelpCircle className="w-3.5 h-3.5 text-slate-400" /> FAQ</a>
@@ -533,10 +535,11 @@ export default function Home() {
               <span className="font-bold text-slate-500 shrink-0">Buscas populares:</span>
               <div className="flex sm:flex-wrap items-center gap-2 overflow-x-auto sm:overflow-visible w-full sm:w-auto py-2 scrollbar-none justify-start sm:justify-center -mx-4 px-4 sm:mx-0 sm:px-0 snap-x">
                 {[
+                  { label: "PS Plus Extra", query: "PS Plus" },
+                  { label: "Game Pass", query: "Game Pass" },
                   { label: "GTA V", query: "GTA V" },
+                  { label: "EA Sports FC", query: "EA Sports" },
                   { label: "God of War", query: "God of War" },
-                  { label: "Elden Ring", query: "Elden Ring" },
-                  { label: "Mortal Kombat 1", query: "Mortal Kombat 1" },
                   { label: "Gift Card PSN", query: "PlayStation" },
                   { label: "Gift Card Xbox", query: "Xbox" }
                 ].map((pill) => (

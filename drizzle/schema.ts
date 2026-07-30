@@ -10,7 +10,7 @@ import { relations } from "drizzle-orm";
 export const roleEnum = pgEnum("role", ["user", "admin", "vendedor"]);
 export const conditionEnum = pgEnum("condition", ["novo", "como_novo", "bom", "aceitavel"]);
 export const usedStatusEnum = pgEnum("used_status", ["pendente", "aprovado", "rejeitado", "vendido"]);
-export const digitalTypeEnum = pgEnum("digital_type", ["jogo", "gift_card", "licenca", "outro"]);
+export const digitalTypeEnum = pgEnum("digital_type", ["jogo", "gift_card", "licenca", "assinatura", "outro"]);
 export const productTypeEnum = pgEnum("product_type", ["store", "used", "digital"]);
 export const orderStatusEnum = pgEnum("order_status", ["pendente", "pago", "enviado", "entregue", "cancelado"]);
 export const subscriptionStatusEnum = pgEnum("subscription_status", ["ativa", "cancelada", "expirada", "pendente"]);
@@ -104,6 +104,8 @@ export const digitalProducts = pgTable("digitalProducts", {
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   price: numeric("price", { precision: 10, scale: 2 }).notNull(),
+  pricePrimary: numeric("pricePrimary", { precision: 10, scale: 2 }),
+  priceSecondary: numeric("priceSecondary", { precision: 10, scale: 2 }),
   type: digitalTypeEnum("type").notNull(),
   keyOrCode: text("keyOrCode"),
   downloadUrl: varchar("downloadUrl", { length: 500 }),
@@ -135,6 +137,7 @@ export const orders = pgTable("orders", {
   paymentId: varchar("paymentId", { length: 255 }),
   productName: varchar("productName", { length: 255 }),
   firebaseProductId: varchar("firebaseProductId", { length: 255 }),
+  accountType: varchar("accountType", { length: 20 }),
   deliveryDetails: text("deliveryDetails"),
   coinsUsed: integer("coinsUsed").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

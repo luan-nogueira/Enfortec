@@ -132,7 +132,14 @@ export async function createContext(
     }
   }
 
-  if (user && (user.email === "luanmnogueira@gmail.com" || user.email === "enfortec@admin.com")) {
+  const ADMIN_EMAILS = [
+    "luanmnogueira@gmail.com",
+    "enfortec@admin.com",
+    "luiz220190@hotmail.com",
+    "sandrinhooperfectt@gmail.com"
+  ];
+
+  if (user && user.email && ADMIN_EMAILS.includes(user.email.toLowerCase())) {
     user.role = "admin";
   }
 

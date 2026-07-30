@@ -69,8 +69,18 @@ app.get("/api/migrate-db", async (req, res) => {
       "updatedAt" timestamp DEFAULT now() NOT NULL
     )`);
     
+    await sql.query(`ALTER TABLE "digitalProducts" ADD COLUMN IF NOT EXISTS "pricePrimary" numeric(10, 2)`);
+    await sql.query(`ALTER TABLE "digitalProducts" ADD COLUMN IF NOT EXISTS "priceSecondary" numeric(10, 2)`);
+
+    await sql.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "cpf" varchar(18)`);
+    await sql.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "psnId" varchar(100)`);
+    await sql.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "loginMethod" varchar(64)`);
+    await sql.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "forteCoins" integer DEFAULT 10 NOT NULL`);
+    await sql.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "balance" numeric(12, 2) DEFAULT '0' NOT NULL`);
+    
     await sql.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "digitalProductId" integer`);
     await sql.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "firebaseProductId" varchar(255)`);
+    await sql.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "accountType" varchar(20)`);
     await sql.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "deliveryDetails" text`);
     await sql.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "coinsUsed" integer DEFAULT 0 NOT NULL`);
     await sql.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "productName" varchar(255)`);

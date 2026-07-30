@@ -74,7 +74,8 @@ export default function UsedMarketplace() {
   const [useCoins, setUseCoins] = useState(false);
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
 
-  const isAdmin = user?.email === "luanmnogueira@gmail.com" || user?.email === "enfortec@admin.com" || user?.role === "admin";
+  const ADMIN_EMAILS = ["luanmnogueira@gmail.com", "enfortec@admin.com", "luiz220190@hotmail.com", "sandrinhooperfectt@gmail.com"];
+  const isAdmin = (user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase())) || user?.role === "admin";
 
   const handleDeleteProduct = async (id: string) => {
     toast("Deletar este anúncio?", {

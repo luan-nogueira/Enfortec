@@ -93,8 +93,17 @@ export function registerPaymentRoute(app: Express) {
   // ─── Checkout: cria link de pagamento InfinitePay ────────────────────────────
   app.post("/api/infinitepay/checkout", async (req, res) => {
     try {
-      const { name, price, quantity = 1, redirectUrl, productType = "store", productId, sellerId, customer, coinsToUse = 0, couponCode } = req.body;
-      const productNameStr: string = name || "Produto";
+      const { name, price, quantity = 1, redirectUrl, productType = "store", productId, sellerId, customer, coinsToUse = 0, couponCode, accountType } = req.body;
+      let productNameStr: string = name || "Produto";
+      if (accountType === "secundaria") {
+        if (!productNameStr.toLowerCase().includes("secundária") && !productNameStr.toLowerCase().includes("secundaria")) {
+          productNameStr += " (Conta Secundária)";
+        }
+      } else if (accountType === "primaria") {
+        if (!productNameStr.toLowerCase().includes("primária") && !productNameStr.toLowerCase().includes("primaria")) {
+          productNameStr += " (Conta Primária)";
+        }
+      }
 
       if (!name || price === undefined) {
         return res.status(400).json({ success: false, error: "Nome e preço são obrigatórios." });
@@ -178,6 +187,7 @@ export function registerPaymentRoute(app: Express) {
             paymentId: `ForteCoins-100%-${Date.now()}`,
             coinsUsed: Number(coinsToUse),
             productName: productNameStr,
+            accountType: accountType || null,
             firebaseProductId: productId ? String(productId) : null,
           };
 

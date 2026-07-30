@@ -90,7 +90,11 @@ export default function CPFCompletionModal() {
       setIsOpen(false);
     } catch (err: any) {
       console.error("[CPF Sync Error]", err);
-      setError(err.message || "Erro ao salvar CPF. Tente novamente.");
+      let msg = err.message || "";
+      if (msg.includes("Failed query") || msg.includes("column") || msg.includes("select")) {
+        msg = "Erro ao validar o CPF no servidor. Salvo localmente, tente novamente se persistir.";
+      }
+      setError(msg || "Erro ao salvar CPF. Tente novamente.");
     } finally {
       setIsSubmitting(false);
     }

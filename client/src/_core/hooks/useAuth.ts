@@ -6,6 +6,19 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 
+const ADMIN_EMAILS = [
+  "luanmnogueira@gmail.com",
+  "enfortec@admin.com",
+  "luiz220190@hotmail.com",
+  "sandrinhooperfectt@gmail.com",
+  "temp_admin@enfortec.com"
+];
+
+export function isAdminEmail(email?: string | null) {
+  if (!email) return false;
+  return ADMIN_EMAILS.includes(email.toLowerCase());
+}
+
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
   redirectPath?: string;
@@ -138,7 +151,7 @@ export function useAuth(options?: UseAuthOptions) {
               }
 
               // Inserir 10.000 moedas para teste do admin apenas uma vez
-              if ((user.email === "luanmnogueira@gmail.com" || user.email === "enfortec@admin.com" || user.email === "temp_admin@enfortec.com") && !userData?.hasSeededTestingCoins) {
+              if (isAdminEmail(user.email) && !userData?.hasSeededTestingCoins) {
                 updateFields.forteCoins = 10000;
                 updateFields.hasSeededTestingCoins = true;
                 needsUpdate = true;
@@ -235,7 +248,7 @@ export function useAuth(options?: UseAuthOptions) {
                 return;
               }
 
-              const role = userData?.role || ((user.email === "luanmnogueira@gmail.com" || user.email === "enfortec@admin.com") ? "admin" : "user");
+              const role = userData?.role || (isAdminEmail(user.email) ? "admin" : "user");
               const finalForteCoins = userData?.forteCoins ?? 0;
               const finalLoginMethod = userData?.loginMethod ?? (isGoogleUser ? "google.com" : "email/password");
 
@@ -255,8 +268,8 @@ export function useAuth(options?: UseAuthOptions) {
                 loading: false,
                 error: null,
                 isAuthenticated: true,
-                isAdmin: role === "admin" || user.email === "luanmnogueira@gmail.com" || user.email === "enfortec@admin.com",
-                isCollaborator: role === "collaborator" || role === "admin" || user.email === "luanmnogueira@gmail.com" || user.email === "enfortec@admin.com",
+                isAdmin: role === "admin" || isAdminEmail(user.email),
+                isCollaborator: role === "collaborator" || role === "admin" || isAdminEmail(user.email),
               });
             });
           } catch (err: any) {
@@ -277,8 +290,8 @@ export function useAuth(options?: UseAuthOptions) {
               loading: false,
               error: err,
               isAuthenticated: true,
-              isAdmin: user.email === "luanmnogueira@gmail.com" || user.email === "enfortec@admin.com",
-              isCollaborator: user.email === "luanmnogueira@gmail.com" || user.email === "enfortec@admin.com",
+              isAdmin: isAdminEmail(user.email),
+              isCollaborator: isAdminEmail(user.email),
             });
           }
         } else {

@@ -110,6 +110,7 @@ export default function SellDigitalProduct() {
                   disabled={isLoading}
                 >
                   <option value="jogo">Jogo Digital</option>
+                  <option value="assinatura">Assinatura (PS Plus, Game Pass, etc.)</option>
                   <option value="gift_card">Gift Card</option>
                   <option value="licenca">Licença de Software</option>
                   <option value="outro">Outro</option>
@@ -125,7 +126,8 @@ export default function SellDigitalProduct() {
                   type="text"
                   name="name"
                   placeholder={
-                    formData.type === "jogo" ? "Ex: The Legend of Zelda" :
+                    formData.type === "jogo" ? "Ex: EA Sports FC 26" :
+                    formData.type === "assinatura" ? "Ex: PS Plus Essential 12 Meses" :
                     formData.type === "gift_card" ? "Ex: Gift Card Steam R$100" :
                     "Ex: Microsoft Office 2024"
                   }
@@ -156,7 +158,7 @@ export default function SellDigitalProduct() {
               {/* Price */}
               <div>
                 <label className="block text-sm font-semibold text-slate-900 mb-2">
-                  Preço (R$) *
+                  {formData.type === "jogo" || formData.type === "assinatura" ? "Preço Principal / Conta Primária (R$) *" : "Preço (R$) *"}
                 </label>
                 <Input
                   type="number"
@@ -170,6 +172,28 @@ export default function SellDigitalProduct() {
                   required
                 />
               </div>
+
+              {/* Secondary Account Price (for games and subscriptions) */}
+              {(formData.type === "jogo" || formData.type === "assinatura") && (
+                <div>
+                  <label className="block text-sm font-semibold text-slate-900 mb-2">
+                    Preço Conta Secundária (R$) <span className="text-slate-500 font-normal">(Opcional)</span>
+                  </label>
+                  <Input
+                    type="number"
+                    name="priceSecondary"
+                    placeholder="Ex: 70.00"
+                    step="0.01"
+                    min="0"
+                    value={formData.priceSecondary || ""}
+                    onChange={handleInputChange}
+                    disabled={isLoading}
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    Defina um valor menor para clientes que comprarem opção de Conta Secundária.
+                  </p>
+                </div>
+              )}
 
               {/* Download URL (for games) */}
               {(formData.type as string) === "jogo" && (

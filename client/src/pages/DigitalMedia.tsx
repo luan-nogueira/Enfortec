@@ -2,7 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import UserProfileButton from "@/components/UserProfileButton";
-import { Search, Gamepad2, Gift, Lock, ArrowLeft, Flame, X, Coins, Shield } from "lucide-react";
+import { Search, Gamepad2, Gift, Lock, ArrowLeft, Flame, X, Coins, Shield, Sparkles } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -73,6 +73,7 @@ export default function DigitalMedia() {
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const [accountType, setAccountType] = useState<"primaria" | "secundaria">("primaria");
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -121,6 +122,7 @@ export default function DigitalMedia() {
       setAppliedCoupon(null);
       setCouponError(null);
       setAcceptedTerms(false);
+      setAccountType("primaria");
     }
   }, [selectedProduct, user]);
 
@@ -204,6 +206,7 @@ export default function DigitalMedia() {
         body: JSON.stringify({
           name: selectedProduct.name,
           price: price,
+          accountType: (selectedProduct.type === "jogo" || selectedProduct.type === "assinatura" || selectedProduct.priceSecondary || selectedProduct.price_secondary) ? accountType : undefined,
           redirectUrl: `${window.location.origin}/minhas-compras`,
           productType: "digital",
           productId: selectedProduct.id,
@@ -340,6 +343,7 @@ export default function DigitalMedia() {
 
   const types = [
     { value: "jogo", label: "Jogos", icon: Gamepad2 },
+    { value: "assinatura", label: "Assinaturas (PS Plus / Game Pass)", icon: Sparkles },
     { value: "gift_card", label: "Gift Cards", icon: Gift },
     { value: "licenca", label: "Licenças", icon: Lock },
     { value: "outro", label: "Outros", icon: Gamepad2 },
@@ -351,7 +355,19 @@ export default function DigitalMedia() {
     return <Icon className="w-6 h-6" />;
   };
 
-  const price = selectedProduct ? parseFloat(selectedProduct.price) : 0;
+  const getProductPrice = (prod: any, accType: "primaria" | "secundaria") => {
+    if (!prod) return 0;
+    const basePrice = parseFloat(prod.price || 0);
+    const primaryPrice = prod.pricePrimary ? parseFloat(prod.pricePrimary) : (prod.price_primary ? parseFloat(prod.price_primary) : basePrice);
+    const secondaryPrice = prod.priceSecondary ? parseFloat(prod.priceSecondary) : (prod.price_secondary ? parseFloat(prod.price_secondary) : (basePrice > 0 ? basePrice * 0.65 : 0));
+    
+    if (accType === "secundaria") {
+      return Math.max(0, secondaryPrice);
+    }
+    return Math.max(0, primaryPrice);
+  };
+
+  const price = selectedProduct ? getProductPrice(selectedProduct, accountType) : 0;
   const couponDiscount = appliedCoupon ? price * (discountPercentage / 100) : 0;
   const priceAfterCoupon = Math.max(0, price - couponDiscount);
   const coinsToUseVal = useCoins ? Math.min(user?.forteCoins || 0, Math.ceil(priceAfterCoupon * 10)) : 0;
@@ -606,12 +622,25 @@ export default function DigitalMedia() {
                     <h3 className="text-[11px] sm:text-sm font-bold text-white line-clamp-2 mb-1.5 sm:mb-2 group-hover:text-red-400 transition-colors flex-1">
                       {product.name}
                     </h3>
-                    <div className="flex justify-between items-center mb-2 sm:mb-3">
-                      <span className="text-base sm:text-xl font-black text-red-500">
-                        {parseFloat(product.price) === 0
-                          ? "Consultar"
-                          : `R$ ${parseFloat(product.price).toFixed(2).replace('.', ',')}`}
-                      </span>
+                    <div className="flex flex-col mb-2 sm:mb-3">
+                      {parseFloat(product.price) === 0 ? (
+                        <span className="text-base sm:text-xl font-black text-red-500">Consultar</span>
+                      ) : (product.type === "jogo" || product.type === "assinatura" || product.priceSecondary || product.price_secondary) ? (
+                        <div className="space-y-0.5 bg-slate-950/60 p-1.5 rounded-lg border border-slate-800">
+                          <div className="flex justify-between items-center text-[10px] sm:text-xs">
+                            <span className="text-slate-400 font-bold">👤 Primária:</span>
+                            <span className="font-black text-red-500">R$ {getProductPrice(product, "primaria").toFixed(2).replace('.', ',')}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-[10px] sm:text-xs">
+                            <span className="text-slate-400 font-bold">👥 Secundária:</span>
+                            <span className="font-bold text-slate-300">R$ {getProductPrice(product, "secundaria").toFixed(2).replace('.', ',')}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-base sm:text-xl font-black text-red-500">
+                          R$ {parseFloat(product.price).toFixed(2).replace('.', ',')}
+                        </span>
+                      )}
                     </div>
                     <div className="flex flex-col gap-1.5">
                       <Button
@@ -667,8 +696,59 @@ export default function DigitalMedia() {
               <div>
                 <h4 className="font-bold text-white line-clamp-2">{selectedProduct?.name}</h4>
                 <p className="text-xs text-slate-500">{selectedProduct?.platform || "PS4/PS5"}</p>
+                <div className="mt-2 text-lg font-black text-red-500">
+                  R$ {price.toFixed(2).replace('.', ',')}
+                </div>
               </div>
             </div>
+
+            {/* Seletor de Licença: Conta Primária vs Conta Secundária */}
+            {(selectedProduct?.type === "jogo" || selectedProduct?.type === "assinatura" || selectedProduct?.priceSecondary || selectedProduct?.price_secondary) && (
+              <div className="bg-slate-950 border border-red-600/30 rounded-xl p-3.5 space-y-2 animate-in fade-in duration-200">
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                  Escolha o Tipo de Licença / Conta *
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAccountType("primaria")}
+                    className={`p-2.5 rounded-lg border text-left transition-all ${
+                      accountType === "primaria"
+                        ? "bg-red-600/20 border-red-500 text-white shadow-[0_0_15px_rgba(220,38,38,0.3)]"
+                        : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="font-bold text-xs flex items-center justify-between">
+                      <span>👤 Primária</span>
+                      {accountType === "primaria" && <span className="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded font-black">OK</span>}
+                    </div>
+                    <p className="text-[9px] text-slate-400 mt-1 leading-tight">Jogue no seu perfil pessoal com conquistas</p>
+                    <div className="font-black text-xs text-red-500 mt-1.5">
+                      R$ {getProductPrice(selectedProduct, "primaria").toFixed(2).replace('.', ',')}
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAccountType("secundaria")}
+                    className={`p-2.5 rounded-lg border text-left transition-all ${
+                      accountType === "secundaria"
+                        ? "bg-red-600/20 border-red-500 text-white shadow-[0_0_15px_rgba(220,38,38,0.3)]"
+                        : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="font-bold text-xs flex items-center justify-between">
+                      <span>👥 Secundária</span>
+                      {accountType === "secundaria" && <span className="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded font-black">OK</span>}
+                    </div>
+                    <p className="text-[9px] text-slate-400 mt-1 leading-tight">Jogue na conta enviada com internet</p>
+                    <div className="font-black text-xs text-red-500 mt-1.5">
+                      R$ {getProductPrice(selectedProduct, "secundaria").toFixed(2).replace('.', ',')}
+                    </div>
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-4 pt-4 border-t border-slate-800 animate-in fade-in slide-in-from-top-2 duration-300">
               <h4 className="font-bold text-sm text-slate-300 flex items-center gap-2">

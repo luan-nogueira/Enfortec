@@ -117,6 +117,13 @@ export default function MobileBottomNav() {
           path: "/digital",
           color: "text-purple-400",
         },
+        {
+          label: "Assinaturas (PS Plus / Game Pass)",
+          icon: Sparkles,
+          path: "/digital?type=assinatura",
+          color: "text-amber-400",
+          badge: "PS PLUS",
+        },
       ],
     },
     {

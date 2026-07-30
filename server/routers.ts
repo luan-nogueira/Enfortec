@@ -28,16 +28,24 @@ export const appRouter = router({
       }))
       .mutation(async ({ ctx, input }) => {
         const database = await getDb();
-        if (!database) throw new Error("Database not available");
+        if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indisponível." });
         
         const updateData: any = {};
         if (input.cpf) {
           const cleanCpf = input.cpf.replace(/\D/g, "");
           
-          // Check if CPF is already used by someone else
-          const existingUserWithCpf = await database.select().from(users).where(eq(users.cpf, cleanCpf)).limit(1);
-          if (existingUserWithCpf.length > 0 && existingUserWithCpf[0].id !== ctx.user.id) {
-            throw new Error("Este CPF já está vinculado a outra conta. Não é permitido o uso de um mesmo CPF em múltiplas contas.");
+          try {
+            // Check if CPF is already used by someone else
+            const existingUserWithCpf = await database.select().from(users).where(eq(users.cpf, cleanCpf)).limit(1);
+            if (existingUserWithCpf.length > 0 && existingUserWithCpf[0].id !== ctx.user.id && existingUserWithCpf[0].openId !== ctx.user.openId) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "Este CPF já está vinculado a outra conta. Não é permitido o uso de um mesmo CPF em múltiplas contas."
+              });
+            }
+          } catch (err: any) {
+            if (err instanceof TRPCError) throw err;
+            console.warn("[updateProfile] Warning checking duplicate CPF in database:", err.message);
           }
           
           updateData.cpf = cleanCpf;
@@ -45,9 +53,30 @@ export const appRouter = router({
         if (input.name) updateData.name = input.name;
         if (input.forteCoins !== undefined) updateData.forteCoins = input.forteCoins;
         
-        await database.update(users)
-          .set(updateData)
-          .where(eq(users.id, ctx.user.id));
+        try {
+          if (ctx.user.id && ctx.user.id !== 999999) {
+            await database.update(users)
+              .set(updateData)
+              .where(eq(users.id, ctx.user.id));
+          } else if (ctx.user.openId) {
+            await database.insert(users).values({
+              openId: ctx.user.openId,
+              name: ctx.user.name || input.name || "User",
+              email: ctx.user.email,
+              ...updateData
+            }).onConflictDoUpdate({
+              target: users.openId,
+              set: updateData
+            });
+          }
+        } catch (dbErr: any) {
+          console.error("[updateProfile] Error updating user profile in database:", dbErr);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Erro ao salvar perfil no banco de dados. Tente novamente."
+          });
+        }
+
         return { success: true };
       }),
   }),
