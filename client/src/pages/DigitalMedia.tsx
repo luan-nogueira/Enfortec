@@ -355,13 +355,21 @@ export default function DigitalMedia() {
     return <Icon className="w-6 h-6" />;
   };
 
+  const hasSecondaryPrice = (prod: any) => {
+    if (!prod) return false;
+    const sec = prod.priceSecondary ?? prod.price_secondary;
+    if (sec === undefined || sec === null || sec === "" || sec === 0 || sec === "0" || sec === "0.00") return false;
+    return parseFloat(sec) > 0;
+  };
+
   const getProductPrice = (prod: any, accType: "primaria" | "secundaria") => {
     if (!prod) return 0;
     const basePrice = parseFloat(prod.price || 0);
     const primaryPrice = prod.pricePrimary ? parseFloat(prod.pricePrimary) : (prod.price_primary ? parseFloat(prod.price_primary) : basePrice);
-    const secondaryPrice = prod.priceSecondary ? parseFloat(prod.priceSecondary) : (prod.price_secondary ? parseFloat(prod.price_secondary) : (basePrice > 0 ? basePrice * 0.65 : 0));
+    const secVal = prod.priceSecondary ?? prod.price_secondary;
+    const secondaryPrice = (secVal !== undefined && secVal !== null && secVal !== "") ? parseFloat(secVal) : 0;
     
-    if (accType === "secundaria") {
+    if (accType === "secundaria" && secondaryPrice > 0) {
       return Math.max(0, secondaryPrice);
     }
     return Math.max(0, primaryPrice);
@@ -625,7 +633,7 @@ export default function DigitalMedia() {
                     <div className="flex flex-col mb-2 sm:mb-3">
                       {parseFloat(product.price) === 0 ? (
                         <span className="text-base sm:text-xl font-black text-red-500">Consultar</span>
-                      ) : (product.type === "jogo" || product.type === "assinatura" || product.priceSecondary || product.price_secondary) ? (
+                      ) : hasSecondaryPrice(product) ? (
                         <div className="space-y-0.5 bg-slate-950/60 p-1.5 rounded-lg border border-slate-800">
                           <div className="flex justify-between items-center text-[10px] sm:text-xs">
                             <span className="text-slate-400 font-bold">👤 Primária:</span>
@@ -638,7 +646,7 @@ export default function DigitalMedia() {
                         </div>
                       ) : (
                         <span className="text-base sm:text-xl font-black text-red-500">
-                          R$ {parseFloat(product.price).toFixed(2).replace('.', ',')}
+                          R$ {getProductPrice(product, "primaria").toFixed(2).replace('.', ',')}
                         </span>
                       )}
                     </div>
@@ -703,7 +711,7 @@ export default function DigitalMedia() {
             </div>
 
             {/* Seletor de Licença: Conta Primária vs Conta Secundária */}
-            {(selectedProduct?.type === "jogo" || selectedProduct?.type === "assinatura" || selectedProduct?.priceSecondary || selectedProduct?.price_secondary) && (
+            {hasSecondaryPrice(selectedProduct) && (
               <div className="bg-slate-950 border border-red-600/30 rounded-xl p-3.5 space-y-2 animate-in fade-in duration-200">
                 <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
                   Escolha o Tipo de Licença / Conta *
