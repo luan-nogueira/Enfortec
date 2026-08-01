@@ -66,7 +66,7 @@ export function useAuth(options?: UseAuthOptions) {
             hasUpdates = true;
           }
 
-          if (pgUser.cpf !== undefined && pgUser.cpf !== userData.cpf) {
+          if (pgUser.cpf && pgUser.cpf !== userData.cpf) {
             updates.cpf = pgUser.cpf;
             hasUpdates = true;
           }

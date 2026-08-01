@@ -2052,7 +2052,7 @@ var appRouter = router({
         const cleanCpf = input.cpf.replace(/\D/g, "");
         try {
           const existingUserWithCpf = await database.select().from(users).where(eq4(users.cpf, cleanCpf)).limit(1);
-          if (existingUserWithCpf.length > 0 && existingUserWithCpf[0].id !== ctx.user.id && existingUserWithCpf[0].openId !== ctx.user.openId) {
+          if (ctx.user.role !== "admin" && existingUserWithCpf.length > 0 && existingUserWithCpf[0].id !== ctx.user.id && existingUserWithCpf[0].openId !== ctx.user.openId) {
             throw new TRPCError3({
               code: "BAD_REQUEST",
               message: "Este CPF j\xE1 est\xE1 vinculado a outra conta. N\xE3o \xE9 permitido o uso de um mesmo CPF em m\xFAltiplas contas."

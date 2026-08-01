@@ -76,14 +76,20 @@ export default function CPFCompletionModal() {
     }
 
     setIsSubmitting(true);
+    const cleanCpf = cpf.replace(/\D/g, "");
     try {
-      // 1. Save to PostgreSQL via tRPC
-      await updateProfileMutation.mutateAsync({ cpf });
-
-      // 2. Save to Firestore
+      // 1. Save to Firestore first so the modal can close immediately
       if (user?.id) {
         const userRef = doc(db, "users", user.id);
-        await setDoc(userRef, { cpf: cpf.replace(/\D/g, "") }, { merge: true });
+        await setDoc(userRef, { cpf: cleanCpf }, { merge: true });
+      }
+
+      // 2. Sync to PostgreSQL via tRPC
+      try {
+        await updateProfileMutation.mutateAsync({ cpf });
+      } catch (err: any) {
+        console.error("[CPF Sync Error]", err);
+        toast.warning("CPF salvo localmente. A sincronização com o servidor falhou, tente novamente mais tarde.");
       }
 
       toast.success("Cadastro concluído com sucesso!");

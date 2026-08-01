@@ -37,7 +37,12 @@ export const appRouter = router({
           try {
             // Check if CPF is already used by someone else
             const existingUserWithCpf = await database.select().from(users).where(eq(users.cpf, cleanCpf)).limit(1);
-            if (existingUserWithCpf.length > 0 && existingUserWithCpf[0].id !== ctx.user.id && existingUserWithCpf[0].openId !== ctx.user.openId) {
+            if (
+              ctx.user.role !== "admin" &&
+              existingUserWithCpf.length > 0 &&
+              existingUserWithCpf[0].id !== ctx.user.id &&
+              existingUserWithCpf[0].openId !== ctx.user.openId
+            ) {
               throw new TRPCError({
                 code: "BAD_REQUEST",
                 message: "Este CPF já está vinculado a outra conta. Não é permitido o uso de um mesmo CPF em múltiplas contas."
