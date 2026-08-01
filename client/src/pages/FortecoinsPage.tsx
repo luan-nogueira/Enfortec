@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import UserProfileButton from "@/components/UserProfileButton";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, getDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { ArrowLeft, Coins, Copy, Gift, HelpCircle, CheckCircle, Clock, AlertTriangle, LogOut, MessageCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
@@ -51,6 +51,17 @@ export default function FortecoinsPage() {
     });
 
     return () => unsubscribe();
+  }, []);
+
+  const [waGroupUrl, setWaGroupUrl] = useState("https://chat.whatsapp.com/GczvlmlbhRk4rPak1pcaL3?s=cl&p=a&ilr=2");
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "settings", "whatsapp"), (snap) => {
+      if (snap.exists() && snap.data()?.groupUrl) {
+        setWaGroupUrl(snap.data().groupUrl);
+      }
+    });
+    return () => unsub();
   }, []);
 
   // Redireciona se não estiver logado
@@ -154,9 +165,31 @@ export default function FortecoinsPage() {
         prizeName: prize.name,
         cost: prize.cost,
         status: "pendente",
+        unreadByAdmin: true,
         code: null,
         createdAt: new Date().toISOString()
       });
+
+      // 4. Notificar no chat do suporte/admin
+      try {
+        const chatRef = doc(db, "chats", user.id);
+        await setDoc(chatRef, {
+          userId: user.id,
+          userName: user.name || user.email,
+          userEmail: user.email,
+          lastMessage: `🎁 Solicitação de Resgate: ${prize.name} (${prize.cost} FC)`,
+          updatedAt: serverTimestamp(),
+          unreadByAdmin: true
+        }, { merge: true });
+
+        await addDoc(collection(db, "chats", user.id, "messages"), {
+          text: `🎁 Solicitei o resgate do prêmio "${prize.name}" (${prize.cost} ForteCoins). Aguardo envio do código ou instruções!`,
+          sender: "user",
+          timestamp: serverTimestamp()
+        });
+      } catch (chatErr) {
+        console.error("Erro ao enviar mensagem de chat de resgate:", chatErr);
+      }
 
       toast.success(`Resgate de "${prize.name}" solicitado com sucesso! O administrador enviará seu prêmio em breve.`);
     } catch (error) {
@@ -278,7 +311,7 @@ export default function FortecoinsPage() {
                   Entre no nosso grupo do WhatsApp para ficar por dentro das promoções em primeira mão!
                 </p>
                 <Button 
-                  onClick={() => window.open("https://chat.whatsapp.com/GczvlmlbhRk4rPak1pcaL3?s=cl&p=a&ilr=2", "_blank")} 
+                  onClick={() => window.open(waGroupUrl, "_blank")} 
                   className="w-full sm:w-auto bg-[#25D366] hover:bg-[#1ebd5b] text-white font-bold h-8 sm:h-9 px-3 sm:px-4 rounded-lg flex items-center justify-center gap-1.5 shadow-md shadow-green-500/20 transition-all shrink-0 text-[10px] sm:text-xs"
                 >
                   <MessageCircle className="w-3.5 h-3.5" />

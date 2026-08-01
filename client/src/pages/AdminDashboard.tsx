@@ -8,7 +8,7 @@ import { db, storage } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, onSnapshot, doc, updateDoc, setDoc, deleteDoc, query, orderBy, serverTimestamp, addDoc, getDoc } from "firebase/firestore";
 import { useLocation } from "wouter";
-import { Shield, User, UserCheck, UserPlus, ArrowLeft, Plus, X, Lock, Mail, Trash2, MessageCircle, Send, Coins, Gift, Check, Clock, LogOut, Gamepad2, Edit, Menu, BarChart3, Users, ShoppingBag, Tag, Image, Percent, Ban, Trophy, ExternalLink, Flame } from "lucide-react";
+import { Shield, User, UserCheck, UserPlus, ArrowLeft, Plus, X, Lock, Mail, Trash2, MessageCircle, Send, Coins, Gift, Check, Clock, LogOut, Gamepad2, Edit, Menu, BarChart3, Users, ShoppingBag, Tag, Image, Percent, Ban, Trophy, ExternalLink, Flame, Copy, Settings, Bell, Filter, CheckCircle2 } from "lucide-react";
 import { useState, useEffect, useRef, useMemo } from "react";
 import {
   Dialog,
@@ -368,7 +368,7 @@ function PlatinadorAdminTab() {
 
 export default function AdminDashboard() {
 
-  const { user, isAuthenticated, isAdmin, loading: authLoading, logout } = useAuth();
+  const { user, isAuthenticated, isAdmin, isCollaborator, loading: authLoading, logout } = useAuth();
   const [, navigate] = useLocation();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1128,8 +1128,205 @@ export default function AdminDashboard() {
   const [allRedemptions, setAllRedemptions] = useState<any[]>([]);
   const [allPrizes, setAllPrizes] = useState<any[]>([]);
 
+  // --- Configurações de ForteCoins ---
+  const [fcConfig, setFcConfig] = useState({
+    referralReward: 15,
+    purchaseReward: 5,
+    platinadorReward: 500,
+    reviewReward: 3,
+    coinValue: 0.10,
+  });
+  const [savingFcConfig, setSavingFcConfig] = useState(false);
+
+  // --- Configurações de WhatsApp e Grupos ---
+  const [waConfig, setWaConfig] = useState({
+    groupUrl: "https://chat.whatsapp.com/GczvlmlbhRk4rPak1pcaL3?s=cl&p=a&ilr=2",
+    supportNumber: "554384253691"
+  });
+  const [savingWaConfig, setSavingWaConfig] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated || !isAdmin) return;
+    const unsubFc = onSnapshot(doc(db, "settings", "fortecoins"), (snap) => {
+      if (snap.exists()) {
+        setFcConfig(prev => ({ ...prev, ...snap.data() }));
+      }
+    });
+    const unsubWa = onSnapshot(doc(db, "settings", "whatsapp"), (snap) => {
+      if (snap.exists()) {
+        setWaConfig(prev => ({ ...prev, ...snap.data() }));
+      }
+    });
+    return () => {
+      unsubFc();
+      unsubWa();
+    };
+  }, [isAuthenticated, isAdmin]);
+
+  const handleSaveFcConfig = async () => {
+    setSavingFcConfig(true);
+    try {
+      await setDoc(doc(db, "settings", "fortecoins"), fcConfig, { merge: true });
+      toast.success("Configurações de ForteCoins salvas com sucesso!");
+    } catch (err) {
+      console.error("Erro ao salvar config de ForteCoins:", err);
+      toast.error("Erro ao salvar configurações.");
+    } finally {
+      setSavingFcConfig(false);
+    }
+  };
+
+  const handleSaveWaConfig = async () => {
+    setSavingWaConfig(true);
+    try {
+      await setDoc(doc(db, "settings", "whatsapp"), waConfig, { merge: true });
+      toast.success("Link do Grupo e Número do WhatsApp salvos com sucesso!");
+    } catch (err) {
+      console.error("Erro ao salvar config do WhatsApp:", err);
+      toast.error("Erro ao salvar configurações do WhatsApp.");
+    } finally {
+      setSavingWaConfig(false);
+    }
+  };
+
+  // --- Negociações & Chats (Atendimento e Negociações de Mídia Física) ---
+  const [allChats, setAllChats] = useState<any[]>([]);
+  const [selectedChatUser, setSelectedChatUser] = useState<{ id: string; name: string; email?: string; topic?: string } | null>(null);
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [adminReplyText, setAdminReplyText] = useState("");
+  const [sendingReply, setSendingReply] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated || (!isAdmin && !isCollaborator)) return;
+    const qChats = collection(db, "chats");
+    const unsubChats = onSnapshot(qChats, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAllChats(data);
+    });
+    return () => unsubChats();
+  }, [isAuthenticated, isAdmin, isCollaborator]);
+
+  useEffect(() => {
+    if (!selectedChatUser) return;
+    const qMsg = query(collection(db, "chats", selectedChatUser.id, "messages"), orderBy("timestamp", "asc"));
+    const unsubMsg = onSnapshot(qMsg, (snapshot) => {
+      setChatMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubMsg();
+  }, [selectedChatUser]);
+
+  const handleSendAdminMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedChatUser || !adminReplyText.trim()) return;
+    setSendingReply(true);
+    try {
+      const chatRef = doc(db, "chats", selectedChatUser.id);
+      await setDoc(chatRef, {
+        userId: selectedChatUser.id,
+        userName: selectedChatUser.name,
+        userEmail: selectedChatUser.email || "",
+        lastMessage: adminReplyText.trim(),
+        updatedAt: serverTimestamp(),
+        unreadByAdmin: false
+      }, { merge: true });
+
+      await addDoc(collection(db, "chats", selectedChatUser.id, "messages"), {
+        text: adminReplyText.trim(),
+        sender: "admin",
+        timestamp: serverTimestamp()
+      });
+
+      setAdminReplyText("");
+      toast.success("Mensagem enviada com sucesso!");
+    } catch (err) {
+      console.error("Erro ao enviar mensagem do gestor:", err);
+      toast.error("Erro ao enviar mensagem.");
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
+  // --- Feed Unificado de Notificações & Atividades ---
+  const [notifFilter, setNotifFilter] = useState<string>("todas");
+
+  const notificationFeed = useMemo(() => {
+    const feed: any[] = [];
+
+    // 1. Resgates de Gift Cards & Prêmios
+    allRedemptions.forEach((red) => {
+      feed.push({
+        id: `red_${red.id}`,
+        rawId: red.id,
+        category: "resgate",
+        title: `🎁 Resgate de Gift Card: ${red.prizeName}`,
+        subtitle: `Solicitado por: ${red.userName || red.userEmail} (${red.userEmail || ''}) • Custo: ${red.cost} ForteCoins`,
+        status: red.status || "pendente",
+        timestamp: red.createdAt ? new Date(red.createdAt).getTime() : Date.now(),
+        createdAtStr: red.createdAt ? new Date(red.createdAt).toLocaleString("pt-BR") : "Recente",
+        data: red
+      });
+    });
+
+    // 2. Chats e Mensagens
+    allChats.forEach((chat) => {
+      feed.push({
+        id: `chat_${chat.id}`,
+        rawId: chat.id,
+        category: "mensagem",
+        title: `💬 Conversa com ${chat.userName || "Cliente"}`,
+        subtitle: `${chat.lastMessage || "Nova conversa ou negociação iniciada"}`,
+        status: chat.unreadByAdmin ? "pendente" : "lido",
+        timestamp: chat.updatedAt?.toDate ? chat.updatedAt.toDate().getTime() : Date.now(),
+        createdAtStr: chat.updatedAt?.toDate ? chat.updatedAt.toDate().toLocaleString("pt-BR") : "Recente",
+        data: chat
+      });
+    });
+
+    // 3. Indicações de Amigos
+    allReferrals.forEach((ref) => {
+      feed.push({
+        id: `ref_${ref.id}`,
+        rawId: ref.id,
+        category: "indicacao",
+        title: `💰 Indicação de Amigo (Padrinho: ${ref.referrerName || 'Usuário'})`,
+        subtitle: `Amigo Indicado: ${ref.inviteeName || ref.inviteeEmail}`,
+        status: ref.status || "pendente",
+        timestamp: ref.createdAt ? new Date(ref.createdAt).getTime() : Date.now(),
+        createdAtStr: ref.createdAt ? new Date(ref.createdAt).toLocaleString("pt-BR") : "Recente",
+        data: ref
+      });
+    });
+
+    // 4. Vendas / Pedidos
+    (sales || []).forEach((sale: any) => {
+      feed.push({
+        id: `sale_${sale.id}`,
+        rawId: sale.id,
+        category: "pedido",
+        title: `🛒 Pedido de Jogo #${sale.id}: ${sale.gameTitle || sale.productName || 'Jogo'}`,
+        subtitle: `Cliente: ${sale.customerName || sale.customerEmail} • R$ ${sale.totalPrice || '0'}`,
+        status: sale.status || "pendente",
+        timestamp: sale.createdAt ? new Date(sale.createdAt).getTime() : Date.now(),
+        createdAtStr: sale.createdAt ? new Date(sale.createdAt).toLocaleString("pt-BR") : "Recente",
+        data: sale
+      });
+    });
+
+    return feed.sort((a, b) => b.timestamp - a.timestamp);
+  }, [allRedemptions, allChats, allReferrals, sales]);
+
+  const pendingNotifCount = useMemo(() => {
+    return notificationFeed.filter(item => item.status === "pendente").length;
+  }, [notificationFeed]);
+
   const menuItems = useMemo(() => [
     { value: "visao-geral", label: "Visão Geral", icon: BarChart3 },
+    { 
+      value: "notificacoes", 
+      label: "🔔 Central de Notificações", 
+      icon: Bell, 
+      badge: pendingNotifCount > 0 
+    },
     { value: "usuarios", label: "Gerenciar Acessos", icon: Users },
     { value: "jogos", label: "Gerenciar Jogos", icon: Gamepad2 },
     { 
@@ -1138,13 +1335,20 @@ export default function AdminDashboard() {
       icon: Coins, 
       badge: (allRedemptions.some(r => r.status === "pendente") || allReferrals.some(r => r.status === "pendente")) 
     },
+    { 
+      value: "negociacoes", 
+      label: "Negociações & Mensagens", 
+      icon: MessageCircle, 
+      badge: allChats.some(c => c.unreadByAdmin) 
+    },
     { value: "premios", label: "Gerenciar Prêmios", icon: Gift },
     { value: "platinador", label: "Clube Platinador", icon: Trophy },
     { value: "vendas", label: "Gerenciar Vendas", icon: ShoppingBag },
+    { value: "promocoes", label: "Banners da Home", icon: Image },
     { value: "aba_promocoes", label: "Gerenciar Promoções", icon: Tag },
-    { value: "promocoes", label: "Banners Promo", icon: Image },
-    { value: "cupons", label: "Cupons", icon: Percent }
-  ], [allRedemptions, allReferrals]);
+    { value: "cupons", label: "Cupons", icon: Percent },
+    { value: "config_fortecoins", label: "📲 Link WhatsApp & ForteCoins", icon: Settings }
+  ], [allRedemptions, allReferrals, allChats, pendingNotifCount]);
 
   // Modal de prêmios
   const [showPrizeModal, setShowPrizeModal] = useState(false);
@@ -1546,7 +1750,8 @@ export default function AdminDashboard() {
   const handleConfirmPurchase = async (referral: any) => {
     if (referral.status === "pago") return;
     
-    toast(`Confirmar que o usuário indicado (${referral.inviteeName}) efetuou a compra de um jogo? Isso creditará +15 Fortecoins ao padrinho.`, {
+    const rewardAmount = fcConfig.referralReward || 15;
+    toast(`Confirmar que o usuário indicado (${referral.inviteeName}) efetuou a compra de um jogo? Isso creditará +${rewardAmount} Fortecoins ao padrinho.`, {
       action: {
         label: "Confirmar",
         onClick: async () => {
@@ -1564,9 +1769,9 @@ export default function AdminDashboard() {
             if (referrerSnap.exists()) {
               const currentCoins = referrerSnap.data()?.forteCoins ?? 0;
               await updateDoc(referrerRef, {
-                forteCoins: currentCoins + 15
+                forteCoins: currentCoins + rewardAmount
               });
-              toast.success(`Sucesso! Compra de jogo confirmada e 15 Fortecoins adicionados ao saldo do padrinho.`);
+              toast.success(`Sucesso! Compra de jogo confirmada e ${rewardAmount} Fortecoins adicionados ao saldo do padrinho.`);
             } else {
               toast.error(`A indicação foi marcada como paga, mas o padrinho correspondente (${referral.referrerId}) não foi localizado no servidor.`);
             }
@@ -2018,6 +2223,189 @@ export default function AdminDashboard() {
         {/* Page Content Body */}
         <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8 max-w-7xl w-full mx-auto">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+
+            {/* ========================= CENTRAL DE NOTIFICAÇÕES ========================= */}
+            <TabsContent value="notificacoes" className="space-y-6">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
+                <div>
+                  <h3 className="text-xl font-black text-white flex items-center gap-2">
+                    <Bell className="w-6 h-6 text-red-500" /> Central de Notificações
+                    {pendingNotifCount > 0 && (
+                      <span className="bg-red-600 text-white text-xs font-black px-2 py-0.5 rounded-full animate-pulse">
+                        {pendingNotifCount} pendente{pendingNotifCount !== 1 ? "s" : ""}
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-slate-400 text-sm mt-0.5">Visão unificada de toda a atividade do site em tempo real.</p>
+                </div>
+              </div>
+
+              {/* Filtros por Categoria */}
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { key: "todas", label: "🔔 Todas", color: "bg-slate-700 text-slate-200" },
+                  { key: "resgate", label: "🎁 Gift Cards", color: "bg-purple-900/60 text-purple-300 border border-purple-700/40" },
+                  { key: "mensagem", label: "💬 Mensagens", color: "bg-blue-900/60 text-blue-300 border border-blue-700/40" },
+                  { key: "indicacao", label: "💰 Indicações", color: "bg-yellow-900/60 text-yellow-300 border border-yellow-700/40" },
+                  { key: "pedido", label: "🛒 Pedidos", color: "bg-green-900/60 text-green-300 border border-green-700/40" },
+                  { key: "pendente", label: "⚠️ Pendentes", color: "bg-red-900/60 text-red-300 border border-red-700/40" },
+                ].map(f => (
+                  <button
+                    key={f.key}
+                    onClick={() => setNotifFilter(f.key)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${
+                      notifFilter === f.key
+                        ? "ring-2 ring-red-500 scale-105 " + f.color
+                        : "bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700"
+                    }`}
+                  >
+                    {f.label}
+                    {f.key !== "todas" && (
+                      <span className="ml-1.5 opacity-70">
+                        ({notificationFeed.filter(n => f.key === "pendente" ? n.status === "pendente" : n.category === f.key).length})
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {/* Feed de Notificações */}
+              <div className="space-y-3">
+                {(() => {
+                  const filtered = notifFilter === "todas"
+                    ? notificationFeed
+                    : notifFilter === "pendente"
+                      ? notificationFeed.filter(n => n.status === "pendente")
+                      : notificationFeed.filter(n => n.category === notifFilter);
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="text-center py-16 text-slate-500">
+                        <Bell className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                        <p className="font-bold">Nenhuma atividade nesta categoria</p>
+                        <p className="text-xs mt-1">Tudo tranquilo por aqui!</p>
+                      </div>
+                    );
+                  }
+
+                  return filtered.map((item: any) => {
+                    const categoryColors: Record<string, string> = {
+                      resgate: "border-l-purple-500 bg-purple-950/20",
+                      mensagem: "border-l-blue-500 bg-blue-950/20",
+                      indicacao: "border-l-yellow-500 bg-yellow-950/20",
+                      pedido: "border-l-green-500 bg-green-950/20",
+                    };
+                    const statusBadge: Record<string, string> = {
+                      pendente: "bg-amber-500/20 text-amber-400 border border-amber-600/40",
+                      pago: "bg-green-500/20 text-green-400 border border-green-600/40",
+                      entregue: "bg-green-500/20 text-green-400 border border-green-600/40",
+                      confirmado: "bg-green-500/20 text-green-400 border border-green-600/40",
+                      lido: "bg-slate-700/40 text-slate-400 border border-slate-600/40",
+                      recusado: "bg-red-500/20 text-red-400 border border-red-600/40",
+                    };
+
+                    return (
+                      <div
+                        key={item.id}
+                        className={`relative flex items-start gap-4 p-4 rounded-xl border border-slate-800 border-l-4 transition-all hover:bg-slate-800/40 cursor-default ${categoryColors[item.category] || "bg-slate-900"}`}
+                      >
+                        {/* Dot Pendente */}
+                        {item.status === "pendente" && (
+                          <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+                        )}
+
+                        {/* Ícone Categoria */}
+                        <div className="shrink-0 w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-xl">
+                          {item.category === "resgate" && "🎁"}
+                          {item.category === "mensagem" && "💬"}
+                          {item.category === "indicacao" && "💰"}
+                          {item.category === "pedido" && "🛒"}
+                        </div>
+
+                        {/* Conteúdo */}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-white text-sm truncate">{item.title}</p>
+                          <p className="text-slate-400 text-xs mt-0.5 line-clamp-2">{item.subtitle}</p>
+                          <div className="flex items-center gap-2 mt-2 flex-wrap">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusBadge[item.status] || statusBadge["lido"]}`}>
+                              {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                            </span>
+                            <span className="text-[10px] text-slate-500">🕐 {item.createdAtStr}</span>
+                          </div>
+                        </div>
+
+                        {/* Ações Rápidas */}
+                        <div className="shrink-0 flex flex-col gap-1.5">
+                          {item.category === "mensagem" && (
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                setSelectedChatUser({ id: item.data.userId || item.rawId, name: item.data.userName || "Cliente", email: item.data.userEmail });
+                                setActiveTab("negociacoes");
+                              }}
+                              className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-7 text-[10px] px-2.5 flex items-center gap-1"
+                            >
+                              <MessageCircle className="w-3 h-3" /> Ver Chat
+                            </Button>
+                          )}
+                          {item.category === "resgate" && (
+                            <Button
+                              size="sm"
+                              onClick={() => setActiveTab("referrals")}
+                              className="bg-purple-600 hover:bg-purple-700 text-white font-bold h-7 text-[10px] px-2.5 flex items-center gap-1"
+                            >
+                              <Gift className="w-3 h-3" /> Ver Resgate
+                            </Button>
+                          )}
+                          {item.category === "indicacao" && (
+                            <Button
+                              size="sm"
+                              onClick={() => setActiveTab("referrals")}
+                              className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold h-7 text-[10px] px-2.5 flex items-center gap-1"
+                            >
+                              <Coins className="w-3 h-3" /> Ver Indicação
+                            </Button>
+                          )}
+                          {item.category === "pedido" && (
+                            <Button
+                              size="sm"
+                              onClick={() => setActiveTab("vendas")}
+                              className="bg-green-600 hover:bg-green-700 text-white font-bold h-7 text-[10px] px-2.5 flex items-center gap-1"
+                            >
+                              <ShoppingBag className="w-3 h-3" /> Ver Pedido
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+
+              {/* Resumo de Estatísticas */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2 border-t border-slate-800">
+                {[
+                  { label: "Gift Cards", count: notificationFeed.filter(n => n.category === "resgate").length, pending: notificationFeed.filter(n => n.category === "resgate" && n.status === "pendente").length, color: "text-purple-400", icon: "🎁" },
+                  { label: "Mensagens", count: notificationFeed.filter(n => n.category === "mensagem").length, pending: notificationFeed.filter(n => n.category === "mensagem" && n.status === "pendente").length, color: "text-blue-400", icon: "💬" },
+                  { label: "Indicações", count: notificationFeed.filter(n => n.category === "indicacao").length, pending: notificationFeed.filter(n => n.category === "indicacao" && n.status === "pendente").length, color: "text-yellow-400", icon: "💰" },
+                  { label: "Pedidos", count: notificationFeed.filter(n => n.category === "pedido").length, pending: notificationFeed.filter(n => n.category === "pedido" && n.status === "pendente").length, color: "text-green-400", icon: "🛒" },
+                ].map(stat => (
+                  <div key={stat.label} className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
+                    <div className="text-2xl mb-1">{stat.icon}</div>
+                    <div className={`text-2xl font-black ${stat.color}`}>{stat.count}</div>
+                    <div className="text-xs text-slate-400 font-medium">{stat.label}</div>
+                    {stat.pending > 0 && (
+                      <div className="text-[10px] text-amber-400 font-bold mt-1">
+                        ⚠️ {stat.pending} pendente{stat.pending !== 1 ? "s" : ""}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </TabsContent>
+            {/* ======================================================================= */}
+
             <TabsContent value="visao-geral">
               <div className="space-y-8">
               {/* KPIs Row */}
@@ -2720,6 +3108,19 @@ export default function AdminDashboard() {
 
                     <div className="p-5 pt-0 flex gap-2 border-t border-slate-850/60 mt-2">
                       <Button
+                        onClick={() => {
+                          const linkStr = p.link || "/";
+                          const fullUrl = linkStr.startsWith("http") ? linkStr : `${window.location.origin}${linkStr.startsWith("/") ? "" : "/"}${linkStr}`;
+                          navigator.clipboard.writeText(fullUrl);
+                          toast.success("Link do banner copiado para compartilhamento!");
+                        }}
+                        variant="outline"
+                        className="bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700 font-bold h-9 text-xs px-2.5 flex items-center gap-1"
+                        title="Copiar Link para Compartilhar"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
                         onClick={() => handleTogglePromoActive(p.id, p.isActive)}
                         className={`flex-1 font-bold h-9 text-xs ${p.isActive ? "bg-slate-800 hover:bg-slate-700 text-slate-300" : "bg-green-600 hover:bg-green-700 text-white"}`}
                       >
@@ -2728,16 +3129,79 @@ export default function AdminDashboard() {
                       <Button
                         onClick={() => openEditPromo(p)}
                         variant="outline"
-                        className="bg-blue-950/20 hover:bg-blue-950/40 text-blue-400 border-blue-500/30 hover:border-blue-500/50 font-bold h-9 text-xs px-3"
+                        className="bg-blue-950/20 hover:bg-blue-950/40 text-blue-400 border-blue-500/30 hover:border-blue-500/50 font-bold h-9 text-xs px-2.5"
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
                       <Button
                         onClick={() => handleDeletePromo(p.id)}
                         variant="outline"
-                        className="bg-red-950/20 hover:bg-red-950/40 text-red-400 border-red-500/30 hover:border-red-500/50 font-bold h-9 text-xs px-3"
+                        className="bg-red-950/20 hover:bg-red-950/40 text-red-400 border-red-500/30 hover:border-red-500/50 font-bold h-9 text-xs px-2.5"
                       >
                         <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </Card>
+                ))
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Aba Negociações & Mensagens dos Clientes */}
+          <TabsContent value="negociacoes" className="space-y-6">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <MessageCircle className="w-6 h-6 text-red-500" /> Negociações & Mensagens dos Clientes
+                </h3>
+                <p className="text-slate-400 text-sm">
+                  Acompanhe em tempo real as conversas dos clientes, resgates de prêmios e negociações de mídias físicas.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {allChats.length === 0 ? (
+                <div className="col-span-full py-16 text-center text-slate-500 italic bg-slate-900/40 rounded-xl border border-slate-800">
+                  <MessageCircle className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                  <h4 className="font-bold text-slate-400">Nenhuma conversa registrada ainda</h4>
+                  <p className="text-xs text-slate-600 mt-1">As conversas e solicitações dos clientes aparecerão aqui.</p>
+                </div>
+              ) : (
+                allChats.map((chat) => (
+                  <Card key={chat.id} className="bg-slate-900 border-slate-800 p-5 flex flex-col justify-between card-neon hover:border-red-500/40 transition-all">
+                    <div>
+                      <div className="flex items-start justify-between gap-2 mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-red-400 font-bold text-sm uppercase">
+                            {chat.userName?.charAt(0) || "U"}
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-white text-sm">{chat.userName || "Usuário"}</h4>
+                            <p className="text-[11px] text-slate-400">{chat.userEmail || chat.id}</p>
+                          </div>
+                        </div>
+                        {chat.unreadByAdmin && (
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-red-600 text-white animate-pulse">
+                            Novo
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="bg-slate-950/80 p-3 rounded-lg border border-slate-850 text-xs text-slate-300 font-mono line-clamp-3 mb-4">
+                        {chat.lastMessage || "Nenhuma mensagem recente."}
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-800 flex justify-between items-center">
+                      <span className="text-[10px] text-slate-500">
+                        {chat.updatedAt?.toDate ? chat.updatedAt.toDate().toLocaleString("pt-BR") : "Recente"}
+                      </span>
+                      <Button
+                        onClick={() => setSelectedChatUser({ id: chat.userId || chat.id, name: chat.userName || "Usuário", email: chat.userEmail })}
+                        className="bg-red-600 hover:bg-red-700 text-white font-bold h-8 text-xs flex items-center gap-1.5 px-3 rounded-lg"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" /> Falar no Chat
                       </Button>
                     </div>
                   </Card>
@@ -2935,6 +3399,203 @@ export default function AdminDashboard() {
           {/* Aba Clube Platinador */}
           <TabsContent value="platinador" className="space-y-6">
             <PlatinadorAdminTab />
+          </TabsContent>
+
+          {/* Aba de Configuração de Valores de ForteCoins & Canais */}
+          <TabsContent value="config_fortecoins" className="space-y-6">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Coins className="w-6 h-6 text-red-500" /> Configurações Gerais & Canais
+                </h3>
+                <p className="text-slate-400 text-sm">
+                  Gerencie o link do grupo do WhatsApp, valores de recompensas e custo dos prêmios.
+                </p>
+              </div>
+            </div>
+
+            {/* Card de Gerenciamento do WhatsApp & Grupos */}
+            <Card className="bg-slate-900 border-green-500/30 p-6 card-neon space-y-4 mb-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800 pb-4">
+                <div>
+                  <h4 className="font-black text-white text-base flex items-center gap-2">
+                    <MessageCircle className="w-5 h-5 text-green-500" /> Gerenciar Link do WhatsApp & Comunidade
+                  </h4>
+                  <p className="text-slate-400 text-xs mt-0.5">
+                    Caso o grupo do WhatsApp fique cheio, atualize o link abaixo para redirecionar novos clientes automaticamente.
+                  </p>
+                </div>
+                <Button
+                  onClick={handleSaveWaConfig}
+                  disabled={savingWaConfig}
+                  className="bg-green-600 hover:bg-green-700 text-white font-bold h-9 px-4 text-xs flex items-center gap-1.5 shrink-0"
+                >
+                  <Check className="w-4 h-4" />
+                  {savingWaConfig ? "Salvando..." : "Salvar Link do WhatsApp"}
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                <div>
+                  <Label className="text-xs text-slate-300 font-bold">URL do Grupo / Comunidade do WhatsApp</Label>
+                  <Input
+                    value={waConfig.groupUrl}
+                    onChange={(e) => setWaConfig({ ...waConfig, groupUrl: e.target.value })}
+                    placeholder="Ex: https://chat.whatsapp.com/GczvlmlbhRk4r..."
+                    className="bg-slate-950 border-slate-800 text-white text-xs h-10 mt-1 font-mono"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-1 block">Link completo do convite do grupo do WhatsApp</span>
+                </div>
+
+                <div>
+                  <Label className="text-xs text-slate-300 font-bold">Número do WhatsApp de Atendimento (com DDD)</Label>
+                  <Input
+                    value={waConfig.supportNumber}
+                    onChange={(e) => setWaConfig({ ...waConfig, supportNumber: e.target.value })}
+                    placeholder="Ex: 554384253691"
+                    className="bg-slate-950 border-slate-800 text-white text-xs h-10 mt-1 font-mono"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-1 block">Formato: 55 + DDD + Número (apenas dígitos)</span>
+                </div>
+              </div>
+            </Card>
+
+            <div className="flex justify-between items-center mb-4">
+              <h4 className="font-bold text-white text-base flex items-center gap-2">
+                <Coins className="w-5 h-5 text-red-500" /> Regras de ForteCoins & Tabela de Prêmios
+              </h4>
+              <Button
+                onClick={handleSaveFcConfig}
+                disabled={savingFcConfig}
+                className="bg-red-600 hover:bg-red-700 font-bold btn-neon flex items-center gap-2 text-xs h-9"
+              >
+                <Check className="w-4 h-4" />
+                {savingFcConfig ? "Salvando..." : "Salvar Regras de FC"}
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Regras de Recompensa */}
+              <Card className="bg-slate-900 border-red-600/10 p-6 card-neon space-y-5">
+                <h4 className="font-bold text-white text-base border-l-4 border-red-600 pl-3 uppercase tracking-wider text-xs">
+                  🎁 Regras de Recompensa (Acúmulo)
+                </h4>
+
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-xs text-slate-300 font-bold">ForteCoins por Indicação de Amigo</Label>
+                    <p className="text-[11px] text-slate-500 mb-1.5">Concedido quando o amigo indicado realiza a primeira compra de jogo.</p>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        value={fcConfig.referralReward}
+                        onChange={(e) => setFcConfig({ ...fcConfig, referralReward: Number(e.target.value) })}
+                        className="bg-slate-950 border-slate-800 text-white font-bold h-10"
+                      />
+                      <span className="text-xs text-slate-400 font-bold shrink-0">FC</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs text-slate-300 font-bold">ForteCoins por Desafio de Platina (Conclusão)</Label>
+                    <p className="text-[11px] text-slate-500 mb-1.5">Valor padrão concedido ao completar um desafio de platina.</p>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        value={fcConfig.platinadorReward}
+                        onChange={(e) => setFcConfig({ ...fcConfig, platinadorReward: Number(e.target.value) })}
+                        className="bg-slate-950 border-slate-800 text-white font-bold h-10"
+                      />
+                      <span className="text-xs text-slate-400 font-bold shrink-0">FC</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs text-slate-300 font-bold">ForteCoins por Avaliação de Produto</Label>
+                    <p className="text-[11px] text-slate-500 mb-1.5">Recompensa para cada review publicada com sucesso pelo cliente.</p>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        value={fcConfig.reviewReward}
+                        onChange={(e) => setFcConfig({ ...fcConfig, reviewReward: Number(e.target.value) })}
+                        className="bg-slate-950 border-slate-800 text-white font-bold h-10"
+                      />
+                      <span className="text-xs text-slate-400 font-bold shrink-0">FC</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs text-slate-300 font-bold">Equivalência Estimada em Reais (1 FC = R$)</Label>
+                    <p className="text-[11px] text-slate-500 mb-1.5">Valor de referência de cada ForteCoin em R$. Ex: 0.10 = R$ 0,10</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-400 font-bold shrink-0">R$</span>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={fcConfig.coinValue}
+                        onChange={(e) => setFcConfig({ ...fcConfig, coinValue: Number(e.target.value) })}
+                        className="bg-slate-950 border-slate-800 text-white font-bold h-10"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Tabela de Prêmios e Preços em FC */}
+              <Card className="bg-slate-900 border-red-600/10 p-6 card-neon space-y-4 flex flex-col justify-between">
+                <div>
+                  <h4 className="font-bold text-white text-base border-l-4 border-red-600 pl-3 uppercase tracking-wider text-xs mb-4">
+                    🏆 Preço dos Prêmios (Resgate em FC)
+                  </h4>
+
+                  <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+                    {allPrizes.length === 0 ? (
+                      <p className="text-xs text-slate-500 italic py-6 text-center">Nenhum prêmio cadastrado.</p>
+                    ) : (
+                      allPrizes.map((prize) => (
+                        <div key={prize.id} className="flex items-center justify-between bg-slate-950 p-3 rounded-lg border border-slate-850">
+                          <div>
+                            <p className="font-bold text-white text-xs">{prize.name}</p>
+                            <p className="text-[10px] text-slate-500">Estoque: {prize.stock} un</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number"
+                              defaultValue={prize.cost}
+                              id={`prize-cost-input-${prize.id}`}
+                              className="w-20 bg-slate-900 border-slate-700 text-xs font-bold text-red-500 text-center h-8"
+                            />
+                            <span className="text-[10px] text-slate-400 font-bold">FC</span>
+                            <Button
+                              size="sm"
+                              onClick={async () => {
+                                const inputEl = document.getElementById(`prize-cost-input-${prize.id}`) as HTMLInputElement;
+                                const newCost = parseInt(inputEl?.value || "500");
+                                try {
+                                  await updateDoc(doc(db, "prizes", prize.id), { cost: newCost });
+                                  toast.success(`Custo do prêmio "${prize.name}" atualizado para ${newCost} FC!`);
+                                } catch (err) {
+                                  toast.error("Erro ao atualizar valor do prêmio.");
+                                }
+                              }}
+                              className="bg-red-600 hover:bg-red-700 text-white font-bold h-8 text-[11px] px-2.5"
+                            >
+                              Salvar
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-slate-800">
+                  <p className="text-[11px] text-slate-400 italic">
+                    💡 Dica: Você também pode ajustar o saldo de moedas de qualquer usuário individual na aba <strong className="text-white">Gerenciar Acessos</strong>.
+                  </p>
+                </div>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </main>
@@ -3743,6 +4404,25 @@ export default function AdminDashboard() {
                 placeholder="Ex: /fortecoins ou /digital"
                 className="bg-slate-950 border-slate-800 text-white"
               />
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                <span className="text-[10px] text-slate-400 font-bold w-full">Atalhos de Link:</span>
+                {[
+                  { label: "🎁 ForteCoins", url: "/fortecoins" },
+                  { label: "🎮 Mídias Digitais", url: "/digital" },
+                  { label: "📦 Desapegos Físicos", url: "/usados" },
+                  { label: "⚡ Jogue com Economia", url: "/economia" },
+                  { label: "🏆 Clube Platinador", url: "/platinador" },
+                ].map((preset) => (
+                  <button
+                    key={preset.url}
+                    type="button"
+                    onClick={() => setPromoLink(preset.url)}
+                    className="text-[10px] px-2 py-1 bg-slate-950 hover:bg-slate-800 text-slate-300 rounded border border-slate-800 transition-colors font-semibold"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="space-y-1.5">
@@ -3772,6 +4452,58 @@ export default function AdminDashboard() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de Chat Direto do Gestor com o Usuário */}
+      {selectedChatUser && (
+        <Dialog open={!!selectedChatUser} onOpenChange={() => setSelectedChatUser(null)}>
+          <DialogContent className="bg-slate-900 border-red-600/30 text-white max-w-lg card-neon">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-bold flex items-center gap-2 text-neon">
+                <MessageCircle className="text-red-500" /> Mensagens com {selectedChatUser.name}
+              </DialogTitle>
+              <DialogDescription className="text-slate-400 text-xs">
+                {selectedChatUser.topic ? `Assunto: ${selectedChatUser.topic}` : selectedChatUser.email || selectedChatUser.id}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 my-2">
+              <div className="h-72 overflow-y-auto p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-3">
+                {chatMessages.length === 0 ? (
+                  <p className="text-xs text-slate-500 text-center py-12 italic">Nenhuma mensagem nesta conversa ainda. Digite abaixo para enviar a primeira mensagem.</p>
+                ) : (
+                  chatMessages.map((msg, idx) => {
+                    const isAdminMsg = msg.sender === "admin";
+                    return (
+                      <div key={msg.id || idx} className={`flex flex-col ${isAdminMsg ? "items-end" : "items-start"}`}>
+                        <div className={`max-w-[85%] p-3 rounded-xl text-xs ${
+                          isAdminMsg ? "bg-red-600 text-white rounded-br-none font-medium shadow" : "bg-slate-800 text-slate-200 rounded-bl-none border border-slate-700"
+                        }`}>
+                          <p className="whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+                        </div>
+                        <span className="text-[9px] text-slate-500 mt-0.5 px-1 font-mono">
+                          {isAdminMsg ? "Gestor / Admin" : selectedChatUser.name}
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              <form onSubmit={handleSendAdminMessage} className="flex gap-2">
+                <Input
+                  value={adminReplyText}
+                  onChange={(e) => setAdminReplyText(e.target.value)}
+                  placeholder="Digite sua resposta ou código do prêmio para enviar ao usuário..."
+                  className="bg-slate-950 border-slate-800 text-white text-xs h-10 flex-1"
+                />
+                <Button type="submit" disabled={sendingReply || !adminReplyText.trim()} className="bg-red-600 hover:bg-red-700 text-white font-bold h-10 px-4">
+                  <Send className="w-4 h-4" />
+                </Button>
+              </form>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Modal de Criação de Cupom */}
       <Dialog open={showCouponModal} onOpenChange={setShowCouponModal}>

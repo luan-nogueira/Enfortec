@@ -47,8 +47,8 @@ const DEFAULT_SIDEBAR_TOP = {
 
 const DEFAULT_SIDEBAR_BOTTOM = {
   id: "default-sidebar-bottom",
-  title: "🎁 Acumule ForteCoins!",
-  description: "Faça compras e avaliações para ganhar moedas e usar como desconto nas próximas compras.",
+  title: "🎁 Indique e Ganhe ForteCoins",
+  description: "Troque por prêmios, jogos, ou descontos em suas compras!",
   imageUrl: "https://images.unsplash.com/photo-1621761191319-c6fb62004040?q=80&w=600",
   link: "/fortecoins",
   expiresAt: null

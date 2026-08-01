@@ -409,5 +409,6 @@ export default function JogueComEconomia() {
           </DialogContent>
         </Dialog>
       )}
+    </div>
   );
 }
