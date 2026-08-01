@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,38 +10,36 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { db } from "@/lib/firebase";
+import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
 import {
-  collection,
-  addDoc,
-  doc,
-  setDoc,
-  query,
-  orderBy,
-  onSnapshot,
-  serverTimestamp,
-} from "firebase/firestore";
-import { MessageCircle, Send, User as UserIcon } from "lucide-react";
+  SELLER_CHATS,
+  STORE_SELLER_ID,
+  STORE_SELLER_NAME,
+  markSellerChatRead,
+  sellerChatTimeLabel,
+  sellerThreadId,
+  sendSellerChatMessage,
+  type SellerChatMessage,
+} from "@/lib/sellerChat";
+import { MessageCircle, Send, User as UserIcon, ShieldCheck } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 
-type ChatMsg = {
-  id: string;
-  text: string;
-  senderId: string;
-  senderName: string;
-  sender?: string;
-  timestamp: any;
-};
-
 interface SellerChatDialogProps {
+  /** Id do anúncio/produto. Se omitido, usamos o nome como chave da conversa. */
+  productId?: string;
   productName: string;
+  /** Id do vendedor dono do anúncio. Sem ele, a conversa vai para a Loja Eforte. */
+  sellerId?: string;
   sellerName?: string;
   buttonLabel?: string;
   buttonClassName?: string;
 }
 
 export default function SellerChatDialog({
+  productId,
   productName,
+  sellerId,
   sellerName,
   buttonLabel = "Falar com Vendedor",
   buttonClassName = "",
@@ -50,18 +48,38 @@ export default function SellerChatDialog({
   const [, navigate] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const [messages, setMessages] = useState<SellerChatMessage[]>([]);
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const resolvedSellerId = sellerId || STORE_SELLER_ID;
+  const resolvedSellerName =
+    sellerName || (resolvedSellerId === STORE_SELLER_ID ? STORE_SELLER_NAME : "Vendedor");
+  const isStoreThread = resolvedSellerId === STORE_SELLER_ID;
+  const isOwnListing = Boolean(user?.id && sellerId && user.id === sellerId);
+
+  const threadId = useMemo(() => {
+    if (!user?.id) return null;
+    return sellerThreadId(resolvedSellerId, productId || productName, user.id);
+  }, [user?.id, resolvedSellerId, productId, productName]);
+
   useEffect(() => {
-    if (!isOpen || !user?.id) return;
-    const q = query(collection(db, "chats", user.id, "messages"), orderBy("timestamp", "asc"));
+    if (!isOpen || !threadId) return;
+    const q = query(
+      collection(db, SELLER_CHATS, threadId, "messages"),
+      orderBy("timestamp", "asc")
+    );
     const unsub = onSnapshot(q, (snap) => {
-      setMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ChatMsg)));
+      setMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() } as SellerChatMessage)));
     });
     return () => unsub();
-  }, [isOpen, user?.id]);
+  }, [isOpen, threadId]);
+
+  useEffect(() => {
+    if (isOpen && threadId && messages.length > 0) {
+      markSellerChatRead(threadId, "buyer");
+    }
+  }, [isOpen, threadId, messages.length]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -73,55 +91,46 @@ export default function SellerChatDialog({
       navigate("/login");
       return;
     }
+    if (isOwnListing) {
+      toast.info("Este anúncio é seu. As mensagens dos compradores ficam no Painel do Vendedor.");
+      navigate("/vendedor");
+      return;
+    }
     setIsOpen(true);
   };
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     const msg = message.trim();
-    if (!msg || !user?.id || sending) return;
+    if (!msg || !user?.id || !threadId || sending) return;
     setSending(true);
     setMessage("");
     try {
-      const isFirst = messages.length === 0;
-      const chatRef = doc(db, "chats", user.id);
-      await setDoc(
-        chatRef,
-        {
-          userId: user.id,
-          userName: user.name || "Cliente",
-          userEmail: user.email || "",
-          topic: `Falar com Vendedor: ${productName}${sellerName ? ` (${sellerName})` : ""}`,
-          lastMessage: msg,
-          updatedAt: serverTimestamp(),
-          unreadByAdmin: true,
-          ...(sellerName ? { sellerName } : {}),
-        },
-        { merge: true }
-      );
-      await addDoc(collection(db, "chats", user.id, "messages"), {
+      await sendSellerChatMessage({
+        threadId,
         text: msg,
         senderId: user.id,
         senderName: user.name || "Cliente",
-        timestamp: serverTimestamp(),
+        senderRole: "buyer",
+        thread: {
+          productId: productId || productName,
+          productName,
+          sellerId: resolvedSellerId,
+          sellerName: resolvedSellerName,
+          buyerId: user.id,
+          buyerName: user.name || "Cliente",
+          buyerEmail: user.email || "",
+          participants: [user.id, resolvedSellerId],
+        },
       });
-      if (isFirst) {
-        await addDoc(collection(db, "chats", user.id, "messages"), {
-          text: `👋 Sua conversa sobre **${productName}** foi iniciada! A equipe Eforte Games vai te atender em instantes.`,
-          senderId: "ai-support",
-          senderName: "Assistente Eforte",
-          timestamp: serverTimestamp(),
-        });
-      }
     } catch (err) {
       console.error("[SellerChat] Erro ao enviar mensagem:", err);
+      setMessage(msg);
       toast.error("Erro ao enviar mensagem. Tente novamente.");
     } finally {
       setSending(false);
     }
   };
-
-  const currentUserId = user?.id || "guest";
 
   return (
     <>
@@ -141,14 +150,21 @@ export default function SellerChatDialog({
           <DialogHeader className="p-4 bg-gradient-to-r from-green-800 via-emerald-700 to-green-800 border-b border-green-500/30">
             <DialogTitle className="text-base font-black text-white flex items-center gap-2">
               <MessageCircle className="w-5 h-5 text-green-300" />
-              Falar com Vendedor
+              {isStoreThread ? "Falar com a Loja" : "Falar com Vendedor"}
             </DialogTitle>
             <DialogDescription className="text-[11px] text-green-100/80 flex items-center gap-1.5">
               <UserIcon className="w-3 h-3" />
-              {productName}
-              {sellerName ? ` • ${sellerName}` : ""}
+              {productName} • {resolvedSellerName}
             </DialogDescription>
           </DialogHeader>
+
+          <div className="px-3.5 py-2 bg-slate-950 border-b border-slate-800 flex items-center gap-1.5">
+            <ShieldCheck className="w-3 h-3 text-green-500 shrink-0" />
+            <p className="text-[9px] text-slate-500 leading-tight">
+              Conversa direta e privada com {isStoreThread ? "a loja" : "o vendedor"}. Combine tudo por
+              aqui e finalize a compra pela plataforma para manter a garantia Eforte.
+            </p>
+          </div>
 
           <div ref={scrollRef} className="h-80 overflow-y-auto p-3.5 space-y-3 bg-slate-950/60 flex-1">
             {messages.length === 0 ? (
@@ -156,39 +172,31 @@ export default function SellerChatDialog({
                 <MessageCircle className="w-10 h-10 text-slate-700" />
                 <p className="text-xs text-slate-500">
                   Envie sua dúvida sobre <strong className="text-slate-300">{productName}</strong>.
-                  A equipe Eforte Games responde rapidinho! 🚀
+                  {isStoreThread
+                    ? " A equipe Eforte Games responde rapidinho! 🚀"
+                    : ` ${resolvedSellerName} recebe sua mensagem no painel de vendedor.`}
                 </p>
               </div>
             ) : (
               messages.map((msg) => {
-                const isMine = msg.senderId === currentUserId;
-                const isAdmin = msg.senderId === "admin" || msg.sender === "admin";
-                const isBot = msg.senderId === "ai-support";
+                const isMine = msg.senderId === user?.id;
+                const isFromSupport = msg.senderRole === "admin";
                 return (
                   <div key={msg.id} className={`flex flex-col ${isMine ? "items-end" : "items-start"}`}>
                     <div
                       className={`max-w-[88%] p-2.5 rounded-2xl text-xs font-medium whitespace-pre-wrap leading-relaxed ${
                         isMine
                           ? "bg-green-700 text-white rounded-br-none shadow-md"
-                          : isAdmin
+                          : isFromSupport
                           ? "bg-red-600 text-white rounded-bl-none shadow-md"
                           : "bg-slate-800 text-slate-200 rounded-bl-none border border-slate-700"
                       }`}
                     >
-                      {isBot && (
-                        <span className="block text-[8px] text-green-400 font-black uppercase tracking-wider mb-1">
-                          Eforte Bot 🤖
-                        </span>
-                      )}
-                      {isAdmin && (
-                        <span className="block text-[8px] text-red-200 font-black uppercase tracking-wider mb-1">
-                          Gestor Eforte
-                        </span>
-                      )}
                       {msg.text}
                     </div>
                     <span className="text-[9px] text-slate-500 mt-0.5 px-1 font-mono">
-                      {isMine ? "Você" : isAdmin ? "Gestor" : isBot ? "Assistente" : msg.senderName || "Vendedor"}
+                      {isMine ? "Você" : msg.senderName || resolvedSellerName}
+                      {msg.timestamp ? ` • ${sellerChatTimeLabel(msg.timestamp)}` : ""}
                     </span>
                   </div>
                 );
@@ -210,7 +218,12 @@ export default function SellerChatDialog({
               className="bg-slate-900 border-slate-800 text-white text-xs focus-visible:ring-green-600 h-9 rounded-xl"
               disabled={sending}
             />
-            <Button type="submit" size="icon" className="bg-green-600 hover:bg-green-700 h-9 w-9 shrink-0 rounded-xl" disabled={sending || !message.trim()}>
+            <Button
+              type="submit"
+              size="icon"
+              className="bg-green-600 hover:bg-green-700 h-9 w-9 shrink-0 rounded-xl"
+              disabled={sending || !message.trim()}
+            >
               <Send className="w-3.5 h-3.5" />
             </Button>
           </form>

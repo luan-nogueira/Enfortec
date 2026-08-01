@@ -574,7 +574,9 @@ export default function UsedMarketplace() {
                       
                       <div className="grid grid-cols-2 gap-1.5">
                         <SellerChatDialog
+                          productId={product.id}
                           productName={product.name}
+                          sellerId={product.sellerId || undefined}
                           sellerName={product.sellerName || "Vendedor"}
                           buttonLabel="Falar Vendedor"
                         />

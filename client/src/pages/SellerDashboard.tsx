@@ -8,10 +8,12 @@ import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc, updateDoc
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useLocation } from "wouter";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { Plus, TrendingUp, ShoppingCart, Star, Flame, Trash2, Coins } from "lucide-react";
+import { Plus, TrendingUp, ShoppingCart, Star, Flame, Trash2, Coins, MessageCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import SellerChatsPanel from "@/components/SellerChatsPanel";
+import { SELLER_CHATS } from "@/lib/sellerChat";
 
 const BRAZIL_STATES = [
   { uf: "AC", name: "Acre" },
@@ -54,9 +56,10 @@ const mockEarningsData = [
 export default function SellerDashboard() {
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<"vendas" | "produtos" | "avaliacoes">("vendas");
-  
+  const [activeTab, setActiveTab] = useState<"vendas" | "produtos" | "mensagens" | "avaliacoes">("vendas");
+
   const [usedProducts, setUsedProducts] = useState<any[]>([]);
+  const [unreadChats, setUnreadChats] = useState(0);
   const [showAddForm, setShowAddForm] = useState(false);
   
   // Form para novo produto
@@ -88,7 +91,16 @@ export default function SellerDashboard() {
       setUsedProducts(data);
     });
 
-    return () => unsubscribe();
+    // Conversas dos compradores com este vendedor (badge de não lidas)
+    const qChats = query(collection(db, SELLER_CHATS), where("sellerId", "==", user.id));
+    const unsubscribeChats = onSnapshot(qChats, (snapshot) => {
+      setUnreadChats(snapshot.docs.filter((d) => d.data().unreadBySeller).length);
+    });
+
+    return () => {
+      unsubscribe();
+      unsubscribeChats();
+    };
   }, [isAuthenticated, user?.id]);
 
   const handleCepChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -424,6 +436,22 @@ export default function SellerDashboard() {
               Meus Produtos
             </button>
             <button
+              onClick={() => setActiveTab("mensagens")}
+              className={`px-6 py-3 font-bold transition flex items-center gap-2 ${
+                activeTab === "mensagens"
+                  ? "text-red-500 border-b-2 border-red-500"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <MessageCircle className="w-4 h-4" />
+              Mensagens
+              {unreadChats > 0 && (
+                <span className="text-[10px] font-black bg-green-600 text-white px-1.5 py-0.5 rounded-full">
+                  {unreadChats}
+                </span>
+              )}
+            </button>
+            <button
               onClick={() => setActiveTab("avaliacoes")}
               className={`px-6 py-3 font-bold transition ${
                 activeTab === "avaliacoes"
@@ -634,6 +662,23 @@ export default function SellerDashboard() {
               ))}
             </div>
           </div>
+        )}
+
+        {activeTab === "mensagens" && (
+          <Card className="p-6 card-neon">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <MessageCircle className="w-5 h-5 text-green-500" /> Conversas com Compradores
+              </h2>
+              <p className="text-xs text-slate-500 mt-1">
+                Chat direto com quem clicou em "Falar Vendedor" nos seus anúncios.
+              </p>
+            </div>
+            <SellerChatsPanel
+              role="seller"
+              emptyMessage="Nenhum comprador entrou em contato ainda. Quando alguém clicar em 'Falar Vendedor' no seu anúncio, a conversa aparece aqui."
+            />
+          </Card>
         )}
 
         {activeTab === "avaliacoes" && (

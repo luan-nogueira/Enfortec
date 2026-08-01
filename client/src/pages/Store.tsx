@@ -484,6 +484,7 @@ export default function Store() {
                       {product.stock > 0 && (
                         <div className="flex gap-1.5 sm:gap-2 mt-2">
                           <SellerChatDialog
+                            productId={product.id}
                             productName={product.name}
                             buttonLabel="Falar Vendedor"
                             buttonClassName="flex-1 bg-slate-900 border border-green-600/40 hover:border-green-500 text-green-400 font-bold text-[10px] sm:text-xs h-10 sm:h-12 rounded-lg sm:rounded-xl flex items-center justify-center gap-1"

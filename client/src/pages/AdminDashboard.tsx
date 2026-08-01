@@ -24,6 +24,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer } from "recharts";
+import SellerChatsPanel from "@/components/SellerChatsPanel";
+import { STORE_SELLER_NAME } from "@/lib/sellerChat";
 
 function PlatinadorAdminTab() {
   const [gameTitle, setGameTitle] = useState("");
@@ -3279,6 +3281,21 @@ export default function AdminDashboard() {
                   </Card>
                 ))
               )}
+            </div>
+
+            {/* Conversas diretas Comprador ↔ Vendedor (inclui produtos da própria loja) */}
+            <div className="pt-8 border-t border-slate-800">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <MessageCircle className="w-6 h-6 text-green-500" /> Chats Diretos com Vendedores
+              </h3>
+              <p className="text-slate-400 text-sm mb-4">
+                Conversas privadas abertas pelo botão "Falar Vendedor". Nas conversas de produtos da
+                loja, você responde como {STORE_SELLER_NAME}.
+              </p>
+              <SellerChatsPanel
+                role="admin"
+                emptyMessage="Nenhuma conversa direta com vendedores até o momento."
+              />
             </div>
           </TabsContent>
 

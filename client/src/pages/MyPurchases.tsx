@@ -1,6 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import SellerChatDialog from "@/components/SellerChatDialog";
+import SellerChatsPanel from "@/components/SellerChatsPanel";
 import {
   Dialog,
   DialogContent,
@@ -12,7 +13,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { getLoginUrl } from "@/const";
-import { Package, Star, AlertCircle } from "lucide-react";
+import { Package, Star, AlertCircle, MessageCircle } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -162,6 +163,7 @@ export default function MyPurchases() {
                   </div>
 
                   <SellerChatDialog
+                    productId={`pedido-${order.id}`}
                     productName={order.productName || "Pedido #" + order.id}
                     buttonLabel="Falar sobre o Pedido"
                     buttonClassName="w-full md:w-auto bg-slate-900 border border-green-600/40 hover:border-green-500 text-green-400 font-bold text-xs py-2.5 px-4 rounded-xl flex items-center justify-center gap-1.5"
@@ -185,6 +187,21 @@ export default function MyPurchases() {
             ))}
           </div>
         )}
+
+        {/* Conversas diretas com vendedores */}
+        <div className="mt-10">
+          <h2 className="text-xl font-bold text-white flex items-center gap-2 mb-1">
+            <MessageCircle className="w-5 h-5 text-green-500" />
+            Minhas Conversas com Vendedores
+          </h2>
+          <p className="text-xs text-slate-500 mb-4">
+            Respostas dos vendedores aos seus contatos por "Falar Vendedor".
+          </p>
+          <SellerChatsPanel
+            role="buyer"
+            emptyMessage="Você ainda não iniciou nenhuma conversa com vendedores."
+          />
+        </div>
 
         {/* Modal de Avaliação / Escrow */}
         <Dialog open={reviewModalOpen} onOpenChange={setReviewModalOpen}>
