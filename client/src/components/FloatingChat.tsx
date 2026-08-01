@@ -14,9 +14,9 @@ import {
   setDoc,
   doc
 } from "firebase/firestore";
-import { MessageCircle, X, Send, Bot } from "lucide-react";
+import { MessageCircle, X, Send, Bot, ShieldCheck, Zap, Trophy, ShoppingBag, Sparkles } from "lucide-react";
 
-// ─── Client-side AI catalog ──────────────────────────────────────────────────
+// ─── Catalog ──────────────────────────────────────────────────────────────────
 const CATALOG = [
   { name: "AGONY PS4/PS5", price: 9.90 },
   { name: "ASSASSIN'S CREED MIRAGE PS4/PS5", price: 59.90 },
@@ -72,35 +72,16 @@ const CATALOG = [
   { name: "JUST CAUSE 4 PS4/PS5", price: 19.90 },
   { name: "MAFIA 3 PS4/PS5", price: 24.90 },
   { name: "MAFIA THE OLD COUNTRY PS5", price: 159.90 },
-  { name: "MARTHA IS DEAD PS4/PS5", price: 40.00 },
   { name: "MORTAL KOMBAT 1 PS5", price: 69.90 },
   { name: "MORTAL KOMBAT 11 PS4/PS5", price: 20.00 },
   { name: "NARUTO STORM 4 PS4/PS5", price: 59.90 },
   { name: "NBA 2K26 PS4/PS5", price: 65.00 },
-  { name: "PREY PS4/PS5", price: 27.90 },
-  { name: "PRINCE OF PERSIA LOST CROWN PS4/PS5", price: 44.90 },
-  { name: "REANIMAL PS5", price: 159.90 },
   { name: "RED DEAD REDEMPTION 2 PS4/PS5", price: 64.90 },
   { name: "SHADOW OF THE COLOSSUS PS4/PS5", price: 44.99 },
-  { name: "SHADOW OF MORDOR PS4/PS5", price: 17.90 },
-  { name: "SNIPER ELITE 4 PS4/PS5", price: 27.90 },
-  { name: "SNIPER ELITE RESISTANCE PS4/PS5", price: 109.90 },
-  { name: "STAR WARS OUTLAWS PS5", price: 69.90 },
-  { name: "TEST DRIVE UNLIMITED SOLAR CROWN PS5", price: 44.90 },
-  { name: "THE CREW MOTORFEST PS4/PS5", price: 55.00 },
-  { name: "THE ELDER SCROLLS V SKYRIM PS4/PS5", price: 36.90 },
   { name: "THE LAST OF US PART I PS5", price: 120.00 },
   { name: "THE LAST OF US PART II PS4", price: 100.00 },
   { name: "THE LAST OF US REMASTERED PS4/PS5", price: 35.90 },
-  { name: "THE ORDER 1886 PS4/PS5", price: 36.90 },
-  { name: "TOM CLANCY GHOST RECON BREAKPOINT PS4/PS5", price: 39.90 },
-  { name: "TONY HAWK'S PRO SKATER 1+2 PS4/PS5", price: 64.90 },
-  { name: "UNCHARTED 4 + LOST LEGACY PS4", price: 69.90 },
   { name: "UNCHARTED LEGACY OF THIEVES PS5", price: 89.90 },
-  { name: "WATCH DOGS LEGION PS4/PS5", price: 29.90 },
-  { name: "WOLFENSTEIN THE NEW ORDER PS4/PS5", price: 16.90 },
-  { name: "WUCHANG FALLEN FEATHERS PS5", price: 149.90 },
-  { name: "WWE 2K26 PS5", price: 184.90 },
 ];
 
 const WA_NUMBER = "554384253691";
@@ -125,21 +106,32 @@ const STOP = new Set(["tem", "voce", "voces", "o", "de", "com", "jogo", "jogos",
 function aiAnswer(q: string): string {
   const nq = norm(q);
 
-  // FAQ
+  if (/jogue com economia|secundaria|conta secundaria/.test(nq))
+    return "⚡ **Jogue com Economia (Contas Secundárias)**!\n\nAs contas secundárias são a opção perfeita para jogar os lançamentos gastando muito menos.\n\n[👉 Ver Jogos em Jogue com Economia](/jogue-com-economia)";
+
+  if (/platinador|clube|clube do platinador|assinatura/.test(nq))
+    return "🏆 **Clube do Platinador VIP (R$ 35,00/mês)**!\n\n• **2 Sorteios por mês** de jogos no grupo VIP\n• **Desafios Semanais** de Platina acumulando ForteCoins\n\n[👉 Assinar Clube do Platinador](/platinador)";
+
+  if (/vender|revendedor|comissao|escrow|anunciar/.test(nq))
+    return "💼 **Vender sua conta ou Mídias Físicas na Eforte Games**!\n\n• **Revenda de Contas**: Comissão de 10% com retenção do valor em escrow até a entrega.\n• **Mídias Físicas / Consoles**: Taxa de 8% com intermediação segura.\n\n[👉 Virar Revendedor](/virar-vendedor)";
+
   if (/preciso de ajuda|ajuda com algum jogo|qual jogo deseja ajuda/.test(nq))
-    return "Com certeza! Estou aqui para ajudar. 🎮\n\nSe você deseja ajuda com um jogo específico, digite o nome dele e eu vejo se temos disponível.\n\nSe preferir falar diretamente com um atendente, clique aqui: [👉 Chamar no WhatsApp](" + WA_BASE + ")";
+    return "Com certeza! Estou aqui para ajudar. 🎮\n\nSe você deseja ajuda com um jogo específico, digite o nome dele e eu vejo se temos disponível no nosso catálogo!\n\n[👉 Chamar no WhatsApp](" + WA_BASE + ")";
+
   if (/pagamento|pix|cartao|boleto|pagar|pago|infinitepay/.test(nq))
     return "Aceitamos **Pix**, **Cartão de Crédito** e **Boleto** via InfinitePay. 💳\n\nVocê também pode usar suas **ForteCoins** como desconto! (10 FC = R$ 1,00 de desconto)";
+
   if (/fortecoin|moeda|coins|desconto/.test(nq))
-    return "As **ForteCoins** são nossa moeda virtual! 🪙\n\nA cada compra você acumula pontos e pode usar como desconto em qualquer produto.\n\n**10 ForteCoins = R$ 1,00 de desconto**\n\nAcesse a loja e marque a opção \"Usar ForteCoins\" no checkout.";
+    return "As **ForteCoins** são nossa moeda virtual! 🪙\n\nA cada compra você acumula pontos e pode usar como desconto em qualquer produto.\n\n**10 ForteCoins = R$ 1,00 de desconto**";
+
   if (/entrega|envio|prazo|frete|como recebo/.test(nq))
     return "Mídias digitais são enviadas via **WhatsApp ou e-mail** logo após a confirmação do pagamento. 📦\n\nProdutos físicos vão pelos Correios com rastreio.";
+
   if (/contato|whatsapp|telefone|suporte|falar com|atendimento|adm/.test(nq))
-    return `Fale diretamente com a nossa equipe:\n[👉 Abrir WhatsApp](${WA_BASE})`;
-  if (/como comprar|adquirir|onde comprar/.test(nq))
-    return "É simples! 🛒\n\n1. Acesse nossa **[Loja](/loja)**\n2. Escolha o jogo e a versão (PS4/PS5)\n3. Preencha seus dados\n4. Use suas **ForteCoins** como desconto (opcional)\n5. Pague via Pix, Cartão ou Boleto";
+    return `Fale diretamente com a nossa equipe no WhatsApp:\n[👉 Abrir Suporte no WhatsApp](${WA_BASE})`;
+
   if (/oi|ola|olá|bom dia|boa tarde|boa noite|tudo bem/.test(nq))
-    return "Olá! 👋 Sou o assistente da **Eforte Games**.\n\nPosso te ajudar a encontrar jogos, tirar dúvidas sobre pagamentos e muito mais. Pergunte o que quiser! 🎮";
+    return "Olá! 👋 Sou o assistente inteligente da **Eforte Games**.\n\nComo posso te ajudar hoje? Escolha um atalho abaixo ou digite o nome do jogo!";
 
   const isListMode = /quais|lista|todos|tem algum|voces tem|disponivel/.test(nq);
   const keywords = nq.split(" ").filter(w => w.length > 2 && !STOP.has(w));
@@ -161,20 +153,18 @@ function aiAnswer(q: string): string {
   }).filter(x => x.score >= 15).sort((a, b) => b.score - a.score);
 
   if (scored.length === 0)
-    return `Não encontrei esse jogo no catálogo. 😕\n\nTente outro nome ou [fale com o ADM no WhatsApp](${WA_BASE}) para verificar!`;
+    return `Não encontrei esse jogo exatamente no catálogo padrão. 😕\n\nTente outro nome ou [fale com o atendimento no WhatsApp](${WA_BASE})!`;
 
   if (scored[0].score >= 80 && scored.length === 1 && !isListMode) {
     const g = scored[0].g;
-    return `✅ Temos **${g.name}** disponível!\n\n💰 Preço: **${fmt(g.price)}**\n🪙 Você pode usar **ForteCoins** como desconto no checkout!\n\n[👉 Ver na Loja](/loja)`;
+    return `✅ Temos **${g.name}** disponível!\n\n💰 Valor: **${fmt(g.price)}**\n🎁 Ganhe +7 ForteCoins de Cashback nesta compra!\n\n[👉 Ver Mídias Digitais](/digital)`;
   }
 
-  const top = scored.slice(0, 7);
+  const top = scored.slice(0, 6);
   const list = top.map(x => `• **${x.g.name}** — ${fmt(x.g.price)}`).join("\n");
-  const extra = scored.length > 7 ? `\n\n_...e mais ${scored.length - 7} resultados_` : "";
-  return `Encontrei **${scored.length}** jogo(s) no catálogo:\n\n${list}${extra}\n\n[👉 Ver todos na Loja](/loja)`;
+  const extra = scored.length > 6 ? `\n\n_...e mais ${scored.length - 6} resultados_` : "";
+  return `Encontrei **${scored.length}** resultado(s):\n\n${list}${extra}\n\n[👉 Ver todos na Loja](/digital)`;
 }
-// ─────────────────────────────────────────────────────────────────────────────
-
 
 function parseBold(text: string) {
   const parts = text.split(/\*\*([^*]+)\*\*/g);
@@ -197,7 +187,7 @@ function renderMessageText(text: string) {
         length: full.length,
         element: (
           <a key={`link-${match.index}`} href={url} target="_blank" rel="noopener noreferrer"
-            className="text-red-400 hover:text-red-300 underline font-bold">
+            className="text-red-400 hover:text-red-300 underline font-bold inline-flex items-center gap-1">
             {linkText}
           </a>
         )
@@ -215,14 +205,11 @@ function renderMessageText(text: string) {
   });
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
 type Msg = { id: string; text: string; senderId: string; senderName: string; timestamp: any };
 
-// Mensagens de boas-vindas automáticas do bot
 const WELCOME_FLOW: { text: string; delay: number }[] = [
-  { text: "Olá! 👋 Bem-vindo à **Eforte Games**! Preciso de ajuda?", delay: 600 },
-  { text: "🎮 Precisa de ajuda com algum jogo?", delay: 1400 },
-  { text: "🔍 Qual jogo deseja ajuda? Digite o nome abaixo ou clique em uma das opções rápidas!", delay: 2200 },
+  { text: "Olá! 👋 Bem-vindo à **Eforte Games**!", delay: 400 },
+  { text: "🎮 Precisa de ajuda com algum jogo, conta ou pedido?", delay: 1100 },
 ];
 
 export default function FloatingChat() {
@@ -235,7 +222,6 @@ export default function FloatingChat() {
   const welcomeStarted = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Real-time messages for authenticated users
   useEffect(() => {
     if (!isOpen || !isAuthenticated || !user?.id) return;
     const q = query(collection(db, "chats", user.id, "messages"), orderBy("timestamp", "asc"));
@@ -249,27 +235,20 @@ export default function FloatingChat() {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, thinking]);
 
-  // Fluxo de boas-vindas automático: envia as mensagens sequencialmente
-  // Só dispara uma vez, quando o chat é aberto e ainda não há mensagens
   useEffect(() => {
     if (!isOpen || welcomeStarted.current) return;
-    // Para usuários autenticados, aguarda o Firestore carregar antes de decidir
-    // Se já tiver mensagens do Firestore, não exibe boas-vindas
     const delayCheck = setTimeout(() => {
       if (welcomeStarted.current) return;
-      // Acessa o estado atual de messages via closure não é confiável;
-      // usamos um pequeno delay para o Firestore ter chance de popular
       welcomeStarted.current = true;
       setShowChips(false);
 
       const timeouts: ReturnType<typeof setTimeout>[] = [];
 
       WELCOME_FLOW.forEach((step, idx) => {
-        const tTyping = setTimeout(() => setThinking(true), step.delay - 500 < 0 ? 0 : step.delay - 500);
+        const tTyping = setTimeout(() => setThinking(true), step.delay - 400 < 0 ? 0 : step.delay - 400);
         const tMsg = setTimeout(() => {
           setThinking(false);
           setMessages(prev => {
-            // Se já houver mensagens reais (do Firestore), não acrescenta as de boas-vindas
             if (prev.length > 0 && !prev[0]?.id?.startsWith("welcome-")) return prev;
             return [
               ...prev,
@@ -290,7 +269,7 @@ export default function FloatingChat() {
       });
 
       return () => timeouts.forEach(clearTimeout);
-    }, isAuthenticated ? 800 : 100); // aguarda um pouco mais para usuários autenticados
+    }, isAuthenticated ? 600 : 100);
 
     return () => clearTimeout(delayCheck);
   }, [isOpen, isAuthenticated]);
@@ -301,7 +280,6 @@ export default function FloatingChat() {
     const uid = isAuthenticated && user?.id ? user.id : "guest";
     const uname = isAuthenticated && user?.name ? user.name : "Visitante";
 
-    // Optimistic user message (for guests; Firestore listener handles auth users)
     if (!isAuthenticated || !user?.id) {
       setMessages(prev => [...prev, {
         id: `u-${Date.now()}`, text: msg, senderId: uid, senderName: uname, timestamp: new Date()
@@ -309,14 +287,11 @@ export default function FloatingChat() {
     }
 
     setThinking(true);
-
-    // Simulate slight delay for natural feel
-    await new Promise(r => setTimeout(r, 600));
+    await new Promise(r => setTimeout(r, 450));
     const answer = aiAnswer(msg);
     setThinking(false);
 
     if (isAuthenticated && user?.id) {
-      // Persist to Firestore for logged-in users (admin can see it)
       const chatRef = doc(db, "chats", user.id);
       try {
         await setDoc(chatRef, {
@@ -331,14 +306,12 @@ export default function FloatingChat() {
         });
         await setDoc(chatRef, { lastMessage: answer, updatedAt: serverTimestamp(), unreadByAdmin: false }, { merge: true });
       } catch {
-        // Fallback: show locally if Firestore fails
         setMessages(prev => [...prev,
           { id: `u-${Date.now()}`, text: msg, senderId: user.id, senderName: user.name, timestamp: new Date() },
           { id: `ai-${Date.now()}`, text: answer, senderId: "ai-support", senderName: "Assistente Eforte", timestamp: new Date() }
         ]);
       }
     } else {
-      // Guest: local state only
       setMessages(prev => [...prev, {
         id: `ai-${Date.now()}`, text: answer, senderId: "ai-support", senderName: "Assistente Eforte", timestamp: new Date()
       }]);
@@ -358,165 +331,160 @@ export default function FloatingChat() {
   };
 
   const currentUserId = isAuthenticated && user?.id ? user.id : "guest";
-  const currentUserName = isAuthenticated && user?.name ? user.name : "Visitante";
 
   return (
     <>
-      {/* Frosted blurred background overlay when open */}
       {isOpen && (
         <div 
           onClick={() => setIsOpen(false)}
-          className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-[90] transition-all duration-500 cursor-pointer animate-in fade-in duration-300"
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-[90] transition-all duration-300 cursor-pointer animate-in fade-in"
         />
       )}
 
-      <div className={`fixed bottom-20 right-4 sm:bottom-6 sm:right-6 ${isOpen ? "z-[100]" : "z-[80]"} lg:bottom-6 lg:right-6`}>
-        {/* Floating Button */}
+      <div className={`fixed bottom-20 right-4 sm:bottom-6 sm:right-6 ${isOpen ? "z-[100]" : "z-[80]"}`}>
         {!isOpen && (
           <Button
             onClick={() => setIsOpen(true)}
-            className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-red-600 hover:bg-red-700 shadow-[0_8px_30px_rgba(220,38,38,0.5)] flex items-center justify-center p-0 transition-all hover:scale-110 active:scale-95 group relative"
+            className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 shadow-[0_8px_25px_rgba(220,38,38,0.5)] flex items-center justify-center p-0 transition-all hover:scale-110 active:scale-95 group relative border border-red-400/30"
           >
-            <MessageCircle className="w-6 h-6 sm:w-8 sm:h-8 text-white group-hover:rotate-12 transition-transform" />
-            <div className="absolute -top-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 bg-green-500 border-2 border-slate-950 rounded-full animate-pulse" />
+            <MessageCircle className="w-6 h-6 text-white group-hover:rotate-12 transition-transform" />
+            <div className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-400 border-2 border-slate-950 rounded-full animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
           </Button>
         )}
 
-        {/* Chat Window */}
         {isOpen && (
-          <Card className="w-[calc(100vw-2rem)] max-w-[360px] h-[520px] flex flex-col bg-slate-900 border-red-600/30 shadow-[0_20px_60px_rgba(0,0,0,0.6)] overflow-hidden">
-          {/* Header */}
-          <div className="p-4 bg-gradient-to-r from-red-700 to-red-600 flex justify-between items-center flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
-                <Bot className="w-5 h-5 text-white" />
+          <Card className="w-[calc(100vw-2rem)] max-w-[360px] h-[520px] flex flex-col bg-slate-900 border-red-600/40 shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden rounded-2xl animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="p-3.5 bg-gradient-to-r from-red-700 via-red-600 to-red-700 flex justify-between items-center shrink-0 border-b border-red-500/30 shadow-md">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-slate-950/80 border border-red-400/30 flex items-center justify-center shadow-inner">
+                  <Bot className="w-5 h-5 text-red-400" />
+                </div>
+                <div>
+                  <p className="text-xs font-black text-white leading-none tracking-wide">Assistente Eforte 🤖</p>
+                  <p className="text-[9px] text-emerald-300 font-bold uppercase tracking-wider mt-0.5 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Atendimento IA 24h
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-black text-white leading-none">Assistente Eforte</p>
-                <p className="text-[10px] text-green-300 font-bold uppercase tracking-widest mt-0.5">● Online agora</p>
+              <div className="flex items-center gap-1">
+                <a
+                  href={WA_BASE}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-8 h-8 rounded-lg bg-green-600/80 hover:bg-green-600 flex items-center justify-center text-white transition-colors shadow"
+                  title="WhatsApp"
+                >
+                  <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.42 9.864-9.864.002-2.637-1.03-5.118-2.905-6.993C16.257 1.874 13.78 1.84 11.14 1.84 5.704 1.84 1.28 6.261 1.277 11.705c-.001 1.714.453 3.39 1.317 4.873L1.576 22.25l5.071-1.328z"/>
+                  </svg>
+                </a>
+                <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="text-white/80 hover:text-white hover:bg-white/10 h-8 w-8 rounded-lg">
+                  <X className="w-5 h-5" />
+                </Button>
               </div>
             </div>
-            <div className="flex items-center gap-1">
+
+            {/* Quick Topic Chips Bar */}
+            <div className="px-2.5 py-1.5 bg-slate-950 border-b border-slate-800 flex gap-1.5 overflow-x-auto scrollbar-none shrink-0">
+              {[
+                { label: "⚡ Economia", query: "Jogue com Economia" },
+                { label: "🏆 Platinador", query: "Clube do Platinador" },
+                { label: "💼 Revender", query: "Vender minha conta" },
+                { label: "📦 Entregas", query: "como recebo meu jogo" },
+              ].map(topic => (
+                <button
+                  key={topic.query}
+                  onClick={() => handleSelectSuggestion(topic.query)}
+                  className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-slate-900 border border-slate-800 hover:border-red-500/40 text-slate-300 hover:text-white whitespace-nowrap transition-all shrink-0"
+                >
+                  {topic.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Messages Area */}
+            <div ref={scrollRef} className="flex-1 overflow-y-auto p-3.5 space-y-3 bg-slate-950/60">
+              {messages.map(msg => (
+                <div key={msg.id} className={`flex ${msg.senderId === currentUserId ? "justify-end" : "justify-start"}`}>
+                  <div className={`max-w-[88%] p-3 rounded-2xl text-xs font-medium ${
+                    msg.senderId === currentUserId
+                      ? "bg-red-600 text-white rounded-br-none shadow-md"
+                      : "bg-slate-900 text-slate-200 rounded-bl-none border border-slate-800"
+                  }`}>
+                    {msg.senderId === "ai-support" && (
+                      <span className="block text-[8px] text-red-400 font-black uppercase tracking-wider mb-1">Eforte Bot 🤖</span>
+                    )}
+                    {renderMessageText(msg.text)}
+                  </div>
+                </div>
+              ))}
+
+              {/* Dynamic Action Chips */}
+              {showChips && messages.length === WELCOME_FLOW.length && (
+                <div className="flex flex-col gap-1.5 pl-1 pr-2 mt-1">
+                  <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Como posso ajudar?</span>
+                  {[
+                    { emoji: "⚡", label: "Ver Jogos Secundários (Jogue com Economia)", query: "Jogue com Economia" },
+                    { emoji: "🏆", label: "Assinar Clube do Platinador VIP", query: "Clube do Platinador" },
+                    { emoji: "💼", label: "Como Vender / Anunciar minha conta", query: "Vender minha conta" },
+                    { emoji: "💬", label: "Falar com Atendente no WhatsApp", query: "contato" },
+                  ].map(chip => (
+                    <button
+                      key={chip.query}
+                      type="button"
+                      onClick={() => { setShowChips(false); handleSelectSuggestion(chip.query); }}
+                      className="text-left text-xs bg-slate-900 hover:bg-slate-850 text-slate-200 hover:text-white px-3 py-2 rounded-xl border border-slate-800 hover:border-red-500/40 transition-all font-semibold cursor-pointer active:scale-95 shadow-sm"
+                    >
+                      {chip.emoji} {chip.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Typing indicator */}
+              {thinking && (
+                <div className="flex justify-start">
+                  <div className="p-2.5 rounded-2xl rounded-bl-none bg-slate-900 border border-slate-800 flex gap-1.5 items-center">
+                    <span className="text-[8px] text-red-400 font-bold uppercase tracking-wider mr-1">Eforte Bot 🤖</span>
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-bounce" style={{ animationDelay: "300ms" }} />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Direct WhatsApp Callout Banner */}
+            <div className="px-3 py-2 bg-slate-950 border-t border-slate-800 flex justify-center shrink-0">
               <a
                 href={WA_BASE}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors"
-                title="Suporte no WhatsApp"
+                className="flex items-center justify-center gap-2 w-full bg-green-600/90 hover:bg-green-600 text-white font-black text-[10px] uppercase tracking-wider py-2 rounded-lg shadow transition-colors"
               >
-                <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
                   <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.42 9.864-9.864.002-2.637-1.03-5.118-2.905-6.993C16.257 1.874 13.78 1.84 11.14 1.84 5.704 1.84 1.28 6.261 1.277 11.705c-.001 1.714.453 3.39 1.317 4.873L1.576 22.25l5.071-1.328z"/>
                 </svg>
+                Atendimento Direto no WhatsApp
               </a>
-              <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="text-white/70 hover:text-white hover:bg-white/10 h-8 w-8">
-                <X className="w-5 h-5" />
-              </Button>
             </div>
-          </div>
 
-          {/* Messages */}
-          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-900/80">
-            {messages.map(msg => (
-              <div key={msg.id} className={`flex ${msg.senderId === currentUserId ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[88%] p-3.5 rounded-2xl text-sm font-medium ${
-                  msg.senderId === currentUserId
-                    ? "bg-red-600 text-white rounded-br-none shadow-lg"
-                    : "bg-slate-800 text-slate-200 rounded-bl-none border border-red-600/20"
-                }`}>
-                  {msg.senderId === "ai-support" && (
-                    <span className="block text-[9px] text-red-400 font-bold uppercase tracking-wider mb-1.5">Assistente 🤖</span>
-                  )}
-                  {renderMessageText(msg.text)}
-                </div>
-              </div>
-            ))}
-
-            {/* Chips de ação rápida — aparecem após as mensagens de boas-vindas */}
-            {showChips && messages.length === WELCOME_FLOW.length && (
-              <div className="flex flex-col gap-2 pl-1 pr-2 mt-1">
-                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-0.5">Resposta rápida:</span>
-                {[
-                  { emoji: "🎮", label: "Sim, preciso de ajuda com um jogo!", query: "Preciso de ajuda" },
-                  { emoji: "💳", label: "Como funciona o pagamento?", query: "Como funciona o pagamento" },
-                  { emoji: "📦", label: "Como recebo meu jogo?", query: "Como recebo meu jogo" },
-                  { emoji: "💬", label: "Falar com suporte", query: "contato" },
-                ].map(chip => (
-                  <button
-                    key={chip.query}
-                    type="button"
-                    onClick={() => { setShowChips(false); handleSelectSuggestion(chip.query); }}
-                    className="text-left text-xs bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white px-3 py-2.5 rounded-xl border border-red-600/15 hover:border-red-600/40 transition-all font-semibold cursor-pointer active:scale-95"
-                  >
-                    {chip.emoji} {chip.label}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Chips reaparecem após uma troca de mensagens se o usuário quiser continuar */}
-            {!showChips && messages.length > 0 && messages[messages.length - 1]?.senderId === "ai-support" && !thinking && (
-              <div className="flex flex-wrap gap-1.5 pl-1 pr-2 mt-1">
-                {[
-                  { emoji: "🎮", label: "Ver catálogo", query: "quais jogos vocês têm" },
-                  { emoji: "💬", label: "Falar com suporte", query: "contato" },
-                ].map(chip => (
-                  <button
-                    key={chip.query}
-                    type="button"
-                    onClick={() => handleSelectSuggestion(chip.query)}
-                    className="text-xs bg-slate-800/70 hover:bg-slate-700 text-slate-300 hover:text-white px-2.5 py-1.5 rounded-lg border border-slate-700/60 hover:border-red-600/30 transition-all font-medium cursor-pointer active:scale-95"
-                  >
-                    {chip.emoji} {chip.label}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Typing indicator */}
-            {thinking && (
-              <div className="flex justify-start">
-                <div className="p-3.5 rounded-2xl rounded-bl-none bg-slate-800 border border-red-600/10 flex gap-1.5 items-center">
-                  <span className="text-[9px] text-red-400 font-bold uppercase tracking-wider mr-1">Assistente 🤖</span>
-                  <div className="w-2 h-2 rounded-full bg-red-500 animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <div className="w-2 h-2 rounded-full bg-red-500 animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <div className="w-2 h-2 rounded-full bg-red-500 animate-bounce" style={{ animationDelay: "300ms" }} />
-                </div>
-              </div>
-            )}
-          </div>
-
-
-
-          {/* Quick Support Banner above Input */}
-          <div className="px-3 py-2 bg-slate-950/60 border-t border-red-600/10 flex justify-center flex-shrink-0">
-            <a
-              href={WA_BASE}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 w-full bg-green-600 hover:bg-green-700 text-white font-black text-[11px] uppercase tracking-wider py-2 rounded-lg shadow-md transition-colors"
-            >
-              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.42 9.864-9.864.002-2.637-1.03-5.118-2.905-6.993C16.257 1.874 13.78 1.84 11.14 1.84 5.704 1.84 1.28 6.261 1.277 11.705c-.001 1.714.453 3.39 1.317 4.873L1.576 22.25l5.071-1.328z"/>
-              </svg>
-              Precisa de ajuda? Chamar no WhatsApp
-            </a>
-          </div>
-
-          {/* Input */}
-          <form onSubmit={handleSend} className="p-3 bg-slate-950 border-t border-red-600/10 flex gap-2 flex-shrink-0">
-            <Input
-              value={message}
-              onChange={e => setMessage(e.target.value)}
-              placeholder="Pergunte sobre jogos, preços..."
-              className="bg-slate-900 border-slate-700 text-white text-sm focus-visible:ring-red-600 h-10"
-              disabled={thinking}
-            />
-            <Button type="submit" size="icon" className="bg-red-600 hover:bg-red-700 h-10 w-10 flex-shrink-0" disabled={thinking}>
-              <Send className="w-4 h-4" />
-            </Button>
-          </form>
-        </Card>
-      )}
+            {/* Input Form */}
+            <form onSubmit={handleSend} className="p-2.5 bg-slate-950 border-t border-slate-800 flex gap-2 shrink-0">
+              <Input
+                value={message}
+                onChange={e => setMessage(e.target.value)}
+                placeholder="Pergunte sobre jogos, preços..."
+                className="bg-slate-900 border-slate-800 text-white text-xs focus-visible:ring-red-600 h-9 rounded-xl"
+                disabled={thinking}
+              />
+              <Button type="submit" size="icon" className="bg-red-600 hover:bg-red-700 h-9 w-9 shrink-0 rounded-xl" disabled={thinking}>
+                <Send className="w-3.5 h-3.5" />
+              </Button>
+            </form>
+          </Card>
+        )}
       </div>
     </>
   );

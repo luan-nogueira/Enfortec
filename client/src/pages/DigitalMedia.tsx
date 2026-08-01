@@ -299,6 +299,19 @@ export default function DigitalMedia() {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (products.length > 0) {
+      const params = new URLSearchParams(window.location.search);
+      const buyId = params.get("buy");
+      if (buyId) {
+        const prod = products.find((p: any) => String(p.id) === String(buyId) || p.name?.toLowerCase().includes(buyId.toLowerCase()));
+        if (prod) {
+          setSelectedProduct(prod);
+        }
+      }
+    }
+  }, [products]);
+
   const filteredProducts = products.filter((p: any) => {
     const nameLower = p.name.toLowerCase();
     const matchesSearch = !searchTerm || nameLower.includes(searchTerm.toLowerCase()) ||
@@ -306,11 +319,18 @@ export default function DigitalMedia() {
     const matchesType = !selectedType || p.type === selectedType;
 
     let matchesPlatform = true;
-    if (selectedPlatform) {
+    if (selectedPlatform && selectedType !== "assinatura" && selectedGenre !== "Assinaturas") {
+      const pPlat = (p.platform || "").toLowerCase();
       if (selectedPlatform === "PS5") {
-        matchesPlatform = p.platform === "PS5" || p.platform === "PS4/PS5" || nameLower.includes("ps5");
+        const isPS4Only = pPlat === "ps4" || (nameLower.includes("ps4") && !nameLower.includes("ps5") && !nameLower.includes("ps4/ps5") && !nameLower.includes("ps4 / ps5"));
+        const isPS5Match = pPlat.includes("ps5") || nameLower.includes("ps5") || nameLower.includes("ps4/ps5") || nameLower.includes("ps4 / ps5") || pPlat === "ps4/ps5" || pPlat === "ps4 / ps5";
+        matchesPlatform = isPS5Match && !isPS4Only;
       } else if (selectedPlatform === "PS4") {
-        matchesPlatform = p.platform === "PS4" || p.platform === "PS4/PS5" || nameLower.includes("ps4");
+        const isPS5Only = pPlat === "ps5" || (nameLower.includes("ps5") && !nameLower.includes("ps4") && !nameLower.includes("ps4/ps5") && !nameLower.includes("ps4 / ps5"));
+        const isPS4Match = pPlat.includes("ps4") || nameLower.includes("ps4") || nameLower.includes("ps4/ps5") || nameLower.includes("ps4 / ps5") || pPlat === "ps4/ps5" || pPlat === "ps4 / ps5";
+        matchesPlatform = isPS4Match && !isPS5Only;
+      } else if (selectedPlatform === "PS4/PS5") {
+        matchesPlatform = (pPlat.includes("ps4") && pPlat.includes("ps5")) || nameLower.includes("ps4/ps5") || nameLower.includes("ps4 / ps5");
       } else {
         matchesPlatform = p.platform === selectedPlatform;
       }
@@ -320,6 +340,11 @@ export default function DigitalMedia() {
     if (selectedGenre) {
       if (selectedGenre === "Pré Venda") {
         matchesGenre = p.isPreVenda === true || nameLower.includes("pré-venda") || nameLower.includes("pre-venda") || nameLower.includes("prevenda") || (p.category && p.category.toLowerCase() === "pré venda");
+      } else if (selectedGenre === "Assinaturas") {
+        const isTypeAssinatura = p.type === "assinatura";
+        const isCategoryAssinatura = p.category && p.category.toLowerCase().includes("assinatura");
+        const isNameAssinatura = nameLower.includes("ps plus") || nameLower.includes("essential") || nameLower.includes("extra") || nameLower.includes("deluxe") || nameLower.includes("game pass") || nameLower.includes("assinatura");
+        matchesGenre = isTypeAssinatura || isCategoryAssinatura || isNameAssinatura;
       } else {
         const matchesCategoryProp = p.category && p.category.toLowerCase() === selectedGenre.toLowerCase();
         const matchesKeyword = GENRE_MAP[selectedGenre] ? GENRE_MAP[selectedGenre].some(kw => nameLower.includes(kw)) : false;
@@ -345,8 +370,6 @@ export default function DigitalMedia() {
     { value: "jogo", label: "Jogos", icon: Gamepad2 },
     { value: "assinatura", label: "Assinaturas (PS Plus / Game Pass)", icon: Sparkles },
     { value: "gift_card", label: "Gift Cards", icon: Gift },
-    { value: "licenca", label: "Licenças", icon: Lock },
-    { value: "outro", label: "Outros", icon: Gamepad2 },
   ];
 
   const getTypeIcon = (type: string) => {
@@ -383,7 +406,7 @@ export default function DigitalMedia() {
   const finalPriceVal = Math.max(0, priceAfterCoupon - coinDiscount);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900">
+    <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 overflow-x-hidden w-full max-w-full">
       {/* Header */}
       <div className="bg-gradient-to-r from-purple-900 to-slate-950 border-b border-red-600/20">
         <div className="container mx-auto px-4 py-4 sm:py-8">
@@ -478,8 +501,8 @@ export default function DigitalMedia() {
             ))}
           </div>
 
-          {/* Sub-categorias de Plataforma */}
-          {(selectedType === "jogo" || !selectedType) && (
+          {/* Sub-categorias de Plataforma - Ocultar quando a categoria for Assinaturas */}
+          {selectedType !== "assinatura" && selectedGenre !== "Assinaturas" && (selectedType === "jogo" || !selectedType) && (
             <div className="flex gap-1.5 sm:gap-2 flex-wrap mt-3 pt-2.5 border-t border-slate-800">
               <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider self-center mr-1">Plataforma:</span>
               <button

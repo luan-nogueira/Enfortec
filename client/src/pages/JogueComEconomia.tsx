@@ -17,6 +17,7 @@ export default function JogueComEconomia() {
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const [selectedAccountType, setSelectedAccountType] = useState<"primaria" | "secundaria">("secundaria");
   const [useCoins, setUseCoins] = useState(false);
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
 
@@ -36,45 +37,55 @@ export default function JogueComEconomia() {
     return () => unsubDigital();
   }, []);
 
-  // Filter products: MUST have priceSecondary or price
+  // Filter products: show only products enabled for Economia
   const filteredProducts = products.filter((product) => {
-    const secPrice = Number(product.priceSecondary || product.price);
-    if (!secPrice || secPrice <= 0) return false;
+    if (product.showInEconomia === false) return false;
     if (searchTerm.trim() === "") return true;
     return product.name?.toLowerCase().includes(searchTerm.toLowerCase());
   }).sort((a, b) => {
-    const priceA = Number(a.priceSecondary || a.price);
-    const priceB = Number(b.priceSecondary || b.price);
+    const priceA = Number(a.priceSecondary || a.pricePrimary || a.price || 0);
+    const priceB = Number(b.priceSecondary || b.pricePrimary || b.price || 0);
     return priceA - priceB; // Lowest price first
   });
 
   const handleOpenBuyModal = (product: any) => {
     setSelectedProduct(product);
+    const defaultType = product.economiaLicenseType === "primaria" ? "primaria" : "secundaria";
+    setSelectedAccountType(defaultType);
+  };
+
+  const getItemPrice = (product: any, accType: "primaria" | "secundaria") => {
+    const secPrice = Number(product.priceSecondary ?? product.price_secondary);
+    const primPrice = Number(product.pricePrimary ?? product.price_primary ?? product.price);
+    if (accType === "secundaria" && secPrice > 0) return secPrice;
+    return primPrice > 0 ? primPrice : (secPrice > 0 ? secPrice : Number(product.price || 0));
   };
 
   const handleCheckout = async () => {
     if (!selectedProduct) return;
     setIsProcessingCheckout(true);
     try {
-      const secPrice = Number(selectedProduct.priceSecondary || selectedProduct.price);
-      let finalPrice = secPrice;
+      const basePrice = getItemPrice(selectedProduct, selectedAccountType);
+      let finalPrice = basePrice;
       let coinsUsed = 0;
 
       if (useCoins && user && user.forteCoins > 0) {
-        coinsUsed = Math.min(user.forteCoins, Math.floor(secPrice));
-        finalPrice = Math.max(0, secPrice - coinsUsed);
+        coinsUsed = Math.min(user.forteCoins, Math.floor(basePrice));
+        finalPrice = Math.max(0, basePrice - coinsUsed);
       }
+
+      const accountLabel = selectedAccountType === "primaria" ? "Conta Primária" : "Conta Secundária";
 
       const res = await fetch("/api/infinitepay/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: `${selectedProduct.name} - Conta Secundária`,
+          name: `${selectedProduct.name} - ${accountLabel}`,
           price: finalPrice,
           quantity: 1,
           productType: "digital",
           productId: selectedProduct.id,
-          accountType: "secundaria",
+          accountType: selectedAccountType,
           coinsUsed: coinsUsed,
         }),
       });
@@ -122,13 +133,13 @@ export default function JogueComEconomia() {
       <section className="relative py-12 px-4 overflow-hidden bg-gradient-to-b from-red-950/30 via-slate-950 to-slate-950 border-b border-red-950/50">
         <div className="max-w-6xl mx-auto text-center relative z-10">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-600/20 border border-red-500/40 text-red-400 font-bold text-xs uppercase tracking-wider mb-4 animate-pulse">
-            <Zap className="w-4 h-4" /> Ofertas Exclusivas em Contas Secundárias
+            <Zap className="w-4 h-4" /> Ofertas Exclusivas em Contas Digitais
           </div>
           <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight mb-4 uppercase">
             Jogue com <span className="text-red-500">Economia</span> 🎮
           </h1>
           <p className="text-slate-300 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed mb-6">
-            Acesse seus jogos favoritos no PS4 e PS5 pagando muito menos! Todas as contas secundárias possuem **Garantia Eforte Games**, ativação rápida e suporte exclusivo.
+            Acesse seus jogos favoritos no PS4 e PS5 pagando muito menos! Todas as contas possuem **Garantia Eforte Games**, ativação rápida e suporte exclusivo.
           </p>
 
           {/* Search Box */}
@@ -150,7 +161,7 @@ export default function JogueComEconomia() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h2 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
-              <Tag className="w-6 h-6 text-red-500" /> Catálogo de Contas Secundárias
+              <Tag className="w-6 h-6 text-red-500" /> Catálogo de Jogos Econômicos
             </h2>
             <p className="text-xs sm:text-sm text-slate-400">Ordenado do menor preço para o maior</p>
           </div>
@@ -174,8 +185,10 @@ export default function JogueComEconomia() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {filteredProducts.map((product) => {
-              const secPrice = Number(product.priceSecondary || product.price);
-              const primPrice = Number(product.pricePrimary || product.price * 1.6);
+              const licenseType = product.economiaLicenseType || "secundaria";
+              const secPrice = Number(product.priceSecondary ?? product.price_secondary ?? product.price);
+              const primPrice = Number(product.pricePrimary ?? product.price_primary ?? product.price);
+              const hasSecondary = secPrice > 0;
 
               return (
                 <div
@@ -184,15 +197,17 @@ export default function JogueComEconomia() {
                 >
                   {/* Badge */}
                   <div className="absolute top-2 left-2 z-10 flex flex-col gap-1">
-                    <span className="bg-red-600 text-white font-black text-[10px] uppercase px-2 py-0.5 rounded shadow">
-                      Conta Secundária
+                    <span className={`text-white font-black text-[10px] uppercase px-2 py-0.5 rounded shadow ${
+                      licenseType === "primaria" ? "bg-blue-600" : licenseType === "ambas" ? "bg-purple-600" : "bg-red-600"
+                    }`}>
+                      {licenseType === "primaria" ? "Conta Primária" : licenseType === "ambas" ? "Primária ou Secundária" : "Conta Secundária"}
                     </span>
                     <span className="bg-amber-500 text-slate-950 font-black text-[9px] px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">
                       🎁 +7 FC Cashback
                     </span>
                   </div>
 
-                  {/* Image Container with strict vertical aspect ratio */}
+                  {/* Image Container */}
                   <div className="relative aspect-[3/4] w-full overflow-hidden bg-slate-950">
                     <img
                       src={product.imageUrl || "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?q=80&w=600"}
@@ -219,23 +234,47 @@ export default function JogueComEconomia() {
                     </div>
 
                     <div className="mt-3 pt-3 border-t border-slate-800">
-                      {primPrice > secPrice && (
-                        <div className="text-[10px] text-slate-500 line-through">
-                          Primária: R$ {primPrice.toFixed(2)}
+                      {licenseType === "ambas" ? (
+                        <div className="space-y-0.5 text-[11px] mb-2 bg-slate-950/60 p-2 rounded border border-slate-800">
+                          <div className="flex justify-between">
+                            <span className="text-slate-400 font-bold">👤 Primária:</span>
+                            <span className="text-red-400 font-bold">R$ {primPrice.toFixed(2)}</span>
+                          </div>
+                          {hasSecondary && (
+                            <div className="flex justify-between">
+                              <span className="text-slate-400 font-bold">👥 Secundária:</span>
+                              <span className="text-slate-200 font-bold">R$ {secPrice.toFixed(2)}</span>
+                            </div>
+                          )}
+                        </div>
+                      ) : licenseType === "primaria" ? (
+                        <div className="flex items-baseline justify-between mt-0.5">
+                          <span className="text-[10px] text-slate-400 font-medium">Primária:</span>
+                          <span className="text-lg font-black text-red-500">
+                            R$ {primPrice.toFixed(2)}
+                          </span>
+                        </div>
+                      ) : (
+                        <div>
+                          {primPrice > secPrice && (
+                            <div className="text-[10px] text-slate-500 line-through">
+                              Primária: R$ {primPrice.toFixed(2)}
+                            </div>
+                          )}
+                          <div className="flex items-baseline justify-between mt-0.5">
+                            <span className="text-[10px] text-slate-400 font-medium">Secundária:</span>
+                            <span className="text-lg font-black text-red-500">
+                              R$ {secPrice.toFixed(2)}
+                            </span>
+                          </div>
                         </div>
                       )}
-                      <div className="flex items-baseline justify-between mt-0.5">
-                        <span className="text-[10px] text-slate-400 font-medium">Secundária:</span>
-                        <span className="text-lg font-black text-red-500">
-                          R$ {secPrice.toFixed(2)}
-                        </span>
-                      </div>
 
                       <Button
                         onClick={() => handleOpenBuyModal(product)}
                         className="w-full mt-3 bg-red-600 hover:bg-red-700 text-white font-bold text-xs py-2 rounded-lg transition-all shadow-md"
                       >
-                        Comprar Secundária
+                        {licenseType === "primaria" ? "Comprar Primária" : licenseType === "ambas" ? "Comprar / Escolher Licença" : "Comprar Secundária"}
                       </Button>
                     </div>
                   </div>
@@ -255,7 +294,7 @@ export default function JogueComEconomia() {
                 <ShoppingCart className="w-5 h-5 text-red-500" /> Finalizar Compra
               </DialogTitle>
               <DialogDescription className="text-slate-400 text-xs">
-                Você está adquirindo a **Conta Secundária** de {selectedProduct.name}.
+                Escolha o tipo de licença e confirme os detalhes da compra de {selectedProduct.name}.
               </DialogDescription>
             </DialogHeader>
 
@@ -268,10 +307,54 @@ export default function JogueComEconomia() {
                 />
                 <div>
                   <h4 className="font-bold text-sm text-white">{selectedProduct.name}</h4>
-                  <p className="text-xs text-red-400 font-semibold mt-0.5">Opção: Conta Secundária</p>
-                  <p className="text-sm font-black text-white mt-1">
-                    Valor: R$ {Number(selectedProduct.priceSecondary || selectedProduct.price).toFixed(2)}
+                  <p className="text-xs text-slate-400 mt-0.5">Plataforma: {selectedProduct.platform || "PS4 / PS5"}</p>
+                  <p className="text-base font-black text-red-500 mt-1">
+                    Valor: R$ {getItemPrice(selectedProduct, selectedAccountType).toFixed(2)}
                   </p>
+                </div>
+              </div>
+
+              {/* Seletor de Conta Primária vs Secundária */}
+              <div className="bg-slate-950 border border-slate-800 p-3 rounded-lg space-y-2">
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                  Escolha o Tipo de Licença *
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedAccountType("primaria")}
+                    className={`p-2 rounded-lg border text-left transition-all ${
+                      selectedAccountType === "primaria"
+                        ? "bg-red-600/20 border-red-500 text-white shadow-md font-bold"
+                        : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="text-xs font-bold flex justify-between items-center">
+                      <span>👤 Primária</span>
+                      {selectedAccountType === "primaria" && <span className="text-[8px] bg-red-600 text-white px-1 rounded">OK</span>}
+                    </div>
+                    <div className="text-xs text-red-400 font-black mt-1">
+                      R$ {getItemPrice(selectedProduct, "primaria").toFixed(2)}
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedAccountType("secundaria")}
+                    className={`p-2 rounded-lg border text-left transition-all ${
+                      selectedAccountType === "secundaria"
+                        ? "bg-red-600/20 border-red-500 text-white shadow-md font-bold"
+                        : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="text-xs font-bold flex justify-between items-center">
+                      <span>👥 Secundária</span>
+                      {selectedAccountType === "secundaria" && <span className="text-[8px] bg-red-600 text-white px-1 rounded">OK</span>}
+                    </div>
+                    <div className="text-xs text-red-400 font-black mt-1">
+                      R$ {getItemPrice(selectedProduct, "secundaria").toFixed(2)}
+                    </div>
+                  </button>
                 </div>
               </div>
 
@@ -298,11 +381,11 @@ export default function JogueComEconomia() {
                 <p>• Suporte total via WhatsApp e Chat da loja.</p>
               </div>
 
-              {/* WhatsApp direct support button (Requirement 5) */}
+              {/* WhatsApp direct support button */}
               <button
                 type="button"
                 onClick={() => {
-                  const msg = encodeURIComponent(`Olá! Tenho uma dúvida antes de finalizar a compra da Conta Secundária do jogo "${selectedProduct.name}". Podem me ajudar?`);
+                  const msg = encodeURIComponent(`Olá! Tenho uma dúvida antes de finalizar a compra do jogo "${selectedProduct.name}". Podem me ajudar?`);
                   window.open(`https://wa.me/554384253691?text=${msg}`, "_blank");
                 }}
                 className="w-full py-2 bg-green-950/40 border border-green-800/40 hover:bg-green-900/50 text-green-400 font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-colors"
@@ -326,6 +409,5 @@ export default function JogueComEconomia() {
           </DialogContent>
         </Dialog>
       )}
-    </div>
   );
 }

@@ -44,7 +44,7 @@ export default function MyPurchases() {
 
   const confirmMutation = trpc.orders.confirmAndReview.useMutation({
     onSuccess: () => {
-      toast.success("Recebimento confirmado e vendedor avaliado com sucesso!");
+      toast.success("Recebimento confirmado! O vendedor foi avaliado e o pagamento foi liberado com sucesso.");
       refetch();
       setReviewModalOpen(false);
       setSelectedOrderId(null);
@@ -147,6 +147,10 @@ export default function MyPurchases() {
                         {order.deliveryDetails}
                       </pre>
                     </div>
+                  {(order.status === 'pago' || order.status === 'enviado') && (
+                    <div className="mt-2 text-xs text-amber-400 font-bold bg-amber-950/40 border border-amber-800/40 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                      <span>🔒 Valor Retido em Segurança pela EforteGames</span>
+                    </div>
                   )}
                 </div>
 
@@ -157,15 +161,15 @@ export default function MyPurchases() {
                   
                   {(order.status === 'pago' || order.status === 'enviado') ? (
                     <Button 
-                      className="bg-green-600 hover:bg-green-700 text-white w-full md:w-auto"
+                      className="bg-green-600 hover:bg-green-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow-lg shadow-green-600/20 w-full md:w-auto"
                       onClick={() => handleOpenReview(order.id)}
                       disabled={confirmMutation.isPending}
                     >
-                      Confirmar Recebimento
+                      ⭐ Avaliar Vendedor & Liberar Pagamento
                     </Button>
                   ) : order.status === 'entregue' ? (
-                    <div className="flex items-center text-green-500 text-sm font-medium">
-                      <Star className="w-4 h-4 mr-1 fill-current" /> Avaliado
+                    <div className="flex items-center text-green-500 text-sm font-bold bg-green-950/40 border border-green-800/40 px-3 py-1.5 rounded-lg">
+                      <Star className="w-4 h-4 mr-1.5 fill-current" /> Recebido & Valor Liberado
                     </div>
                   ) : null}
                 </div>

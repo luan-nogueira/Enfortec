@@ -2,9 +2,10 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocation } from "wouter";
-import { Zap, Gamepad2, Search, Shield, Package, LayoutGrid, Tag, Coins, LogOut, HelpCircle, Home as HomeIcon, Instagram, ChevronLeft, ChevronRight, ShieldCheck, Sparkles, PlusCircle, Swords, Compass, Trophy, Gauge, Crosshair, Flame, ShoppingCart, Star } from "lucide-react";
+import { Zap, Gamepad2, Search, Shield, Package, LayoutGrid, Tag, Coins, LogOut, HelpCircle, Home as HomeIcon, Instagram, ChevronLeft, ChevronRight, ShieldCheck, Sparkles, PlusCircle, Swords, Compass, Trophy, Gauge, Crosshair, Flame, ShoppingCart, Star, Menu, ArrowRight } from "lucide-react";
 import { getLoginUrl } from "@/const";
 import UserProfileButton from "@/components/UserProfileButton";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, query, orderBy, limit } from "firebase/firestore";
@@ -100,7 +101,7 @@ export default function Home() {
   const [digitalProducts, setDigitalProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [heroSearch, setHeroSearch] = useState("");
-  const [activeListingTab, setActiveListingTab] = useState<"todos" | "digital" | "usado" | "assinatura">("todos");
+  const [activeListingTab, setActiveListingTab] = useState<"todos" | "digital" | "usado" | "assinatura">("digital");
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
 
   const [promos, setPromos] = useState<any[]>([]);
@@ -259,15 +260,15 @@ export default function Home() {
     };
   }, []);
 
-  // Combine and sort by newest
-  const allListings = [
-    ...usedProducts.map((p: any) => ({ ...p, _type: 'used' })),
-    ...digitalProducts.map((p: any) => ({ ...p, _type: 'digital' }))
-  ].sort((a, b) => {
-    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-    return timeB - timeA;
-  }).slice(0, 12);
+  // Apenas mídias digitais e assinaturas recém-adicionadas nos Últimos Anúncios
+  const allListings = digitalProducts
+    .map((p: any) => ({ ...p, _type: 'digital' }))
+    .sort((a, b) => {
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return timeB - timeA;
+    })
+    .slice(0, 12);
 
   const categories = [
     { name: "Assinaturas", icon: Sparkles, color: "from-amber-500 to-yellow-600" },
@@ -281,66 +282,146 @@ export default function Home() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-950">
+    <div className="min-h-screen bg-slate-950 overflow-x-hidden w-full max-w-full">
       {/* Navigation */}
-      <nav className="nav-glass sticky top-0 z-50">
-        <div className="max-w-[1600px] mx-auto px-4 py-3 flex justify-between items-center gap-4">
-          <div className="flex items-center gap-2.5 cursor-pointer shrink-0" onClick={() => navigate("/")}>
-            <img src="/logo.png" alt="Eforte Games Logo" className="w-9 h-9 object-contain rounded-lg shadow-[0_0_15px_rgba(220,38,38,0.3)] border border-slate-800 bg-slate-950" />
-            <span className="text-xl sm:text-2xl font-black text-white tracking-tight shrink-0">EFORTE<span className="text-red-500">GAMES</span></span>
+      <nav className="nav-glass sticky top-0 z-50 border-b border-slate-800/80">
+        <div className="max-w-[1600px] mx-auto px-4 py-3 flex justify-between items-center gap-3">
+          
+          {/* Logo & Desktop Menu Drawer Trigger */}
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => navigate("/")}>
+              <img src="/logo.png" alt="Eforte Games Logo" className="w-9 h-9 object-contain rounded-lg shadow-[0_0_15px_rgba(220,38,38,0.3)] border border-slate-800 bg-slate-950" />
+              <span className="text-xl sm:text-2xl font-black text-white tracking-tight">EFORTE<span className="text-red-500">GAMES</span></span>
+            </div>
+
+            {/* Desktop & Mobile Sheet Drawer Trigger Button */}
+            <Sheet>
+              <SheetTrigger asChild>
+                <button className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-red-500/50 hover:bg-slate-800 text-xs font-bold text-slate-200 transition-all shadow-sm">
+                  <Menu className="w-4 h-4 text-red-500" />
+                  <span className="hidden sm:inline">Menu & Categorias</span>
+                </button>
+              </SheetTrigger>
+              <SheetContent side="left" className="bg-slate-950 border-r border-slate-800 text-white w-80 sm:w-96 p-0 overflow-y-auto">
+                <SheetHeader className="p-5 border-b border-slate-800 bg-slate-900/60">
+                  <div className="flex items-center gap-2.5">
+                    <img src="/logo.png" alt="Eforte Games" className="w-8 h-8 object-contain rounded bg-slate-950 border border-slate-800" />
+                    <SheetTitle className="text-lg font-black text-white tracking-tight">
+                      EFORTE<span className="text-red-500">GAMES</span>
+                    </SheetTitle>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">Navegação completa da plataforma</p>
+                </SheetHeader>
+
+                <div className="p-4 space-y-6">
+                  {/* Category 1 */}
+                  <div className="space-y-2">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider px-2">🎮 Mídias Digitais & Contas</h4>
+                    <div className="space-y-1">
+                      <a href="/jogue-com-economia" className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-900 text-xs font-bold text-red-400 hover:text-red-300 transition-colors border border-red-950/40">
+                        <span className="flex items-center gap-2.5"><Zap className="w-4 h-4 text-red-500 animate-pulse" /> Jogue com Economia (Secundárias)</span>
+                        <span className="bg-red-600/30 text-red-400 text-[9px] px-1.5 py-0.5 rounded font-black">OFERTAS</span>
+                      </a>
+                      <a href="/digital" className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-slate-900 text-xs font-semibold text-slate-300 hover:text-white transition-colors">
+                        <Gamepad2 className="w-4 h-4 text-purple-400" /> Mídias Digitais & Gift Cards
+                      </a>
+                      <a href="/digital?type=assinatura" className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-900 text-xs font-bold text-amber-400 hover:text-amber-300 transition-colors">
+                        <span className="flex items-center gap-2.5"><Sparkles className="w-4 h-4 text-amber-400" /> Assinaturas (PS Plus / Game Pass)</span>
+                        <span className="bg-amber-500/20 text-amber-400 text-[9px] px-1.5 py-0.5 rounded font-black">VIP</span>
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* Category 2 */}
+                  <div className="space-y-2">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider px-2">📦 Físicos, Consoles & Acessórios</h4>
+                    <div className="space-y-1">
+                      <a href="/usados" className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-slate-900 text-xs font-semibold text-slate-300 hover:text-white transition-colors">
+                        <ShoppingCart className="w-4 h-4 text-blue-400" /> Desapegos de Jogos Físicos & Consoles
+                      </a>
+                      <a href="/loja" className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-slate-900 text-xs font-semibold text-slate-300 hover:text-white transition-colors">
+                        <Package className="w-4 h-4 text-emerald-400" /> Loja Oficial Eforte
+                      </a>
+                      <a href="/usados/anunciar" className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-slate-900 text-xs font-semibold text-slate-300 hover:text-white transition-colors">
+                        <PlusCircle className="w-4 h-4 text-slate-400" /> Anunciar meu Item Físico
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* Category 3 */}
+                  <div className="space-y-2">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider px-2">⭐ Clube & Benefícios</h4>
+                    <div className="space-y-1">
+                      <a href="/platinador" className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-900 text-xs font-bold text-amber-400 hover:text-amber-300 transition-colors border border-amber-950/40">
+                        <span className="flex items-center gap-2.5"><Trophy className="w-4 h-4 text-amber-400" /> Clube do Platinador (R$ 35/mês)</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </a>
+                      <a href="/virar-vendedor" className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-slate-900 text-xs font-semibold text-slate-300 hover:text-white transition-colors">
+                        <Zap className="w-4 h-4 text-red-500" /> Vender minha conta EforteGames (10%)
+                      </a>
+                      <a href="/fortecoins" className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-slate-900 text-xs font-semibold text-amber-400 hover:text-amber-300 transition-colors">
+                        <Coins className="w-4 h-4 text-amber-400" /> ForteCoins & Fidelidade
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* Category 4 */}
+                  <div className="space-y-2">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider px-2">❓ Suporte & Avaliações</h4>
+                    <div className="space-y-1">
+                      <a href="/avaliacoes" className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-slate-900 text-xs font-semibold text-slate-300 hover:text-white transition-colors">
+                        <Star className="w-4 h-4 text-yellow-500" /> Avaliações dos Clientes
+                      </a>
+                      <a href="/promocoes" className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-slate-900 text-xs font-semibold text-slate-300 hover:text-white transition-colors">
+                        <Flame className="w-4 h-4 text-orange-500" /> Promoções Imperdíveis
+                      </a>
+                      <a href="/faq" className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-slate-900 text-xs font-semibold text-slate-300 hover:text-white transition-colors">
+                        <HelpCircle className="w-4 h-4 text-slate-400" /> FAQ / Central de Ajuda
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
           
-          {/* Desktop Nav Links */}
-          <div className="hidden lg:flex items-center gap-3 xl:gap-5 text-xs xl:text-sm font-medium">
-            <a href="#categorias" className="text-slate-300 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap"><LayoutGrid className="w-3.5 h-3.5 text-slate-400" /> Categorias</a>
-            <a href="/jogue-com-economia" className="text-red-400 hover:text-red-300 font-bold transition flex items-center gap-1.5 whitespace-nowrap"><Zap className="w-3.5 h-3.5 text-red-500 animate-pulse" /> Jogue com Economia</a>
-            <a href="/digital?type=assinatura" className="text-amber-400 hover:text-amber-300 font-bold transition flex items-center gap-1.5 whitespace-nowrap"><Sparkles className="w-3.5 h-3.5 text-amber-400" /> Assinaturas</a>
-            <a href="#anuncios" className="text-slate-300 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap"><Tag className="w-3.5 h-3.5 text-slate-400" /> Anúncios</a>
-            <a href="/usados" className="text-slate-300 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap"><ShoppingCart className="w-3.5 h-3.5 text-blue-500" /> Desapegos Físicos</a>
-            <a href="/faq" className="text-slate-300 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap"><HelpCircle className="w-3.5 h-3.5 text-slate-400" /> FAQ</a>
-            <a href="/avaliacoes" className="text-slate-300 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap"><Star className="w-3.5 h-3.5 text-yellow-500" /> Avaliações</a>
-            <a href="/promocoes" className="text-slate-300 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap"><Flame className="w-3.5 h-3.5 text-red-500" /> Promoções</a>
-            <a href="/platinador" className="text-amber-400 hover:text-amber-300 font-bold transition flex items-center gap-1.5 whitespace-nowrap"><Trophy className="w-3.5 h-3.5 text-amber-400" /> Clube Platinador</a>
-            <a href="/virar-vendedor" className="text-slate-300 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap"><Zap className="w-3.5 h-3.5 text-red-500" /> Revendedor</a>
+          {/* Desktop Clean Main Links (Requirement: Organizado e Sem Poluição) */}
+          <div className="hidden lg:flex items-center gap-4 text-xs xl:text-sm font-medium">
+            <a href="/jogue-com-economia" className="text-red-400 hover:text-red-300 font-bold transition flex items-center gap-1.5 whitespace-nowrap bg-red-950/40 border border-red-800/40 px-3 py-1 rounded-full">
+              <Zap className="w-3.5 h-3.5 text-red-500 animate-pulse" /> Jogue com Economia
+            </a>
+            <a href="/usados" className="text-slate-300 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap">
+              <ShoppingCart className="w-3.5 h-3.5 text-blue-400" /> Desapegos Físicos
+            </a>
+            <a href="/digital?type=assinatura" className="text-amber-400 hover:text-amber-300 font-bold transition flex items-center gap-1.5 whitespace-nowrap">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Assinaturas
+            </a>
+            <a href="/platinador" className="text-amber-400 hover:text-amber-300 font-bold transition flex items-center gap-1.5 whitespace-nowrap bg-amber-950/30 border border-amber-800/30 px-3 py-1 rounded-full">
+              <Trophy className="w-3.5 h-3.5 text-amber-400" /> Clube Platinador
+            </a>
           </div>
           
+          {/* Right Controls */}
           <div className="flex items-center gap-2 shrink-0">
-            <span className="hidden xl:block w-px h-6 bg-slate-800 mr-1"></span>
             {isAuthenticated ? (
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white hover:bg-slate-900 text-xs px-2.5 h-8" onClick={() => navigate("/fortecoins")}>
+                <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white hover:bg-slate-900 text-xs px-2.5 h-8 hidden sm:flex" onClick={() => navigate("/fortecoins")}>
                   <Coins className="w-3.5 h-3.5 mr-1.5 text-red-500" /> {user?.forteCoins ?? 0} FC
                 </Button>
-                <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white hover:bg-slate-900 text-xs px-2.5 h-8" onClick={() => navigate("/minhas-compras")}>
-                  <Package className="w-3.5 h-3.5 mr-1.5" /> Minhas Compras
+                <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white hover:bg-slate-900 text-xs px-2.5 h-8 hidden md:flex" onClick={() => navigate("/minhas-compras")}>
+                  <Package className="w-3.5 h-3.5 mr-1.5" /> Compras
                 </Button>
                 <UserProfileButton />
               </div>
             ) : (
-              <div className="flex gap-3">
-                <Button variant="ghost" className="text-slate-300 hover:text-white hover:bg-slate-900" onClick={() => navigate("/login")}>
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white hover:bg-slate-900 text-xs" onClick={() => navigate("/login")}>
                   Entrar
                 </Button>
-                <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white shadow-[0_0_10px_rgba(220,38,38,0.3)]" onClick={() => navigate("/login")}>
+                <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white text-xs px-3 shadow-[0_0_10px_rgba(220,38,38,0.3)]" onClick={() => navigate("/login")}>
                   Cadastrar
                 </Button>
               </div>
-            )}
-          </div>
-
-          {/* Mobile Nav Links */}
-          <div className="flex lg:hidden items-center gap-2">
-            {isAuthenticated ? (
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white hover:bg-slate-900 px-2 animate-pulse" onClick={() => navigate("/fortecoins")}>
-                  <Coins className="w-4 h-4 text-red-500" /> <span className="ml-1 text-xs">{user?.forteCoins ?? 0}</span>
-                </Button>
-                <UserProfileButton />
-              </div>
-            ) : (
-              <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white text-xs px-3" onClick={() => navigate("/login")}>
-                Entrar
-              </Button>
             )}
           </div>
         </div>
@@ -536,7 +617,7 @@ export default function Home() {
           <div className="max-w-4xl mx-auto mt-4 px-4 pb-4 space-y-3">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-xs text-slate-400">
               <span className="font-bold text-slate-500 shrink-0">Buscas populares:</span>
-              <div className="flex sm:flex-wrap items-center gap-2 overflow-x-auto sm:overflow-visible w-full sm:w-auto py-1 scrollbar-none justify-start sm:justify-center -mx-4 px-4 sm:mx-0 sm:px-0 snap-x">
+              <div className="flex sm:flex-wrap items-center gap-2 overflow-x-auto sm:overflow-visible w-full sm:w-auto py-1 scrollbar-none justify-start sm:justify-center max-w-full">
                 {[
                   { label: "PS Plus Extra", query: "PS Plus" },
                   { label: "Game Pass", query: "Game Pass" },
@@ -747,9 +828,8 @@ export default function Home() {
             {/* Tab Filter Control (Requirement 1) */}
             <div className="flex items-center gap-1 sm:gap-2 bg-slate-900 p-1 rounded-xl border border-slate-800 self-stretch sm:self-auto overflow-x-auto">
               {[
-                { id: "todos", label: "Todos" },
+                { id: "todos", label: "Todos os Digitais" },
                 { id: "digital", label: "🎮 Jogos Digitais" },
-                { id: "usado", label: "📦 Físicos & Consoles" },
                 { id: "assinatura", label: "⭐ Assinaturas" },
               ].map((tab) => (
                 <button
@@ -785,9 +865,10 @@ export default function Home() {
               if (activeListingTab === "assinatura") return listing.type === 'assinatura';
               return true;
             }).map((listing: any) => {
-              const priceValue = listing._type === 'used'
-                ? (listing.pricePS4 || listing.pricePS5 || listing.price || 0)
-                : (listing.price || 0);
+              const secVal = listing.priceSecondary ?? listing.price_secondary;
+              const hasSec = secVal !== undefined && secVal !== null && secVal !== "" && parseFloat(secVal) > 0;
+              const primaryPrice = listing.pricePrimary ? parseFloat(listing.pricePrimary) : (listing.price_primary ? parseFloat(listing.price_primary) : parseFloat(listing.price || 0));
+              const secondaryPrice = hasSec ? parseFloat(secVal) : 0;
 
               const isAssinatura = listing.type === 'assinatura';
               const isDigital = listing._type === 'digital' && !isAssinatura;
@@ -796,7 +877,7 @@ export default function Home() {
                 <div 
                   key={`${listing._type}-${listing.id}`}
                   className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-red-500/40 transition-all hover:-translate-y-1.5 hover:shadow-[0_8px_30px_rgba(220,38,38,0.2)] flex flex-col h-full cursor-pointer min-w-[160px] sm:min-w-[220px] lg:min-w-0 w-[45vw] sm:w-[35vw] lg:w-auto snap-start shrink-0 group game-card-shine"
-                  onClick={() => navigate(listing._type === 'digital' ? '/digital' : '/usados')}
+                  onClick={() => navigate(listing._type === 'digital' ? `/digital?search=${encodeURIComponent(listing.name)}&buy=${listing.id}` : '/usados')}
                 >
                   <div className="h-28 sm:h-40 bg-slate-800 relative overflow-hidden">
                     {listing.imageUrl || (listing.images && listing.images.length > 0) ? (
@@ -836,26 +917,48 @@ export default function Home() {
                     <h3 className="text-white font-medium text-xs sm:text-base line-clamp-2 mb-1.5 sm:mb-2 group-hover:text-red-400 transition-colors">
                       {listing.name}
                     </h3>
-                    <div className="mt-auto flex flex-col sm:flex-row sm:items-end justify-between gap-2 pt-2.5 sm:pt-4 border-t border-slate-800">
-                      <span className="text-base sm:text-2xl font-black text-white">
-                        {Number(priceValue) === 0 ? (
-                          <span className="text-xs sm:text-lg font-bold text-red-500">A definir</span>
-                        ) : (
-                          <>
-                            <span className="text-[10px] sm:text-sm text-slate-500 font-normal">R$</span> {Number(priceValue).toFixed(2).replace('.', ',')}
-                          </>
-                        )}
-                      </span>
+                    
+                    {/* Bloco de Exibição dos Valores Primária e Secundária */}
+                    <div className="mt-auto pt-2 space-y-1">
+                      {hasSec ? (
+                        <div className="bg-slate-950/70 p-2 rounded-lg border border-slate-800 space-y-1">
+                          <div className="flex justify-between items-center text-[10px] sm:text-xs">
+                            <span className="text-slate-400 font-bold">👤 Primária:</span>
+                            <span className="font-black text-red-500">R$ {primaryPrice.toFixed(2).replace('.', ',')}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-[10px] sm:text-xs">
+                            <span className="text-slate-400 font-bold">👥 Secundária:</span>
+                            <span className="font-bold text-slate-300">R$ {secondaryPrice.toFixed(2).replace('.', ',')}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-xs text-slate-400 font-bold">👤 Primária:</span>
+                          <span className="text-base sm:text-2xl font-black text-white">
+                            {primaryPrice === 0 ? (
+                              <span className="text-xs sm:text-lg font-bold text-red-500">A definir</span>
+                            ) : (
+                              <>
+                                <span className="text-[10px] sm:text-sm text-slate-500 font-normal">R$</span> {primaryPrice.toFixed(2).replace('.', ',')}
+                              </>
+                            )}
+                          </span>
+                        </div>
+                      )}
+
                       <Button
                         size="sm"
-                        className="bg-red-600 hover:bg-red-700 text-white rounded-lg px-2.5 py-1 sm:px-4 text-[10px] sm:text-xs"
+                        className="w-full bg-red-600 hover:bg-red-700 text-white rounded-lg px-2.5 py-1.5 text-[10px] sm:text-xs font-bold btn-neon mt-2"
                         onClick={(e) => {
                           e.stopPropagation();
-                          const page = listing._type === 'digital' ? '/digital' : '/usados';
-                          navigate(`${page}?search=${encodeURIComponent(listing.name)}`);
+                          if (listing._type === 'digital') {
+                            navigate(`/digital?search=${encodeURIComponent(listing.name)}&buy=${listing.id}`);
+                          } else {
+                            navigate('/usados');
+                          }
                         }}
                       >
-                        {Number(priceValue) === 0 ? "Contatar" : "Comprar"}
+                        {primaryPrice === 0 ? "Contatar" : "Comprar / Escolher Conta"}
                       </Button>
                     </div>
                   </div>

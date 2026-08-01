@@ -585,6 +585,55 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    adminUpdateChallenge: protectedProcedure
+      .input(
+        z.object({
+          challengeId: z.number(),
+          gameTitle: z.string().min(2).optional(),
+          description: z.string().optional(),
+          platform: z.string().optional(),
+          imageUrl: z.string().optional(),
+          rewardCoins: z.number().optional(),
+          status: z.enum(["ativo", "encerrado", "brevemente"]).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin")
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores" });
+
+        const database = await getDb();
+        if (database) {
+          const updateData: any = {};
+          if (input.gameTitle !== undefined) updateData.gameTitle = input.gameTitle;
+          if (input.description !== undefined) updateData.description = input.description;
+          if (input.platform !== undefined) updateData.platform = input.platform;
+          if (input.imageUrl !== undefined) updateData.imageUrl = input.imageUrl;
+          if (input.rewardCoins !== undefined) updateData.rewardCoins = input.rewardCoins;
+          if (input.status !== undefined) updateData.status = input.status;
+
+          await database
+            .update(platinumChallenges)
+            .set(updateData)
+            .where(eq(platinumChallenges.id, input.challengeId));
+        }
+        return { success: true };
+      }),
+
+    adminDeleteChallenge: protectedProcedure
+      .input(z.object({ challengeId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin")
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores" });
+
+        const database = await getDb();
+        if (database) {
+          await database
+            .delete(platinumChallenges)
+            .where(eq(platinumChallenges.id, input.challengeId));
+        }
+        return { success: true };
+      }),
+
     adminListSubmissions: protectedProcedure.query(async ({ ctx }) => {
       if (ctx.user.role !== "admin")
         throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores" });

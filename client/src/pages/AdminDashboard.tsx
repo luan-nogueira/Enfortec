@@ -33,6 +33,15 @@ function PlatinadorAdminTab() {
   const [platform, setPlatform] = useState("PS4 / PS5");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Estados para edição de desafio
+  const [editingChallenge, setEditingChallenge] = useState<any | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+  const [editCoins, setEditCoins] = useState("500");
+  const [editImage, setEditImage] = useState("");
+  const [editPlatform, setEditPlatform] = useState("PS4 / PS5");
+  const [editStatus, setEditStatus] = useState<"ativo" | "encerrado" | "brevemente">("ativo");
+
   const challengesQuery = trpc.platinador.listChallenges.useQuery();
   const submissionsQuery = trpc.platinador.adminListSubmissions.useQuery();
 
@@ -48,6 +57,27 @@ function PlatinadorAdminTab() {
     onError: (err: any) => {
       toast.error(err.message || "Erro ao criar desafio");
       setIsSubmitting(false);
+    },
+  });
+
+  const updateChallengeMutation = trpc.platinador.adminUpdateChallenge.useMutation({
+    onSuccess: () => {
+      toast.success("Desafio atualizado com sucesso!");
+      setEditingChallenge(null);
+      challengesQuery.refetch();
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Erro ao atualizar desafio");
+    },
+  });
+
+  const deleteChallengeMutation = trpc.platinador.adminDeleteChallenge.useMutation({
+    onSuccess: () => {
+      toast.success("Desafio excluído com sucesso!");
+      challengesQuery.refetch();
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Erro ao excluir desafio");
     },
   });
 
@@ -84,8 +114,44 @@ function PlatinadorAdminTab() {
     });
   };
 
+  const handleOpenEdit = (ch: any) => {
+    setEditingChallenge(ch);
+    setEditTitle(ch.gameTitle || "");
+    setEditDesc(ch.description || "");
+    setEditCoins(String(ch.rewardCoins || 500));
+    setEditImage(ch.imageUrl || "");
+    setEditPlatform(ch.platform || "PS4 / PS5");
+    setEditStatus(ch.status || "ativo");
+  };
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingChallenge) return;
+    updateChallengeMutation.mutate({
+      challengeId: editingChallenge.id,
+      gameTitle: editTitle.trim(),
+      description: editDesc.trim(),
+      platform: editPlatform,
+      imageUrl: editImage.trim(),
+      rewardCoins: Number(editCoins) || 500,
+      status: editStatus,
+    });
+  };
+
+  const handleDeleteChallenge = (ch: any) => {
+    toast(`Excluir desafio "${ch.gameTitle}"?`, {
+      action: {
+        label: "Excluir",
+        onClick: () => {
+          deleteChallengeMutation.mutate({ challengeId: ch.id });
+        },
+      },
+    });
+  };
+
   return (
     <div className="space-y-8">
+      {/* Form Criar Novo Desafio */}
       <Card className="bg-[#121212] border-red-600/30 p-6 shadow-xl">
         <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
           <Trophy className="text-red-500" /> Cadastrar Novo Desafio de Platina
@@ -119,6 +185,65 @@ function PlatinadorAdminTab() {
         </form>
       </Card>
 
+      {/* Gerenciamento de Desafios de Platina Existentes */}
+      <Card className="bg-[#121212] border-red-600/30 p-6 shadow-xl">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-bold text-white flex items-center gap-2">
+            <Gamepad2 className="text-red-500" /> Desafios de Platina Cadastrados
+          </h3>
+          <span className="text-xs text-slate-400 font-mono">
+            {challengesQuery.data?.length || 0} desafios disponíveis
+          </span>
+        </div>
+
+        {challengesQuery.isLoading ? (
+          <p className="text-slate-400 text-sm">Carregando desafios...</p>
+        ) : !challengesQuery.data || challengesQuery.data.length === 0 ? (
+          <p className="text-slate-400 text-sm py-4">Nenhum desafio de platina cadastrado ainda.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {challengesQuery.data.map((ch: any) => (
+              <div key={ch.id} className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden p-4 flex flex-col justify-between space-y-3">
+                <div className="flex gap-3 items-start">
+                  <div className="w-16 h-20 rounded bg-slate-900 overflow-hidden shrink-0 border border-slate-800">
+                    <img src={ch.imageUrl || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=200"} alt={ch.gameTitle} className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300">
+                        {ch.platform || "PS4 / PS5"}
+                      </span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                        ch.status === "ativo" ? "bg-emerald-950/80 text-emerald-400 border border-emerald-800/40" : "bg-amber-950/80 text-amber-400 border border-amber-800/40"
+                      }`}>
+                        {ch.status === "ativo" ? "Ativo" : ch.status === "brevemente" ? "Em breve" : "Encerrado"}
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-white text-sm line-clamp-1 truncate">{ch.gameTitle}</h4>
+                    <p className="text-xs text-amber-400 font-bold mt-1 flex items-center gap-1">
+                      <Coins className="w-3 h-3" /> +{ch.rewardCoins} ForteCoins
+                    </p>
+                    {ch.description && (
+                      <p className="text-[11px] text-slate-400 line-clamp-2 mt-1 leading-tight">{ch.description}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-900">
+                  <Button size="sm" variant="ghost" onClick={() => handleOpenEdit(ch)} className="text-xs text-slate-300 hover:text-white hover:bg-slate-900 h-8 px-2.5">
+                    <Edit className="w-3.5 h-3.5 mr-1 text-blue-400" /> Editar
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => handleDeleteChallenge(ch)} className="text-xs text-red-400 hover:text-red-300 hover:bg-red-950/30 h-8 px-2.5">
+                    <Trash2 className="w-3.5 h-3.5 mr-1" /> Excluir
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      {/* Comprovações de Platina para Aprovação */}
       <Card className="bg-[#121212] border-red-600/30 p-6 shadow-xl">
         <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
           <Coins className="text-amber-400" /> Comprovações de Platina para Aprovação
@@ -175,6 +300,68 @@ function PlatinadorAdminTab() {
           </div>
         )}
       </Card>
+
+      {/* Modal de Editar Desafio de Platina */}
+      {editingChallenge && (
+        <Dialog open={!!editingChallenge} onOpenChange={(open) => !open && setEditingChallenge(null)}>
+          <DialogContent className="bg-slate-900 border-red-600/30 text-white sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold text-white flex items-center gap-2">
+                <Edit className="w-5 h-5 text-blue-400" /> Editar Desafio de Platina
+              </DialogTitle>
+              <DialogDescription className="text-slate-400 text-xs">
+                Altere as informações do desafio selecionado.
+              </DialogDescription>
+            </DialogHeader>
+
+            <form onSubmit={handleSaveEdit} className="space-y-4 my-2">
+              <div>
+                <Label className="text-xs text-slate-300 font-bold uppercase">Nome do Jogo *</Label>
+                <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} required className="bg-slate-950 border-slate-800 text-white mt-1" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-slate-300 font-bold uppercase">Plataforma</Label>
+                  <Input value={editPlatform} onChange={(e) => setEditPlatform(e.target.value)} className="bg-slate-950 border-slate-800 text-white mt-1" />
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-300 font-bold uppercase">Recompensa FC *</Label>
+                  <Input type="number" value={editCoins} onChange={(e) => setEditCoins(e.target.value)} required className="bg-slate-950 border-slate-800 text-white mt-1" />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs text-slate-300 font-bold uppercase">Status do Desafio</Label>
+                <select
+                  value={editStatus}
+                  onChange={(e) => setEditStatus(e.target.value as any)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-md h-10 px-3 text-sm text-white mt-1"
+                >
+                  <option value="ativo">Ativo (Disponível)</option>
+                  <option value="brevemente">Em Breve</option>
+                  <option value="encerrado">Encerrado</option>
+                </select>
+              </div>
+              <div>
+                <Label className="text-xs text-slate-300 font-bold uppercase">URL da Imagem da Capa</Label>
+                <Input value={editImage} onChange={(e) => setEditImage(e.target.value)} className="bg-slate-950 border-slate-800 text-white mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs text-slate-300 font-bold uppercase">Descrição do Desafio</Label>
+                <textarea value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className="w-full h-20 p-3 bg-slate-950 border border-slate-800 rounded-md text-sm text-white focus:outline-none focus:ring-1 focus:ring-red-500/50 mt-1" />
+              </div>
+
+              <DialogFooter className="pt-2">
+                <Button type="button" variant="ghost" onClick={() => setEditingChallenge(null)} className="text-slate-400">
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={updateChallengeMutation.isPending} className="bg-red-600 hover:bg-red-700 text-white font-bold">
+                  {updateChallengeMutation.isPending ? "Salvando..." : "Salvar Alterações"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
@@ -643,6 +830,8 @@ export default function AdminDashboard() {
   const [gameStock, setGameStock] = useState(999);
   const [gameIsActive, setGameIsActive] = useState(true);
   const [gameIsPreVenda, setGameIsPreVenda] = useState(false);
+  const [gameShowInEconomia, setGameShowInEconomia] = useState(true);
+  const [gameEconomiaLicenseType, setGameEconomiaLicenseType] = useState<"secundaria" | "primaria" | "ambas">("secundaria");
   const [gameCoverFit, setGameCoverFit] = useState<"cover" | "contain">("cover");
   const [addingGame, setAddingGame] = useState(false);
   const [editingGameId, setEditingGameId] = useState<string | null>(null);
@@ -1153,7 +1342,9 @@ export default function AdminDashboard() {
           coverFit: gameCoverFit,
           stock: Number(gameStock),
           isActive: gameIsActive,
-          isPreVenda: gameIsPreVenda
+          isPreVenda: gameIsPreVenda,
+          showInEconomia: gameShowInEconomia,
+          economiaLicenseType: gameEconomiaLicenseType
         });
         toast.success("Produto/Jogo atualizado com sucesso!");
       } else {
@@ -1170,6 +1361,8 @@ export default function AdminDashboard() {
           stock: Number(gameStock),
           isActive: gameIsActive,
           isPreVenda: gameIsPreVenda,
+          showInEconomia: gameShowInEconomia,
+          economiaLicenseType: gameEconomiaLicenseType,
           description: "Mídia Digital Eforte Games.",
           createdAt: new Date().toISOString()
         });
@@ -1197,6 +1390,8 @@ export default function AdminDashboard() {
     setGameStock(999);
     setGameIsActive(true);
     setGameIsPreVenda(false);
+    setGameShowInEconomia(true);
+    setGameEconomiaLicenseType("secundaria");
     setEditingGameId(null);
   };
 
@@ -1213,6 +1408,8 @@ export default function AdminDashboard() {
     setGameStock(game.stock ?? 999);
     setGameIsActive(game.isActive ?? true);
     setGameIsPreVenda(game.isPreVenda ?? false);
+    setGameShowInEconomia(game.showInEconomia ?? true);
+    setGameEconomiaLicenseType(game.economiaLicenseType || "secundaria");
     setShowGameModal(true);
   };
 
@@ -2124,6 +2321,27 @@ export default function AdminDashboard() {
                         Estq: {game.stock}
                       </span>
                     </div>
+
+                    <div className="mt-2 pt-2 border-t border-slate-800 flex items-center justify-between">
+                      <span className="text-[10px] text-slate-400 font-bold">⚡ Economia:</span>
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          const currentVal = game.showInEconomia !== false;
+                          await updateDoc(doc(db, "digital_products", game.id), {
+                            showInEconomia: !currentVal
+                          });
+                          toast.success(!currentVal ? "Jogo ativado na página Jogue com Economia!" : "Jogo removido do Jogue com Economia.");
+                        }}
+                        className={`text-[9px] px-2 py-0.5 rounded font-black uppercase transition-all ${
+                          game.showInEconomia !== false
+                            ? "bg-red-600/20 text-red-400 border border-red-500/40 hover:bg-red-600/40"
+                            : "bg-slate-900 text-slate-500 border border-slate-800 hover:bg-slate-800"
+                        }`}
+                      >
+                        {game.showInEconomia !== false ? `⚡ Exibindo (${game.economiaLicenseType === "primaria" ? "Primária" : game.economiaLicenseType === "ambas" ? "Ambas" : "Secundária"})` : "Off"}
+                      </button>
+                    </div>
                   </div>
                 </Card>
               ))}
@@ -3011,6 +3229,37 @@ export default function AdminDashboard() {
                   min={0}
                 />
               </div>
+            </div>
+
+            {/* Configuração para o "Jogue com Economia" */}
+            <div className="bg-red-950/20 p-3 rounded-lg border border-red-500/30 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs text-white font-bold uppercase flex items-center gap-1.5 cursor-pointer">
+                  <span>⚡ Exibir em "Jogue com Economia" (/economia)</span>
+                </Label>
+                <input
+                  type="checkbox"
+                  checked={gameShowInEconomia}
+                  onChange={(e) => setGameShowInEconomia(e.target.checked)}
+                  className="w-4 h-4 accent-red-600 rounded cursor-pointer"
+                />
+              </div>
+              {gameShowInEconomia && (
+                <div className="space-y-1.5 pt-2 border-t border-red-500/20">
+                  <Label className="text-[10px] text-slate-300 font-bold uppercase block">
+                    Tipo de Conta em Destaque no Economia:
+                  </Label>
+                  <select
+                    value={gameEconomiaLicenseType}
+                    onChange={(e) => setGameEconomiaLicenseType(e.target.value as any)}
+                    className="w-full bg-slate-950 border border-red-600/30 rounded-md h-9 px-3 text-xs text-white"
+                  >
+                    <option value="secundaria">👥 Conta Secundária (Padrão)</option>
+                    <option value="primaria">👤 Conta Primária</option>
+                    <option value="ambas">⚡ Ambas (Permitir escolha)</option>
+                  </select>
+                </div>
+              )}
             </div>
             <div className="space-y-4 border border-red-600/10 p-3 rounded-lg bg-slate-950/20">
               <div className="space-y-2">
