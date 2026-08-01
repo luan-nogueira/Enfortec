@@ -603,18 +603,23 @@ export const appRouter = router({
 
         const database = await getDb();
         if (database) {
-          const updateData: any = {};
-          if (input.gameTitle !== undefined) updateData.gameTitle = input.gameTitle;
-          if (input.description !== undefined) updateData.description = input.description;
-          if (input.platform !== undefined) updateData.platform = input.platform;
-          if (input.imageUrl !== undefined) updateData.imageUrl = input.imageUrl;
-          if (input.rewardCoins !== undefined) updateData.rewardCoins = input.rewardCoins;
-          if (input.status !== undefined) updateData.status = input.status;
+          try {
+            const updateData: any = {};
+            if (input.gameTitle !== undefined) updateData.gameTitle = input.gameTitle;
+            if (input.description !== undefined) updateData.description = input.description;
+            if (input.platform !== undefined) updateData.platform = input.platform;
+            if (input.imageUrl !== undefined) updateData.imageUrl = input.imageUrl;
+            if (input.rewardCoins !== undefined) updateData.rewardCoins = input.rewardCoins;
+            if (input.status !== undefined) updateData.status = input.status;
 
-          await database
-            .update(platinumChallenges)
-            .set(updateData)
-            .where(eq(platinumChallenges.id, input.challengeId));
+            await database
+              .update(platinumChallenges)
+              .set(updateData)
+              .where(eq(platinumChallenges.id, Number(input.challengeId)));
+          } catch (err: any) {
+            console.error("[TRPC adminUpdateChallenge Error]", err);
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message || "Erro ao atualizar desafio no banco de dados." });
+          }
         }
         return { success: true };
       }),

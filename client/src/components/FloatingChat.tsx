@@ -212,6 +212,24 @@ const WELCOME_FLOW: { text: string; delay: number }[] = [
   { text: "🎮 Precisa de ajuda com algum jogo, conta ou pedido?", delay: 1100 },
 ];
 
+// Atendentes do WhatsApp
+const WA_ATTENDANTS = [
+  {
+    name: "Andre",
+    role: "Suporte & Vendas",
+    number: "554384253691",
+    avatar: "A",
+    color: "bg-red-600",
+  },
+  {
+    name: "Sandro",
+    role: "Suporte & Vendas",
+    number: "5571987650840",
+    avatar: "S",
+    color: "bg-blue-600",
+  },
+];
+
 export default function FloatingChat() {
   const { user, isAuthenticated } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
@@ -219,6 +237,7 @@ export default function FloatingChat() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [thinking, setThinking] = useState(false);
   const [showChips, setShowChips] = useState(false);
+  const [showWaSelector, setShowWaSelector] = useState(false);
   const welcomeStarted = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -368,21 +387,56 @@ export default function FloatingChat() {
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                <a
-                  href={WA_BASE}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  onClick={() => setShowWaSelector(v => !v)}
                   className="w-8 h-8 rounded-lg bg-green-600/80 hover:bg-green-600 flex items-center justify-center text-white transition-colors shadow"
-                  title="WhatsApp"
+                  title="Atendimento no WhatsApp"
                 >
                   <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
                     <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.42 9.864-9.864.002-2.637-1.03-5.118-2.905-6.993C16.257 1.874 13.78 1.84 11.14 1.84 5.704 1.84 1.28 6.261 1.277 11.705c-.001 1.714.453 3.39 1.317 4.873L1.576 22.25l5.071-1.328z"/>
                   </svg>
-                </a>
+                </button>
                 <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="text-white/80 hover:text-white hover:bg-white/10 h-8 w-8 rounded-lg">
                   <X className="w-5 h-5" />
                 </Button>
               </div>
+
+              {/* Modal de Seleção de Atendente */}
+              {showWaSelector && (
+                <div className="absolute top-14 right-3 z-50 bg-slate-900 border border-green-500/30 rounded-2xl shadow-2xl p-4 w-64 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <p className="text-[10px] text-green-400 font-black uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                    <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.42 9.864-9.864.002-2.637-1.03-5.118-2.905-6.993C16.257 1.874 13.78 1.84 11.14 1.84 5.704 1.84 1.28 6.261 1.277 11.705c-.001 1.714.453 3.39 1.317 4.873L1.576 22.25l5.071-1.328z"/></svg>
+                    Com quem deseja falar?
+                  </p>
+                  <div className="space-y-2">
+                    {WA_ATTENDANTS.map(att => (
+                      <a
+                        key={att.name}
+                        href={`https://wa.me/${att.number}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => setShowWaSelector(false)}
+                        className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-800 hover:bg-green-900/40 border border-slate-700 hover:border-green-500/40 transition-all group"
+                      >
+                        <div className={`w-9 h-9 rounded-full ${att.color} flex items-center justify-center text-white font-black text-sm shrink-0`}>
+                          {att.avatar}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white font-black text-xs group-hover:text-green-300 transition-colors">{att.name}</p>
+                          <p className="text-slate-400 text-[10px]">{att.role}</p>
+                        </div>
+                        <svg className="w-4 h-4 fill-current text-green-500 shrink-0" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.42 9.864-9.864.002-2.637-1.03-5.118-2.905-6.993C16.257 1.874 13.78 1.84 11.14 1.84 5.704 1.84 1.28 6.261 1.277 11.705c-.001 1.714.453 3.39 1.317 4.873L1.576 22.25l5.071-1.328z"/></svg>
+                      </a>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setShowWaSelector(false)}
+                    className="mt-3 w-full text-[10px] text-slate-500 hover:text-slate-300 font-bold transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Quick Topic Chips Bar */}
@@ -457,17 +511,15 @@ export default function FloatingChat() {
 
             {/* Direct WhatsApp Callout Banner */}
             <div className="px-3 py-2 bg-slate-950 border-t border-slate-800 flex justify-center shrink-0">
-              <a
-                href={WA_BASE}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                onClick={() => setShowWaSelector(v => !v)}
                 className="flex items-center justify-center gap-2 w-full bg-green-600/90 hover:bg-green-600 text-white font-black text-[10px] uppercase tracking-wider py-2 rounded-lg shadow transition-colors"
               >
                 <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
                   <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.42 9.864-9.864.002-2.637-1.03-5.118-2.905-6.993C16.257 1.874 13.78 1.84 11.14 1.84 5.704 1.84 1.28 6.261 1.277 11.705c-.001 1.714.453 3.39 1.317 4.873L1.576 22.25l5.071-1.328z"/>
                 </svg>
                 Atendimento Direto no WhatsApp
-              </a>
+              </button>
             </div>
 
             {/* Input Form */}

@@ -128,7 +128,7 @@ function PlatinadorAdminTab() {
     e.preventDefault();
     if (!editingChallenge) return;
     updateChallengeMutation.mutate({
-      challengeId: editingChallenge.id,
+      challengeId: Number(editingChallenge.id),
       gameTitle: editTitle.trim(),
       description: editDesc.trim(),
       platform: editPlatform,
@@ -749,6 +749,53 @@ export default function AdminDashboard() {
       toast.success("Banner promocional deletado!");
     } catch (err) {
       toast.error("Erro ao deletar banner.");
+    }
+  };
+
+  const handleImportDefaultBanners = async () => {
+    try {
+      const defaultBanners = [
+        {
+          title: "ELDEN RING PS4/PS5",
+          imageUrl: "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?q=80&w=1200",
+          link: "/digital?search=Elden%20Ring",
+          position: "main",
+          isActive: true,
+          createdAt: new Date().toISOString()
+        },
+        {
+          title: "MORTAL KOMBAT 1 PS5",
+          imageUrl: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=1200",
+          link: "/digital?search=Mortal%20Kombat%201",
+          position: "main",
+          isActive: true,
+          createdAt: new Date().toISOString()
+        },
+        {
+          title: "JOGUE COM ECONOMIA - Mídia Secundária",
+          imageUrl: "https://images.unsplash.com/photo-1511512578047-dfb367046420?q=80&w=600",
+          link: "/economia",
+          position: "sidebar_top",
+          isActive: true,
+          createdAt: new Date().toISOString()
+        },
+        {
+          title: "Indique e Ganhe ForteCoins",
+          imageUrl: "https://images.unsplash.com/photo-1563089145-599997674d42?q=80&w=600",
+          link: "/fortecoins",
+          position: "sidebar_bottom",
+          isActive: true,
+          createdAt: new Date().toISOString()
+        }
+      ];
+
+      for (const b of defaultBanners) {
+        await addDoc(collection(db, "promos"), b);
+      }
+      toast.success("Banners padrão carregados no banco com sucesso! Agora você pode alterá-los livremente.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao carregar banners padrão.");
     }
   };
 
@@ -3072,8 +3119,25 @@ export default function AdminDashboard() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {promosList.length === 0 ? (
-                <div className="col-span-full py-12 text-center text-slate-500 italic">
-                  Nenhum banner cadastrado.
+                <div className="col-span-full bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center space-y-4">
+                  <div className="w-16 h-16 rounded-full bg-red-600/10 border border-red-500/20 text-red-500 flex items-center justify-center mx-auto text-2xl">
+                    🖼️
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-black text-white">Nenhum Banner Personalizado Cadastrado</h4>
+                    <p className="text-slate-400 text-xs sm:text-sm max-w-xl mx-auto mt-1">
+                      A página inicial do site está exibindo os <strong>Banners Padrão do Sistema</strong> (Elden Ring, Mortal Kombat 1, Jogue com Economia e Indique e Ganhe).
+                    </p>
+                  </div>
+                  <div className="pt-2">
+                    <Button
+                      onClick={handleImportDefaultBanners}
+                      className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-2.5 rounded-xl btn-neon flex items-center gap-2 mx-auto text-xs sm:text-sm"
+                    >
+                      <Plus className="w-4 h-4" />
+                      🚀 Carregar Banners Padrão da Home para Editar
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 promosList.map((p) => (
