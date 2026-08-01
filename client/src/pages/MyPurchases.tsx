@@ -147,6 +147,7 @@ export default function MyPurchases() {
                         {order.deliveryDetails}
                       </pre>
                     </div>
+                  )}
                   {(order.status === 'pago' || order.status === 'enviado') && (
                     <div className="mt-2 text-xs text-amber-400 font-bold bg-amber-950/40 border border-amber-800/40 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
                       <span>🔒 Valor Retido em Segurança pela EforteGames</span>
