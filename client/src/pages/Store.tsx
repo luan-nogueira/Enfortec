@@ -2,6 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import UserProfileButton from "@/components/UserProfileButton";
+import SellerChatDialog from "@/components/SellerChatDialog";
 import { auth, db } from "@/lib/firebase";
 import { collection, onSnapshot, query, orderBy, doc, getDoc, updateDoc } from "firebase/firestore";
 import { Search, ShoppingCart, ArrowLeft, Flame, Package, Check, X, Coins, HelpCircle, Shield } from "lucide-react";
@@ -481,12 +482,19 @@ export default function Store() {
                         {product.stock > 0 ? "Comprar" : "Indisponível"}
                       </Button>
                       {product.stock > 0 && (
-                        <Button
-                          onClick={() => handleBargainClick(product)}
-                          className="flex-1 bg-slate-900 border border-red-600/30 hover:border-red-600/60 text-red-500 font-bold text-[10px] sm:text-xs h-10 sm:h-12 rounded-lg sm:rounded-xl mt-2 transition-all active:scale-[0.95] flex items-center justify-center gap-1"
-                        >
-                          💸 Pechinchar
-                        </Button>
+                        <div className="flex gap-1.5 sm:gap-2 mt-2">
+                          <SellerChatDialog
+                            productName={product.name}
+                            buttonLabel="Falar Vendedor"
+                            buttonClassName="flex-1 bg-slate-900 border border-green-600/40 hover:border-green-500 text-green-400 font-bold text-[10px] sm:text-xs h-10 sm:h-12 rounded-lg sm:rounded-xl flex items-center justify-center gap-1"
+                          />
+                          <Button
+                            onClick={() => handleBargainClick(product)}
+                            className="flex-1 bg-slate-900 border border-red-600/30 hover:border-red-600/60 text-red-500 font-bold text-[10px] sm:text-xs h-10 sm:h-12 rounded-lg sm:rounded-xl transition-all active:scale-[0.95] flex items-center justify-center gap-1"
+                          >
+                            💸 Pechinchar
+                          </Button>
+                        </div>
                       )}
                     </div>
                   </div>

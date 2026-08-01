@@ -2,6 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import UserProfileButton from "@/components/UserProfileButton";
+import SellerChatDialog from "@/components/SellerChatDialog";
 import { Search, Gamepad2, Gift, Lock, ArrowLeft, Flame, X, Coins, Shield, Sparkles } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
@@ -692,13 +693,21 @@ export default function DigitalMedia() {
                         <p className="text-red-400 text-[10px] text-center">⚠️ {checkoutError}</p>
                       )}
                       {parseFloat(product.price) > 0 && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleBargainClick(product)}
-                          className="w-full bg-slate-900 border border-red-600/30 hover:border-red-600/60 text-red-500 font-bold text-[10px] sm:text-xs flex items-center justify-center gap-1 h-8 sm:h-9"
-                        >
-                          💸 Pechinchar
-                        </Button>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <SellerChatDialog
+                            productName={product.name}
+                            sellerName={product.sellerName || undefined}
+                            buttonLabel="Falar Vendedor"
+                            buttonClassName="w-full bg-slate-900 border border-green-600/40 hover:border-green-500 text-green-400 font-bold text-[10px] sm:text-xs h-8 sm:h-9 rounded-lg sm:rounded-xl flex items-center justify-center gap-1"
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() => handleBargainClick(product)}
+                            className="w-full bg-slate-900 border border-red-600/30 hover:border-red-600/60 text-red-500 font-bold text-[10px] sm:text-xs flex items-center justify-center gap-1 h-8 sm:h-9"
+                          >
+                            💸 Pechinchar
+                          </Button>
+                        </div>
                       )}
                     </div>
                   </div>

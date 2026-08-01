@@ -464,7 +464,7 @@ export async function confirmOrderAndReview(orderId: number, buyerId: number, ra
   return { success: true };
 }
 
-export async function updateOrderStatus(orderId: number, status: string) {
+export async function updateOrderStatus(orderId: number, status: "pendente" | "pago" | "enviado" | "entregue" | "cancelado") {
   const db = getDb();
   if (!db) throw new Error("Database not available");
   return db.update(orders).set({ status }).where(eq(orders.id, orderId));

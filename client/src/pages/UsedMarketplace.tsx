@@ -2,6 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import UserProfileButton from "@/components/UserProfileButton";
+import SellerChatDialog from "@/components/SellerChatDialog";
 import { Search, Star, ShoppingCart, ArrowLeft, Flame, User, Check, Package, Coins, MapPin, Shield, Trash2, MessageCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
@@ -572,18 +573,11 @@ export default function UsedMarketplace() {
                       )}
                       
                       <div className="grid grid-cols-2 gap-1.5">
-                        <Button
-                          onClick={() => {
-                            const sellerContactName = product.sellerName || "Vendedor";
-                            const priceText = parseFloat(product.pricePS4 || product.pricePS5 || 0).toFixed(2).replace('.', ',');
-                            const msg = encodeURIComponent(`Olá ${sellerContactName}! Vi seu anúncio no EforteGames: "${product.name}" (R$ ${priceText}). Gostaria de tirar umas dúvidas antes de comprar!`);
-                            const phone = product.sellerPhone || "5543984253691";
-                            window.open(`https://wa.me/${phone.replace(/\D/g, "")}?text=${msg}`, '_blank');
-                          }}
-                          className="w-full bg-slate-900 border border-green-600/40 hover:border-green-500 text-green-400 font-bold text-[10px] sm:text-xs h-10 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center gap-1"
-                        >
-                          <MessageCircle className="w-3.5 h-3.5 text-green-500" /> Falar Vendedor
-                        </Button>
+                        <SellerChatDialog
+                          productName={product.name}
+                          sellerName={product.sellerName || "Vendedor"}
+                          buttonLabel="Falar Vendedor"
+                        />
                         {parseFloat(product.pricePS4 || product.pricePS5 || 0) > 0 && (
                           <Button
                             onClick={() => handleBargainClick(product)}

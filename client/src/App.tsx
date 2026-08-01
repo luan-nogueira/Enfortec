@@ -40,6 +40,7 @@ function Router() {
         <Route path={"/usados"} component={UsedMarketplace} />
         <Route path={"/digital"} component={DigitalMedia} />
         <Route path={"/jogue-com-economia"} component={JogueComEconomia} />
+        <Route path={"/economia"} component={JogueComEconomia} />
         <Route path={"/promocoes"} component={PromotionsPage} />
         <Route path={"/platinador"} component={PlatinadorPage} />
         <Route path={"/admin"} component={AdminDashboard} />

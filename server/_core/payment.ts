@@ -293,27 +293,34 @@ export function registerPaymentRoute(app: Express) {
       const event = req.body;
       console.log("[InfinitePay Webhook] Evento recebido:", JSON.stringify(event));
 
-      // InfinitePay envia eventos do tipo "charge.paid" ou "payment.approved"
+      // InfinitePay envia o webhook APÓS o pagamento ser aprovado, sem campo "type"/"status".
+      // Aceita os formatos conhecidos: eventos com type/status OU o payload padrão do webhook
+      // (que contém order_nsu + transaction_nsu/invoice_slug e não tem type/status)
+      const hasWebhookPayload =
+        !!event?.order_nsu && (!!event?.transaction_nsu || !!event?.invoice_slug);
       const isPaid =
         event?.type === "charge.paid" ||
         event?.type === "payment.approved" ||
         event?.status === "paid" ||
-        event?.status === "approved";
+        event?.status === "approved" ||
+        hasWebhookPayload;
 
       if (!isPaid) {
-        console.log("[InfinitePay Webhook] Evento ignorado (não é pagamento aprovado):", event?.type || event?.status);
+        console.log("[InfinitePay Webhook] Evento ignorado (não é pagamento aprovado):", event?.type || event?.status || "sem status");
         return res.status(200).json({ received: true });
       }
 
       // Extraindo dados do evento
-      const paymentId = event?.id || event?.charge_id || event?.payment_id || null;
+      const paymentId = event?.id || event?.charge_id || event?.payment_id || event?.transaction_nsu || event?.invoice_slug || null;
       const totalPrice = event?.amount
         ? (event.amount / 100).toFixed(2)
         : event?.total_amount
         ? String(event.total_amount)
+        : event?.paid_amount
+        ? (event.paid_amount / 100).toFixed(2)
         : "0.00";
 
-      const productName = event?.items?.[0]?.name || event?.description || "Produto Eforte Games";
+      const productName = event?.items?.[0]?.name || event?.items?.[0]?.description || event?.description || "Produto Eforte Games";
 
       // Tenta obter o order_nsu do payload do webhook
       const orderNsu =
@@ -330,7 +337,7 @@ export function registerPaymentRoute(app: Express) {
       let productIdString: string | null = null;
       let coinsUsedValue = 0;
       let couponCodeValue: string | null = null;
-      let productNameFromNsu: string = event?.items?.[0]?.name || event?.description || "Produto Eforte Games";
+      let productNameFromNsu: string = event?.items?.[0]?.name || event?.items?.[0]?.description || event?.description || "Produto Eforte Games";
 
       if (orderNsu && typeof orderNsu === "string") {
         const parts = orderNsu.split("_");

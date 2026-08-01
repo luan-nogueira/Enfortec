@@ -200,7 +200,7 @@ export default function Home() {
       !dbGameBanners.some(dbGame => dbGame.title.toLowerCase().includes(fallback.title.toLowerCase()))
     )
   ];
-  const finalBanners = activeBanners.length > 0 ? activeBanners : DEFAULT_BANNERS;
+  const finalBanners = activeBanners.length > 0 ? activeBanners : DEFAULT_MAIN_BANNERS;
 
   const sidebarTopBanner = sidebarTopPromo || DEFAULT_SIDEBAR_TOP;
   const sidebarBottomBanner = sidebarBottomPromo || DEFAULT_SIDEBAR_BOTTOM;

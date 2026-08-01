@@ -839,7 +839,7 @@ export default function AdminDashboard() {
     }
   });
 
-  const handleUpdateSaleStatus = (orderId: number, status: string) => {
+  const handleUpdateSaleStatus = (orderId: number, status: "pendente" | "pago" | "enviado" | "entregue" | "cancelado") => {
     if (confirm(`Tem certeza que deseja mudar o status deste pedido para '${status}'?`)) {
       updateOrderStatusMutation.mutate({ orderId, status });
     }
@@ -1023,17 +1023,17 @@ export default function AdminDashboard() {
         const simpleIntRegex = /\s+(\d+)$/;              // ex: "20" ou "60"
 
         if (doubleNumberRegex.test(text)) {
-          const match = text.match(doubleNumberRegex);
+          const match = text.match(doubleNumberRegex)!;
           price = parseFloat(`${match[1]}.${match[2]}`);
           pricePrimary = price;
           nameAndPlatform = text.replace(doubleNumberRegex, "").trim();
         } else if (singlePriceRegex.test(text)) {
-          const match = text.match(singlePriceRegex);
+          const match = text.match(singlePriceRegex)!;
           price = parseFloat(match[1].replace(",", "."));
           pricePrimary = price;
           nameAndPlatform = text.replace(singlePriceRegex, "").trim();
         } else if (simpleIntRegex.test(text)) {
-          const match = text.match(simpleIntRegex);
+          const match = text.match(simpleIntRegex)!;
           price = parseFloat(match[1]);
           pricePrimary = price;
           nameAndPlatform = text.replace(simpleIntRegex, "").trim();
@@ -1042,7 +1042,7 @@ export default function AdminDashboard() {
         // Tenta extrair plataforma do final do nome
         const platformRegex = /\s*\(?(PS4\s*[\/\-&eE]?\s*PS5|PS5\s*[\/\-&eE]?\s*PS4|PS5|PS4)\)?$/i;
         if (platformRegex.test(nameAndPlatform)) {
-          const match = nameAndPlatform.match(platformRegex);
+          const match = nameAndPlatform.match(platformRegex)!;
           platform = match[1].toUpperCase().replace(/\s+/g, "/"); // Normaliza para PS4/PS5, PS5 ou PS4
           name = nameAndPlatform.replace(platformRegex, "").trim();
         } else {
@@ -1280,6 +1280,9 @@ export default function AdminDashboard() {
       await addDoc(collection(db, "chats", selectedChatUser.id, "messages"), {
         text: adminReplyText.trim(),
         sender: "admin",
+        senderId: "admin",
+        senderName: "Gestor Eforte",
+        isRead: true,
         timestamp: serverTimestamp()
       });
 
@@ -3255,6 +3258,11 @@ export default function AdminDashboard() {
                       <div className="bg-slate-950/80 p-3 rounded-lg border border-slate-850 text-xs text-slate-300 font-mono line-clamp-3 mb-4">
                         {chat.lastMessage || "Nenhuma mensagem recente."}
                       </div>
+                      {chat.topic && (
+                        <span className="inline-block max-w-full truncate px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-wide bg-green-950/40 border border-green-600/30 text-green-400 mb-3">
+                          💬 {chat.topic}
+                        </span>
+                      )}
                     </div>
 
                     <div className="pt-3 border-t border-slate-800 flex justify-between items-center">
@@ -3262,7 +3270,7 @@ export default function AdminDashboard() {
                         {chat.updatedAt?.toDate ? chat.updatedAt.toDate().toLocaleString("pt-BR") : "Recente"}
                       </span>
                       <Button
-                        onClick={() => setSelectedChatUser({ id: chat.userId || chat.id, name: chat.userName || "Usuário", email: chat.userEmail })}
+                        onClick={() => setSelectedChatUser({ id: chat.userId || chat.id, name: chat.userName || "Usuário", email: chat.userEmail, topic: chat.topic })}
                         className="bg-red-600 hover:bg-red-700 text-white font-bold h-8 text-xs flex items-center gap-1.5 px-3 rounded-lg"
                       >
                         <MessageCircle className="w-3.5 h-3.5" /> Falar no Chat
@@ -4536,7 +4544,7 @@ export default function AdminDashboard() {
                   <p className="text-xs text-slate-500 text-center py-12 italic">Nenhuma mensagem nesta conversa ainda. Digite abaixo para enviar a primeira mensagem.</p>
                 ) : (
                   chatMessages.map((msg, idx) => {
-                    const isAdminMsg = msg.sender === "admin";
+                    const isAdminMsg = msg.sender === "admin" || msg.senderId === "admin";
                     return (
                       <div key={msg.id || idx} className={`flex flex-col ${isAdminMsg ? "items-end" : "items-start"}`}>
                         <div className={`max-w-[85%] p-3 rounded-xl text-xs ${

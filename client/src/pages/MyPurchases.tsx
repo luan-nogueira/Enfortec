@@ -1,5 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import SellerChatDialog from "@/components/SellerChatDialog";
 import {
   Dialog,
   DialogContent,
@@ -159,6 +160,12 @@ export default function MyPurchases() {
                   <div className="text-xl font-bold text-neon">
                     R$ {Number(order.totalPrice).toFixed(2)}
                   </div>
+
+                  <SellerChatDialog
+                    productName={order.productName || "Pedido #" + order.id}
+                    buttonLabel="Falar sobre o Pedido"
+                    buttonClassName="w-full md:w-auto bg-slate-900 border border-green-600/40 hover:border-green-500 text-green-400 font-bold text-xs py-2.5 px-4 rounded-xl flex items-center justify-center gap-1.5"
+                  />
                   
                   {(order.status === 'pago' || order.status === 'enviado') ? (
                     <Button 

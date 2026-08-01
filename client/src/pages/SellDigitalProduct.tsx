@@ -16,7 +16,7 @@ export default function SellDigitalProduct() {
     priceSecondary: "",
     hasPrimary: true,
     hasSecondary: true,
-    type: "jogo" as "jogo" | "gift_card" | "licenca" | "outro",
+    type: "jogo" as "jogo" | "gift_card" | "licenca" | "assinatura" | "outro",
     keyOrCode: "",
     downloadUrl: "",
   });

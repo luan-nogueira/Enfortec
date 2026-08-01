@@ -11,6 +11,7 @@ var __export = (target, all) => {
 // drizzle/schema.ts
 var schema_exports = {};
 __export(schema_exports, {
+  challengeStatusEnum: () => challengeStatusEnum,
   conditionEnum: () => conditionEnum,
   coupons: () => coupons,
   digitalProducts: () => digitalProducts,
@@ -22,6 +23,9 @@ __export(schema_exports, {
   orders: () => orders,
   ordersRelations: () => ordersRelations,
   platformSettings: () => platformSettings,
+  platinadorSubscriptions: () => platinadorSubscriptions,
+  platinumChallenges: () => platinumChallenges,
+  platinumSubmissions: () => platinumSubmissions,
   productTypeEnum: () => productTypeEnum,
   products: () => products,
   reviews: () => reviews,
@@ -29,6 +33,8 @@ __export(schema_exports, {
   roleEnum: () => roleEnum,
   sellers: () => sellers,
   sellersRelations: () => sellersRelations,
+  submissionStatusEnum: () => submissionStatusEnum,
+  subscriptionStatusEnum: () => subscriptionStatusEnum,
   usedProducts: () => usedProducts,
   usedProductsRelations: () => usedProductsRelations,
   usedStatusEnum: () => usedStatusEnum,
@@ -37,16 +43,19 @@ __export(schema_exports, {
 });
 import { integer, pgEnum, pgTable, text, timestamp, varchar, numeric, boolean, json, serial } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-var roleEnum, conditionEnum, usedStatusEnum, digitalTypeEnum, productTypeEnum, orderStatusEnum, users, sellers, products, usedProducts, digitalProducts, orders, coupons, reviews, messages, platformSettings, usersRelations, sellersRelations, usedProductsRelations, digitalProductsRelations, ordersRelations, reviewsRelations, messagesRelations;
+var roleEnum, conditionEnum, usedStatusEnum, digitalTypeEnum, productTypeEnum, orderStatusEnum, subscriptionStatusEnum, challengeStatusEnum, submissionStatusEnum, users, sellers, products, usedProducts, digitalProducts, orders, coupons, reviews, messages, platformSettings, platinadorSubscriptions, platinumChallenges, platinumSubmissions, usersRelations, sellersRelations, usedProductsRelations, digitalProductsRelations, ordersRelations, reviewsRelations, messagesRelations;
 var init_schema = __esm({
   "drizzle/schema.ts"() {
     "use strict";
     roleEnum = pgEnum("role", ["user", "admin", "vendedor"]);
     conditionEnum = pgEnum("condition", ["novo", "como_novo", "bom", "aceitavel"]);
     usedStatusEnum = pgEnum("used_status", ["pendente", "aprovado", "rejeitado", "vendido"]);
-    digitalTypeEnum = pgEnum("digital_type", ["jogo", "gift_card", "licenca", "outro"]);
+    digitalTypeEnum = pgEnum("digital_type", ["jogo", "gift_card", "licenca", "assinatura", "outro"]);
     productTypeEnum = pgEnum("product_type", ["store", "used", "digital"]);
     orderStatusEnum = pgEnum("order_status", ["pendente", "pago", "enviado", "entregue", "cancelado"]);
+    subscriptionStatusEnum = pgEnum("subscription_status", ["ativa", "cancelada", "expirada", "pendente"]);
+    challengeStatusEnum = pgEnum("challenge_status", ["ativo", "encerrado", "brevemente"]);
+    submissionStatusEnum = pgEnum("submission_status", ["pendente", "aprovado", "rejeitado"]);
     users = pgTable("users", {
       /** Surrogate primary key. Auto-incremented by PostgreSQL. */
       id: serial("id").primaryKey(),
@@ -56,6 +65,7 @@ var init_schema = __esm({
       email: varchar("email", { length: 320 }),
       loginMethod: varchar("loginMethod", { length: 64 }),
       cpf: varchar("cpf", { length: 18 }),
+      psnId: varchar("psnId", { length: 100 }),
       forteCoins: integer("forteCoins").default(10).notNull(),
       role: roleEnum("role").default("user").notNull(),
       createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -99,6 +109,9 @@ var init_schema = __esm({
       status: usedStatusEnum("status").default("pendente"),
       estado: varchar("estado", { length: 50 }),
       cidade: varchar("cidade", { length: 100 }),
+      cep: varchar("cep", { length: 9 }),
+      bairro: varchar("bairro", { length: 100 }),
+      boostedUntil: timestamp("boostedUntil"),
       createdAt: timestamp("createdAt").defaultNow().notNull(),
       updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => /* @__PURE__ */ new Date())
     });
@@ -108,6 +121,8 @@ var init_schema = __esm({
       name: varchar("name", { length: 255 }).notNull(),
       description: text("description"),
       price: numeric("price", { precision: 10, scale: 2 }).notNull(),
+      pricePrimary: numeric("pricePrimary", { precision: 10, scale: 2 }),
+      priceSecondary: numeric("priceSecondary", { precision: 10, scale: 2 }),
       type: digitalTypeEnum("type").notNull(),
       keyOrCode: text("keyOrCode"),
       downloadUrl: varchar("downloadUrl", { length: 500 }),
@@ -134,6 +149,7 @@ var init_schema = __esm({
       paymentId: varchar("paymentId", { length: 255 }),
       productName: varchar("productName", { length: 255 }),
       firebaseProductId: varchar("firebaseProductId", { length: 255 }),
+      accountType: varchar("accountType", { length: 20 }),
       deliveryDetails: text("deliveryDetails"),
       coinsUsed: integer("coinsUsed").default(0).notNull(),
       createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -170,7 +186,42 @@ var init_schema = __esm({
     platformSettings = pgTable("platform_settings", {
       id: integer("id").primaryKey(),
       commissionPercentage: numeric("commissionPercentage", { precision: 5, scale: 2 }).default("10"),
+      vipWhatsappUrl: varchar("vipWhatsappUrl", { length: 500 }).default("https://chat.whatsapp.com/Gkx7ExampleVipLink"),
       updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => /* @__PURE__ */ new Date())
+    });
+    platinadorSubscriptions = pgTable("platinador_subscriptions", {
+      id: serial("id").primaryKey(),
+      userId: integer("userId").notNull().unique(),
+      status: subscriptionStatusEnum("status").default("ativa").notNull(),
+      planName: varchar("planName", { length: 100 }).default("Clube Platinador VIP").notNull(),
+      price: numeric("price", { precision: 10, scale: 2 }).default("15.00").notNull(),
+      startsAt: timestamp("startsAt").defaultNow().notNull(),
+      expiresAt: timestamp("expiresAt").notNull(),
+      paymentId: varchar("paymentId", { length: 255 }),
+      createdAt: timestamp("createdAt").defaultNow().notNull()
+    });
+    platinumChallenges = pgTable("platinum_challenges", {
+      id: serial("id").primaryKey(),
+      gameTitle: varchar("gameTitle", { length: 255 }).notNull(),
+      description: text("description"),
+      platform: varchar("platform", { length: 50 }).default("PS4 / PS5").notNull(),
+      imageUrl: varchar("imageUrl", { length: 500 }),
+      rewardCoins: integer("rewardCoins").default(500).notNull(),
+      status: challengeStatusEnum("status").default("ativo").notNull(),
+      deadline: timestamp("deadline"),
+      createdAt: timestamp("createdAt").defaultNow().notNull()
+    });
+    platinumSubmissions = pgTable("platinum_submissions", {
+      id: serial("id").primaryKey(),
+      challengeId: integer("challengeId").notNull(),
+      userId: integer("userId").notNull(),
+      psnId: varchar("psnId", { length: 100 }).notNull(),
+      proofUrl: text("proofUrl").notNull(),
+      status: submissionStatusEnum("status").default("pendente").notNull(),
+      coinsAwarded: integer("coinsAwarded").default(0).notNull(),
+      adminNotes: text("adminNotes"),
+      submittedAt: timestamp("submittedAt").defaultNow().notNull(),
+      reviewedAt: timestamp("reviewedAt")
     });
     usersRelations = relations(users, ({ one, many }) => ({
       seller: one(sellers, {
@@ -374,7 +425,7 @@ var NOT_ADMIN_ERR_MSG = "You do not have required permission (10002)";
 
 // server/db.ts
 init_schema();
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 
@@ -397,8 +448,8 @@ function getDb() {
     return null;
   }
   try {
-    const sql = neon(process.env.DATABASE_URL);
-    return drizzle(sql);
+    const sqlClient = neon(process.env.DATABASE_URL);
+    return drizzle(sqlClient);
   } catch (error) {
     console.warn("[Database] Falha ao inicializar banco:", error.message);
     return null;
@@ -414,47 +465,54 @@ async function upsertUser(user) {
     return;
   }
   try {
-    const values = {
-      openId: user.openId
-    };
-    const updateSet = {};
-    const textFields = ["name", "email", "loginMethod", "cpf"];
-    const assignNullable = (field) => {
-      const value = user[field];
-      if (value === void 0) return;
-      const normalized = value ?? null;
-      values[field] = normalized;
-      updateSet[field] = normalized;
-    };
-    textFields.forEach(assignNullable);
-    if (user.forteCoins !== void 0) {
-      values.forteCoins = user.forteCoins;
-      updateSet.forteCoins = user.forteCoins;
+    const userEmailLower = user.email?.toLowerCase().trim();
+    const ADMIN_EMAILS = [
+      "luanmnogueira@gmail.com",
+      "enfortec@admin.com",
+      "luiz220190@hotmail.com",
+      "sandrinhooperfectt@gmail.com"
+    ];
+    const isAdmin = user.openId === ENV.ownerOpenId || userEmailLower && ADMIN_EMAILS.includes(userEmailLower);
+    const roleToSet = user.role || (isAdmin ? "admin" : "user");
+    let existingUser = await db.select().from(users).where(eq(users.openId, user.openId)).limit(1).then((r) => r[0]);
+    if (!existingUser && userEmailLower) {
+      existingUser = await db.select().from(users).where(sql`LOWER(${users.email}) = ${userEmailLower}`).limit(1).then((r) => r[0]);
     }
-    if (user.lastSignedIn !== void 0) {
-      values.lastSignedIn = user.lastSignedIn;
-      updateSet.lastSignedIn = user.lastSignedIn;
+    if (existingUser) {
+      const updateData = {
+        openId: user.openId,
+        lastSignedIn: user.lastSignedIn || /* @__PURE__ */ new Date(),
+        role: isAdmin ? "admin" : existingUser.role
+      };
+      if (user.name) updateData.name = user.name;
+      if (user.email) updateData.email = user.email;
+      if (user.cpf) updateData.cpf = user.cpf;
+      if (user.forteCoins !== void 0) updateData.forteCoins = user.forteCoins;
+      if (user.loginMethod) updateData.loginMethod = user.loginMethod;
+      await db.update(users).set(updateData).where(eq(users.id, existingUser.id));
+    } else {
+      const insertData = {
+        openId: user.openId,
+        name: user.name || "User",
+        email: user.email || null,
+        loginMethod: user.loginMethod || "firebase",
+        role: roleToSet,
+        lastSignedIn: user.lastSignedIn || /* @__PURE__ */ new Date(),
+        forteCoins: user.forteCoins ?? 10
+      };
+      if (user.cpf) insertData.cpf = user.cpf;
+      await db.insert(users).values(insertData).onConflictDoUpdate({
+        target: users.openId,
+        set: {
+          name: user.name || "User",
+          email: user.email || null,
+          role: roleToSet,
+          lastSignedIn: user.lastSignedIn || /* @__PURE__ */ new Date()
+        }
+      });
     }
-    if (user.role !== void 0) {
-      values.role = user.role;
-      updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId || user.email === "luanmnogueira@gmail.com" || user.email === "enfortec@admin.com") {
-      values.role = "admin";
-      updateSet.role = "admin";
-    }
-    if (!values.lastSignedIn) {
-      values.lastSignedIn = /* @__PURE__ */ new Date();
-    }
-    if (Object.keys(updateSet).length === 0) {
-      updateSet.lastSignedIn = /* @__PURE__ */ new Date();
-    }
-    await db.insert(users).values(values).onConflictDoUpdate({
-      target: users.openId,
-      set: updateSet
-    });
   } catch (error) {
     console.error("[Database] Failed to upsert user:", error);
-    throw error;
   }
 }
 async function getUserByOpenId(openId) {
@@ -467,7 +525,19 @@ async function getUserByOpenId(openId) {
     const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
     return result.length > 0 ? result[0] : void 0;
   } catch (error) {
-    console.error("[Database Error] getUserByOpenId failed:", error);
+    console.error("[Database] Failed to get user by openId:", error);
+    return void 0;
+  }
+}
+async function getUserByEmail(email) {
+  try {
+    const db = getDb();
+    if (!db || !email) return void 0;
+    const cleanEmail = email.toLowerCase().trim();
+    const result = await db.select().from(users).where(sql`LOWER(${users.email}) = ${cleanEmail}`).limit(1);
+    return result.length > 0 ? result[0] : void 0;
+  } catch (error) {
+    console.error("[Database] Failed to get user by email:", error);
     return void 0;
   }
 }
@@ -664,8 +734,8 @@ async function getPlatformSettings() {
   if (!db) return void 0;
   const result = await db.select().from(platformSettings).where(eq(platformSettings.id, 1)).limit(1);
   if (result.length === 0) {
-    await db.insert(platformSettings).values({ id: 1, commissionPercentage: "10" }).onConflictDoNothing();
-    return { id: 1, commissionPercentage: "10" };
+    await db.insert(platformSettings).values({ id: 1, commissionPercentage: "6" }).onConflictDoNothing();
+    return { id: 1, commissionPercentage: "6" };
   }
   return result[0];
 }
@@ -728,6 +798,36 @@ async function deleteOrder(orderId) {
   const db = getDb();
   if (!db) throw new Error("Database not available");
   return db.delete(orders).where(eq(orders.id, orderId));
+}
+async function getRecentReviews() {
+  const db = getDb();
+  if (!db) return [];
+  const results = await db.select({
+    review: reviews,
+    buyer: users,
+    order: orders,
+    product: products,
+    digitalProduct: digitalProducts,
+    usedProduct: usedProducts
+  }).from(reviews).leftJoin(users, eq(reviews.buyerId, users.id)).leftJoin(orders, eq(reviews.orderId, orders.id)).leftJoin(products, eq(orders.productId, products.id)).leftJoin(digitalProducts, eq(orders.digitalProductId, digitalProducts.id)).leftJoin(usedProducts, eq(orders.usedProductId, usedProducts.id)).orderBy(desc(reviews.createdAt)).limit(50);
+  return results.map((r) => {
+    let productName = r.order?.productName || "Produto";
+    if (r.order?.productType === "store" && r.product) {
+      productName = r.product.name;
+    } else if (r.order?.productType === "used" && r.usedProduct) {
+      productName = r.usedProduct.name;
+    } else if (r.order?.productType === "digital" && r.digitalProduct) {
+      productName = r.digitalProduct.name;
+    }
+    return {
+      id: r.review.id,
+      rating: r.review.rating,
+      comment: r.review.comment,
+      createdAt: r.review.createdAt,
+      buyerName: r.buyer?.name || "Cliente",
+      productName
+    };
+  });
 }
 
 // server/_core/cookies.ts
@@ -1383,59 +1483,32 @@ async function createContext(opts) {
       console.log("[TRPC Server] Firebase Token decoded payload sub:", decoded?.sub || "none");
       if (decoded && decoded.sub) {
         const uid = decoded.sub;
-        const email = decoded.email;
+        const email = decoded.email?.toLowerCase().trim();
         const name = decoded.name || email?.split("@")[0] || "User";
         try {
-          user = await getUserByOpenId(uid) || null;
-          console.log("[TRPC Server] Database user lookup result (by openId):", user ? `found (id: ${user.id})` : "not found");
-          if (!user) {
-            try {
-              console.log("[TRPC Server] User not found in database, upserting...");
-              await upsertUser({
-                openId: uid,
-                name,
-                email,
-                loginMethod: "firebase",
-                lastSignedIn: /* @__PURE__ */ new Date()
-              });
-              user = await getUserByOpenId(uid) || null;
-              console.log("[TRPC Server] User upsert complete, user id:", user?.id);
-            } catch (dbError) {
-              console.error("[FirebaseAuth] Failed to upsert user in database:", dbError);
-            }
-          } else {
-            try {
-              await upsertUser({
-                openId: uid,
-                lastSignedIn: /* @__PURE__ */ new Date()
-              });
-            } catch (e) {
-              console.error("[FirebaseAuth] Failed to update user lastSignedIn:", e);
-            }
-          }
-        } catch (dbErr) {
-          console.error("[TRPC Server] Database user lookup failed, falling back to local mock user:", dbErr);
-          user = {
-            id: 999999,
+          user = await getUserByOpenId(uid) || (email ? await getUserByEmail(email) : void 0) || null;
+          console.log("[TRPC Server] Database user lookup result:", user ? `found (id: ${user.id}, openId: ${user.openId})` : "not found");
+          await upsertUser({
             openId: uid,
             name,
-            email: email || null,
-            loginMethod: "firebase_fallback",
-            role: "user",
-            createdAt: /* @__PURE__ */ new Date(),
-            updatedAt: /* @__PURE__ */ new Date(),
-            lastSignedIn: /* @__PURE__ */ new Date(),
-            balance: "0.00"
-          };
+            email,
+            loginMethod: "firebase",
+            lastSignedIn: /* @__PURE__ */ new Date()
+          });
+          user = await getUserByOpenId(uid) || (email ? await getUserByEmail(email) : void 0) || null;
+        } catch (dbErr) {
+          console.error("[TRPC Server] User auth processing error:", dbErr);
         }
         if (!user) {
-          console.log("[TRPC Server] SQL database unreachable or user not found, using Firebase user fallback.");
           user = {
             id: 999999,
             openId: uid,
             name,
             email: email || null,
             loginMethod: "firebase_fallback",
+            cpf: null,
+            psnId: null,
+            forteCoins: 0,
             role: "user",
             createdAt: /* @__PURE__ */ new Date(),
             updatedAt: /* @__PURE__ */ new Date(),
@@ -1446,7 +1519,13 @@ async function createContext(opts) {
       }
     }
   }
-  if (user && (user.email === "luanmnogueira@gmail.com" || user.email === "enfortec@admin.com")) {
+  const ADMIN_EMAILS = [
+    "luanmnogueira@gmail.com",
+    "enfortec@admin.com",
+    "luiz220190@hotmail.com",
+    "sandrinhooperfectt@gmail.com"
+  ];
+  if (user && user.email && ADMIN_EMAILS.includes(user.email.toLowerCase())) {
     user.role = "admin";
   }
   return {
@@ -1461,11 +1540,12 @@ import { eq as eq3 } from "drizzle-orm";
 function registerPaymentRoute(app2) {
   app2.get("/api/games/search-cover", async (req, res) => {
     try {
-      const term = req.query.term;
-      if (!term) {
+      const rawTerm = req.query.term;
+      if (!rawTerm) {
         return res.status(400).json({ success: false, error: "Termo de busca \xE9 obrigat\xF3rio." });
       }
-      const steamUrl = `https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(term)}&l=portuguese&cc=BR`;
+      const term = rawTerm.replace(/\b(PS4\/PS5|PS5|PS4|XBOX|PC)\b/gi, "").replace(/\b(MÍDIA|MIDIA|DIGITAL|CONTA|COMPARTILHADA|PRIMÁRIA|SECUNDÁRIA)\b/gi, "").trim();
+      const steamUrl = `https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(term || rawTerm)}&l=portuguese&cc=BR`;
       const response = await axios2.get(steamUrl);
       const data = response.data;
       if (data && data.items && data.items.length > 0) {
@@ -1524,8 +1604,17 @@ function registerPaymentRoute(app2) {
   });
   app2.post("/api/infinitepay/checkout", async (req, res) => {
     try {
-      const { name, price, quantity = 1, redirectUrl, productType = "store", productId, sellerId, customer, coinsToUse = 0, couponCode } = req.body;
-      const productNameStr = name || "Produto";
+      const { name, price, quantity = 1, redirectUrl, productType = "store", productId, sellerId, customer, coinsToUse = 0, couponCode, accountType } = req.body;
+      let productNameStr = name || "Produto";
+      if (accountType === "secundaria") {
+        if (!productNameStr.toLowerCase().includes("secund\xE1ria") && !productNameStr.toLowerCase().includes("secundaria")) {
+          productNameStr += " (Conta Secund\xE1ria)";
+        }
+      } else if (accountType === "primaria") {
+        if (!productNameStr.toLowerCase().includes("prim\xE1ria") && !productNameStr.toLowerCase().includes("primaria")) {
+          productNameStr += " (Conta Prim\xE1ria)";
+        }
+      }
       if (!name || price === void 0) {
         return res.status(400).json({ success: false, error: "Nome e pre\xE7o s\xE3o obrigat\xF3rios." });
       }
@@ -1573,7 +1662,7 @@ function registerPaymentRoute(app2) {
       if (finalPrice <= 0) {
         const database = await getDb();
         if (database) {
-          let commissionPct = "10.00";
+          let commissionPct = "6.00";
           try {
             const settings = await getPlatformSettings();
             if (settings?.commissionPercentage) {
@@ -1595,6 +1684,7 @@ function registerPaymentRoute(app2) {
             paymentId: `ForteCoins-100%-${Date.now()}`,
             coinsUsed: Number(coinsToUse),
             productName: productNameStr,
+            accountType: accountType || null,
             firebaseProductId: productId ? String(productId) : null
           };
           if (productType === "store" && productId) {
@@ -1676,14 +1766,15 @@ function registerPaymentRoute(app2) {
     try {
       const event = req.body;
       console.log("[InfinitePay Webhook] Evento recebido:", JSON.stringify(event));
-      const isPaid = event?.type === "charge.paid" || event?.type === "payment.approved" || event?.status === "paid" || event?.status === "approved";
+      const hasWebhookPayload = !!event?.order_nsu && (!!event?.transaction_nsu || !!event?.invoice_slug);
+      const isPaid = event?.type === "charge.paid" || event?.type === "payment.approved" || event?.status === "paid" || event?.status === "approved" || hasWebhookPayload;
       if (!isPaid) {
-        console.log("[InfinitePay Webhook] Evento ignorado (n\xE3o \xE9 pagamento aprovado):", event?.type || event?.status);
+        console.log("[InfinitePay Webhook] Evento ignorado (n\xE3o \xE9 pagamento aprovado):", event?.type || event?.status || "sem status");
         return res.status(200).json({ received: true });
       }
-      const paymentId = event?.id || event?.charge_id || event?.payment_id || null;
-      const totalPrice = event?.amount ? (event.amount / 100).toFixed(2) : event?.total_amount ? String(event.total_amount) : "0.00";
-      const productName = event?.items?.[0]?.name || event?.description || "Produto Eforte Games";
+      const paymentId = event?.id || event?.charge_id || event?.payment_id || event?.transaction_nsu || event?.invoice_slug || null;
+      const totalPrice = event?.amount ? (event.amount / 100).toFixed(2) : event?.total_amount ? String(event.total_amount) : event?.paid_amount ? (event.paid_amount / 100).toFixed(2) : "0.00";
+      const productName = event?.items?.[0]?.name || event?.items?.[0]?.description || event?.description || "Produto Eforte Games";
       const orderNsu = event?.order_nsu || event?.data?.order_nsu || event?.payment?.order_nsu || event?.charge?.order_nsu || event?.object?.order_nsu || null;
       let buyerId = 0;
       let sellerId = null;
@@ -1691,7 +1782,7 @@ function registerPaymentRoute(app2) {
       let productIdString = null;
       let coinsUsedValue = 0;
       let couponCodeValue = null;
-      let productNameFromNsu = event?.items?.[0]?.name || event?.description || "Produto Eforte Games";
+      let productNameFromNsu = event?.items?.[0]?.name || event?.items?.[0]?.description || event?.description || "Produto Eforte Games";
       if (orderNsu && typeof orderNsu === "string") {
         const parts = orderNsu.split("_");
         if (parts.length >= 4) {
@@ -1716,7 +1807,7 @@ function registerPaymentRoute(app2) {
       console.log(`[InfinitePay Webhook] Pagamento confirmado \u2014 ID: ${paymentId}, Valor: R$${totalPrice}, Produto: ${productName}, Buyer: ${buyerId}, Seller: ${sellerId}, Tipo: ${productType}, Moedas usadas: ${coinsUsedValue}, Cupom: ${couponCodeValue}`);
       const database = await getDb();
       if (database) {
-        let commissionPct = "10.00";
+        let commissionPct = "6.00";
         try {
           const settings = await getPlatformSettings();
           if (settings?.commissionPercentage) {
@@ -1936,7 +2027,8 @@ var systemRouter = router({
 // server/routers.ts
 import { z as z2 } from "zod";
 init_schema();
-import { eq as eq4 } from "drizzle-orm";
+import { eq as eq4, desc as desc2, sql as sql2 } from "drizzle-orm";
+import { TRPCError as TRPCError3 } from "@trpc/server";
 var appRouter = router({
   system: systemRouter,
   auth: router({
@@ -1954,19 +2046,46 @@ var appRouter = router({
       forteCoins: z2.number().optional()
     })).mutation(async ({ ctx, input }) => {
       const database = await getDb();
-      if (!database) throw new Error("Database not available");
+      if (!database) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indispon\xEDvel." });
       const updateData = {};
       if (input.cpf) {
         const cleanCpf = input.cpf.replace(/\D/g, "");
-        const existingUserWithCpf = await database.select().from(users).where(eq4(users.cpf, cleanCpf)).limit(1);
-        if (existingUserWithCpf.length > 0 && existingUserWithCpf[0].id !== ctx.user.id) {
-          throw new Error("Este CPF j\xE1 est\xE1 vinculado a outra conta. N\xE3o \xE9 permitido o uso de um mesmo CPF em m\xFAltiplas contas.");
+        try {
+          const existingUserWithCpf = await database.select().from(users).where(eq4(users.cpf, cleanCpf)).limit(1);
+          if (existingUserWithCpf.length > 0 && existingUserWithCpf[0].id !== ctx.user.id && existingUserWithCpf[0].openId !== ctx.user.openId) {
+            throw new TRPCError3({
+              code: "BAD_REQUEST",
+              message: "Este CPF j\xE1 est\xE1 vinculado a outra conta. N\xE3o \xE9 permitido o uso de um mesmo CPF em m\xFAltiplas contas."
+            });
+          }
+        } catch (err) {
+          if (err instanceof TRPCError3) throw err;
+          console.warn("[updateProfile] Warning checking duplicate CPF in database:", err.message);
         }
         updateData.cpf = cleanCpf;
       }
       if (input.name) updateData.name = input.name;
       if (input.forteCoins !== void 0) updateData.forteCoins = input.forteCoins;
-      await database.update(users).set(updateData).where(eq4(users.id, ctx.user.id));
+      try {
+        if (ctx.user.openId) {
+          await upsertUser({
+            openId: ctx.user.openId,
+            name: ctx.user.name || input.name || "User",
+            email: ctx.user.email,
+            ...updateData
+          });
+        } else if (ctx.user.id && ctx.user.id !== 999999) {
+          await database.update(users).set(updateData).where(eq4(users.id, ctx.user.id));
+        } else if (ctx.user.email) {
+          await database.update(users).set(updateData).where(sql2`LOWER(${users.email}) = LOWER(${ctx.user.email.trim()})`);
+        }
+      } catch (dbErr) {
+        console.error("[updateProfile] Error updating user profile in database:", dbErr);
+        throw new TRPCError3({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Erro ao salvar perfil no banco de dados. Tente novamente."
+        });
+      }
       return { success: true };
     })
   }),
@@ -2015,8 +2134,10 @@ var appRouter = router({
       price: z2.number().positive(),
       condition: z2.enum(["novo", "como_novo", "bom", "aceitavel"]),
       images: z2.array(z2.string()).optional(),
+      cep: z2.string().optional(),
       estado: z2.string().optional(),
-      cidade: z2.string().optional()
+      cidade: z2.string().optional(),
+      bairro: z2.string().optional()
     })).mutation(async ({ ctx, input }) => {
       const database = await getDb();
       if (!database) throw new Error("Database not available");
@@ -2029,9 +2150,23 @@ var appRouter = router({
         price: input.price.toString(),
         condition: input.condition,
         images: input.images || [],
+        cep: input.cep || null,
         estado: input.estado || null,
-        cidade: input.cidade || null
+        cidade: input.cidade || null,
+        bairro: input.bairro || null
       });
+      return result;
+    }),
+    boost: protectedProcedure.input(z2.object({
+      id: z2.number()
+    })).mutation(async ({ ctx, input }) => {
+      const database = await getDb();
+      if (!database) throw new Error("Database not available");
+      const seller = await getSellerByUserId(ctx.user.id);
+      if (!seller) throw new Error("User is not a seller");
+      const boostedUntilDate = /* @__PURE__ */ new Date();
+      boostedUntilDate.setDate(boostedUntilDate.getDate() + 3);
+      const result = await database.update(usedProducts).set({ boostedUntil: boostedUntilDate }).where(eq4(usedProducts.id, input.id));
       return result;
     })
   }),
@@ -2042,7 +2177,9 @@ var appRouter = router({
       name: z2.string().min(3),
       description: z2.string(),
       price: z2.number().positive(),
-      type: z2.enum(["jogo", "gift_card", "licenca", "outro"]),
+      pricePrimary: z2.number().positive().optional(),
+      priceSecondary: z2.number().positive().optional(),
+      type: z2.enum(["jogo", "gift_card", "licenca", "assinatura", "outro"]),
       keyOrCode: z2.string().optional(),
       downloadUrl: z2.string().optional()
     })).mutation(async ({ ctx, input }) => {
@@ -2054,6 +2191,8 @@ var appRouter = router({
         name: input.name,
         description: input.description,
         price: input.price.toString(),
+        pricePrimary: input.pricePrimary?.toString() || null,
+        priceSecondary: input.priceSecondary?.toString() || null,
         type: input.type,
         keyOrCode: input.keyOrCode,
         downloadUrl: input.downloadUrl
@@ -2069,14 +2208,14 @@ var appRouter = router({
       return seller ? getOrdersBySellerId(seller.userId) : [];
     }),
     listAll: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new Error("Unauthorized");
+      if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
       return getAllOrdersWithDetails();
     }),
     deliverOrder: protectedProcedure.input(z2.object({
       orderId: z2.number(),
       deliveryDetails: z2.string().min(1)
     })).mutation(async ({ ctx, input }) => {
-      if (ctx.user.role !== "admin") throw new Error("Unauthorized");
+      if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
       return deliverOrder(input.orderId, input.deliveryDetails);
     }),
     confirmAndReview: protectedProcedure.input(z2.object({
@@ -2088,13 +2227,13 @@ var appRouter = router({
     }),
     updateStatus: protectedProcedure.input(z2.object({
       orderId: z2.number(),
-      status: z2.string()
+      status: z2.enum(["pendente", "pago", "enviado", "entregue", "cancelado"])
     })).mutation(async ({ ctx, input }) => {
-      if (ctx.user.role !== "admin") throw new Error("Unauthorized");
+      if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
       return updateOrderStatus(input.orderId, input.status);
     }),
     delete: protectedProcedure.input(z2.number()).mutation(async ({ ctx, input }) => {
-      if (ctx.user.role !== "admin") throw new Error("Unauthorized");
+      if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
       return deleteOrder(input);
     })
   }),
@@ -2104,18 +2243,19 @@ var appRouter = router({
     update: protectedProcedure.input(z2.object({
       commissionPercentage: z2.string()
     })).mutation(async ({ ctx, input }) => {
-      if (ctx.user.role !== "admin") throw new Error("Unauthorized");
+      if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
       return updatePlatformSettings(input.commissionPercentage);
     })
   }),
   // Reviews Router
   reviews: router({
-    getBySellerId: publicProcedure.input(z2.number()).query(({ input }) => getReviewsBySellerId(input))
+    getBySellerId: publicProcedure.input(z2.number()).query(({ input }) => getReviewsBySellerId(input)),
+    getRecent: publicProcedure.query(() => getRecentReviews())
   }),
   // Coupons Router
   coupons: router({
     list: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new Error("Unauthorized");
+      if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
       return getAllCoupons();
     }),
     create: protectedProcedure.input(z2.object({
@@ -2124,7 +2264,7 @@ var appRouter = router({
       maxUses: z2.number().nullable().optional(),
       expiresAt: z2.string().nullable().optional()
     })).mutation(async ({ ctx, input }) => {
-      if (ctx.user.role !== "admin") throw new Error("Unauthorized");
+      if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
       const expiresAtDate = input.expiresAt ? new Date(input.expiresAt) : null;
       return createCoupon({
         code: input.code.toUpperCase().trim(),
@@ -2142,7 +2282,7 @@ var appRouter = router({
       maxUses: z2.number().nullable().optional(),
       expiresAt: z2.string().nullable().optional()
     })).mutation(async ({ ctx, input }) => {
-      if (ctx.user.role !== "admin") throw new Error("Unauthorized");
+      if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
       const updateData = {};
       if (input.isActive !== void 0) updateData.isActive = input.isActive;
       if (input.code !== void 0) updateData.code = input.code.toUpperCase().trim();
@@ -2154,7 +2294,7 @@ var appRouter = router({
       return updateCoupon(input.id, updateData);
     }),
     delete: protectedProcedure.input(z2.number()).mutation(async ({ ctx, input }) => {
-      if (ctx.user.role !== "admin") throw new Error("Unauthorized");
+      if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
       return deleteCoupon(input);
     }),
     validate: publicProcedure.input(z2.object({
@@ -2173,6 +2313,284 @@ var appRouter = router({
         code: coupon.code,
         discountPercentage: parseFloat(coupon.discountPercentage)
       };
+    })
+  }),
+  // Platinador Club Router
+  platinador: router({
+    getStatus: protectedProcedure.query(async ({ ctx }) => {
+      const database = await getDb();
+      let isSubscribed = false;
+      let subscription = null;
+      let vipWhatsappUrl = "https://chat.whatsapp.com/Gkx7EforteGamesVipClub";
+      if (database) {
+        try {
+          const subs = await database.select().from(platinadorSubscriptions).where(eq4(platinadorSubscriptions.userId, ctx.user.id)).limit(1);
+          if (subs.length > 0 && subs[0].status === "ativa") {
+            const now = /* @__PURE__ */ new Date();
+            if (subs[0].expiresAt && new Date(subs[0].expiresAt) > now) {
+              isSubscribed = true;
+              subscription = subs[0];
+            }
+          }
+          const settings = await database.select().from(platformSettings).where(eq4(platformSettings.id, 1)).limit(1);
+          if (settings.length > 0 && settings[0].vipWhatsappUrl) {
+            vipWhatsappUrl = settings[0].vipWhatsappUrl;
+          }
+        } catch (e) {
+          console.error("[TRPC Platinador] Error fetching status:", e);
+        }
+      }
+      return {
+        isSubscribed,
+        subscription,
+        psnId: ctx.user.psnId || null,
+        forteCoins: ctx.user.forteCoins || 0,
+        vipWhatsappUrl
+      };
+    }),
+    updatePsnId: protectedProcedure.input(z2.object({ psnId: z2.string().min(2) })).mutation(async ({ ctx, input }) => {
+      const database = await getDb();
+      if (database) {
+        await database.update(users).set({ psnId: input.psnId.trim() }).where(eq4(users.id, ctx.user.id));
+      }
+      return { success: true, psnId: input.psnId.trim() };
+    }),
+    subscribe: protectedProcedure.mutation(async ({ ctx }) => {
+      const database = await getDb();
+      const now = /* @__PURE__ */ new Date();
+      const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1e3);
+      if (database) {
+        try {
+          const existing = await database.select().from(platinadorSubscriptions).where(eq4(platinadorSubscriptions.userId, ctx.user.id)).limit(1);
+          if (existing.length > 0) {
+            await database.update(platinadorSubscriptions).set({
+              status: "ativa",
+              startsAt: now,
+              expiresAt,
+              paymentId: "PIX_SIMULATED_" + Date.now()
+            }).where(eq4(platinadorSubscriptions.id, existing[0].id));
+          } else {
+            await database.insert(platinadorSubscriptions).values({
+              userId: ctx.user.id,
+              status: "ativa",
+              planName: "Clube Platinador VIP",
+              price: "15.00",
+              startsAt: now,
+              expiresAt,
+              paymentId: "PIX_SIMULATED_" + Date.now()
+            });
+          }
+        } catch (e) {
+          console.error("[TRPC Platinador] Subscribe DB error:", e);
+        }
+      }
+      return {
+        success: true,
+        expiresAt,
+        message: "Assinatura do Clube Platinador ativada com sucesso por 30 dias!"
+      };
+    }),
+    listChallenges: publicProcedure.query(async () => {
+      const database = await getDb();
+      if (database) {
+        try {
+          const list = await database.select().from(platinumChallenges).orderBy(desc2(platinumChallenges.createdAt));
+          if (list.length > 0) return list;
+        } catch (e) {
+          console.error("[TRPC Platinador] Error fetching challenges:", e);
+        }
+      }
+      return [
+        {
+          id: 1,
+          gameTitle: "God of War Ragnar\xF6k",
+          description: "Conquiste todos os trof\xE9us incluindo a vit\xF3ria na arena de Valhalla e derrotar Gn\xE1.",
+          platform: "PS4 / PS5",
+          imageUrl: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=800",
+          rewardCoins: 500,
+          status: "ativo",
+          createdAt: /* @__PURE__ */ new Date()
+        },
+        {
+          id: 2,
+          gameTitle: "Marvel's Spider-Man 2",
+          description: "Desbloqueie a platina completa explorando toda a Nova York com Peter e Miles.",
+          platform: "PS5",
+          imageUrl: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=800",
+          rewardCoins: 400,
+          status: "ativo",
+          createdAt: /* @__PURE__ */ new Date()
+        },
+        {
+          id: 3,
+          gameTitle: "Elden Ring",
+          description: "Alcance o t\xEDtulo de Lorde Prateado e consiga todos os 42 trof\xE9us nas terras intermedi\xE1rias.",
+          platform: "PS4 / PS5",
+          imageUrl: "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?q=80&w=800",
+          rewardCoins: 600,
+          status: "ativo",
+          createdAt: /* @__PURE__ */ new Date()
+        }
+      ];
+    }),
+    submitPlatinum: protectedProcedure.input(
+      z2.object({
+        challengeId: z2.number(),
+        proofUrl: z2.string().url("Envie um link v\xE1lido para a imagem de comprova\xE7\xE3o"),
+        psnId: z2.string().min(2)
+      })
+    ).mutation(async ({ ctx, input }) => {
+      const database = await getDb();
+      if (database) {
+        await database.update(users).set({ psnId: input.psnId.trim() }).where(eq4(users.id, ctx.user.id));
+        await database.insert(platinumSubmissions).values({
+          challengeId: input.challengeId,
+          userId: ctx.user.id,
+          psnId: input.psnId.trim(),
+          proofUrl: input.proofUrl.trim(),
+          status: "pendente"
+        });
+      }
+      return {
+        success: true,
+        message: "Comprova\xE7\xE3o de platina enviada com sucesso! Aguarde a an\xE1lise da nossa equipe."
+      };
+    }),
+    getUserSubmissions: protectedProcedure.query(async ({ ctx }) => {
+      const database = await getDb();
+      if (database) {
+        try {
+          const list = await database.select().from(platinumSubmissions).where(eq4(platinumSubmissions.userId, ctx.user.id)).orderBy(desc2(platinumSubmissions.submittedAt));
+          return list;
+        } catch (e) {
+          console.error("[TRPC Platinador] Error fetching user submissions:", e);
+        }
+      }
+      return [];
+    }),
+    adminCreateChallenge: protectedProcedure.input(
+      z2.object({
+        gameTitle: z2.string().min(2),
+        description: z2.string().optional(),
+        platform: z2.string().default("PS4 / PS5"),
+        imageUrl: z2.string().optional(),
+        rewardCoins: z2.number().default(500)
+      })
+    ).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin")
+        throw new TRPCError3({ code: "FORBIDDEN", message: "Apenas administradores" });
+      const database = await getDb();
+      if (database) {
+        await database.insert(platinumChallenges).values({
+          gameTitle: input.gameTitle,
+          description: input.description || "",
+          platform: input.platform,
+          imageUrl: input.imageUrl || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=800",
+          rewardCoins: input.rewardCoins,
+          status: "ativo"
+        });
+      }
+      return { success: true };
+    }),
+    adminUpdateChallenge: protectedProcedure.input(
+      z2.object({
+        challengeId: z2.number(),
+        gameTitle: z2.string().min(2).optional(),
+        description: z2.string().optional(),
+        platform: z2.string().optional(),
+        imageUrl: z2.string().optional(),
+        rewardCoins: z2.number().optional(),
+        status: z2.enum(["ativo", "encerrado", "brevemente"]).optional()
+      })
+    ).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin")
+        throw new TRPCError3({ code: "FORBIDDEN", message: "Apenas administradores" });
+      const database = await getDb();
+      if (database) {
+        try {
+          const updateData = {};
+          if (input.gameTitle !== void 0) updateData.gameTitle = input.gameTitle;
+          if (input.description !== void 0) updateData.description = input.description;
+          if (input.platform !== void 0) updateData.platform = input.platform;
+          if (input.imageUrl !== void 0) updateData.imageUrl = input.imageUrl;
+          if (input.rewardCoins !== void 0) updateData.rewardCoins = input.rewardCoins;
+          if (input.status !== void 0) updateData.status = input.status;
+          await database.update(platinumChallenges).set(updateData).where(eq4(platinumChallenges.id, Number(input.challengeId)));
+        } catch (err) {
+          console.error("[TRPC adminUpdateChallenge Error]", err);
+          throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR", message: err.message || "Erro ao atualizar desafio no banco de dados." });
+        }
+      }
+      return { success: true };
+    }),
+    adminDeleteChallenge: protectedProcedure.input(z2.object({ challengeId: z2.number() })).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin")
+        throw new TRPCError3({ code: "FORBIDDEN", message: "Apenas administradores" });
+      const database = await getDb();
+      if (database) {
+        await database.delete(platinumChallenges).where(eq4(platinumChallenges.id, input.challengeId));
+      }
+      return { success: true };
+    }),
+    adminListSubmissions: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin")
+        throw new TRPCError3({ code: "FORBIDDEN", message: "Apenas administradores" });
+      const database = await getDb();
+      if (database) {
+        try {
+          const list = await database.select().from(platinumSubmissions).orderBy(desc2(platinumSubmissions.submittedAt));
+          return list;
+        } catch (e) {
+          console.error("[TRPC Platinador] Error fetching admin submissions:", e);
+        }
+      }
+      return [];
+    }),
+    adminApproveSubmission: protectedProcedure.input(
+      z2.object({
+        submissionId: z2.number(),
+        coinsToAward: z2.number().min(1),
+        adminNotes: z2.string().optional()
+      })
+    ).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin")
+        throw new TRPCError3({ code: "FORBIDDEN", message: "Apenas administradores" });
+      const database = await getDb();
+      if (database) {
+        const subs = await database.select().from(platinumSubmissions).where(eq4(platinumSubmissions.id, input.submissionId)).limit(1);
+        if (subs.length === 0) throw new Error("Submiss\xE3o n\xE3o encontrada");
+        const sub = subs[0];
+        await database.update(platinumSubmissions).set({
+          status: "aprovado",
+          coinsAwarded: input.coinsToAward,
+          adminNotes: input.adminNotes || "Platina verificada e aprovada!",
+          reviewedAt: /* @__PURE__ */ new Date()
+        }).where(eq4(platinumSubmissions.id, input.submissionId));
+        const targetUsers = await database.select().from(users).where(eq4(users.id, sub.userId)).limit(1);
+        if (targetUsers.length > 0) {
+          const currentCoins = targetUsers[0].forteCoins || 0;
+          await database.update(users).set({ forteCoins: currentCoins + input.coinsToAward }).where(eq4(users.id, sub.userId));
+        }
+      }
+      return { success: true, message: `Submiss\xE3o aprovada! ${input.coinsToAward} ForteCoins creditados.` };
+    }),
+    adminRejectSubmission: protectedProcedure.input(
+      z2.object({
+        submissionId: z2.number(),
+        adminNotes: z2.string().min(2, "Insira um motivo de rejei\xE7\xE3o")
+      })
+    ).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin")
+        throw new TRPCError3({ code: "FORBIDDEN", message: "Apenas administradores" });
+      const database = await getDb();
+      if (database) {
+        await database.update(platinumSubmissions).set({
+          status: "rejeitado",
+          adminNotes: input.adminNotes,
+          reviewedAt: /* @__PURE__ */ new Date()
+        }).where(eq4(platinumSubmissions.id, input.submissionId));
+      }
+      return { success: true, message: "Submiss\xE3o rejeitada." };
     })
   })
 });
@@ -2206,6 +2624,50 @@ registerOAuthRoutes(app);
 registerSeedRoute(app);
 registerAiRoute(app);
 registerPaymentRoute(app);
+app.get("/api/migrate-db", async (req, res) => {
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) return res.status(500).json({ error: "DATABASE_URL not set in environment" });
+  try {
+    const { neon: neon2 } = await import("@neondatabase/serverless");
+    const sql3 = neon2(dbUrl);
+    await sql3.query(`CREATE TABLE IF NOT EXISTS "digitalProducts" (
+      "id" serial PRIMARY KEY,
+      "sellerId" integer,
+      "name" varchar(255) NOT NULL,
+      "description" text,
+      "price" numeric(10, 2) NOT NULL,
+      "type" varchar(50) NOT NULL,
+      "keyOrCode" text,
+      "downloadUrl" varchar(500),
+      "imageUrl" varchar(500),
+      "stock" integer NOT NULL DEFAULT 1,
+      "isActive" boolean DEFAULT true,
+      "createdAt" timestamp DEFAULT now() NOT NULL,
+      "updatedAt" timestamp DEFAULT now() NOT NULL
+    )`);
+    await sql3.query(`ALTER TABLE "digitalProducts" ADD COLUMN IF NOT EXISTS "pricePrimary" numeric(10, 2)`);
+    await sql3.query(`ALTER TABLE "digitalProducts" ADD COLUMN IF NOT EXISTS "priceSecondary" numeric(10, 2)`);
+    await sql3.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "cpf" varchar(18)`);
+    await sql3.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "psnId" varchar(100)`);
+    await sql3.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "loginMethod" varchar(64)`);
+    await sql3.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "forteCoins" integer DEFAULT 10 NOT NULL`);
+    await sql3.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "balance" numeric(12, 2) DEFAULT '0' NOT NULL`);
+    await sql3.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "digitalProductId" integer`);
+    await sql3.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "firebaseProductId" varchar(255)`);
+    await sql3.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "accountType" varchar(20)`);
+    await sql3.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "deliveryDetails" text`);
+    await sql3.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "coinsUsed" integer DEFAULT 0 NOT NULL`);
+    await sql3.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "productName" varchar(255)`);
+    await sql3.query(`CREATE TABLE IF NOT EXISTS "platformSettings" (
+      "id" serial PRIMARY KEY,
+      "commissionPercentage" varchar(10) NOT NULL DEFAULT '6.00'
+    )`);
+    await sql3.query(`INSERT INTO "platformSettings" (id, "commissionPercentage") VALUES (1, '6.00') ON CONFLICT (id) DO UPDATE SET "commissionPercentage" = '6.00'`);
+    return res.json({ success: true, message: "Migra\xE7\xE3o das tabelas e comiss\xE3o de 6% conclu\xEDda com sucesso na Vercel!" });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
 app.get("/api/test-db", async (req, res) => {
   const dbUrl = process.env.DATABASE_URL;
   if (!dbUrl) {
@@ -2214,8 +2676,8 @@ app.get("/api/test-db", async (req, res) => {
   try {
     const { neon: neon2 } = await import("@neondatabase/serverless");
     const { drizzle: drizzle2 } = await import("drizzle-orm/neon-http");
-    const sql = neon2(dbUrl);
-    const db = drizzle2(sql);
+    const sql3 = neon2(dbUrl);
+    const db = drizzle2(sql3);
     const result = await db.execute("SELECT 1 AS ok");
     return res.json({ success: true, result, driver: "neon-serverless" });
   } catch (err) {
@@ -2236,8 +2698,8 @@ app.get("/api/test-create-order", async (req, res) => {
     const { drizzle: drizzle2 } = await import("drizzle-orm/neon-http");
     const { eq: eq5 } = await import("drizzle-orm");
     const { users: usersTable, orders: ordersTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const sql = neon2(dbUrl);
-    const db = drizzle2(sql);
+    const sql3 = neon2(dbUrl);
+    const db = drizzle2(sql3);
     const userEmail = "luanmnogueira@gmail.com";
     let buyer = await db.select().from(usersTable).where(eq5(usersTable.email, userEmail)).limit(1).then((r) => r[0]);
     if (!buyer) {
@@ -2319,11 +2781,11 @@ async function startServer() {
   if (dbUrl) {
     try {
       const { neon: neon2 } = await import("@neondatabase/serverless");
-      const sql = neon2(dbUrl);
+      const sql3 = neon2(dbUrl);
       console.log("[Database] Executando migra\xE7\xF5es de inicializa\xE7\xE3o...");
-      await sql(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "cpf" varchar(18)`);
-      await sql(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "forteCoins" integer DEFAULT 10 NOT NULL`);
-      await sql(`CREATE TABLE IF NOT EXISTS "coupons" (
+      await sql3.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "cpf" varchar(18)`);
+      await sql3.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "forteCoins" integer DEFAULT 10 NOT NULL`);
+      await sql3.query(`CREATE TABLE IF NOT EXISTS "coupons" (
         "id" serial PRIMARY KEY,
         "code" varchar(50) NOT NULL UNIQUE,
         "discountPercentage" numeric(5, 2) NOT NULL,
@@ -2333,8 +2795,8 @@ async function startServer() {
         "isActive" boolean DEFAULT true,
         "createdAt" timestamp DEFAULT now() NOT NULL
       )`);
-      await sql(`ALTER TABLE "usedProducts" ADD COLUMN IF NOT EXISTS "estado" varchar(50)`);
-      await sql(`ALTER TABLE "usedProducts" ADD COLUMN IF NOT EXISTS "cidade" varchar(100)`);
+      await sql3.query(`ALTER TABLE "usedProducts" ADD COLUMN IF NOT EXISTS "estado" varchar(50)`);
+      await sql3.query(`ALTER TABLE "usedProducts" ADD COLUMN IF NOT EXISTS "cidade" varchar(100)`);
       console.log("[Database] Migra\xE7\xF5es de inicializa\xE7\xE3o conclu\xEDdas com sucesso.");
     } catch (migErr) {
       console.warn("[Database] Aviso: Falha na migra\xE7\xE3o autom\xE1tica de inicializa\xE7\xE3o:", migErr.message);

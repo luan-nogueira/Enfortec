@@ -469,6 +469,9 @@ export default function FloatingChat() {
                     {msg.senderId === "ai-support" && (
                       <span className="block text-[8px] text-red-400 font-black uppercase tracking-wider mb-1">Eforte Bot 🤖</span>
                     )}
+                    {msg.senderId === "admin" && (
+                      <span className="block text-[8px] text-emerald-400 font-black uppercase tracking-wider mb-1">Gestor Eforte</span>
+                    )}
                     {renderMessageText(msg.text)}
                   </div>
                 </div>

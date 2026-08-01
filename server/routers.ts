@@ -6,7 +6,7 @@ import { z } from "zod";
 import * as db from "./db";
 import { getDb } from "./db";
 import { users, sellers, products, usedProducts, digitalProducts, orders, reviews, coupons, platinadorSubscriptions, platinumChallenges, platinumSubmissions, platformSettings } from "../drizzle/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 
 import { TRPCError } from "@trpc/server";
 export const appRouter = router({
@@ -188,7 +188,9 @@ export const appRouter = router({
         name: z.string().min(3),
         description: z.string(),
         price: z.number().positive(),
-        type: z.enum(["jogo", "gift_card", "licenca", "outro"]),
+        pricePrimary: z.number().positive().optional(),
+        priceSecondary: z.number().positive().optional(),
+        type: z.enum(["jogo", "gift_card", "licenca", "assinatura", "outro"]),
         keyOrCode: z.string().optional(),
         downloadUrl: z.string().optional(),
       }))
@@ -203,6 +205,8 @@ export const appRouter = router({
           name: input.name,
           description: input.description,
           price: input.price.toString(),
+          pricePrimary: input.pricePrimary?.toString() || null,
+          priceSecondary: input.priceSecondary?.toString() || null,
           type: input.type,
           keyOrCode: input.keyOrCode,
           downloadUrl: input.downloadUrl,
@@ -243,7 +247,7 @@ export const appRouter = router({
     updateStatus: protectedProcedure
       .input(z.object({
         orderId: z.number(),
-        status: z.string(),
+        status: z.enum(["pendente", "pago", "enviado", "entregue", "cancelado"]),
       }))
       .mutation(async ({ ctx, input }) => {
         if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
