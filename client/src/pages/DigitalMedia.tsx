@@ -61,7 +61,10 @@ export default function DigitalMedia() {
     return params.get("search") || "";
   });
   const [selectedType, setSelectedType] = useState<string | null>(null);
-  const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
+  const [selectedPlatform, setSelectedPlatform] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("platform") || null;
+  });
   const [selectedGenre, setSelectedGenre] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get("genre") || null;

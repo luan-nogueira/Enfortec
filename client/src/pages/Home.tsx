@@ -93,26 +93,6 @@ function BannerCountdown({ expiresAt }: { expiresAt: string }) {
   );
 }
 
-// Mesma lógica de detecção PS4/PS5 usada em DigitalMedia.tsx, para que o filtro de
-// console também reconheça jogos com plataforma combinada (ex: "PS4/PS5").
-function matchesConsoleFilter(listing: any, platform: string | null): boolean {
-  if (!platform) return true;
-  const pPlat = (listing.platform || "").toLowerCase();
-  const nameLower = (listing.name || "").toLowerCase();
-
-  if (platform === "PS5") {
-    const isPS4Only = pPlat === "ps4" || (nameLower.includes("ps4") && !nameLower.includes("ps5") && !nameLower.includes("ps4/ps5") && !nameLower.includes("ps4 / ps5"));
-    const isPS5Match = pPlat.includes("ps5") || nameLower.includes("ps5") || nameLower.includes("ps4/ps5") || nameLower.includes("ps4 / ps5") || pPlat === "ps4/ps5" || pPlat === "ps4 / ps5";
-    return isPS5Match && !isPS4Only;
-  }
-  if (platform === "PS4") {
-    const isPS5Only = pPlat === "ps5" || (nameLower.includes("ps5") && !nameLower.includes("ps4") && !nameLower.includes("ps4/ps5") && !nameLower.includes("ps4 / ps5"));
-    const isPS4Match = pPlat.includes("ps4") || nameLower.includes("ps4") || nameLower.includes("ps4/ps5") || nameLower.includes("ps4 / ps5") || pPlat === "ps4/ps5" || pPlat === "ps4 / ps5";
-    return isPS4Match && !isPS5Only;
-  }
-  return pPlat === platform.toLowerCase() || nameLower.includes(platform.toLowerCase());
-}
-
 export default function Home() {
   const { user, isAuthenticated, isAdmin, isCollaborator, logout } = useAuth();
   const [, navigate] = useLocation();
@@ -122,7 +102,6 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [heroSearch, setHeroSearch] = useState("");
   const [activeListingTab, setActiveListingTab] = useState<"todos" | "digital" | "usado" | "assinatura" | "primaria" | "secundaria">("digital");
-  const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
 
   const [promos, setPromos] = useState<any[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -658,7 +637,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Platform Console Pills (Requirement 2) */}
+            {/* Platform Console Pills — atalho direto para o catálogo já filtrado */}
             <div className="flex items-center justify-center gap-2 pt-2 border-t border-slate-800/80 flex-wrap">
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mr-1">Filtrar Console:</span>
               {[
@@ -670,12 +649,8 @@ export default function Home() {
               ].map((plat) => (
                 <button
                   key={plat.label}
-                  onClick={() => setSelectedPlatform(plat.id)}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                    selectedPlatform === plat.id
-                      ? "bg-red-600 text-white shadow-lg shadow-red-600/30"
-                      : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800"
-                  }`}
+                  onClick={() => navigate(plat.id ? `/digital?platform=${plat.id}` : "/digital")}
+                  className="px-3 py-1 rounded-lg text-xs font-bold transition-all bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800 active:scale-95"
                 >
                   {plat.label}
                 </button>
@@ -872,7 +847,6 @@ export default function Home() {
           <div className="flex lg:grid lg:grid-cols-4 xl:grid-cols-5 overflow-x-auto lg:overflow-x-visible gap-4 pb-4 lg:pb-0 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             {(() => {
               const visibleListings = allListings.filter((listing: any) => {
-                if (!matchesConsoleFilter(listing, selectedPlatform)) return false;
                 if (activeListingTab === "digital") return listing._type === 'digital' && listing.type !== 'assinatura';
                 if (activeListingTab === "usado") return listing._type === 'used';
                 if (activeListingTab === "assinatura") return listing.type === 'assinatura';
