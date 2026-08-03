@@ -91,7 +91,7 @@ export default function UserProfileButton() {
                   value={user.email || ""}
                   readOnly
                   disabled
-                  className="pl-9 bg-slate-900/50 border-slate-800 text-slate-350 cursor-not-allowed select-all"
+                  className="pl-9 bg-slate-900/50 border-slate-800 text-slate-400 cursor-not-allowed select-all"
                 />
               </div>
             </div>
@@ -105,7 +105,7 @@ export default function UserProfileButton() {
                 </span>
               </div>
               <div className="relative">
-                <User className="absolute left-3 top-3 w-4 h-4 text-slate-550" />
+                <User className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
                 <Input
                   value={formatCPF(user.cpf)}
                   readOnly
@@ -124,7 +124,7 @@ export default function UserProfileButton() {
                   value={`${user.forteCoins ?? 0} FC`}
                   readOnly
                   disabled
-                  className="pl-9 bg-slate-900/50 border-slate-800 text-slate-350 cursor-not-allowed"
+                  className="pl-9 bg-slate-900/50 border-slate-800 text-slate-400 cursor-not-allowed"
                 />
               </div>
             </div>
@@ -136,7 +136,7 @@ export default function UserProfileButton() {
                   <span className="text-[10px] text-red-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
                     <ShieldCheck className="w-3.5 h-3.5" /> Painel de Gestão
                   </span>
-                  <span className="text-[9px] bg-red-650 text-white font-black px-1.5 py-0.5 rounded uppercase tracking-wider">
+                  <span className="text-[9px] bg-red-600 text-white font-black px-1.5 py-0.5 rounded uppercase tracking-wider">
                     {isAdmin ? "Admin" : "Colaborador"}
                   </span>
                 </div>

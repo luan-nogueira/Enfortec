@@ -60,12 +60,12 @@ export default function TermsFortecoins() {
               <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white mb-3">
                 TERMO DE USO E REGULAMENTO DO PROGRAMA DE RECOMPENSAS FORTECOINS – EFORTEGAMES
               </h2>
-              <p className="text-xs text-slate-505 uppercase tracking-widest font-bold">
+              <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">
                 Versão Atualizada 2026
               </p>
             </div>
 
-            <div className="space-y-8 text-sm sm:text-base text-slate-355 leading-relaxed text-justify">
+            <div className="space-y-8 text-sm sm:text-base text-slate-400 leading-relaxed text-justify">
               
               <div className="space-y-3">
                 <h3 className="text-lg font-black text-white border-l-4 border-red-600 pl-3">
@@ -204,12 +204,12 @@ export default function TermsFortecoins() {
               <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white mb-3">
                 TERMOS DE USO, GARANTIA E LICENCIAMENTO DIGITAL – EFORTEGAMES
               </h2>
-              <p className="text-xs text-slate-505 uppercase tracking-widest font-bold">
+              <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">
                 Última atualização: 19/06/2026
               </p>
             </div>
 
-            <div className="space-y-8 text-sm sm:text-base text-slate-355 leading-relaxed text-justify">
+            <div className="space-y-8 text-sm sm:text-base text-slate-400 leading-relaxed text-justify">
               
               <div className="bg-slate-950/80 border border-red-950 p-4 rounded-xl space-y-2 mb-6">
                 <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">

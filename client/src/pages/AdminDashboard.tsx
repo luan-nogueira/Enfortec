@@ -1373,33 +1373,36 @@ export default function AdminDashboard() {
 
   const menuItems = useMemo(() => [
     { value: "visao-geral", label: "Visão Geral", icon: BarChart3 },
-    { 
-      value: "notificacoes", 
-      label: "🔔 Central de Notificações", 
-      icon: Bell, 
-      badge: pendingNotifCount > 0 
+    {
+      value: "notificacoes",
+      label: "🔔 Central de Notificações",
+      icon: Bell,
+      badge: pendingNotifCount > 0,
+      section: "Atendimento",
     },
-    { value: "usuarios", label: "Gerenciar Acessos", icon: Users },
-    { value: "jogos", label: "Gerenciar Jogos", icon: Gamepad2 },
-    { 
-      value: "referrals", 
-      label: "Indicações & Prêmios", 
-      icon: Coins, 
-      badge: (allRedemptions.some(r => r.status === "pendente") || allReferrals.some(r => r.status === "pendente")) 
+    {
+      value: "negociacoes",
+      label: "Negociações & Mensagens",
+      icon: MessageCircle,
+      badge: allChats.some(c => c.unreadByAdmin),
+      section: "Atendimento",
     },
-    { 
-      value: "negociacoes", 
-      label: "Negociações & Mensagens", 
-      icon: MessageCircle, 
-      badge: allChats.some(c => c.unreadByAdmin) 
+    { value: "jogos", label: "Gerenciar Jogos", icon: Gamepad2, section: "Catálogo & Vendas" },
+    { value: "vendas", label: "Gerenciar Vendas", icon: ShoppingBag, section: "Catálogo & Vendas" },
+    { value: "premios", label: "Gerenciar Prêmios", icon: Gift, section: "Catálogo & Vendas" },
+    { value: "platinador", label: "Clube Platinador", icon: Trophy, section: "Catálogo & Vendas" },
+    { value: "usuarios", label: "Gerenciar Acessos", icon: Users, section: "Clientes" },
+    {
+      value: "referrals",
+      label: "Indicações & Prêmios",
+      icon: Coins,
+      badge: (allRedemptions.some(r => r.status === "pendente") || allReferrals.some(r => r.status === "pendente")),
+      section: "Clientes",
     },
-    { value: "premios", label: "Gerenciar Prêmios", icon: Gift },
-    { value: "platinador", label: "Clube Platinador", icon: Trophy },
-    { value: "vendas", label: "Gerenciar Vendas", icon: ShoppingBag },
-    { value: "promocoes", label: "Banners da Home", icon: Image },
-    { value: "aba_promocoes", label: "Gerenciar Promoções", icon: Tag },
-    { value: "cupons", label: "Cupons", icon: Percent },
-    { value: "config_fortecoins", label: "📲 Link WhatsApp & ForteCoins", icon: Settings }
+    { value: "promocoes", label: "Banners da Home", icon: Image, section: "Marketing" },
+    { value: "aba_promocoes", label: "Gerenciar Promoções", icon: Tag, section: "Marketing" },
+    { value: "cupons", label: "Cupons", icon: Percent, section: "Marketing" },
+    { value: "config_fortecoins", label: "📲 Link WhatsApp & ForteCoins", icon: Settings, section: "Sistema" },
   ], [allRedemptions, allReferrals, allChats, pendingNotifCount]);
 
   // Modal de prêmios
@@ -2157,26 +2160,33 @@ export default function AdminDashboard() {
 
       {/* Nav Options */}
       <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
-        {menuItems.map((item) => {
+        {menuItems.map((item, index) => {
           const Icon = item.icon;
           const isActive = activeTab === item.value;
+          const showSectionHeader = Boolean(item.section) && item.section !== menuItems[index - 1]?.section;
           return (
-            <button
-              key={item.value}
-              onClick={() => {
-                setActiveTab(item.value);
-                setSidebarOpen(false);
-              }}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 group ${isActive ? "bg-red-655/10 text-red-500 border-l-4 border-red-600 font-bold" : "text-slate-400 hover:text-white hover:bg-slate-850"}`}
-            >
-              <div className="flex items-center gap-3">
-                <Icon className={`w-4 h-4 transition-colors ${isActive ? "text-red-500" : "text-slate-500 group-hover:text-red-500"}`} />
-                <span>{item.label}</span>
-              </div>
-              {item.badge && (
-                <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
+            <div key={item.value}>
+              {showSectionHeader && (
+                <p className="px-4 pt-4 pb-1.5 text-[10px] font-black uppercase tracking-widest text-slate-600">
+                  {item.section}
+                </p>
               )}
-            </button>
+              <button
+                onClick={() => {
+                  setActiveTab(item.value);
+                  setSidebarOpen(false);
+                }}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 group ${isActive ? "bg-red-600/10 text-red-500 border-l-4 border-red-600 font-bold" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}
+              >
+                <div className="flex items-center gap-3">
+                  <Icon className={`w-4 h-4 transition-colors ${isActive ? "text-red-500" : "text-slate-500 group-hover:text-red-500"}`} />
+                  <span>{item.label}</span>
+                </div>
+                {item.badge && (
+                  <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
+                )}
+              </button>
+            </div>
           );
         })}
       </nav>
@@ -2184,7 +2194,7 @@ export default function AdminDashboard() {
       {/* Footer Info */}
       <div className="p-4 border-t border-slate-800 bg-slate-950/20">
         <div className="flex items-center gap-3 px-2 py-3 mb-3">
-          <div className="w-9 h-9 rounded-full bg-red-650/10 border border-red-500/20 flex items-center justify-center font-bold text-red-500 uppercase text-sm shrink-0">
+          <div className="w-9 h-9 rounded-full bg-red-600/10 border border-red-500/20 flex items-center justify-center font-bold text-red-500 uppercase text-sm shrink-0">
             {user?.name?.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0">
@@ -2196,7 +2206,7 @@ export default function AdminDashboard() {
           <Button
             variant="outline"
             onClick={() => navigate("/")}
-            className="flex-1 h-9 text-xs border-slate-800 text-slate-400 hover:text-white hover:bg-slate-850 font-bold"
+            className="flex-1 h-9 text-xs border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800 font-bold"
           >
             Ir para Home
           </Button>
@@ -2244,7 +2254,7 @@ export default function AdminDashboard() {
       {/* Main Content Pane */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Header Bar */}
-        <header className="bg-slate-900 border-b border-red-650/10 py-4 px-6 sticky top-0 z-30 backdrop-blur-md bg-opacity-95">
+        <header className="bg-slate-900 border-b border-red-600/10 py-4 px-6 sticky top-0 z-30 backdrop-blur-md bg-opacity-95">
           <div className="flex justify-between items-center gap-4">
             <div className="flex items-center gap-4">
               {/* Hamburger Menu Trigger */}
@@ -2803,7 +2813,7 @@ export default function AdminDashboard() {
                     </div>
                   ) : (
                     allRedemptions.map((red) => (
-                      <div key={red.id} className="bg-slate-950/80 border border-slate-850 p-4 rounded-xl space-y-3">
+                      <div key={red.id} className="bg-slate-950/80 border border-slate-800 p-4 rounded-xl space-y-3">
                         <div className="flex justify-between items-start">
                           <div>
                             <p className="font-bold text-white text-sm">{red.prizeName}</p>
@@ -2876,7 +2886,7 @@ export default function AdminDashboard() {
                     </div>
                   ) : (
                     allReferrals.map((ref) => (
-                      <div key={ref.id} className="bg-slate-950/80 border border-slate-850 p-4 rounded-xl space-y-2">
+                      <div key={ref.id} className="bg-slate-950/80 border border-slate-800 p-4 rounded-xl space-y-2">
                         <div className="flex justify-between items-start">
                           <div>
                             <p className="text-xs text-slate-400">Padrinho (UID): <span className="font-semibold text-slate-300 font-mono text-[10px]">{ref.referrerId}</span></p>
@@ -3175,7 +3185,7 @@ export default function AdminDashboard() {
                       )}
                     </div>
 
-                    <div className="p-5 pt-0 flex gap-2 border-t border-slate-850/60 mt-2">
+                    <div className="p-5 pt-0 flex gap-2 border-t border-slate-800/60 mt-2">
                       <Button
                         onClick={() => {
                           const linkStr = p.link || "/";
@@ -3257,7 +3267,7 @@ export default function AdminDashboard() {
                         )}
                       </div>
 
-                      <div className="bg-slate-950/80 p-3 rounded-lg border border-slate-850 text-xs text-slate-300 font-mono line-clamp-3 mb-4">
+                      <div className="bg-slate-950/80 p-3 rounded-lg border border-slate-800 text-xs text-slate-300 font-mono line-clamp-3 mb-4">
                         {chat.lastMessage || "Nenhuma mensagem recente."}
                       </div>
                       {chat.topic && (
@@ -3642,7 +3652,7 @@ export default function AdminDashboard() {
                       <p className="text-xs text-slate-500 italic py-6 text-center">Nenhum prêmio cadastrado.</p>
                     ) : (
                       allPrizes.map((prize) => (
-                        <div key={prize.id} className="flex items-center justify-between bg-slate-950 p-3 rounded-lg border border-slate-850">
+                        <div key={prize.id} className="flex items-center justify-between bg-slate-950 p-3 rounded-lg border border-slate-800">
                           <div>
                             <p className="font-bold text-white text-xs">{prize.name}</p>
                             <p className="text-[10px] text-slate-500">Estoque: {prize.stock} un</p>

@@ -106,7 +106,7 @@ export default function TermsAcceptanceModal() {
             className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
               activeTab === "fortecoins"
                 ? "bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)]"
-                : "bg-slate-955 text-slate-400 hover:text-white border border-slate-800"
+                : "bg-slate-950 text-slate-400 hover:text-white border border-slate-800"
             }`}
           >
             <BookOpen className="w-4 h-4" />
@@ -118,7 +118,7 @@ export default function TermsAcceptanceModal() {
             className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
               activeTab === "games"
                 ? "bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)]"
-                : "bg-slate-955 text-slate-400 hover:text-white border border-slate-800"
+                : "bg-slate-950 text-slate-400 hover:text-white border border-slate-800"
             }`}
           >
             <BookOpen className="w-4 h-4" />
@@ -155,7 +155,7 @@ export default function TermsAcceptanceModal() {
                     <h4 className="font-bold text-white border-l-2 border-red-500 pl-2">2. DEFINIÇÃO DAS FORTECOINS</h4>
                     <p>As ForteCoins são moedas virtuais promocionais disponibilizadas pela EFORTEGAMES para utilização exclusiva dentro da plataforma e de seus serviços.</p>
                     <p>As ForteCoins possuem caráter exclusivamente promocional e não constituem moeda oficial, ativo financeiro, investimento, valor mobiliário, crédito financeiro ou qualquer outra forma de patrimônio econômico.</p>
-                    <div className="bg-slate-900 border border-slate-850 p-3 rounded-lg text-[11px] text-slate-400">
+                    <div className="bg-slate-900 border border-slate-800 p-3 rounded-lg text-[11px] text-slate-400">
                       <strong>As ForteCoins não poderão, em hipótese alguma:</strong>
                       <ul className="list-disc pl-5 mt-1 space-y-0.5">
                         <li>Ser convertidas em dinheiro;</li>
@@ -391,7 +391,7 @@ export default function TermsAcceptanceModal() {
           <Button
             variant="ghost"
             onClick={() => logout()}
-            className="w-full sm:w-auto text-slate-400 hover:text-white hover:bg-slate-850 flex items-center justify-center gap-2"
+            className="w-full sm:w-auto text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center gap-2"
           >
             <LogOut className="w-4 h-4" />
             Fazer Logout / Sair

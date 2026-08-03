@@ -431,7 +431,7 @@ export default function DigitalMedia() {
               <div className="flex items-center gap-3">
                 <Button 
                   variant="ghost" 
-                  className="text-slate-350 hover:text-white hover:bg-slate-900/40 flex items-center gap-1.5 px-2 sm:px-4"
+                  className="text-slate-400 hover:text-white hover:bg-slate-900/40 flex items-center gap-1.5 px-2 sm:px-4"
                   onClick={() => navigate("/fortecoins")}
                 >
                   <Coins className="w-4 h-4 text-red-500" />
@@ -912,7 +912,7 @@ export default function DigitalMedia() {
                   }}
                   className="w-4 h-4 mt-0.5 rounded border-slate-700 bg-slate-800 text-red-600 focus:ring-red-500 cursor-pointer"
                 />
-                <span className="text-xs text-slate-305 leading-relaxed text-left select-none">
+                <span className="text-xs text-slate-300 leading-relaxed text-left select-none">
                   Li e concordo com os{" "}
                   <button
                     type="button"
@@ -1036,7 +1036,7 @@ export default function DigitalMedia() {
                 setTermsScrolled(true);
               }
             }}
-            className="flex-1 overflow-y-auto pr-2 border border-slate-800 rounded-xl p-4 bg-slate-950/60 text-slate-300 text-xs space-y-4 my-4 select-none max-h-[350px] scrollbar-thin scrollbar-thumb-red-650"
+            className="flex-1 overflow-y-auto pr-2 border border-slate-800 rounded-xl p-4 bg-slate-950/60 text-slate-300 text-xs space-y-4 my-4 select-none max-h-[350px] scrollbar-thin scrollbar-thumb-red-600"
           >
             <div className="space-y-4 text-justify">
               <div className="text-center pb-2 border-b border-slate-800">

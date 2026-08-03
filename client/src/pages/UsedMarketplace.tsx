@@ -560,35 +560,47 @@ export default function UsedMarketplace() {
                           Apagar Anúncio
                         </Button>
                       )}
-                      <Button 
-                        onClick={() => handleBuyClick(product)}
-                        disabled={isProcessingCheckout && selectedProduct?.id === product.id}
-                        className="w-full bg-red-600 hover:bg-red-700 text-white font-black text-xs sm:text-lg h-10 sm:h-12 rounded-xl sm:rounded-2xl transition-all active:scale-95 shadow-lg border-b-2 sm:border-b-4 border-red-800 flex items-center justify-center gap-1.5 sm:gap-3"
-                      >
-                        <ShoppingCart className="w-3.5 h-3.5 sm:w-5 sm:h-5" strokeWidth={3} />
-                        {(isProcessingCheckout && selectedProduct?.id === product.id) ? "..." : "Comprar com Garantia"}
-                      </Button>
-                      {selectedProduct?.id === product.id && checkoutError && (
-                        <p className="text-red-400 text-[10px] text-center">⚠️ {checkoutError}</p>
-                      )}
-                      
-                      <div className="grid grid-cols-2 gap-1.5">
-                        <SellerChatDialog
-                          productId={product.id}
-                          productName={product.name}
-                          sellerId={product.sellerId || undefined}
-                          sellerName={product.sellerName || "Vendedor"}
-                          buttonLabel="Falar Vendedor"
-                        />
-                        {parseFloat(product.pricePS4 || product.pricePS5 || 0) > 0 && (
+                      {user?.id && user.id === product.sellerId ? (
+                        <Button
+                          onClick={() => navigate("/vendedor")}
+                          className="w-full bg-slate-900 border border-amber-500/30 hover:border-amber-500/60 text-amber-400 font-bold text-xs sm:text-sm h-10 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center gap-1.5"
+                        >
+                          <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                          Seu anúncio · Gerenciar no Painel
+                        </Button>
+                      ) : (
+                        <>
                           <Button
-                            onClick={() => handleBargainClick(product)}
-                            className="w-full bg-slate-900 border border-red-600/30 hover:border-red-600/60 text-red-500 font-bold text-[10px] sm:text-xs h-10 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center gap-1"
+                            onClick={() => handleBuyClick(product)}
+                            disabled={isProcessingCheckout && selectedProduct?.id === product.id}
+                            className="w-full bg-red-600 hover:bg-red-700 text-white font-black text-xs sm:text-lg h-10 sm:h-12 rounded-xl sm:rounded-2xl transition-all active:scale-95 shadow-lg border-b-2 sm:border-b-4 border-red-800 flex items-center justify-center gap-1.5 sm:gap-3"
                           >
-                            💸 Pechinchar
+                            <ShoppingCart className="w-3.5 h-3.5 sm:w-5 sm:h-5" strokeWidth={3} />
+                            {(isProcessingCheckout && selectedProduct?.id === product.id) ? "..." : "Comprar com Garantia"}
                           </Button>
-                        )}
-                      </div>
+                          {selectedProduct?.id === product.id && checkoutError && (
+                            <p className="text-red-400 text-[10px] text-center">⚠️ {checkoutError}</p>
+                          )}
+
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <SellerChatDialog
+                              productId={product.id}
+                              productName={product.name}
+                              sellerId={product.sellerId || undefined}
+                              sellerName={product.sellerName || "Vendedor"}
+                              buttonLabel="Falar Vendedor"
+                            />
+                            {parseFloat(product.pricePS4 || product.pricePS5 || 0) > 0 && (
+                              <Button
+                                onClick={() => handleBargainClick(product)}
+                                className="w-full bg-slate-900 border border-red-600/30 hover:border-red-600/60 text-red-500 font-bold text-[10px] sm:text-xs h-10 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center gap-1"
+                              >
+                                💸 Pechinchar
+                              </Button>
+                            )}
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>

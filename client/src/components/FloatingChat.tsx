@@ -491,7 +491,7 @@ export default function FloatingChat() {
                       key={chip.query}
                       type="button"
                       onClick={() => { setShowChips(false); handleSelectSuggestion(chip.query); }}
-                      className="text-left text-xs bg-slate-900 hover:bg-slate-850 text-slate-200 hover:text-white px-3 py-2 rounded-xl border border-slate-800 hover:border-red-500/40 transition-all font-semibold cursor-pointer active:scale-95 shadow-sm"
+                      className="text-left text-xs bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white px-3 py-2 rounded-xl border border-slate-800 hover:border-red-500/40 transition-all font-semibold cursor-pointer active:scale-95 shadow-sm"
                     >
                       {chip.emoji} {chip.label}
                     </button>

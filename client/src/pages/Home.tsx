@@ -93,6 +93,26 @@ function BannerCountdown({ expiresAt }: { expiresAt: string }) {
   );
 }
 
+// Mesma lógica de detecção PS4/PS5 usada em DigitalMedia.tsx, para que o filtro de
+// console também reconheça jogos com plataforma combinada (ex: "PS4/PS5").
+function matchesConsoleFilter(listing: any, platform: string | null): boolean {
+  if (!platform) return true;
+  const pPlat = (listing.platform || "").toLowerCase();
+  const nameLower = (listing.name || "").toLowerCase();
+
+  if (platform === "PS5") {
+    const isPS4Only = pPlat === "ps4" || (nameLower.includes("ps4") && !nameLower.includes("ps5") && !nameLower.includes("ps4/ps5") && !nameLower.includes("ps4 / ps5"));
+    const isPS5Match = pPlat.includes("ps5") || nameLower.includes("ps5") || nameLower.includes("ps4/ps5") || nameLower.includes("ps4 / ps5") || pPlat === "ps4/ps5" || pPlat === "ps4 / ps5";
+    return isPS5Match && !isPS4Only;
+  }
+  if (platform === "PS4") {
+    const isPS5Only = pPlat === "ps5" || (nameLower.includes("ps5") && !nameLower.includes("ps4") && !nameLower.includes("ps4/ps5") && !nameLower.includes("ps4 / ps5"));
+    const isPS4Match = pPlat.includes("ps4") || nameLower.includes("ps4") || nameLower.includes("ps4/ps5") || nameLower.includes("ps4 / ps5") || pPlat === "ps4/ps5" || pPlat === "ps4 / ps5";
+    return isPS4Match && !isPS5Only;
+  }
+  return pPlat === platform.toLowerCase() || nameLower.includes(platform.toLowerCase());
+}
+
 export default function Home() {
   const { user, isAuthenticated, isAdmin, isCollaborator, logout } = useAuth();
   const [, navigate] = useLocation();
@@ -101,7 +121,7 @@ export default function Home() {
   const [digitalProducts, setDigitalProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [heroSearch, setHeroSearch] = useState("");
-  const [activeListingTab, setActiveListingTab] = useState<"todos" | "digital" | "usado" | "assinatura">("digital");
+  const [activeListingTab, setActiveListingTab] = useState<"todos" | "digital" | "usado" | "assinatura" | "primaria" | "secundaria">("digital");
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
 
   const [promos, setPromos] = useState<any[]>([]);
@@ -277,7 +297,7 @@ export default function Home() {
     { name: "RPG", icon: Shield, color: "from-purple-500 to-purple-600" },
     { name: "Esportes", icon: Trophy, color: "from-green-500 to-green-600" },
     { name: "Corrida", icon: Gauge, color: "from-orange-500 to-orange-600" },
-    { name: "Tiro / FPS", icon: Crosshair, color: "from-slate-750 to-slate-850" },
+    { name: "Tiro / FPS", icon: Crosshair, color: "from-slate-500 to-slate-700" },
     { name: "Pré Venda", icon: Flame, color: "from-orange-500 to-yellow-500" },
   ];
 
@@ -555,7 +575,7 @@ export default function Home() {
                   <h3 className="text-sm sm:text-base lg:text-lg font-black text-white leading-tight drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.8)]">
                     {sidebarTopBanner.title}
                   </h3>
-                  <p className="text-[10px] sm:text-xs text-slate-350 line-clamp-2 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] max-w-md">
+                  <p className="text-[10px] sm:text-xs text-slate-300 line-clamp-2 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] max-w-md">
                     {sidebarTopBanner.description || sidebarTopBanner.title}
                   </p>
                 </div>
@@ -584,7 +604,7 @@ export default function Home() {
                   <h3 className="text-sm sm:text-base lg:text-lg font-black text-white leading-tight drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.8)]">
                     {sidebarBottomBanner.title}
                   </h3>
-                  <p className="text-[10px] sm:text-xs text-slate-350 line-clamp-2 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] max-w-md">
+                  <p className="text-[10px] sm:text-xs text-slate-300 line-clamp-2 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] max-w-md">
                     {sidebarBottomBanner.description || sidebarBottomBanner.title}
                   </p>
                 </div>
@@ -831,6 +851,8 @@ export default function Home() {
                 { id: "todos", label: "Todos os Digitais" },
                 { id: "digital", label: "🎮 Jogos Digitais" },
                 { id: "assinatura", label: "⭐ Assinaturas" },
+                { id: "primaria", label: "👤 Contas Primárias" },
+                { id: "secundaria", label: "👥 Contas Secundárias" },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -848,23 +870,20 @@ export default function Home() {
           </div>
 
           <div className="flex lg:grid lg:grid-cols-4 xl:grid-cols-5 overflow-x-auto lg:overflow-x-visible gap-4 pb-4 lg:pb-0 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            {allListings.filter((listing: any) => {
-              if (selectedPlatform && !listing.name?.toLowerCase().includes(selectedPlatform.toLowerCase()) && listing.platform !== selectedPlatform) {
-                return false;
-              }
-              if (activeListingTab === "digital") return listing._type === 'digital' && listing.type !== 'assinatura';
-              if (activeListingTab === "usado") return listing._type === 'used';
-              if (activeListingTab === "assinatura") return listing.type === 'assinatura';
-              return true;
-            }).length > 0 ? allListings.filter((listing: any) => {
-              if (selectedPlatform && !listing.name?.toLowerCase().includes(selectedPlatform.toLowerCase()) && listing.platform !== selectedPlatform) {
-                return false;
-              }
-              if (activeListingTab === "digital") return listing._type === 'digital' && listing.type !== 'assinatura';
-              if (activeListingTab === "usado") return listing._type === 'used';
-              if (activeListingTab === "assinatura") return listing.type === 'assinatura';
-              return true;
-            }).map((listing: any) => {
+            {(() => {
+              const visibleListings = allListings.filter((listing: any) => {
+                if (!matchesConsoleFilter(listing, selectedPlatform)) return false;
+                if (activeListingTab === "digital") return listing._type === 'digital' && listing.type !== 'assinatura';
+                if (activeListingTab === "usado") return listing._type === 'used';
+                if (activeListingTab === "assinatura") return listing.type === 'assinatura';
+                if (activeListingTab === "primaria" || activeListingTab === "secundaria") {
+                  const secVal = listing.priceSecondary ?? listing.price_secondary;
+                  const hasSec = secVal !== undefined && secVal !== null && secVal !== "" && parseFloat(secVal) > 0;
+                  return activeListingTab === "secundaria" ? hasSec : !hasSec;
+                }
+                return true;
+              });
+              return visibleListings.length > 0 ? visibleListings.map((listing: any) => {
               const secVal = listing.priceSecondary ?? listing.price_secondary;
               const hasSec = secVal !== undefined && secVal !== null && secVal !== "" && parseFloat(secVal) > 0;
               const primaryPrice = listing.pricePrimary ? parseFloat(listing.pricePrimary) : (listing.price_primary ? parseFloat(listing.price_primary) : parseFloat(listing.price || 0));
@@ -969,11 +988,12 @@ export default function Home() {
                 <Tag className="w-12 h-12 text-slate-600 mx-auto mb-3" />
                 <h3 className="text-lg font-bold text-slate-400">Nenhum anúncio nesta categoria.</h3>
               </div>
-            )}
+            );
+            })()}
           </div>
-          
-          <Button variant="outline" className="border-slate-700 text-slate-300 w-full mt-6 md:hidden" onClick={() => navigate("/digital")}>
-            Ver todos
+
+          <Button variant="outline" className="border-slate-700 text-slate-300 w-full mt-6" onClick={() => navigate("/digital")}>
+            Ver Catálogo Completo de Jogos Digitais →
           </Button>
         </div>
       </section>

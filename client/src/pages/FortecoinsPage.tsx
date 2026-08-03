@@ -342,7 +342,7 @@ export default function FortecoinsPage() {
                 <span className="w-6 h-6 rounded-full bg-red-950 text-red-500 flex items-center justify-center font-black text-xs">1</span>
                 Como Acumular Moedas
               </p>
-              <ul className="space-y-2 text-xs sm:text-sm text-slate-350 list-none pl-0">
+              <ul className="space-y-2 text-xs sm:text-sm text-slate-400 list-none pl-0">
                 <li className="flex items-start gap-2">
                   <span className="text-red-500">🛒</span>
                   <span><strong>Cashback de Compra:</strong> Cada compra realizada de jogo digital na Eforte Games adiciona automaticamente <strong>+7 ForteCoins</strong> na sua carteira.</span>
@@ -360,7 +360,7 @@ export default function FortecoinsPage() {
                 <span className="w-6 h-6 rounded-full bg-red-950 text-red-500 flex items-center justify-center font-black text-xs">2</span>
                 Regras e Validade
               </p>
-              <ul className="space-y-2 text-xs sm:text-sm text-slate-350 list-none pl-0">
+              <ul className="space-y-2 text-xs sm:text-sm text-slate-400 list-none pl-0">
                 <li className="flex items-start gap-2">
                   <span className="text-red-500">⏳</span>
                   <span><strong>Validade de 90 dias:</strong> As moedas acumuladas expiram após 90 dias da data de ganho e são removidas automaticamente da sua conta.</span>
@@ -378,7 +378,7 @@ export default function FortecoinsPage() {
                 <span className="w-6 h-6 rounded-full bg-red-950 text-red-500 flex items-center justify-center font-black text-xs">3</span>
                 Como Resgatar Prêmios
               </p>
-              <ul className="space-y-2 text-xs sm:text-sm text-slate-350 list-none pl-0">
+              <ul className="space-y-2 text-xs sm:text-sm text-slate-400 list-none pl-0">
                 <li className="flex items-start gap-2">
                   <span className="text-red-500">🎁</span>
                   <span><strong>Loja de Resgate:</strong> Troque suas moedas por Gift Cards da Steam, PSN, Xbox, Netflix ou jogos digitais PC logo abaixo.</span>
@@ -510,7 +510,7 @@ export default function FortecoinsPage() {
                     </div>
 
                     {red.status === "entregue" && red.code && (
-                      <div className="bg-slate-950 p-2.5 rounded-lg border border-slate-850 flex justify-between items-center gap-2">
+                      <div className="bg-slate-950 p-2.5 rounded-lg border border-slate-800 flex justify-between items-center gap-2">
                         <span className="text-xs font-mono text-green-400 select-all truncate">
                           Código: {red.code}
                         </span>

@@ -127,7 +127,7 @@ export default function PromotionsPage() {
             ))}
           </div>
         ) : filteredPromotions.length === 0 ? (
-          <div className="text-center py-20 bg-slate-900/20 border border-slate-850 rounded-2xl p-8 max-w-xl mx-auto card-neon">
+          <div className="text-center py-20 bg-slate-900/20 border border-slate-800 rounded-2xl p-8 max-w-xl mx-auto card-neon">
             <Flame className="w-16 h-16 text-slate-700 mx-auto mb-4" />
             <h3 className="text-xl font-bold text-white mb-2">Sem Promoções Ativas</h3>
             <p className="text-slate-400 text-sm">
@@ -141,7 +141,7 @@ export default function PromotionsPage() {
                 key={promo.id}
                 className="card-neon bg-slate-900 border border-red-600/10 rounded-2xl overflow-hidden flex flex-col justify-between hover:-translate-y-1.5 hover:shadow-[0_0_20px_rgba(220,38,38,0.25)] hover:border-red-500/50 transition-all duration-300"
               >
-                <div className="relative h-48 bg-slate-950 overflow-hidden border-b border-slate-850">
+                <div className="relative h-48 bg-slate-950 overflow-hidden border-b border-slate-800">
                   {promo.imageUrl ? (
                     <img
                       src={promo.imageUrl}
@@ -165,7 +165,7 @@ export default function PromotionsPage() {
                     <h3 className="text-lg font-bold text-white mb-2 line-clamp-2">
                       {promo.title}
                     </h3>
-                    <p className="text-slate-450 text-xs line-clamp-3 mb-4 leading-relaxed">
+                    <p className="text-slate-400 text-xs line-clamp-3 mb-4 leading-relaxed">
                       {promo.description}
                     </p>
                   </div>
