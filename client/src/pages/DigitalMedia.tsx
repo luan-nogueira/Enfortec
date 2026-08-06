@@ -326,9 +326,8 @@ export default function DigitalMedia() {
     if (selectedPlatform && selectedType !== "assinatura" && selectedGenre !== "Assinaturas") {
       const pPlat = (p.platform || "").toLowerCase();
       if (selectedPlatform === "PS5") {
-        const isPS4Only = pPlat === "ps4" || (nameLower.includes("ps4") && !nameLower.includes("ps5") && !nameLower.includes("ps4/ps5") && !nameLower.includes("ps4 / ps5"));
-        const isPS5Match = pPlat.includes("ps5") || nameLower.includes("ps5") || nameLower.includes("ps4/ps5") || nameLower.includes("ps4 / ps5") || pPlat === "ps4/ps5" || pPlat === "ps4 / ps5";
-        matchesPlatform = isPS5Match && !isPS4Only;
+        // Somente produtos que tenham PS5 explicitamente no campo platform
+        matchesPlatform = pPlat === "ps5" || pPlat === "ps4/ps5" || pPlat === "ps4 / ps5" || pPlat.includes("ps5");
       } else if (selectedPlatform === "PS4") {
         const isPS5Only = pPlat === "ps5" || (nameLower.includes("ps5") && !nameLower.includes("ps4") && !nameLower.includes("ps4/ps5") && !nameLower.includes("ps4 / ps5"));
         const isPS4Match = pPlat.includes("ps4") || nameLower.includes("ps4") || nameLower.includes("ps4/ps5") || nameLower.includes("ps4 / ps5") || pPlat === "ps4/ps5" || pPlat === "ps4 / ps5";

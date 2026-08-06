@@ -37,9 +37,9 @@ export default function JogueComEconomia() {
     return () => unsubDigital();
   }, []);
 
-  // Filter products: show only products enabled for Economia
+  // Filter products: show only products explicitly enabled for Economia
   const filteredProducts = products.filter((product) => {
-    if (product.showInEconomia === false) return false;
+    if (product.showInEconomia !== true) return false;
     if (searchTerm.trim() === "") return true;
     return product.name?.toLowerCase().includes(searchTerm.toLowerCase());
   }).sort((a, b) => {

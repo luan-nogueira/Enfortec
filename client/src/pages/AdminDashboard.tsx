@@ -475,7 +475,7 @@ export default function AdminDashboard() {
   const [promoImage, setPromoImage] = useState("");
   const [promoLink, setPromoLink] = useState("");
   const [promoCountdown, setPromoCountdown] = useState("");
-  const [promoPosition, setPromoPosition] = useState<"main" | "sidebar_top" | "sidebar_bottom">("main");
+  const [promoPosition, setPromoPosition] = useState<"main" | "sidebar_top" | "sidebar_bottom" | "platinador">("main");
   const [promoIsActive, setPromoIsActive] = useState(true);
   const [editingPromoId, setEditingPromoId] = useState<string | null>(null);
   const [uploadingPromoImage, setUploadingPromoImage] = useState(false);
@@ -3164,9 +3164,14 @@ export default function AdminDashboard() {
                         <div className="w-full h-full flex items-center justify-center text-slate-600">Sem Imagem</div>
                       )}
                       <div className="absolute top-2 right-2 flex gap-1.5">
-                        <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border uppercase tracking-wider ${p.position === "sidebar_top" ? "bg-purple-500/20 text-purple-400 border-purple-500/30" : p.position === "sidebar_bottom" ? "bg-blue-500/20 text-blue-400 border-blue-500/30" : "bg-red-500/20 text-red-400 border-red-500/30"}`}>
+                        <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border uppercase tracking-wider ${
+                          p.position === "sidebar_top" ? "bg-purple-500/20 text-purple-400 border-purple-500/30" :
+                          p.position === "sidebar_bottom" ? "bg-blue-500/20 text-blue-400 border-blue-500/30" :
+                          p.position === "platinador" ? "bg-amber-500/20 text-amber-400 border-amber-500/30" :
+                          "bg-red-500/20 text-red-400 border-red-500/30"}`}>
                           {p.position === "sidebar_top" ? "Lateral Sup" :
-                           p.position === "sidebar_bottom" ? "Lateral Inf" : "Principal"}
+                           p.position === "sidebar_bottom" ? "Lateral Inf" :
+                           p.position === "platinador" ? "🏆 Platinador" : "Principal"}
                         </span>
                         <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border uppercase tracking-wider ${p.isActive ? "bg-green-500/10 text-green-500 border-green-500/20" : "bg-red-500/10 text-red-500 border-red-500/20"}`}>
                           {p.isActive ? "Ativo" : "Inativo"}
@@ -4491,6 +4496,7 @@ export default function AdminDashboard() {
                 <option value="main">Principal (Carrossel Esquerdo)</option>
                 <option value="sidebar_top">Lateral Superior (Direito)</option>
                 <option value="sidebar_bottom">Lateral Inferior (Direito)</option>
+                <option value="platinador">🏆 Clube Platinador (Não aparece no carrossel principal)</option>
               </select>
             </div>
 

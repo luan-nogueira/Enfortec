@@ -5,12 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { getLoginUrl } from "@/const";
 import UserProfileButton from "@/components/UserProfileButton";
-import { Trophy, Flame, ShieldCheck, CheckCircle, Coins, MessageSquare, ExternalLink, Zap, Star, Gamepad2, ArrowLeft, Clock, Sparkles, Check, AlertCircle, Award } from "lucide-react";
+import { storage } from "@/lib/firebase";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import { Trophy, Flame, ShieldCheck, CheckCircle, Coins, MessageSquare, ExternalLink, Zap, Star, Gamepad2, ArrowLeft, Clock, Sparkles, Check, AlertCircle, Award, Upload, Image as ImageIcon } from "lucide-react";
 
 export default function PlatinadorPage() {
   const { user, loading } = useAuth();
@@ -23,6 +25,25 @@ export default function PlatinadorPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [isUpdatingPsn, setIsUpdatingPsn] = useState(false);
+  const [isUploadingProof, setIsUploadingProof] = useState(false);
+  const proofFileRef = useRef<HTMLInputElement>(null);
+
+  const handleProofImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingProof(true);
+    try {
+      const fileRef = storageRef(storage, `platinador_proofs/${Date.now()}_${file.name}`);
+      const snapshot = await uploadBytes(fileRef, file);
+      const url = await getDownloadURL(snapshot.ref);
+      setProofUrl(url);
+      toast.success("Imagem enviada com sucesso! URL preenchida automaticamente.");
+    } catch (err: any) {
+      toast.error("Erro ao fazer upload da imagem: " + (err.message || err));
+    } finally {
+      setIsUploadingProof(false);
+    }
+  };
 
   // Queries
   const statusQuery = trpc.platinador.getStatus.useQuery(undefined, {
@@ -433,8 +454,42 @@ export default function PlatinadorPage() {
 
                           <div>
                             <label className="text-xs font-semibold text-gray-300 block mb-1">
-                              Link / URL da Foto de Comprovação
+                              Comprovação de Platina (Imagem ou URL)
                             </label>
+
+                            {/* Upload de imagem */}
+                            <div className="mb-2">
+                              <input
+                                ref={proofFileRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleProofImageUpload}
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                disabled={isUploadingProof}
+                                onClick={() => proofFileRef.current?.click()}
+                                className="w-full border border-dashed border-gray-700 hover:border-[#dc143c]/50 bg-[#0a0a0a] hover:bg-[#dc143c]/5 text-gray-400 hover:text-white text-xs h-10 flex items-center justify-center gap-2 rounded-lg transition-all"
+                              >
+                                {isUploadingProof ? (
+                                  <><span className="animate-spin">⏳</span> Enviando imagem...</>
+                                ) : (
+                                  <><Upload className="w-4 h-4" /> Fazer Upload da Imagem (recomendado)</>
+                                )}
+                              </Button>
+                            </div>
+
+                            {/* Preview se imagem carregada */}
+                            {proofUrl && proofUrl.startsWith("http") && (
+                              <div className="mb-2 rounded-lg overflow-hidden border border-gray-800 max-h-32">
+                                <img src={proofUrl} alt="Preview" className="w-full h-32 object-cover" />
+                              </div>
+                            )}
+
+                            {/* Campo URL manual */}
+                            <label className="text-[10px] text-gray-500 block mb-1">Ou cole o link/URL da foto:</label>
                             <Input
                               value={proofUrl}
                               onChange={(e) => setProofUrl(e.target.value)}
@@ -443,7 +498,7 @@ export default function PlatinadorPage() {
                               className="bg-[#0a0a0a] border-gray-800 text-white text-sm"
                             />
                             <p className="text-[11px] text-gray-500 mt-1">
-                              Você pode enviar o link do print no Imgur, Google Drive, Discord ou mídias sociais onde apareça seu troféu de platina e sua PSN ID.
+                              Envie o print onde apareça seu troféu de platina e sua PSN ID.
                             </p>
                           </div>
 

@@ -38,10 +38,10 @@ const DEFAULT_MAIN_BANNERS = [
 
 const DEFAULT_SIDEBAR_TOP = {
   id: "default-sidebar-top",
-  title: "🎮 Revenda seus jogos digitais",
+  title: "🎮 Portal de Revenda – Venda seus Jogos",
   description: "Anuncie e desapegue dos seus jogos em mídia digital de PS4 e PS5 com total segurança de escrow da Eforte Games.",
   imageUrl: "https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?q=80&w=600",
-  link: "/digital/vender",
+  link: "/virar-vendedor",
   expiresAt: null
 };
 
@@ -101,7 +101,7 @@ export default function Home() {
   const [digitalProducts, setDigitalProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [heroSearch, setHeroSearch] = useState("");
-  const [activeListingTab, setActiveListingTab] = useState<"todos" | "digital" | "usado" | "assinatura" | "primaria" | "secundaria">("digital");
+  const [activeListingTab, setActiveListingTab] = useState<"todos" | "digital" | "fisico" | "assinatura" | "primaria" | "secundaria">("todos");
 
   const [promos, setPromos] = useState<any[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -128,8 +128,13 @@ export default function Home() {
     return () => unsubPromos();
   }, []);
 
-  // Filter promos by position
-  const mainPromos = promos.filter((p: any) => p.position === "main" || !p.position);
+  // Filter promos by position — exclude platinador banners from main carousel
+  const mainPromos = promos.filter((p: any) =>
+    (p.position === "main" || !p.position) &&
+    p.position !== "platinador" &&
+    p.link !== "/platinador" &&
+    p.type !== "platinador"
+  );
   const sidebarTopPromo = promos.find((p: any) => p.position === "sidebar_top");
   const sidebarBottomPromo = promos.find((p: any) => p.position === "sidebar_bottom");
 
@@ -259,15 +264,15 @@ export default function Home() {
     };
   }, []);
 
-  // Apenas mídias digitais e assinaturas recém-adicionadas nos Últimos Anúncios
-  const allListings = digitalProducts
-    .map((p: any) => ({ ...p, _type: 'digital' }))
-    .sort((a, b) => {
-      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return timeB - timeA;
-    })
-    .slice(0, 12);
+  // Últimos anúncios: digitais + físicos usados
+  const allListings = [
+    ...digitalProducts.map((p: any) => ({ ...p, _type: 'digital' })),
+    ...usedProducts.map((p: any) => ({ ...p, _type: 'used' }))
+  ].sort((a: any, b: any) => {
+    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return timeB - timeA;
+  }).slice(0, 24);
 
   const categories = [
     { name: "Assinaturas", icon: Sparkles, color: "from-amber-500 to-yellow-600" },
@@ -338,6 +343,10 @@ export default function Home() {
                       <a href="/usados" className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-slate-900 text-xs font-semibold text-slate-300 hover:text-white transition-colors">
                         <ShoppingCart className="w-4 h-4 text-blue-400" /> Desapegos de Jogos Físicos & Consoles
                       </a>
+                      <a href="/usados" className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-900 text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors border border-blue-950/40">
+                        <span className="flex items-center gap-2.5"><Package className="w-4 h-4 text-blue-400" /> Mídia Física / Consoles Diversos</span>
+                        <span className="bg-blue-600/30 text-blue-400 text-[9px] px-1.5 py-0.5 rounded font-black">NOVO</span>
+                      </a>
                       <a href="/loja" className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-slate-900 text-xs font-semibold text-slate-300 hover:text-white transition-colors">
                         <Package className="w-4 h-4 text-emerald-400" /> Loja Oficial Eforte
                       </a>
@@ -389,8 +398,8 @@ export default function Home() {
             <a href="/jogue-com-economia" className="text-red-400 hover:text-red-300 font-bold transition flex items-center gap-1.5 whitespace-nowrap bg-red-950/40 border border-red-800/40 px-3 py-1 rounded-full">
               <Zap className="w-3.5 h-3.5 text-red-500 animate-pulse" /> Jogue com Economia
             </a>
-            <a href="/usados" className="text-slate-300 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap">
-              <ShoppingCart className="w-3.5 h-3.5 text-blue-400" /> Desapegos Físicos
+            <a href="/usados" className="text-blue-400 hover:text-blue-300 font-bold transition flex items-center gap-1.5 whitespace-nowrap bg-blue-950/30 border border-blue-800/30 px-3 py-1 rounded-full">
+              <Package className="w-3.5 h-3.5 text-blue-400" /> Mídia Física
             </a>
             <a href="/digital?type=assinatura" className="text-amber-400 hover:text-amber-300 font-bold transition flex items-center gap-1.5 whitespace-nowrap">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Assinaturas
@@ -618,13 +627,9 @@ export default function Home() {
               <span className="font-bold text-slate-500 shrink-0">Buscas populares:</span>
               <div className="flex sm:flex-wrap items-center gap-2 overflow-x-auto sm:overflow-visible w-full sm:w-auto py-1 scrollbar-none justify-start sm:justify-center max-w-full">
                 {[
-                  { label: "PS Plus Extra", query: "PS Plus" },
-                  { label: "Game Pass", query: "Game Pass" },
-                  { label: "GTA V", query: "GTA V" },
-                  { label: "EA Sports FC", query: "EA Sports" },
-                  { label: "God of War", query: "God of War" },
-                  { label: "Gift Card PSN", query: "PlayStation" },
-                  { label: "Gift Card Xbox", query: "Xbox" }
+                  { label: "Gift Cards PSN", query: "Gift Card PSN" },
+                  { label: "PS Plus / Game Pass", query: "PS Plus Game Pass" },
+                  { label: "Gift Cards Xbox", query: "Gift Card Xbox" },
                 ].map((pill) => (
                   <button
                     key={pill.label}
@@ -681,6 +686,183 @@ export default function Home() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Recent Listings (Anúncios) */}
+      <section id="anuncios" className="py-8 sm:py-16">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-5 sm:mb-8 gap-4">
+            <div>
+              <h2 className="text-xl sm:text-3xl font-bold text-white mb-1 sm:mb-2 flex items-center gap-2 sm:gap-3">
+                <Tag className="text-red-500 w-5 h-5 sm:w-8 sm:h-8" /> Últimos Anúncios
+              </h2>
+              <p className="text-slate-400 text-xs sm:text-base">Filtre por tipo de produto para não misturar anúncios.</p>
+            </div>
+
+            {/* Tab Filter Control */}
+            <div className="flex items-center gap-1 sm:gap-2 bg-slate-900 p-1 rounded-xl border border-slate-800 self-stretch sm:self-auto overflow-x-auto">
+              {[
+                { id: "todos", label: "Todos os Digitais" },
+                { id: "digital", label: "🎮 Jogos Digitais" },
+                { id: "assinatura", label: "⭐ Assinaturas" },
+                { id: "primaria", label: "👤 Contas Primárias" },
+                { id: "secundaria", label: "👥 Contas Secundárias" },
+                { id: "fisico", label: "📦 Jogos Físicos" },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveListingTab(tab.id as any)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
+                    activeListingTab === tab.id
+                      ? "bg-red-600 text-white shadow-md"
+                      : "text-slate-400 hover:text-white hover:bg-slate-800"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex lg:grid lg:grid-cols-4 xl:grid-cols-5 overflow-x-auto lg:overflow-x-visible gap-4 pb-4 lg:pb-0 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            {(() => {
+              const visibleListings = allListings.filter((listing: any) => {
+                if (activeListingTab === "digital") return listing._type === 'digital' && listing.type !== 'assinatura';
+                if (activeListingTab === "fisico") return listing._type === 'used';
+                if (activeListingTab === "assinatura") return listing.type === 'assinatura';
+                if (activeListingTab === "primaria" || activeListingTab === "secundaria") {
+                  if (listing._type === 'used') return false;
+                  const secVal = listing.priceSecondary ?? listing.price_secondary;
+                  const hasSec = secVal !== undefined && secVal !== null && secVal !== "" && parseFloat(secVal) > 0;
+                  return activeListingTab === "secundaria" ? hasSec : !hasSec;
+                }
+                // "todos" — todos os digitais (não físicos)
+                return listing._type === 'digital';
+              });
+              return visibleListings.length > 0 ? visibleListings.map((listing: any) => {
+              const secVal = listing.priceSecondary ?? listing.price_secondary;
+              const hasSec = secVal !== undefined && secVal !== null && secVal !== "" && parseFloat(secVal) > 0;
+              const primaryPrice = listing.pricePrimary ? parseFloat(listing.pricePrimary) : (listing.price_primary ? parseFloat(listing.price_primary) : parseFloat(listing.price || 0));
+              const secondaryPrice = hasSec ? parseFloat(secVal) : 0;
+
+              const isAssinatura = listing.type === 'assinatura';
+              const isDigital = listing._type === 'digital' && !isAssinatura;
+              const isFisico = listing._type === 'used';
+
+              return (
+                <div 
+                  key={`${listing._type}-${listing.id}`}
+                  className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-red-500/40 transition-all hover:-translate-y-1.5 hover:shadow-[0_8px_30px_rgba(220,38,38,0.2)] flex flex-col h-full cursor-pointer min-w-[160px] sm:min-w-[220px] lg:min-w-0 w-[45vw] sm:w-[35vw] lg:w-auto snap-start shrink-0 group game-card-shine"
+                  onClick={() => navigate(isFisico ? '/usados' : `/digital?search=${encodeURIComponent(listing.name)}&buy=${listing.id}`)}
+                >
+                  <div className="h-28 sm:h-40 bg-slate-800 relative overflow-hidden">
+                    {listing.imageUrl || (listing.images && listing.images.length > 0) ? (
+                      <img 
+                        src={listing.imageUrl || listing.images[0]} 
+                        alt={listing.name} 
+                        className={`w-full h-full ${listing.coverFit === 'contain' ? 'object-contain bg-slate-900/60 p-2' : 'object-cover'} group-hover:scale-105 transition-transform duration-500`} 
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-slate-600 bg-slate-800/50">
+                        <Gamepad2 className="w-8 h-8 sm:w-12 sm:h-12 opacity-50" />
+                      </div>
+                    )}
+                    <div className={`absolute top-1.5 left-1.5 sm:top-2 sm:left-2 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded text-[8px] sm:text-[10px] uppercase font-bold text-white shadow-md backdrop-blur-sm ${
+                      isAssinatura
+                        ? 'bg-amber-600 border border-amber-500/30'
+                        : isFisico
+                          ? 'bg-blue-600 border border-blue-500/30'
+                          : isDigital 
+                            ? 'bg-red-600 border border-red-500/30' 
+                            : 'bg-blue-600 border border-blue-500/30'
+                    }`}>
+                      {isAssinatura ? '⭐ Assinatura VIP' : isFisico ? '📦 Mídia Física' : '🎮 Mídia Digital'}
+                    </div>
+
+                    {/* Verified & Cashback Badges */}
+                    <div className="absolute bottom-1.5 right-1.5 flex flex-col items-end gap-1">
+                      <span className="bg-amber-500/90 text-slate-950 text-[7px] sm:text-[9px] font-black px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">
+                        🎁 +7 FC
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-3 sm:p-4 flex flex-col flex-grow">
+                    <div className="flex items-center gap-1 mb-1">
+                      <span className="text-[9px] font-bold text-green-400 bg-green-950/60 px-1.5 py-0.5 rounded border border-green-800/40 flex items-center gap-1">
+                        <ShieldCheck className="w-2.5 h-2.5" /> Verificado
+                      </span>
+                    </div>
+                    <h3 className="text-white font-medium text-xs sm:text-base line-clamp-2 mb-1.5 sm:mb-2 group-hover:text-red-400 transition-colors">
+                      {listing.name}
+                    </h3>
+                    
+                    {/* Bloco de Exibição dos Valores */}
+                    <div className="mt-auto pt-2 space-y-1">
+                      {isFisico ? (
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-base sm:text-2xl font-black text-white">
+                            {listing.price ? (
+                              <><span className="text-[10px] sm:text-sm text-slate-500 font-normal">R$</span> {parseFloat(listing.price).toFixed(2).replace('.', ',')}</>
+                            ) : (
+                              <span className="text-xs sm:text-lg font-bold text-red-500">Ver anúncio</span>
+                            )}
+                          </span>
+                        </div>
+                      ) : hasSec ? (
+                        <div className="bg-slate-950/70 p-2 rounded-lg border border-slate-800 space-y-1">
+                          <div className="flex justify-between items-center text-[10px] sm:text-xs">
+                            <span className="text-slate-400 font-bold">👤 Primária:</span>
+                            <span className="font-black text-red-500">R$ {primaryPrice.toFixed(2).replace('.', ',')}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-[10px] sm:text-xs">
+                            <span className="text-slate-400 font-bold">👥 Secundária:</span>
+                            <span className="font-bold text-slate-300">R$ {secondaryPrice.toFixed(2).replace('.', ',')}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-xs text-slate-400 font-bold">👤 Primária:</span>
+                          <span className="text-base sm:text-2xl font-black text-white">
+                            {primaryPrice === 0 ? (
+                              <span className="text-xs sm:text-lg font-bold text-red-500">A definir</span>
+                            ) : (
+                              <><span className="text-[10px] sm:text-sm text-slate-500 font-normal">R$</span> {primaryPrice.toFixed(2).replace('.', ',')}</>
+                            )}
+                          </span>
+                        </div>
+                      )}
+
+                      <Button
+                        size="sm"
+                        className="w-full bg-red-600 hover:bg-red-700 text-white rounded-lg px-2.5 py-1.5 text-[10px] sm:text-xs font-bold btn-neon mt-2"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isFisico) {
+                            navigate('/usados');
+                          } else {
+                            navigate(`/digital?search=${encodeURIComponent(listing.name)}&buy=${listing.id}`);
+                          }
+                        }}
+                      >
+                        {isFisico ? "Ver Anúncio" : primaryPrice === 0 ? "Contatar" : "Comprar / Escolher Conta"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            }) : (
+              <div className="col-span-full py-16 text-center bg-slate-900/50 rounded-2xl border border-slate-800">
+                <Tag className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                <h3 className="text-lg font-bold text-slate-400">Nenhum anúncio nesta categoria.</h3>
+              </div>
+            );
+            })()}
+          </div>
+
+          <Button variant="outline" className="border-slate-700 text-slate-300 w-full mt-6" onClick={() => navigate("/digital")}>
+            Ver Catálogo Completo de Jogos Digitais →
+          </Button>
         </div>
       </section>
 
@@ -809,168 +991,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Recent Listings (Anúncios) */}
-      <section id="anuncios" className="py-8 sm:py-16">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-5 sm:mb-8 gap-4">
-            <div>
-              <h2 className="text-xl sm:text-3xl font-bold text-white mb-1 sm:mb-2 flex items-center gap-2 sm:gap-3">
-                <Tag className="text-red-500 w-5 h-5 sm:w-8 sm:h-8" /> Últimos Anúncios
-              </h2>
-              <p className="text-slate-400 text-xs sm:text-base">Filtre por tipo de produto para não misturar anúncios.</p>
-            </div>
-
-            {/* Tab Filter Control (Requirement 1) */}
-            <div className="flex items-center gap-1 sm:gap-2 bg-slate-900 p-1 rounded-xl border border-slate-800 self-stretch sm:self-auto overflow-x-auto">
-              {[
-                { id: "todos", label: "Todos os Digitais" },
-                { id: "digital", label: "🎮 Jogos Digitais" },
-                { id: "assinatura", label: "⭐ Assinaturas" },
-                { id: "primaria", label: "👤 Contas Primárias" },
-                { id: "secundaria", label: "👥 Contas Secundárias" },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveListingTab(tab.id as any)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
-                    activeListingTab === tab.id
-                      ? "bg-red-600 text-white shadow-md"
-                      : "text-slate-400 hover:text-white hover:bg-slate-800"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex lg:grid lg:grid-cols-4 xl:grid-cols-5 overflow-x-auto lg:overflow-x-visible gap-4 pb-4 lg:pb-0 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            {(() => {
-              const visibleListings = allListings.filter((listing: any) => {
-                if (activeListingTab === "digital") return listing._type === 'digital' && listing.type !== 'assinatura';
-                if (activeListingTab === "usado") return listing._type === 'used';
-                if (activeListingTab === "assinatura") return listing.type === 'assinatura';
-                if (activeListingTab === "primaria" || activeListingTab === "secundaria") {
-                  const secVal = listing.priceSecondary ?? listing.price_secondary;
-                  const hasSec = secVal !== undefined && secVal !== null && secVal !== "" && parseFloat(secVal) > 0;
-                  return activeListingTab === "secundaria" ? hasSec : !hasSec;
-                }
-                return true;
-              });
-              return visibleListings.length > 0 ? visibleListings.map((listing: any) => {
-              const secVal = listing.priceSecondary ?? listing.price_secondary;
-              const hasSec = secVal !== undefined && secVal !== null && secVal !== "" && parseFloat(secVal) > 0;
-              const primaryPrice = listing.pricePrimary ? parseFloat(listing.pricePrimary) : (listing.price_primary ? parseFloat(listing.price_primary) : parseFloat(listing.price || 0));
-              const secondaryPrice = hasSec ? parseFloat(secVal) : 0;
-
-              const isAssinatura = listing.type === 'assinatura';
-              const isDigital = listing._type === 'digital' && !isAssinatura;
-
-              return (
-                <div 
-                  key={`${listing._type}-${listing.id}`}
-                  className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-red-500/40 transition-all hover:-translate-y-1.5 hover:shadow-[0_8px_30px_rgba(220,38,38,0.2)] flex flex-col h-full cursor-pointer min-w-[160px] sm:min-w-[220px] lg:min-w-0 w-[45vw] sm:w-[35vw] lg:w-auto snap-start shrink-0 group game-card-shine"
-                  onClick={() => navigate(listing._type === 'digital' ? `/digital?search=${encodeURIComponent(listing.name)}&buy=${listing.id}` : '/usados')}
-                >
-                  <div className="h-28 sm:h-40 bg-slate-800 relative overflow-hidden">
-                    {listing.imageUrl || (listing.images && listing.images.length > 0) ? (
-                      <img 
-                        src={listing.imageUrl || listing.images[0]} 
-                        alt={listing.name} 
-                        className={`w-full h-full ${listing.coverFit === 'contain' ? 'object-contain bg-slate-900/60 p-2' : 'object-cover'} group-hover:scale-105 transition-transform duration-500`} 
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-slate-600 bg-slate-800/50">
-                        <Gamepad2 className="w-8 h-8 sm:w-12 sm:h-12 opacity-50" />
-                      </div>
-                    )}
-                    <div className={`absolute top-1.5 left-1.5 sm:top-2 sm:left-2 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded text-[8px] sm:text-[10px] uppercase font-bold text-white shadow-md backdrop-blur-sm ${
-                      isAssinatura
-                        ? 'bg-amber-600 border border-amber-500/30'
-                        : isDigital 
-                          ? 'bg-red-600 border border-red-500/30' 
-                          : 'bg-blue-600 border border-blue-500/30'
-                    }`}>
-                      {isAssinatura ? '⭐ Assinatura VIP' : isDigital ? '🎮 Mídia Digital' : '📦 Mídia Física / Console'}
-                    </div>
-
-                    {/* Verified & Cashback Badges */}
-                    <div className="absolute bottom-1.5 right-1.5 flex flex-col items-end gap-1">
-                      <span className="bg-amber-500/90 text-slate-950 text-[7px] sm:text-[9px] font-black px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">
-                        🎁 +7 FC
-                      </span>
-                    </div>
-                  </div>
-                  <div className="p-3 sm:p-4 flex flex-col flex-grow">
-                    <div className="flex items-center gap-1 mb-1">
-                      <span className="text-[9px] font-bold text-green-400 bg-green-950/60 px-1.5 py-0.5 rounded border border-green-800/40 flex items-center gap-1">
-                        <ShieldCheck className="w-2.5 h-2.5" /> Verificado
-                      </span>
-                    </div>
-                    <h3 className="text-white font-medium text-xs sm:text-base line-clamp-2 mb-1.5 sm:mb-2 group-hover:text-red-400 transition-colors">
-                      {listing.name}
-                    </h3>
-                    
-                    {/* Bloco de Exibição dos Valores Primária e Secundária */}
-                    <div className="mt-auto pt-2 space-y-1">
-                      {hasSec ? (
-                        <div className="bg-slate-950/70 p-2 rounded-lg border border-slate-800 space-y-1">
-                          <div className="flex justify-between items-center text-[10px] sm:text-xs">
-                            <span className="text-slate-400 font-bold">👤 Primária:</span>
-                            <span className="font-black text-red-500">R$ {primaryPrice.toFixed(2).replace('.', ',')}</span>
-                          </div>
-                          <div className="flex justify-between items-center text-[10px] sm:text-xs">
-                            <span className="text-slate-400 font-bold">👥 Secundária:</span>
-                            <span className="font-bold text-slate-300">R$ {secondaryPrice.toFixed(2).replace('.', ',')}</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-xs text-slate-400 font-bold">👤 Primária:</span>
-                          <span className="text-base sm:text-2xl font-black text-white">
-                            {primaryPrice === 0 ? (
-                              <span className="text-xs sm:text-lg font-bold text-red-500">A definir</span>
-                            ) : (
-                              <>
-                                <span className="text-[10px] sm:text-sm text-slate-500 font-normal">R$</span> {primaryPrice.toFixed(2).replace('.', ',')}
-                              </>
-                            )}
-                          </span>
-                        </div>
-                      )}
-
-                      <Button
-                        size="sm"
-                        className="w-full bg-red-600 hover:bg-red-700 text-white rounded-lg px-2.5 py-1.5 text-[10px] sm:text-xs font-bold btn-neon mt-2"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (listing._type === 'digital') {
-                            navigate(`/digital?search=${encodeURIComponent(listing.name)}&buy=${listing.id}`);
-                          } else {
-                            navigate('/usados');
-                          }
-                        }}
-                      >
-                        {primaryPrice === 0 ? "Contatar" : "Comprar / Escolher Conta"}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              );
-            }) : (
-              <div className="col-span-full py-16 text-center bg-slate-900/50 rounded-2xl border border-slate-800">
-                <Tag className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                <h3 className="text-lg font-bold text-slate-400">Nenhum anúncio nesta categoria.</h3>
-              </div>
-            );
-            })()}
-          </div>
-
-          <Button variant="outline" className="border-slate-700 text-slate-300 w-full mt-6" onClick={() => navigate("/digital")}>
-            Ver Catálogo Completo de Jogos Digitais →
-          </Button>
-        </div>
-      </section>
 
       {/* Footer */}
       <footer className="bg-slate-950 border-t border-slate-800/60 py-12 mt-10 pb-28 lg:pb-12 relative overflow-hidden">
