@@ -209,7 +209,7 @@ export default function Home() {
     });
 
     // Buscar digitais
-    const qDigital = query(collection(db, "digital_products"), limit(50));
+    const qDigital = query(collection(db, "digital_products"));
     const unsubDigital = onSnapshot(qDigital, (snapshot) => {
       const data = snapshot.docs
         .map(doc => ({
