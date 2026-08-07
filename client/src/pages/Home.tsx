@@ -755,7 +755,7 @@ export default function Home() {
                       <img 
                         src={listing.imageUrl || listing.images[0]} 
                         alt={listing.name} 
-                        className={`w-full h-full ${listing.coverFit === 'contain' ? 'object-contain bg-slate-900/60 p-2' : 'object-cover'} group-hover:scale-105 transition-transform duration-500`} 
+                        className={`w-full h-full ${(listing.coverFit === 'contain' || isFisico) ? 'object-contain bg-slate-900/60 p-2' : 'object-cover'} group-hover:scale-105 transition-transform duration-500`} 
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-slate-600 bg-slate-800/50">
@@ -776,9 +776,6 @@ export default function Home() {
 
                     {/* Verified & Cashback Badges */}
                     <div className="absolute bottom-1.5 right-1.5 flex flex-col items-end gap-1">
-                      <span className="bg-amber-500/90 text-slate-950 text-[7px] sm:text-[9px] font-black px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">
-                        🎁 +7 FC
-                      </span>
                     </div>
                   </div>
                   <div className="p-3 sm:p-4 flex flex-col flex-grow">
