@@ -54,6 +54,15 @@ const DEFAULT_SIDEBAR_BOTTOM = {
   expiresAt: null
 };
 
+const DEFAULT_SIDEBAR_PLATINADOR = {
+  id: "default-sidebar-platinador",
+  title: "🏆 Clube Platinador",
+  description: "Cumpra desafios semanais, ganhe ForteCoins e compita no nosso Ranking de Platinas!",
+  imageUrl: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=600",
+  link: "/platinador",
+  expiresAt: null
+};
+
 
 function BannerCountdown({ expiresAt }: { expiresAt: string }) {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
@@ -137,6 +146,7 @@ export default function Home() {
   );
   const sidebarTopPromo = promos.find((p: any) => p.position === "sidebar_top");
   const sidebarBottomPromo = promos.find((p: any) => p.position === "sidebar_bottom");
+  const sidebarPlatinadorPromo = promos.find((p: any) => p.position === "platinador");
 
   // Imagem escura e neutra de um controle (evita fotos aleatórias de pessoas quando a imagem original quebra)
   const FALLBACK_GAME_IMAGE = "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?q=80&w=1200";
@@ -154,60 +164,15 @@ export default function Home() {
     };
   });
 
-  const POPULAR_GAME_FALLBACKS = [
-    {
-      id: "popular-gow-ragnarok",
-      title: "GOD OF WAR RAGNARÖK PS4/PS5",
-      description: "💥 Vivencie a jornada épica de Kratos e Atreus pelos Nove Reinos. Jogo de Mídia Digital com ativação imediata e 7 ForteCoins de cashback!",
-      imageUrl: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200",
-      link: `/digital?search=${encodeURIComponent("God of War Ragnarök")}`,
-      expiresAt: null
-    },
-    {
-      id: "popular-gta5",
-      title: "GRAND THEFT AUTO V: PREMIUM EDITION PS4/PS5",
-      description: "💥 Explore o submundo do crime em Los Santos. Compre no precinho a mídia digital e garanta 7 ForteCoins de cashback!",
-      imageUrl: "https://images.unsplash.com/photo-1511512578047-dfb367046420?q=80&w=1200",
-      link: `/digital?search=${encodeURIComponent("GTA V")}`,
-      expiresAt: null
-    },
-    {
-      id: "popular-spider-man-2",
-      title: "MARVEL'S SPIDER-MAN 2 PS5",
-      description: "💥 Balance por Nova York como Peter Parker e Miles Morales. Gráficos incríveis no PS5 com 7 ForteCoins de cashback!",
-      imageUrl: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=1200",
-      link: `/digital?search=${encodeURIComponent("Spider-Man 2")}`,
-      expiresAt: null
-    },
-    {
-      id: "popular-elden-ring",
-      title: "ELDEN RING PS4/PS5",
-      description: "💥 Levante-se, Maculado, e seja guiado pela graça para brandir o poder do Anel Prístino. Adquira no precinho com 7 ForteCoins de cashback!",
-      imageUrl: "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?q=80&w=1200",
-      link: `/digital?search=${encodeURIComponent("Elden Ring")}`,
-      expiresAt: null
-    },
-    {
-      id: "popular-mortal-kombat-1",
-      title: "MORTAL KOMBAT 1 PS5",
-      description: "💥 Descubra um Universo Mortal Kombat renascido, criado pelo Deus do Fogo Liu Kang. Lute pela justiça com 7 ForteCoins de cashback!",
-      imageUrl: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=1200",
-      link: `/digital?search=${encodeURIComponent("Mortal Kombat 1")}`,
-      expiresAt: null
-    }
-  ];
-
   const activeBanners = [
     ...mainPromos,
-    ...dbGameBanners,
-    ...POPULAR_GAME_FALLBACKS.filter(fallback =>
-      !dbGameBanners.some(dbGame => dbGame.title.toLowerCase().includes(fallback.title.toLowerCase()))
-    )
+    ...dbGameBanners.slice(0, 5) // Mostra apenas os 5 primeiros jogos para não poluir o banner
   ];
   const finalBanners = activeBanners.length > 0 ? activeBanners : DEFAULT_MAIN_BANNERS;
 
   const sidebarTopBanner = sidebarTopPromo || DEFAULT_SIDEBAR_TOP;
   const sidebarBottomBanner = sidebarBottomPromo || DEFAULT_SIDEBAR_BOTTOM;
+  const sidebarPlatinadorBanner = sidebarPlatinadorPromo || DEFAULT_SIDEBAR_PLATINADOR;
 
   useEffect(() => {
     if (finalBanners.length <= 1) return;
@@ -539,11 +504,11 @@ export default function Home() {
             </div>
 
             {/* Right side: Sidebar Banners */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4 lg:h-[420px]">
+            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 lg:grid-rows-3 gap-3 sm:gap-4 lg:h-[420px]">
               {/* Top Banner Card */}
               <div
                 onClick={() => navigate(sidebarTopBanner.link || "/")}
-                className="relative h-[130px] sm:h-[180px] lg:h-auto lg:flex-1 bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-lg hover:border-red-500/30 hover:shadow-[0_0_20px_rgba(220,38,38,0.1)] transition-all duration-300 group/sidebar cursor-pointer flex flex-col justify-end p-5"
+                className="relative h-[110px] sm:h-[130px] lg:h-full bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-lg hover:border-red-500/30 hover:shadow-[0_0_20px_rgba(220,38,38,0.1)] transition-all duration-300 group/sidebar cursor-pointer flex flex-col justify-end p-4 sm:p-5"
               >
                 {sidebarTopBanner.imageUrl ? (
                   <img
@@ -558,21 +523,21 @@ export default function Home() {
                 ) : (
                   <div className="absolute inset-0 bg-gradient-to-br from-red-950 to-slate-900" />
                 )}
-                <div className="relative z-10 space-y-1 text-left">
+                <div className="relative z-10 space-y-0.5 sm:space-y-1 text-left">
                   {sidebarTopBanner.expiresAt && <BannerCountdown expiresAt={sidebarTopBanner.expiresAt} />}
-                  <h3 className="text-sm sm:text-base lg:text-lg font-black text-white leading-tight drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.8)]">
+                  <h3 className="text-xs sm:text-sm lg:text-base font-black text-white leading-tight drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.8)]">
                     {sidebarTopBanner.title}
                   </h3>
-                  <p className="text-[10px] sm:text-xs text-slate-300 line-clamp-2 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] max-w-md">
+                  <p className="text-[9px] sm:text-[10px] lg:text-xs text-slate-300 line-clamp-2 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] max-w-md">
                     {sidebarTopBanner.description || sidebarTopBanner.title}
                   </p>
                 </div>
               </div>
 
-              {/* Bottom Banner Card */}
+              {/* Middle Banner Card */}
               <div
                 onClick={() => navigate(sidebarBottomBanner.link || "/")}
-                className="relative h-[130px] sm:h-[180px] lg:h-auto lg:flex-1 bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-lg hover:border-red-500/30 hover:shadow-[0_0_20px_rgba(220,38,38,0.1)] transition-all duration-300 group/sidebar cursor-pointer flex flex-col justify-end p-5"
+                className="relative h-[110px] sm:h-[130px] lg:h-full bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-lg hover:border-red-500/30 hover:shadow-[0_0_20px_rgba(220,38,38,0.1)] transition-all duration-300 group/sidebar cursor-pointer flex flex-col justify-end p-4 sm:p-5"
               >
                 {sidebarBottomBanner.imageUrl ? (
                   <img
@@ -587,13 +552,42 @@ export default function Home() {
                 ) : (
                   <div className="absolute inset-0 bg-gradient-to-br from-red-950 to-slate-900" />
                 )}
-                <div className="relative z-10 space-y-1 text-left">
+                <div className="relative z-10 space-y-0.5 sm:space-y-1 text-left">
                   {sidebarBottomBanner.expiresAt && <BannerCountdown expiresAt={sidebarBottomBanner.expiresAt} />}
-                  <h3 className="text-sm sm:text-base lg:text-lg font-black text-white leading-tight drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.8)]">
+                  <h3 className="text-xs sm:text-sm lg:text-base font-black text-white leading-tight drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.8)]">
                     {sidebarBottomBanner.title}
                   </h3>
-                  <p className="text-[10px] sm:text-xs text-slate-300 line-clamp-2 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] max-w-md">
+                  <p className="text-[9px] sm:text-[10px] lg:text-xs text-slate-300 line-clamp-2 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] max-w-md">
                     {sidebarBottomBanner.description || sidebarBottomBanner.title}
+                  </p>
+                </div>
+              </div>
+              
+              {/* Bottom Banner Card (Platinador) */}
+              <div
+                onClick={() => navigate(sidebarPlatinadorBanner.link || "/platinador")}
+                className="relative h-[110px] sm:h-[130px] lg:h-full bg-slate-900 rounded-2xl overflow-hidden border border-amber-500/30 shadow-lg hover:border-amber-400/50 hover:shadow-[0_0_20px_rgba(251,191,36,0.15)] transition-all duration-300 group/sidebar cursor-pointer flex flex-col justify-end p-4 sm:p-5"
+              >
+                {sidebarPlatinadorBanner.imageUrl ? (
+                  <img
+                    src={sidebarPlatinadorBanner.imageUrl}
+                    alt={sidebarPlatinadorBanner.title}
+                    className="absolute inset-0 w-full h-full object-cover brightness-[0.4] group-hover/sidebar:scale-[1.02] transition-transform duration-500"
+                    onError={(e) => {
+                      e.currentTarget.src = FALLBACK_GAME_IMAGE;
+                      e.currentTarget.onerror = null;
+                    }}
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-br from-amber-950 to-slate-900" />
+                )}
+                <div className="relative z-10 space-y-0.5 sm:space-y-1 text-left">
+                  {sidebarPlatinadorBanner.expiresAt && <BannerCountdown expiresAt={sidebarPlatinadorBanner.expiresAt} />}
+                  <h3 className="text-xs sm:text-sm lg:text-base font-black text-amber-400 leading-tight drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.8)]">
+                    {sidebarPlatinadorBanner.title}
+                  </h3>
+                  <p className="text-[9px] sm:text-[10px] lg:text-xs text-slate-300 line-clamp-2 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] max-w-md">
+                    {sidebarPlatinadorBanner.description || sidebarPlatinadorBanner.title}
                   </p>
                 </div>
               </div>
@@ -627,13 +621,13 @@ export default function Home() {
               <span className="font-bold text-slate-500 shrink-0">Buscas populares:</span>
               <div className="flex sm:flex-wrap items-center gap-2 overflow-x-auto sm:overflow-visible w-full sm:w-auto py-1 scrollbar-none justify-start sm:justify-center max-w-full">
                 {[
-                  { label: "Gift Cards PSN", query: "Gift Card PSN" },
-                  { label: "PS Plus / Game Pass", query: "PS Plus Game Pass" },
-                  { label: "Gift Cards Xbox", query: "Gift Card Xbox" },
+                  { label: "Gift Cards PSN", url: "/digital?search=Gift+Card+PSN" },
+                  { label: "PS Plus / Game Pass", url: "/digital?type=assinatura" },
+                  { label: "Gift Cards Xbox", url: "/digital?search=Gift+Card+Xbox" },
                 ].map((pill) => (
                   <button
                     key={pill.label}
-                    onClick={() => navigate(`/digital?search=${encodeURIComponent(pill.query)}`)}
+                    onClick={() => navigate(pill.url)}
                     className="bg-slate-900/60 border border-slate-800 hover:border-red-500/40 hover:text-white px-3 py-1.5 rounded-full transition-all text-xs font-semibold cursor-pointer active:scale-95 whitespace-nowrap shrink-0 snap-start"
                   >
                     🔥 {pill.label}

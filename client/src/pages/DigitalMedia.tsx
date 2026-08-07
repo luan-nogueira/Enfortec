@@ -60,7 +60,10 @@ export default function DigitalMedia() {
     const params = new URLSearchParams(window.location.search);
     return params.get("search") || "";
   });
-  const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [selectedType, setSelectedType] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("type") || null;
+  });
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get("platform") || null;
@@ -326,16 +329,13 @@ export default function DigitalMedia() {
     if (selectedPlatform && selectedType !== "assinatura" && selectedGenre !== "Assinaturas") {
       const pPlat = (p.platform || "").toLowerCase();
       if (selectedPlatform === "PS5") {
-        // Somente produtos que tenham PS5 explicitamente no campo platform
-        matchesPlatform = pPlat === "ps5" || pPlat === "ps4/ps5" || pPlat === "ps4 / ps5" || pPlat.includes("ps5");
+        matchesPlatform = pPlat === "ps5" || (pPlat.includes("ps5") && !pPlat.includes("ps4"));
       } else if (selectedPlatform === "PS4") {
-        const isPS5Only = pPlat === "ps5" || (nameLower.includes("ps5") && !nameLower.includes("ps4") && !nameLower.includes("ps4/ps5") && !nameLower.includes("ps4 / ps5"));
-        const isPS4Match = pPlat.includes("ps4") || nameLower.includes("ps4") || nameLower.includes("ps4/ps5") || nameLower.includes("ps4 / ps5") || pPlat === "ps4/ps5" || pPlat === "ps4 / ps5";
-        matchesPlatform = isPS4Match && !isPS5Only;
+        matchesPlatform = pPlat === "ps4" || (pPlat.includes("ps4") && !pPlat.includes("ps5"));
       } else if (selectedPlatform === "PS4/PS5") {
-        matchesPlatform = (pPlat.includes("ps4") && pPlat.includes("ps5")) || nameLower.includes("ps4/ps5") || nameLower.includes("ps4 / ps5");
+        matchesPlatform = pPlat.includes("ps4") && pPlat.includes("ps5");
       } else {
-        matchesPlatform = p.platform === selectedPlatform;
+        matchesPlatform = pPlat === selectedPlatform.toLowerCase();
       }
     }
 
@@ -669,6 +669,13 @@ export default function DigitalMedia() {
                             <span className="text-slate-400 font-bold">👥 Secundária:</span>
                             <span className="font-bold text-slate-300">R$ {getProductPrice(product, "secundaria").toFixed(2).replace('.', ',')}</span>
                           </div>
+                        </div>
+                      ) : product.type === "jogo" || product.type === "assinatura" || product.category === "Assinaturas" ? (
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-[10px] sm:text-xs text-slate-400 font-bold">👤 Primária:</span>
+                          <span className="text-base sm:text-xl font-black text-red-500">
+                            R$ {getProductPrice(product, "primaria").toFixed(2).replace('.', ',')}
+                          </span>
                         </div>
                       ) : (
                         <span className="text-base sm:text-xl font-black text-red-500">

@@ -172,8 +172,37 @@ function PlatinadorAdminTab() {
             <Input type="number" value={rewardCoins} onChange={(e) => setRewardCoins(e.target.value)} placeholder="Ex: 500" className="bg-slate-950 border-red-600/20 text-white mt-1" required />
           </div>
           <div>
-            <Label className="text-xs text-slate-300 font-bold uppercase">URL da Imagem da Capa</Label>
-            <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." className="bg-slate-950 border-red-600/20 text-white mt-1" />
+            <Label className="text-xs text-slate-300 font-bold uppercase">Imagem da Capa (URL ou Upload)</Label>
+            <div className="flex gap-2 mt-1">
+              <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." className="bg-slate-950 border-red-600/20 text-white flex-1" />
+              <div className="relative">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      setIsSubmitting(true);
+                      const storageRef = ref(storage, `platinador_challenges/${Date.now()}_${file.name}`);
+                      const snapshot = await uploadBytes(storageRef, file);
+                      const url = await getDownloadURL(snapshot.ref);
+                      setImageUrl(url);
+                      toast.success("Imagem enviada!");
+                    } catch (err: any) {
+                      toast.error("Erro ao enviar imagem");
+                    } finally {
+                      setIsSubmitting(false);
+                      e.target.value = '';
+                    }
+                  }}
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                />
+                <Button type="button" variant="outline" className="bg-slate-900 border-slate-700 text-slate-300 h-10 px-3 hover:bg-slate-800">
+                  Upload
+                </Button>
+              </div>
+            </div>
           </div>
           <div className="md:col-span-2">
             <Label className="text-xs text-slate-300 font-bold uppercase">Descrição do Desafio</Label>
@@ -344,8 +373,35 @@ function PlatinadorAdminTab() {
                 </select>
               </div>
               <div>
-                <Label className="text-xs text-slate-300 font-bold uppercase">URL da Imagem da Capa</Label>
-                <Input value={editImage} onChange={(e) => setEditImage(e.target.value)} className="bg-slate-950 border-slate-800 text-white mt-1" />
+                <Label className="text-xs text-slate-300 font-bold uppercase">Imagem da Capa (URL ou Upload)</Label>
+                <div className="flex gap-2 mt-1">
+                  <Input value={editImage} onChange={(e) => setEditImage(e.target.value)} className="bg-slate-950 border-slate-800 text-white flex-1" />
+                  <div className="relative">
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        try {
+                          const storageRef = ref(storage, `platinador_challenges/${Date.now()}_${file.name}`);
+                          const snapshot = await uploadBytes(storageRef, file);
+                          const url = await getDownloadURL(snapshot.ref);
+                          setEditImage(url);
+                          toast.success("Imagem enviada!");
+                        } catch (err: any) {
+                          toast.error("Erro ao enviar imagem");
+                        } finally {
+                          e.target.value = '';
+                        }
+                      }}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                    />
+                    <Button type="button" variant="outline" className="bg-slate-900 border-slate-700 text-slate-300 h-10 px-3 hover:bg-slate-800">
+                      Upload
+                    </Button>
+                  </div>
+                </div>
               </div>
               <div>
                 <Label className="text-xs text-slate-300 font-bold uppercase">Descrição do Desafio</Label>
