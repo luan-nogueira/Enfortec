@@ -402,6 +402,13 @@ function PlatinadorAdminTab() {
                     </Button>
                   </div>
                 </div>
+                {editImage && (
+                  <div className="mt-3 flex justify-center">
+                    <div className="relative w-32 h-32 rounded-lg border border-slate-800 overflow-hidden bg-slate-900">
+                      <img src={editImage} alt="Preview" className="w-full h-full object-contain p-1" />
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                 <Label className="text-xs text-slate-300 font-bold uppercase">Descrição do Desafio</Label>

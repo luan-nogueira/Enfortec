@@ -41,17 +41,18 @@ export default function CPFCompletionModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [completedLocally, setCompletedLocally] = useState(false);
 
   const updateProfileMutation = trpc.auth.updateProfile.useMutation();
 
   useEffect(() => {
     // Show modal if user is logged in, loaded, but has no CPF registered
-    if (!loading && isAuthenticated && user && !user.cpf) {
+    if (!loading && isAuthenticated && user && !user.cpf && !completedLocally) {
       setIsOpen(true);
     } else {
       setIsOpen(false);
     }
-  }, [isAuthenticated, user, loading]);
+  }, [isAuthenticated, user, loading, completedLocally]);
 
   const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/\D/g, "");
@@ -93,6 +94,7 @@ export default function CPFCompletionModal() {
       }
 
       toast.success("Cadastro concluído com sucesso!");
+      setCompletedLocally(true);
       setIsOpen(false);
     } catch (err: any) {
       console.error("[CPF Sync Error]", err);

@@ -119,7 +119,7 @@ export default function PlatinadorPage() {
           price: 35.00,
           quantity: 1,
           productType: "platinador",
-          redirectUrl: `${window.location.origin}/platinador`
+          redirectUrl: statusQuery.data?.vipWhatsappUrl || `${window.location.origin}/platinador`
         })
       });
       const data = await res.json();
