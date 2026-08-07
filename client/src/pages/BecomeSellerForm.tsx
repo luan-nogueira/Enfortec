@@ -144,33 +144,7 @@ export default function BecomeSellerForm() {
             </div>
           </div>
 
-          {/* Custom Tabs */}
-          <div className="flex border-b border-red-600/20 mb-8 bg-slate-900/40 p-1.5 rounded-xl gap-2">
-            <button
-              onClick={() => setActiveTab("cadastro")}
-              className={`flex-1 py-3 text-sm font-black uppercase tracking-wider rounded-lg transition-all ${
-                activeTab === "cadastro"
-                  ? "bg-red-600 text-white shadow-lg shadow-red-600/30"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/30"
-              }`}
-            >
-              Ser Revendedor (Criar Loja)
-            </button>
-            <button
-              onClick={() => setActiveTab("revenda")}
-              className={`flex-1 py-3 text-sm font-black uppercase tracking-wider rounded-lg transition-all ${
-                activeTab === "revenda"
-                  ? "bg-red-600 text-white shadow-lg shadow-red-600/30"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/30"
-              }`}
-            >
-              Vender MINHA CONTA EFORTEGAMES
-            </button>
-          </div>
-
-          {/* Active Tab Content */}
-          {activeTab === "cadastro" ? (
-            <div className="bg-slate-900/60 backdrop-blur-md border border-red-600/20 rounded-3xl p-8 shadow-2xl card-neon">
+          <div className="bg-slate-900/60 backdrop-blur-md border border-red-600/20 rounded-3xl p-8 shadow-2xl card-neon">
               {isCheckingSeller ? (
                 <div className="text-center py-12">
                   <p className="text-slate-400">Verificando dados da loja...</p>
@@ -181,9 +155,9 @@ export default function BecomeSellerForm() {
                     <Store className="w-8 h-8 text-red-500 animate-pulse" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-black text-white uppercase tracking-tight">Sua Loja está Ativa!</h2>
+                    <h2 className="text-2xl font-black text-white uppercase tracking-tight">Seu Perfil de Vendas está Ativo!</h2>
                     <p className="text-sm text-slate-400 mt-2">
-                      Você já está cadastrado como revendedor parceiro (<strong>{activeSeller.storeName}</strong>).
+                      Você já está cadastrado para vender contas (<strong>{activeSeller.storeName}</strong>).
                     </p>
                   </div>
                   <div className="pt-4 flex gap-4 max-w-sm mx-auto">
@@ -191,7 +165,7 @@ export default function BecomeSellerForm() {
                       onClick={() => navigate("/vendedor")}
                       className="w-full h-12 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black uppercase tracking-wider btn-neon"
                     >
-                      Acessar Painel de Desapego
+                      Acessar Painel de Vendas
                     </Button>
                   </div>
                 </div>
@@ -220,11 +194,11 @@ export default function BecomeSellerForm() {
                 {/* Store Name */}
                 <div className="space-y-2">
                   <label className="block text-sm font-black text-white uppercase tracking-wider">
-                    Nome da sua Loja/Marca *
+                    Nome de Vendedor *
                   </label>
                   <Input
                     type="text"
-                    placeholder="Ex: Pedro Games Desapego"
+                    placeholder="Ex: João Silva"
                     value={storeName}
                     onChange={(e) => setStoreName(e.target.value)}
                     className="bg-slate-950 border-red-600/20 text-white focus-visible:ring-red-600 h-12 rounded-xl text-base"
@@ -238,10 +212,10 @@ export default function BecomeSellerForm() {
                 {/* Description */}
                 <div className="space-y-2">
                   <label className="block text-sm font-black text-white uppercase tracking-wider">
-                    Descrição/Apresentação da Loja
+                    Quais contas pretende vender?
                   </label>
                   <textarea
-                    placeholder="Conte um pouco sobre os jogos que pretende vender ou seu foco (ex: Apenas jogos digitais PS5, Gift cards, etc)..."
+                    placeholder="Conte quais jogos estão nas contas que você pretende revender..."
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     rows={4}
@@ -257,9 +231,9 @@ export default function BecomeSellerForm() {
                 <div className="bg-red-950/20 border border-red-600/20 p-5 rounded-2xl flex items-start gap-3">
                   <Info className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-black text-red-400 uppercase tracking-wider">Taxa de Comissão Eforte (10%) & Intermediação Segura</p>
-                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                      Cobramos uma comissão padrão de <strong>10%</strong> sobre as vendas ativas. Em contas de terceiros intermediadas pela loja, o pagamento do comprador fica retido em escrow até a validação e avaliação. Após a aprovação do cliente, o valor é liberado ao vendedor menos a comissão de 10%. Negociações feitas de forma direta e sem intermediação do site são de risco exclusivo das partes.
+                    <p className="text-sm font-black text-red-400 uppercase tracking-wider">Taxa de Comissão Eforte (35%) & Intermediação Segura</p>
+                    <p className="text-sm text-slate-300 leading-relaxed text-justify">
+                      Cobramos uma comissão padrão de <strong>35%</strong> sobre as vendas ativas. Em contas de terceiros intermediadas pela loja, o pagamento do comprador fica retido em escrow até a validação e avaliação. Após a aprovação do cliente, o valor é liberado ao vendedor menos a comissão de 35%. Negociações feitas de forma direta e sem intermediação do site são de risco exclusivo das partes.
                     </p>
                   </div>
                 </div>
@@ -280,70 +254,12 @@ export default function BecomeSellerForm() {
                     className="flex-1 h-12 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black uppercase tracking-wider btn-neon"
                     disabled={isLoading}
                   >
-                    {isLoading ? "Criando Portal..." : "Ativar minha Loja"}
+                    {isLoading ? "Ativando..." : "Ativar Perfil de Vendas"}
                   </Button>
                 </div>
               </form>
               )}
             </div>
-          ) : (
-            <div className="bg-slate-900/60 backdrop-blur-md border border-red-600/20 rounded-3xl p-8 shadow-2xl card-neon space-y-6">
-              <div className="text-center max-w-lg mx-auto">
-                <Store className="w-16 h-16 text-red-600 mx-auto mb-4 animate-bounce" />
-                <h2 className="text-2xl font-black text-white uppercase tracking-tight">VENDER MINHA CONTA EFORTEGAMES</h2>
-                <p className="text-sm text-slate-400 mt-2">
-                  Sabia que você pode ganhar dinheiro revendendo suas contas de jogos para a <strong>Eforte Games</strong>? Nós compramos de volta para revender aos nossos clientes.
-                </p>
-              </div>
-
-              {/* Requirements Box */}
-              <div className="bg-slate-950/80 border border-red-600/20 p-6 rounded-2xl space-y-4">
-                <h3 className="text-xs font-black text-red-500 uppercase tracking-widest border-b border-red-600/10 pb-2">Requisitos Mínimos Obrigatórios</h3>
-                
-                <ul className="space-y-3.5">
-                  <li className="flex items-start gap-3 text-sm">
-                    <div className="w-5 h-5 rounded-full bg-red-600/20 text-red-500 flex items-center justify-center shrink-0 text-xs font-bold mt-0.5">1</div>
-                    <p className="text-slate-300 leading-tight">
-                      A conta precisa ter sido adquirida originalmente em nossa loja (<strong>Eforte Games</strong>).
-                    </p>
-                  </li>
-                  <li className="flex items-start gap-3 text-sm">
-                    <div className="w-5 h-5 rounded-full bg-red-600/20 text-red-500 flex items-center justify-center shrink-0 text-xs font-bold mt-0.5">2</div>
-                    <p className="text-slate-300 leading-tight">
-                      A conta deve estar configurada e vinculada ao <strong>e-mail oficial da nossa loja</strong>.
-                    </p>
-                  </li>
-                  <li className="flex items-start gap-3 text-sm">
-                    <div className="w-5 h-5 rounded-full bg-red-600/20 text-red-500 flex items-center justify-center shrink-0 text-xs font-bold mt-0.5">3</div>
-                    <p className="text-slate-300 leading-tight">
-                      O cliente precisa solicitar e confirmar a <strong>desativação completa da conta</strong> junto à nossa equipe.
-                    </p>
-                  </li>
-                </ul>
-              </div>
-
-              {/* CTA Support Box */}
-              <div className="bg-red-950/20 border border-red-600/20 p-5 rounded-2xl text-center space-y-4">
-                <HelpCircle className="w-8 h-8 text-red-500 mx-auto animate-pulse" />
-                <div className="space-y-1">
-                  <p className="text-sm font-black text-white uppercase tracking-wider">Tudo pronto para negociar?</p>
-                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                    Se sua conta cumpre todos os requisitos acima, clique no botão abaixo para iniciar o atendimento pelo WhatsApp e fechar negócio agora mesmo!
-                  </p>
-                </div>
-                
-                <Button
-                  onClick={handleNegotiateAccount}
-                  className="w-full h-14 bg-green-600 hover:bg-green-700 text-white font-black text-base uppercase tracking-wider rounded-2xl flex items-center justify-center gap-3 shadow-lg shadow-green-600/20"
-                >
-                  <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
-                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.42 9.864-9.864.002-2.637-1.03-5.118-2.905-6.993C16.257 1.874 13.78 1.84 11.14 1.84 5.704 1.84 1.28 6.261 1.277 11.705c-.001 1.714.453 3.39 1.317 4.873L1.576 22.25l5.071-1.328z"/>
-                  </svg>
-                  Iniciar Negociação via WhatsApp
-                </Button>
-              </div>
-            </div>
-          )}
 
           {/* Benefits Grid */}
           <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">

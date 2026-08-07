@@ -377,7 +377,7 @@ export default function SellerDashboard() {
               </p>
             </div>
             <div className="text-[10px] text-slate-500 pt-2 border-t border-slate-800">
-              Taxa de comissão: 8% (Físicos) / 10% (Digitais)
+              Taxa de comissão: 8% (Físicos) / 35% (Digitais)
             </div>
           </Card>
 

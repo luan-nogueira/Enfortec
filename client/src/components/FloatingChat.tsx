@@ -113,7 +113,7 @@ function aiAnswer(q: string): string {
     return "🏆 **Clube do Platinador VIP (R$ 35,00/mês)**!\n\n• **2 Sorteios por mês** de jogos no grupo VIP\n• **Desafios Semanais** de Platina acumulando ForteCoins\n\n[👉 Assinar Clube do Platinador](/platinador)";
 
   if (/vender|revendedor|comissao|escrow|anunciar/.test(nq))
-    return "💼 **Vender sua conta ou Mídias Físicas na Eforte Games**!\n\n• **Revenda de Contas**: Comissão de 10% com retenção do valor em escrow até a entrega.\n• **Mídias Físicas / Consoles**: Taxa de 8% com intermediação segura.\n\n[👉 Virar Revendedor](/virar-vendedor)";
+    return "💼 **Vender sua conta ou Mídias Físicas na Eforte Games**!\n\n• **Revenda de Contas**: Comissão de 35% com retenção do valor em escrow até a entrega.\n• **Mídias Físicas / Consoles**: Taxa de 8% com intermediação segura.\n\n[👉 Virar Revendedor](/virar-vendedor)";
 
   if (/preciso de ajuda|ajuda com algum jogo|qual jogo deseja ajuda/.test(nq))
     return "Com certeza! Estou aqui para ajudar. 🎮\n\nSe você deseja ajuda com um jogo específico, digite o nome dele e eu vejo se temos disponível no nosso catálogo!\n\n[👉 Chamar no WhatsApp](" + WA_BASE + ")";

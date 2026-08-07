@@ -330,7 +330,7 @@ export default function Home() {
                         <ArrowRight className="w-3.5 h-3.5" />
                       </a>
                       <a href="/virar-vendedor" className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-slate-900 text-xs font-semibold text-slate-300 hover:text-white transition-colors">
-                        <Zap className="w-4 h-4 text-red-500" /> Vender minha conta EforteGames (10%)
+                        <Zap className="w-4 h-4 text-red-500" /> Vender minha conta EforteGames (35%)
                       </a>
                       <a href="/fortecoins" className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-slate-900 text-xs font-semibold text-amber-400 hover:text-amber-300 transition-colors">
                         <Coins className="w-4 h-4 text-amber-400" /> ForteCoins & Fidelidade

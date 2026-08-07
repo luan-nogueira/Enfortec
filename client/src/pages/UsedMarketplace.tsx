@@ -345,14 +345,6 @@ export default function UsedMarketplace() {
             </div>
             {isAuthenticated && (
               <div className="flex items-center gap-3">
-                <Button 
-                  variant="ghost" 
-                  className="text-slate-300 hover:text-white hover:bg-slate-900 flex items-center gap-1.5 px-2 sm:px-4"
-                  onClick={() => navigate("/fortecoins")}
-                >
-                  <Coins className="w-4 h-4 text-red-500" />
-                  <span className="text-sm">{user?.forteCoins ?? 0} FC</span>
-                </Button>
                 <UserProfileButton />
               </div>
             )}
@@ -484,7 +476,7 @@ export default function UsedMarketplace() {
                     <img 
                       src={product.imageUrl} 
                       alt={product.name} 
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
+                      className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105" 
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-slate-800">
@@ -740,6 +732,10 @@ export default function UsedMarketplace() {
                   <span>R$ {finalPriceVal.toFixed(2)}</span>
                 </div>
               </div>
+            </div>
+            
+            <div className="mt-3 p-3 bg-red-950/40 border border-red-500/20 rounded-xl text-[10px] text-red-300 leading-tight">
+              <strong>AVISO IMPORTANTE:</strong> A EforteGames não se responsabiliza por negociações que não foram intermediadas pela loja. Caso o cliente queira intermediação da loja, o valor ficará retido até o comprador receber e avaliar o item, liberando assim o pagamento ao vendedor.
             </div>
           </div>
 
