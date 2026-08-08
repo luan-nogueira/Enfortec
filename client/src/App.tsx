@@ -28,8 +28,12 @@ import Reviews from "./pages/Reviews";
 import PlatinadorPage from "./pages/PlatinadorPage";
 import JogueComEconomia from "./pages/JogueComEconomia";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import FortecoinsPage from "./pages/FortecoinsPage";
+import MaintenanceScreen from "./components/MaintenanceScreen";
+import { useAuth } from "./_core/hooks/useAuth";
+import { db } from "./lib/firebase";
+import { doc, onSnapshot } from "firebase/firestore";
 
 function Router() {
   return (
@@ -64,6 +68,20 @@ function Router() {
   );
 }
 function App() {
+  const { isAdmin, loading: isAuthLoading } = useAuth();
+  const [maintenanceConfig, setMaintenanceConfig] = useState<any>(null);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "settings", "maintenance"), (docSnap) => {
+      if (docSnap.exists()) {
+        setMaintenanceConfig(docSnap.data());
+      } else {
+        setMaintenanceConfig(null);
+      }
+    });
+    return () => unsub();
+  }, []);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const ref = params.get("ref");
@@ -72,6 +90,17 @@ function App() {
       console.log("[Referral] Referrer captured:", ref);
     }
   }, []);
+
+  if (!isAuthLoading && maintenanceConfig?.isActive && !isAdmin) {
+    return (
+      <ThemeProvider defaultTheme="light">
+        <MaintenanceScreen 
+          title={maintenanceConfig.title} 
+          message={maintenanceConfig.message} 
+        />
+      </ThemeProvider>
+    );
+  }
 
   return (
     <ErrorBoundary>

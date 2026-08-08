@@ -111,6 +111,8 @@ export const digitalProducts = pgTable("digitalProducts", {
   downloadUrl: varchar("downloadUrl", { length: 500 }),
   imageUrl: varchar("imageUrl", { length: 500 }),
   stock: integer("stock").notNull().default(1),
+  stockPrimary: integer("stockPrimary").default(0),
+  stockSecondary: integer("stockSecondary").default(0),
   isActive: boolean("isActive").default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => new Date()),

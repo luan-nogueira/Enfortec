@@ -22,7 +22,7 @@ export default function JogueComEconomia() {
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
 
   useEffect(() => {
-    const qDigital = query(collection(db, "digital_products"), limit(100));
+    const qDigital = query(collection(db, "digital_products"));
     const unsubDigital = onSnapshot(qDigital, (snapshot) => {
       const data = snapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() }))

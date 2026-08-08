@@ -392,10 +392,10 @@ export async function getPlatformSettings() {
   return result[0];
 }
 
-export async function updatePlatformSettings(commissionPercentage: string) {
+export async function updatePlatformSettings(data: { commissionPercentage?: string, vipWhatsappUrl?: string }) {
   const db = getDb();
   if (!db) return;
-  await db.update(platformSettings).set({ commissionPercentage }).where(eq(platformSettings.id, 1));
+  await db.update(platformSettings).set(data).where(eq(platformSettings.id, 1));
 }
 
 // Balance, Order Confirmation, and Reviews (Escrow System)

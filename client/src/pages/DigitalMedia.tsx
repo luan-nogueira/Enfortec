@@ -163,7 +163,7 @@ export default function DigitalMedia() {
 
   const handleFinalizePurchase = async () => {
     if (!selectedProduct) return;
-    const price = parseFloat(selectedProduct.price);
+    const price = getProductPrice(selectedProduct, accountType);
 
     if (!customerName.trim() || !customerEmail.trim() || !customerPhone.trim()) {
       setCheckoutError("Por favor, preencha todos os dados de contato (Nome, E-mail e WhatsApp).");
@@ -320,6 +320,7 @@ export default function DigitalMedia() {
   }, [products]);
 
   const filteredProducts = products.filter((p: any) => {
+    if (p.showInEconomia === true) return false;
     const nameLower = p.name.toLowerCase();
     const matchesSearch = !searchTerm || nameLower.includes(searchTerm.toLowerCase()) ||
       p.description?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -770,7 +771,7 @@ export default function DigitalMedia() {
                     }`}
                   >
                     <div className="font-bold text-xs flex items-center justify-between">
-                      <span>👤 Primária</span>
+                      <span>👤 Primária {selectedProduct.stockPrimary !== undefined && `(${selectedProduct.stockPrimary} un)`}</span>
                       {accountType === "primaria" && <span className="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded font-black">OK</span>}
                     </div>
                     <p className="text-[9px] text-slate-400 mt-1 leading-tight">Jogue no seu perfil pessoal com conquistas</p>
@@ -789,7 +790,7 @@ export default function DigitalMedia() {
                     }`}
                   >
                     <div className="font-bold text-xs flex items-center justify-between">
-                      <span>👥 Secundária</span>
+                      <span>👥 Secundária {selectedProduct.stockSecondary !== undefined && `(${selectedProduct.stockSecondary} un)`}</span>
                       {accountType === "secundaria" && <span className="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded font-black">OK</span>}
                     </div>
                     <p className="text-[9px] text-slate-400 mt-1 leading-tight">Jogue na conta enviada com internet</p>

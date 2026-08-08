@@ -92,8 +92,8 @@ export default function AddUsedProduct() {
     if (!files || files.length === 0) return;
 
     Array.from(files).forEach((file) => {
-      if (file.size > 8 * 1024 * 1024) {
-        toast.error(`A imagem ${file.name} ultrapassa 8MB.`);
+      if (file.size > 3 * 1024 * 1024) {
+        toast.error(`A imagem ${file.name} ultrapassa 3MB.`);
         return;
       }
 
@@ -176,8 +176,8 @@ export default function AddUsedProduct() {
       });
       toast.success("Anúncio de mídia física/acessório publicado com sucesso!");
       navigate("/usados");
-    } catch (error) {
-      toast.error("Erro ao adicionar produto. Tente novamente.");
+    } catch (error: any) {
+      toast.error(error?.message || "Erro ao adicionar produto. Tente novamente.");
       console.error(error);
     } finally {
       setIsLoading(false);

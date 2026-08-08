@@ -12,77 +12,12 @@ import {
   onSnapshot,
   serverTimestamp,
   setDoc,
-  doc
+  doc,
+  getDocs
 } from "firebase/firestore";
 import { MessageCircle, X, Send, Bot, ShieldCheck, Zap, Trophy, ShoppingBag, Sparkles } from "lucide-react";
 
-// ─── Catalog ──────────────────────────────────────────────────────────────────
-const CATALOG = [
-  { name: "AGONY PS4/PS5", price: 9.90 },
-  { name: "ASSASSIN'S CREED MIRAGE PS4/PS5", price: 59.90 },
-  { name: "ASSASSIN'S CREED ODYSSEY PS4/PS5", price: 44.90 },
-  { name: "ASSASSIN'S CREED ORIGINS PS4/PS5", price: 37.90 },
-  { name: "ASSASSIN'S CREED SHADOWS PS5", price: 144.90 },
-  { name: "ASSASSIN'S CREED SYNDICATE PS4/PS5", price: 59.99 },
-  { name: "ASSASSIN'S CREED VALHALLA PS4/PS5", price: 50.00 },
-  { name: "ATOMIC HEART PS4/PS5", price: 69.90 },
-  { name: "AVATAR PS4/PS5", price: 74.90 },
-  { name: "BATTLEFIELD 1 PS4/PS5", price: 34.90 },
-  { name: "BATTLEFIELD 4 PS4/PS5", price: 29.90 },
-  { name: "BATTLEFIELD V PS4/PS5", price: 36.90 },
-  { name: "BLEACH REBIRTH OF SOULS PS5", price: 100.00 },
-  { name: "CALL OF DUTY GHOSTS PS4/PS5", price: 99.90 },
-  { name: "CALL OF DUTY VANGUARD PS4/PS5", price: 89.90 },
-  { name: "CALL OF DUTY WW2 PS4/PS5", price: 100.00 },
-  { name: "COD BLACK OPS 6 PS4/PS5", price: 80.00 },
-  { name: "COD BLACK OPS 7 PS4/PS5", price: 120.00 },
-  { name: "COD COLD WAR PS4/PS5", price: 80.00 },
-  { name: "CRASH BANDICOOT TRILOGY PS4/PS5", price: 59.90 },
-  { name: "CRASH NITRO KART PS4/PS5", price: 59.90 },
-  { name: "DEAD ISLAND 2 PS4/PS5", price: 50.00 },
-  { name: "DEAD SPACE PS5", price: 69.90 },
-  { name: "DEMON SLAYER 2 PS4/PS5", price: 144.90 },
-  { name: "DETROIT BECOME HUMAN PS4/PS5", price: 59.90 },
-  { name: "DEVIL MAY CRY 5 PS5", price: 30.00 },
-  { name: "DEVIL MAY CRY 5 + VERGIL PS4/PS5", price: 16.90 },
-  { name: "DEVIL MAY CRY DEFINITIVE EDITION PS4", price: 36.90 },
-  { name: "DIABLO 4 PS4/PS5", price: 100.00 },
-  { name: "DIABLO ETERNAL COLLECTION PS4/PS5", price: 64.90 },
-  { name: "DOOM DARK AGES PS5", price: 110.00 },
-  { name: "DOOM ETERNAL PS4/PS5", price: 64.90 },
-  { name: "DRAGON BALL KAKAROT PS4/PS5", price: 59.90 },
-  { name: "DRAGON BALL SPARKING ZERO PS5", price: 174.90 },
-  { name: "DYING LIGHT PS4/PS5", price: 20.00 },
-  { name: "DYING LIGHT 2 PS4/PS5", price: 54.90 },
-  { name: "DYING LIGHT THE BEAST PS5", price: 159.90 },
-  { name: "EXPEDITION 33 PS5", price: 149.90 },
-  { name: "FAR CRY 5 PS4/PS5", price: 30.00 },
-  { name: "FAR CRY 6 PS4/PS5", price: 54.90 },
-  { name: "FAR CRY NEW DAWN PS4/PS5", price: 24.90 },
-  { name: "FINAL FANTASY XVI PS5", price: 119.90 },
-  { name: "GHOST RECON WILDLANDS PS4/PS5", price: 34.90 },
-  { name: "GOD OF WAR 2018 PS4/PS5", price: 59.90 },
-  { name: "GOD OF WAR 3 REMASTER PS4/PS5", price: 36.99 },
-  { name: "GTA V PS4/PS5", price: 59.90 },
-  { name: "HELLBLADE 2 PS5", price: 70.00 },
-  { name: "HI-FI RUSH PS5", price: 59.90 },
-  { name: "HOGWARTS LEGACY PS4/PS5", price: 39.90 },
-  { name: "HORIZON FORBIDDEN WEST PS4/PS5", price: 100.00 },
-  { name: "JEDI FALLEN ORDER PS4/PS5", price: 44.99 },
-  { name: "JUST CAUSE 4 PS4/PS5", price: 19.90 },
-  { name: "MAFIA 3 PS4/PS5", price: 24.90 },
-  { name: "MAFIA THE OLD COUNTRY PS5", price: 159.90 },
-  { name: "MORTAL KOMBAT 1 PS5", price: 69.90 },
-  { name: "MORTAL KOMBAT 11 PS4/PS5", price: 20.00 },
-  { name: "NARUTO STORM 4 PS4/PS5", price: 59.90 },
-  { name: "NBA 2K26 PS4/PS5", price: 65.00 },
-  { name: "RED DEAD REDEMPTION 2 PS4/PS5", price: 64.90 },
-  { name: "SHADOW OF THE COLOSSUS PS4/PS5", price: 44.99 },
-  { name: "THE LAST OF US PART I PS5", price: 120.00 },
-  { name: "THE LAST OF US PART II PS4", price: 100.00 },
-  { name: "THE LAST OF US REMASTERED PS4/PS5", price: 35.90 },
-  { name: "UNCHARTED LEGACY OF THIEVES PS5", price: 89.90 },
-];
+// Catalog is now fetched dynamically from Firestore
 
 const WA_NUMBER = "554384253691";
 const WA_BASE = `https://wa.me/${WA_NUMBER}`;
@@ -103,7 +38,7 @@ const STOP = new Set(["tem", "voce", "voces", "o", "de", "com", "jogo", "jogos",
   "e", "do", "da", "game", "games", "ps4", "ps5", "quais", "todos", "lista",
   "algum", "tao", "ter", "qualquer", "sobre"]);
 
-function aiAnswer(q: string): string {
+function aiAnswer(q: string, catalog: any[]): string {
   const nq = norm(q);
 
   if (/jogue com economia|secundaria|conta secundaria/.test(nq))
@@ -136,7 +71,7 @@ function aiAnswer(q: string): string {
   const isListMode = /quais|lista|todos|tem algum|voces tem|disponivel/.test(nq);
   const keywords = nq.split(" ").filter(w => w.length > 2 && !STOP.has(w));
 
-  const scored = CATALOG.map(g => {
+  const scored = catalog.map(g => {
     const nn = norm(g.name);
     let score = 0;
     if (nq.includes(nn)) score += 100;
@@ -240,6 +175,23 @@ export default function FloatingChat() {
   const [showWaSelector, setShowWaSelector] = useState(false);
   const welcomeStarted = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [catalog, setCatalog] = useState<{name: string; price: number}[]>([]);
+
+  useEffect(() => {
+    const fetchCatalog = async () => {
+      try {
+        const snap = await getDocs(collection(db, "digital_products"));
+        const products = snap.docs.map(doc => {
+          const data = doc.data();
+          return { name: data.name, price: Number(data.price) || 0 };
+        });
+        setCatalog(products);
+      } catch (err) {
+        console.error("Error fetching catalog for chat:", err);
+      }
+    };
+    fetchCatalog();
+  }, []);
 
   useEffect(() => {
     if (!isOpen || !isAuthenticated || !user?.id) return;
@@ -307,7 +259,7 @@ export default function FloatingChat() {
 
     setThinking(true);
     await new Promise(r => setTimeout(r, 450));
-    const answer = aiAnswer(msg);
+    const answer = aiAnswer(msg, catalog);
     setThinking(false);
 
     if (isAuthenticated && user?.id) {
@@ -360,7 +312,7 @@ export default function FloatingChat() {
         />
       )}
 
-      <div className={`fixed bottom-20 right-4 sm:bottom-6 sm:right-6 ${isOpen ? "z-[100]" : "z-[80]"}`}>
+      <div className={`fixed ${isOpen ? "inset-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2" : "bottom-20 right-4 sm:bottom-6 sm:right-6"} ${isOpen ? "z-[100]" : "z-[80]"}`}>
         {!isOpen && (
           <Button
             onClick={() => setIsOpen(true)}
@@ -372,7 +324,7 @@ export default function FloatingChat() {
         )}
 
         {isOpen && (
-          <Card className="w-[calc(100vw-2rem)] max-w-[360px] h-[520px] flex flex-col bg-slate-900 border-red-600/40 shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden rounded-2xl animate-in zoom-in-95 duration-200">
+          <Card className="w-full h-full sm:w-[600px] sm:max-w-none sm:h-[650px] flex flex-col bg-slate-900 border-red-600/40 shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden sm:rounded-2xl animate-in zoom-in-95 duration-200 rounded-none border-0 sm:border">
             {/* Header */}
             <div className="p-3.5 bg-gradient-to-r from-red-700 via-red-600 to-red-700 flex justify-between items-center shrink-0 border-b border-red-500/30 shadow-md">
               <div className="flex items-center gap-2.5">

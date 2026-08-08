@@ -140,8 +140,8 @@
 
   /* Custom thin scrollbar */
   ::-webkit-scrollbar {
-    width: 5px;
-    height: 5px;
+    width: 10px;
+    height: 10px;
   }
   ::-webkit-scrollbar-track {
     background: #0a0a0a;

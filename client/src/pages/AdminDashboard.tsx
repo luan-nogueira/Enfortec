@@ -8,7 +8,7 @@ import { db, storage } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, onSnapshot, doc, updateDoc, setDoc, deleteDoc, query, orderBy, serverTimestamp, addDoc, getDoc } from "firebase/firestore";
 import { useLocation } from "wouter";
-import { Shield, User, UserCheck, UserPlus, ArrowLeft, Plus, X, Lock, Mail, Trash2, MessageCircle, Send, Coins, Gift, Check, Clock, LogOut, Gamepad2, Edit, Menu, BarChart3, Users, ShoppingBag, Tag, Image, Percent, Ban, Trophy, ExternalLink, Flame, Copy, Settings, Bell, Filter, CheckCircle2 } from "lucide-react";
+import { Shield, User, UserCheck, UserPlus, ArrowLeft, Plus, X, Lock, Mail, Trash2, MessageCircle, Send, Coins, Gift, Check, Clock, LogOut, Gamepad2, Edit, Menu, BarChart3, Users, ShoppingBag, Tag, Image, Percent, Ban, Trophy, ExternalLink, Flame, Copy, Settings, Bell, Filter, CheckCircle2, ShieldAlert } from "lucide-react";
 import { useState, useEffect, useRef, useMemo } from "react";
 import {
   Dialog,
@@ -1288,16 +1288,50 @@ export default function AdminDashboard() {
     }
   };
 
+  const updateWhatsappUrlMutation = trpc.settings.updateWhatsappUrl.useMutation();
+
   const handleSaveWaConfig = async () => {
     setSavingWaConfig(true);
     try {
       await setDoc(doc(db, "settings", "whatsapp"), waConfig, { merge: true });
+      await updateWhatsappUrlMutation.mutateAsync({ vipWhatsappUrl: waConfig.groupUrl });
       toast.success("Link do Grupo e Número do WhatsApp salvos com sucesso!");
     } catch (err) {
       console.error("Erro ao salvar config do WhatsApp:", err);
       toast.error("Erro ao salvar configurações do WhatsApp.");
     } finally {
       setSavingWaConfig(false);
+    }
+  };
+
+  // --- Manutenção do Site ---
+  const [maintenanceConfig, setMaintenanceConfig] = useState({
+    isActive: false,
+    title: "Estamos em Manutenção",
+    message: "Voltamos em breve. A loja está recebendo novos produtos e ajustes no sistema."
+  });
+  const [savingMaintenance, setSavingMaintenance] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated || !isAdmin) return;
+    const unsub = onSnapshot(doc(db, "settings", "maintenance"), (docSnap) => {
+      if (docSnap.exists()) {
+        setMaintenanceConfig(docSnap.data() as any);
+      }
+    });
+    return () => unsub();
+  }, [isAuthenticated, isAdmin]);
+
+  const handleSaveMaintenance = async () => {
+    setSavingMaintenance(true);
+    try {
+      await setDoc(doc(db, "settings", "maintenance"), maintenanceConfig, { merge: true });
+      toast.success("Configurações de manutenção salvas com sucesso!");
+    } catch (err) {
+      console.error("Erro ao salvar config de manutenção:", err);
+      toast.error("Erro ao salvar configurações de manutenção.");
+    } finally {
+      setSavingMaintenance(false);
     }
   };
 
@@ -1465,6 +1499,7 @@ export default function AdminDashboard() {
     { value: "promocoes", label: "Banners da Home", icon: Image, section: "Marketing" },
     { value: "aba_promocoes", label: "Gerenciar Promoções", icon: Tag, section: "Marketing" },
     { value: "cupons", label: "Cupons", icon: Percent, section: "Marketing" },
+    { value: "manutencao", label: "Bloqueio do Site", icon: ShieldAlert, section: "Sistema" },
     { value: "config_fortecoins", label: "📲 Link WhatsApp & ForteCoins", icon: Settings, section: "Sistema" },
   ], [allRedemptions, allReferrals, allChats, pendingNotifCount]);
 
@@ -3764,6 +3799,77 @@ export default function AdminDashboard() {
               </Card>
             </div>
           </TabsContent>
+
+          {/* ABA DE MANUTENÇÃO */}
+          <TabsContent value="manutencao" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <Card className="bg-[#121212] border-red-600/30 p-6 shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-red-600/10 rounded-bl-full blur-2xl pointer-events-none" />
+              
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-3 rounded-lg bg-red-600/10 border border-red-500/20">
+                  <ShieldAlert className="text-red-500 w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-white uppercase tracking-tight">
+                    Modo de Manutenção (Bloqueio)
+                  </h3>
+                  <p className="text-slate-400 text-xs">
+                    Ative este modo para bloquear o acesso dos clientes enquanto você faz atualizações no sistema. (Administradores continuam acessando).
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <div className="flex items-center justify-between p-4 bg-slate-900 border border-slate-800 rounded-xl">
+                  <div>
+                    <h4 className="text-sm font-bold text-white">Status do Site</h4>
+                    <p className="text-xs text-slate-400">Atualmente o site está {maintenanceConfig.isActive ? "BLOQUEADO" : "ONLINE"}</p>
+                  </div>
+                  <Button
+                    onClick={() => setMaintenanceConfig(prev => ({ ...prev, isActive: !prev.isActive }))}
+                    className={`font-bold transition-all ${
+                      maintenanceConfig.isActive 
+                        ? "bg-red-600 hover:bg-red-700 text-white shadow-[0_0_15px_rgba(220,38,38,0.5)]" 
+                        : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-[0_0_15px_rgba(5,150,105,0.5)]"
+                    }`}
+                  >
+                    {maintenanceConfig.isActive ? "Desativar Bloqueio" : "Ativar Bloqueio"}
+                  </Button>
+                </div>
+
+                <div className="space-y-4 p-4 border border-slate-800 rounded-xl bg-slate-950">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold text-slate-300 uppercase">Título da Mensagem</Label>
+                    <Input
+                      value={maintenanceConfig.title}
+                      onChange={(e) => setMaintenanceConfig({ ...maintenanceConfig, title: e.target.value })}
+                      placeholder="Ex: Estamos em Manutenção"
+                      className="bg-slate-900 border-slate-800 focus-visible:ring-red-600 text-white"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold text-slate-300 uppercase">Texto da Mensagem</Label>
+                    <textarea
+                      value={maintenanceConfig.message}
+                      onChange={(e) => setMaintenanceConfig({ ...maintenanceConfig, message: e.target.value })}
+                      className="w-full h-24 p-3 bg-slate-900 border border-slate-800 rounded-md text-sm text-white focus:outline-none focus:ring-1 focus:ring-red-500/50"
+                      placeholder="Ex: Voltamos em breve. A loja está recebendo novos produtos e ajustes no sistema."
+                    />
+                  </div>
+
+                  <Button 
+                    onClick={handleSaveMaintenance} 
+                    disabled={savingMaintenance}
+                    className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-10 mt-2"
+                  >
+                    {savingMaintenance ? "Salvando..." : "Salvar Configurações de Manutenção"}
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </TabsContent>
+
         </Tabs>
       </main>
     </div>

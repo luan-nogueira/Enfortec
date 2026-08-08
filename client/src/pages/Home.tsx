@@ -722,6 +722,8 @@ export default function Home() {
           <div className="flex lg:grid lg:grid-cols-4 xl:grid-cols-5 overflow-x-auto lg:overflow-x-visible gap-4 pb-4 lg:pb-0 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             {(() => {
               const visibleListings = allListings.filter((listing: any) => {
+                if (listing.showInEconomia === true) return false;
+                
                 if (activeListingTab === "digital") return listing._type === 'digital' && listing.type !== 'assinatura';
                 if (activeListingTab === "fisico") return listing._type === 'used';
                 if (activeListingTab === "assinatura") return listing.type === 'assinatura';

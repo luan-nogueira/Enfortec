@@ -147,8 +147,18 @@ export const appRouter = router({
         const database = await getDb();
         if (!database) throw new Error("Database not available");
         
-        const seller = await db.getSellerByUserId(ctx.user.id);
-        if (!seller) throw new Error("User is not a seller");
+        let seller = await db.getSellerByUserId(ctx.user.id);
+        if (!seller) {
+          const user = await db.getUserById(ctx.user.id);
+          const storeName = user?.name || "Vendedor " + ctx.user.id;
+          await database.insert(sellers).values({
+            userId: ctx.user.id,
+            storeName: storeName,
+          });
+          seller = await db.getSellerByUserId(ctx.user.id);
+        }
+        
+        if (!seller) throw new Error("Erro ao criar perfil de vendedor");
         
         const result = await database.insert(usedProducts).values({
           sellerId: seller.id,
@@ -203,7 +213,16 @@ export const appRouter = router({
         const database = await getDb();
         if (!database) throw new Error("Database not available");
         
-        const seller = await db.getSellerByUserId(ctx.user.id);
+        let seller = await db.getSellerByUserId(ctx.user.id);
+        if (!seller) {
+          const user = await db.getUserById(ctx.user.id);
+          const storeName = user?.name || "Vendedor " + ctx.user.id;
+          await database.insert(sellers).values({
+            userId: ctx.user.id,
+            storeName: storeName,
+          });
+          seller = await db.getSellerByUserId(ctx.user.id);
+        }
         
         const result = await database.insert(digitalProducts).values({
           sellerId: seller?.id,
@@ -269,13 +288,17 @@ export const appRouter = router({
   // Settings Router - for admin only
   settings: router({
     get: publicProcedure.query(() => db.getPlatformSettings()),
-    update: protectedProcedure
-      .input(z.object({
-        commissionPercentage: z.string(),
-      }))
+    updateCommission: protectedProcedure
+      .input(z.object({ commissionPercentage: z.string() }))
       .mutation(async ({ ctx, input }) => {
         if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
-        return db.updatePlatformSettings(input.commissionPercentage);
+        return db.updatePlatformSettings({ commissionPercentage: input.commissionPercentage });
+      }),
+    updateWhatsappUrl: protectedProcedure
+      .input(z.object({ vipWhatsappUrl: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+        return db.updatePlatformSettings({ vipWhatsappUrl: input.vipWhatsappUrl });
       }),
   }),
 
@@ -478,44 +501,13 @@ export const appRouter = router({
             .select()
             .from(platinumChallenges)
             .orderBy(desc(platinumChallenges.createdAt));
-          if (list.length > 0) return list;
+          return list;
         } catch (e) {
           console.error("[TRPC Platinador] Error fetching challenges:", e);
         }
       }
 
-      return [
-        {
-          id: 1,
-          gameTitle: "God of War Ragnarök",
-          description: "Conquiste todos os troféus incluindo a vitória na arena de Valhalla e derrotar Gná.",
-          platform: "PS4 / PS5",
-          imageUrl: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=800",
-          rewardCoins: 500,
-          status: "ativo",
-          createdAt: new Date(),
-        },
-        {
-          id: 2,
-          gameTitle: "Marvel's Spider-Man 2",
-          description: "Desbloqueie a platina completa explorando toda a Nova York com Peter e Miles.",
-          platform: "PS5",
-          imageUrl: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=800",
-          rewardCoins: 400,
-          status: "ativo",
-          createdAt: new Date(),
-        },
-        {
-          id: 3,
-          gameTitle: "Elden Ring",
-          description: "Alcance o título de Lorde Prateado e consiga todos os 42 troféus nas terras intermediárias.",
-          platform: "PS4 / PS5",
-          imageUrl: "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?q=80&w=800",
-          rewardCoins: 600,
-          status: "ativo",
-          createdAt: new Date(),
-        },
-      ];
+      return [];
     }),
 
     submitPlatinum: protectedProcedure
