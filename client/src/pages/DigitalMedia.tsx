@@ -732,7 +732,7 @@ export default function DigitalMedia() {
 
       {/* Modal de Confirmação de Compra */}
       <Dialog open={!!selectedProduct} onOpenChange={(open) => !open && setSelectedProduct(null)}>
-        <DialogContent className="bg-slate-900 border-red-600/30 text-white sm:max-w-[425px] card-neon max-h-[85dvh] overflow-y-auto scrollbar-thin scrollbar-thumb-red-600/50">
+        <DialogContent className="w-[92vw] sm:max-w-[425px] bg-slate-900 border-red-600/30 text-white card-neon max-h-[85dvh] overflow-y-auto scrollbar-thin scrollbar-thumb-red-600/50 p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold text-neon flex items-center gap-2">🎮 Confirmar Compra</DialogTitle>
             <DialogDescription className="text-slate-400">

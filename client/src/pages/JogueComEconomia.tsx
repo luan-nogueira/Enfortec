@@ -288,7 +288,7 @@ export default function JogueComEconomia() {
       {/* Checkout Dialog */}
       {selectedProduct && (
         <Dialog open={!!selectedProduct} onOpenChange={() => setSelectedProduct(null)}>
-          <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-md">
+          <DialogContent className="w-[92vw] sm:max-w-md bg-slate-900 border-slate-800 text-white max-h-[85dvh] overflow-y-auto scrollbar-thin scrollbar-thumb-red-600/50 p-4 sm:p-6">
             <DialogHeader>
               <DialogTitle className="text-lg font-bold flex items-center gap-2">
                 <ShoppingCart className="w-5 h-5 text-red-500" /> Finalizar Compra
