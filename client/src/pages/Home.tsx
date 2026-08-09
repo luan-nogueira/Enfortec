@@ -234,9 +234,14 @@ export default function Home() {
     ...digitalProducts.map((p: any) => ({ ...p, _type: 'digital' })),
     ...usedProducts.map((p: any) => ({ ...p, _type: 'used' }))
   ].sort((a: any, b: any) => {
-    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-    return timeB - timeA;
+    const getMs = (dateVal: any) => {
+      if (!dateVal) return 0;
+      if (typeof dateVal.toMillis === 'function') return dateVal.toMillis();
+      if (typeof dateVal === 'number') return dateVal;
+      const parsed = new Date(dateVal).getTime();
+      return isNaN(parsed) ? 0 : parsed;
+    };
+    return getMs(b.createdAt) - getMs(a.createdAt);
   }).slice(0, 24);
 
   const categories = [

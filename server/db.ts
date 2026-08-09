@@ -108,6 +108,18 @@ export async function getUserByOpenId(openId: string) {
   }
 }
 
+export async function getUserById(id: number) {
+  try {
+    const db = getDb();
+    if (!db || !id) return undefined;
+    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    return result.length > 0 ? result[0] : undefined;
+  } catch (error) {
+    console.error("[Database] Failed to get user by id:", error);
+    return undefined;
+  }
+}
+
 export async function getUserByEmail(email: string) {
   try {
     const db = getDb();

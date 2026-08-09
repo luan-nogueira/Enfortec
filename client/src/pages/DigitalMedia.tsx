@@ -363,10 +363,10 @@ export default function DigitalMedia() {
 
     return matchesSearch && matchesType && matchesPlatform && matchesGenre && matchesPreVenda;
   }).sort((a: any, b: any) => {
-    if (sortOrder === "az") return a.name.localeCompare(b.name);
-    if (sortOrder === "za") return b.name.localeCompare(a.name);
-    if (sortOrder === "asc") return parseFloat(a.price) - parseFloat(b.price);
-    if (sortOrder === "desc") return parseFloat(b.price) - parseFloat(a.price);
+    if (sortOrder === "az") return (a.name || "").localeCompare(b.name || "");
+    if (sortOrder === "za") return (b.name || "").localeCompare(a.name || "");
+    if (sortOrder === "asc") return parseFloat(a.price || 0) - parseFloat(b.price || 0);
+    if (sortOrder === "desc") return parseFloat(b.price || 0) - parseFloat(a.price || 0);
     return 0;
   });
 
