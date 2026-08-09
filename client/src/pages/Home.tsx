@@ -113,6 +113,7 @@ export default function Home() {
   const [activeListingTab, setActiveListingTab] = useState<"todos" | "digital" | "fisico" | "assinatura" | "primaria" | "secundaria">("todos");
 
   const [promos, setPromos] = useState<any[]>([]);
+  const [isLoadingPromos, setIsLoadingPromos] = useState(true);
   const [currentSlide, setCurrentSlide] = useState(0);
 
   useEffect(() => {
@@ -127,12 +128,14 @@ export default function Home() {
           return tB - tA;
         });
       setPromos(data);
+      setIsLoadingPromos(false);
     }, (error) => {
       if (error.code === 'permission-denied') {
         console.warn("Sem permissão para ler promos (regras do Firestore não deployadas). Usando promos padrão.");
       } else {
         console.error("Erro ao buscar promos na Home:", error);
       }
+      setIsLoadingPromos(false);
     });
     return () => unsubPromos();
   }, []);
@@ -168,7 +171,9 @@ export default function Home() {
     ...mainPromos,
     ...dbGameBanners.slice(0, 5) // Mostra apenas os 5 primeiros jogos para não poluir o banner
   ];
-  const finalBanners = activeBanners.length > 0 ? activeBanners : DEFAULT_MAIN_BANNERS;
+  const finalBanners = isLoadingPromos 
+    ? [] // Retorna vazio enquanto carrega para não piscar os banners padrão
+    : (activeBanners.length > 0 ? activeBanners : DEFAULT_MAIN_BANNERS);
 
   const sidebarTopBanner = sidebarTopPromo || DEFAULT_SIDEBAR_TOP;
   const sidebarBottomBanner = sidebarBottomPromo || DEFAULT_SIDEBAR_BOTTOM;
@@ -418,6 +423,13 @@ export default function Home() {
             {/* Left side: Banner Carousel Container */}
             <div className="lg:col-span-2 relative w-full h-[240px] sm:h-[380px] md:h-[420px] bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-[0_0_30px_rgba(0,0,0,0.5)] group/carousel">
               
+              {/* Loading Skeleton */}
+              {isLoadingPromos && (
+                <div className="absolute inset-0 flex items-center justify-center bg-slate-900 z-20">
+                   <div className="w-8 h-8 border-4 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              )}
+
               {/* Slides */}
               {finalBanners.map((banner, index) => (
                 <div
