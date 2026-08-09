@@ -102,19 +102,14 @@ export default function Store() {
     setSelectedBargainProduct(null);
   };
 
-  useEffect(() => {
-    const q = query(collection(db, "store_products"), orderBy("createdAt", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setProducts(data);
-      setIsLoading(false);
-    });
+  const { data: trpcProducts, isLoading: isTrpcLoading } = trpc.products.list.useQuery();
 
-    return () => unsubscribe();
-  }, []);
+  useEffect(() => {
+    if (trpcProducts) {
+      setProducts(trpcProducts);
+      setIsLoading(false);
+    }
+  }, [trpcProducts]);
 
   const filteredProducts = products.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

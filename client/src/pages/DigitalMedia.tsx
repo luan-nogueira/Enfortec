@@ -293,18 +293,15 @@ export default function DigitalMedia() {
     }
   };
 
+  const { data: trpcProducts, isLoading: isTrpcLoading } = trpc.digitalProducts.list.useQuery();
+
   useEffect(() => {
-    // Simple collection fetch — no composite index needed
-    const unsubscribe = onSnapshot(collection(db, "digital_products"), (snapshot) => {
-      const data = snapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() }))
-        .filter((p: any) => p.isActive !== false)
-        .sort((a: any, b: any) => a.name.localeCompare(b.name));
+    if (trpcProducts) {
+      const data = [...trpcProducts].sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
       setProducts(data);
       setIsLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
+    }
+  }, [trpcProducts]);
 
   useEffect(() => {
     if (products.length > 0) {

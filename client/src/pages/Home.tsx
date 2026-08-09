@@ -9,6 +9,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, query, orderBy, limit } from "firebase/firestore";
+import { trpc } from "@/lib/trpc";
 const DEFAULT_MAIN_BANNERS = [
   {
     id: "default-fortecoins",
@@ -106,9 +107,9 @@ export default function Home() {
   const { user, isAuthenticated, isAdmin, isCollaborator, logout } = useAuth();
   const [, navigate] = useLocation();
 
-  const [usedProducts, setUsedProducts] = useState<any[]>([]);
-  const [digitalProducts, setDigitalProducts] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: usedProducts = [], isLoading: isUsedLoading } = trpc.usedProducts.list.useQuery();
+  const { data: digitalProducts = [], isLoading: isDigitalLoading } = trpc.digitalProducts.list.useQuery();
+  const isLoading = isUsedLoading || isDigitalLoading;
   const [heroSearch, setHeroSearch] = useState("");
   const [activeListingTab, setActiveListingTab] = useState<"todos" | "digital" | "fisico" | "assinatura" | "primaria" | "secundaria">("todos");
 
@@ -199,40 +200,7 @@ export default function Home() {
     setCurrentSlide(prev => (prev - 1 + finalBanners.length) % finalBanners.length);
   };
 
-  useEffect(() => {
-    // Buscar usados
-    const qUsed = query(collection(db, "used_products"), orderBy("createdAt", "desc"), limit(12));
-    const unsubUsed = onSnapshot(qUsed, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setUsedProducts(data);
-      setIsLoading(false);
-    }, (error) => {
-      console.error("Erro ao buscar usados na Home:", error);
-    });
-
-    // Buscar digitais
-    const qDigital = query(collection(db, "digital_products"));
-    const unsubDigital = onSnapshot(qDigital, (snapshot) => {
-      const data = snapshot.docs
-        .map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }))
-        .filter((p: any) => p.isActive !== false);
-      setDigitalProducts(data);
-      setIsLoading(false);
-    }, (error) => {
-      console.error("Erro ao buscar digitais na Home:", error);
-    });
-
-    return () => {
-      unsubUsed();
-      unsubDigital();
-    };
-  }, []);
+  // As buscas de usedProducts e digitalProducts agora são feitas via TRPC.
 
   // Últimos anúncios: digitais + físicos usados
   const allListings = [

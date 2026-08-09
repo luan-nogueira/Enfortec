@@ -78,18 +78,17 @@ export default function SellerDashboard() {
   const createProductMutation = trpc.usedProducts.create.useMutation();
   // const boostProductMutation = trpc.usedProducts.boost.useMutation();
 
+  const { data: trpcUsedProducts, isLoading: isUsedLoading } = trpc.usedProducts.getByUserId.useQuery(undefined, { enabled: isAuthenticated && !!user?.id });
+  const { data: trpcDigitalProducts, isLoading: isDigitalLoading } = trpc.digitalProducts.getByUserId.useQuery(undefined, { enabled: isAuthenticated && !!user?.id });
+
+  useEffect(() => {
+    if (trpcUsedProducts || trpcDigitalProducts) {
+      setUsedProducts([...(trpcUsedProducts || []), ...(trpcDigitalProducts || [])]);
+    }
+  }, [trpcUsedProducts, trpcDigitalProducts]);
+
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
-    
-    // Consulta apenas os produtos deste vendedor
-    const q = query(collection(db, "used_products"), where("sellerId", "==", user.id));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setUsedProducts(data);
-    });
 
     // Conversas dos compradores com este vendedor (badge de não lidas)
     const qChats = query(collection(db, SELLER_CHATS), where("sellerId", "==", user.id));
@@ -98,7 +97,6 @@ export default function SellerDashboard() {
     });
 
     return () => {
-      unsubscribe();
       unsubscribeChats();
     };
   }, [isAuthenticated, user?.id]);

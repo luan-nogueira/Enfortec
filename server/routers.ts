@@ -198,6 +198,7 @@ export const appRouter = router({
   // Digital Products Router
   digitalProducts: router({
     list: publicProcedure.query(() => db.getActiveDigitalProducts()),
+    getByUserId: protectedProcedure.query(({ ctx }) => db.getDigitalProductsBySellerId(ctx.user.id)),
     create: protectedProcedure
       .input(z.object({
         name: z.string().min(3),

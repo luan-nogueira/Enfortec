@@ -230,19 +230,14 @@ export default function UsedMarketplace() {
     }
   };
   
-  useEffect(() => {
-    const q = query(collection(db, "used_products"), orderBy("createdAt", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setProducts(data);
-      setIsLoading(false);
-    });
+  const { data: trpcProducts, isLoading: isTrpcLoading } = trpc.usedProducts.list.useQuery();
 
-    return () => unsubscribe();
-  }, []);
+  useEffect(() => {
+    if (trpcProducts) {
+      setProducts(trpcProducts);
+      setIsLoading(false);
+    }
+  }, [trpcProducts]);
 
   const handleBuyerCepChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/\D/g, "");
