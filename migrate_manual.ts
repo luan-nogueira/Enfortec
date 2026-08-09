@@ -26,9 +26,12 @@ async function run() {
   }
 
   try {
-    console.log("Adicionando stockPrimary e stockSecondary na tabela digitalProducts...");
+    console.log("Adicionando colunas novas em digitalProducts...");
     await sql`ALTER TABLE "digitalProducts" ADD COLUMN IF NOT EXISTS "stockPrimary" integer DEFAULT 0;`;
     await sql`ALTER TABLE "digitalProducts" ADD COLUMN IF NOT EXISTS "stockSecondary" integer DEFAULT 0;`;
+    await sql`ALTER TABLE "digitalProducts" ADD COLUMN IF NOT EXISTS "pricePrimary" numeric(10, 2);`;
+    await sql`ALTER TABLE "digitalProducts" ADD COLUMN IF NOT EXISTS "priceSecondary" numeric(10, 2);`;
+    await sql`ALTER TABLE "digitalProducts" ADD COLUMN IF NOT EXISTS "imageUrl" varchar(500);`;
     console.log("OK!");
   } catch (e: any) {
     console.log("Erro (stock):", e.message);
