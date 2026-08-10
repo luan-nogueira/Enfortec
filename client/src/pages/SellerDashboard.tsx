@@ -76,7 +76,7 @@ export default function SellerDashboard() {
 
   const { data: pgUser } = trpc.auth.me.useQuery(undefined, { enabled: isAuthenticated });
   const createProductMutation = trpc.usedProducts.create.useMutation();
-  // const boostProductMutation = trpc.usedProducts.boost.useMutation();
+  const boostProductMutation = trpc.usedProducts.boost.useMutation();
 
   const { data: trpcUsedProducts, isLoading: isUsedLoading } = trpc.usedProducts.getByUserId.useQuery(undefined, { enabled: isAuthenticated && !!user?.id });
   const { data: trpcDigitalProducts, isLoading: isDigitalLoading } = trpc.digitalProducts.getByUserId.useQuery(undefined, { enabled: isAuthenticated && !!user?.id });
@@ -284,15 +284,13 @@ export default function SellerDashboard() {
             const boostedUntilDate = new Date();
             boostedUntilDate.setDate(boostedUntilDate.getDate() + 3);
 
-            // Atualiza Firebase
-            await updateDoc(doc(db, "used_products", product.id), {
-              boostedUntil: boostedUntilDate.toISOString()
-            });
+            // Atualiza via tRPC no Postgres
+            await boostProductMutation.mutateAsync({ id: Number(product.id) });
 
             toast.success("Anúncio turbinado com sucesso! ⭐");
-          } catch (error) {
+          } catch (error: any) {
             console.error("Erro ao turbinar:", error);
-            toast.error("Erro ao turbinar o anúncio.");
+            toast.error(error?.message || "Erro ao turbinar o anúncio.");
           } finally {
             setLoading(false);
           }

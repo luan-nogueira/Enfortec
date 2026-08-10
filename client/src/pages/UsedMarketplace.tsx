@@ -77,16 +77,21 @@ export default function UsedMarketplace() {
   const ADMIN_EMAILS = ["luanmnogueira@gmail.com", "enfortec@admin.com", "luiz220190@hotmail.com", "sandrinhooperfectt@gmail.com"];
   const isAdmin = (user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase())) || user?.role === "admin";
 
-  const handleDeleteProduct = async (id: string) => {
+  const deleteUsedProductMutation = trpc.usedProducts.delete.useMutation();
+  const trpcUtils = trpc.useUtils();
+
+  const handleDeleteProduct = (id: number | string) => {
     toast("Deletar este anúncio?", {
       action: {
         label: "Deletar",
         onClick: async () => {
           try {
-            await deleteDoc(doc(db, "used_products", id));
+            await deleteUsedProductMutation.mutateAsync({ id: Number(id) });
             toast.success("Anúncio deletado com sucesso!");
-          } catch (error) {
-            toast.error("Erro ao deletar anúncio.");
+            trpcUtils.usedProducts.list.invalidate();
+          } catch (error: any) {
+            toast.error(error?.message || "Erro ao deletar anúncio.");
+            console.error(error);
           }
         }
       }

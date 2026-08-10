@@ -194,6 +194,29 @@ export const appRouter = router({
           .where(eq(usedProducts.id, input.id));
         return result;
       }),
+    delete: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        
+        const [product] = await database.select().from(usedProducts).where(eq(usedProducts.id, input.id)).limit(1);
+        if (!product) throw new Error("Anúncio não encontrado");
+
+        const seller = await db.getSellerByUserId(ctx.user.id);
+        const adminEmails = ["luanmnogueira@gmail.com", "enfortec@admin.com", "luiz220190@hotmail.com", "sandrinhooperfectt@gmail.com"];
+        const isAdmin = ctx.user.role === 'admin' || (ctx.user.email && adminEmails.includes(ctx.user.email.toLowerCase()));
+        const isOwner = seller && product.sellerId === seller.id;
+
+        if (!isAdmin && !isOwner) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Sem permissão para deletar este anúncio" });
+        }
+
+        await database.delete(usedProducts).where(eq(usedProducts.id, input.id));
+        return { success: true };
+      }),
   }),
 
   // Digital Products Router
