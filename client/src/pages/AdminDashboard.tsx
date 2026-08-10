@@ -930,7 +930,48 @@ export default function AdminDashboard() {
   };
 
   // Jogos
-  const [gamesList, setGamesList] = useState<any[]>([]);
+  const adminDigitalProductsQuery = trpc.digitalProducts.adminList.useQuery(undefined, { enabled: !!(isAuthenticated && isAdmin) });
+  const gamesList = adminDigitalProductsQuery.data || [];
+  
+  const adminCreateGameMutation = trpc.digitalProducts.adminCreate.useMutation({
+    onSuccess: () => {
+      toast.success("Produto/Jogo cadastrado com sucesso!");
+      adminDigitalProductsQuery.refetch();
+      setShowGameModal(false);
+      resetGameForm();
+      setAddingGame(false);
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Erro ao salvar jogo.");
+      setAddingGame(false);
+    }
+  });
+
+  const adminUpdateGameMutation = trpc.digitalProducts.adminUpdate.useMutation({
+    onSuccess: () => {
+      toast.success("Produto/Jogo atualizado com sucesso!");
+      adminDigitalProductsQuery.refetch();
+      setShowGameModal(false);
+      resetGameForm();
+      setAddingGame(false);
+      setEditingGameId(null);
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Erro ao atualizar jogo.");
+      setAddingGame(false);
+    }
+  });
+
+  const adminDeleteGameMutation = trpc.digitalProducts.adminDelete.useMutation({
+    onSuccess: () => {
+      toast.success("Jogo excluído com sucesso!");
+      adminDigitalProductsQuery.refetch();
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Erro ao excluir jogo.");
+    }
+  });
+
   const [showGameModal, setShowGameModal] = useState(false);
   const [gameName, setGameName] = useState("");
   const [gamePrice, setGamePrice] = useState(0);
@@ -946,7 +987,7 @@ export default function AdminDashboard() {
   const [gameEconomiaLicenseType, setGameEconomiaLicenseType] = useState<"secundaria" | "primaria" | "ambas">("secundaria");
   const [gameCoverFit, setGameCoverFit] = useState<"cover" | "contain">("cover");
   const [addingGame, setAddingGame] = useState(false);
-  const [editingGameId, setEditingGameId] = useState<string | null>(null);
+  const [editingGameId, setEditingGameId] = useState<number | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [isSearchingCover, setIsSearchingCover] = useState(false);
 
@@ -1657,21 +1698,8 @@ export default function AdminDashboard() {
     return () => unsubscribe();
   }, [isAuthenticated, isAdmin]);
 
-  // Escutar Jogos
-  useEffect(() => {
-    if (!isAuthenticated || !isAdmin) return;
-
-    const q = collection(db, "digital_products");
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })).sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-      setGamesList(data);
-    });
-
-    return () => unsubscribe();
-  }, [isAuthenticated, isAdmin]);
+  // Escutar Jogos (agora via TRPC acima)
+  // O useEffect foi removido pois o TRPC cuida disso reativamente
 
   const handleSaveGame = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1685,53 +1713,28 @@ export default function AdminDashboard() {
     const priceSecondaryVal = gamePriceSecondary !== "" ? Number(gamePriceSecondary) : null;
     const itemType = (gameCategory === "Assinaturas" || gameCategory === "assinatura") ? "assinatura" : "jogo";
 
-    try {
-      if (editingGameId) {
-        await updateDoc(doc(db, "digital_products", editingGameId), {
-          name: gameName.trim(),
-          price: pricePrimaryVal,
-          pricePrimary: pricePrimaryVal,
-          priceSecondary: priceSecondaryVal,
-          platform: gamePlatform.trim(),
-          category: gameCategory.trim(),
-          type: itemType,
-          imageUrl: gameImageUrl.trim(),
-          coverFit: gameCoverFit,
-          stock: Number(gameStock),
-          isActive: gameIsActive,
-          isPreVenda: gameIsPreVenda,
-          showInEconomia: gameShowInEconomia,
-          economiaLicenseType: gameEconomiaLicenseType
-        });
-        toast.success("Produto/Jogo atualizado com sucesso!");
-      } else {
-        await addDoc(collection(db, "digital_products"), {
-          name: gameName.trim(),
-          price: pricePrimaryVal,
-          pricePrimary: pricePrimaryVal,
-          priceSecondary: priceSecondaryVal,
-          platform: gamePlatform.trim(),
-          category: gameCategory.trim(),
-          type: itemType,
-          imageUrl: gameImageUrl.trim(),
-          coverFit: gameCoverFit,
-          stock: Number(gameStock),
-          isActive: gameIsActive,
-          isPreVenda: gameIsPreVenda,
-          showInEconomia: gameShowInEconomia,
-          economiaLicenseType: gameEconomiaLicenseType,
-          description: "Mídia Digital Eforte Games.",
-          createdAt: new Date().toISOString()
-        });
-        toast.success("Produto/Jogo cadastrado com sucesso!");
-      }
-      setShowGameModal(false);
-      resetGameForm();
-    } catch (error) {
-      console.error("Erro ao salvar jogo:", error);
-      toast.error("Erro ao salvar jogo.");
-    } finally {
-      setAddingGame(false);
+    const payload = {
+      name: gameName.trim(),
+      price: pricePrimaryVal,
+      pricePrimary: pricePrimaryVal,
+      priceSecondary: priceSecondaryVal,
+      platform: gamePlatform.trim(),
+      category: gameCategory.trim(),
+      type: itemType as any,
+      imageUrl: gameImageUrl.trim(),
+      coverFit: gameCoverFit,
+      stock: Number(gameStock),
+      isActive: gameIsActive,
+      isPreVenda: gameIsPreVenda,
+      showInEconomia: gameShowInEconomia,
+      economiaLicenseType: gameEconomiaLicenseType,
+      description: "Mídia Digital Eforte Games.",
+    };
+
+    if (editingGameId) {
+      adminUpdateGameMutation.mutate({ ...payload, id: editingGameId });
+    } else {
+      adminCreateGameMutation.mutate(payload);
     }
   };
 
@@ -1770,18 +1773,12 @@ export default function AdminDashboard() {
     setShowGameModal(true);
   };
 
-  const handleDeleteGame = (gameId: string) => {
+  const handleDeleteGame = (gameId: number) => {
     toast("Tem certeza que deseja excluir permanentemente este jogo?", {
       action: {
         label: "Excluir",
-        onClick: async () => {
-          try {
-            await deleteDoc(doc(db, "digital_products", gameId));
-            toast.success("Jogo excluído com sucesso!");
-          } catch (error) {
-            console.error("Erro ao excluir jogo:", error);
-            toast.error("Erro ao excluir jogo.");
-          }
+        onClick: () => {
+          adminDeleteGameMutation.mutate(gameId);
         }
       }
     });
@@ -2203,18 +2200,49 @@ export default function AdminDashboard() {
         onClick: async () => {
           setSeeding(true);
           setSeedLog([]);
-          const col = collection(db, "digital_products");
           let inserted = 0; let updated = 0;
           for (const game of GAMES_CATALOG) {
             try {
-              const { getDocs, query: q2, where } = await import("firebase/firestore");
-              const snap = await getDocs(q2(col, where("name", "==", game.name)));
-              if (!snap.empty) {
-                await updateDoc(snap.docs[0].ref, { price: game.price, imageUrl: game.imageUrl, platform: game.platform, isActive: true });
+              // Verifica se já existe na lista atual carregada pelo TRPC
+              const existingGame = gamesList.find((g: any) => g.name === game.name);
+              
+              if (existingGame) {
+                await adminUpdateGameMutation.mutateAsync({
+                  id: existingGame.id,
+                  name: game.name,
+                  price: game.price,
+                  pricePrimary: null,
+                  priceSecondary: null,
+                  type: "jogo",
+                  platform: game.platform,
+                  category: null,
+                  imageUrl: game.imageUrl,
+                  coverFit: "cover",
+                  stock: 999,
+                  isActive: true,
+                  isPreVenda: false,
+                  showInEconomia: true,
+                  economiaLicenseType: "secundaria"
+                });
                 setSeedLog(l => [...l, `[~] Atualizado: ${game.name}`]);
                 updated++;
               } else {
-                await addDoc(col, { ...game, type: "jogo", description: "Jogo PS4/PS5 - Mídia Digital.", isActive: true, stock: 999, createdAt: new Date().toISOString() });
+                await adminCreateGameMutation.mutateAsync({
+                  name: game.name,
+                  price: game.price,
+                  pricePrimary: null,
+                  priceSecondary: null,
+                  type: "jogo",
+                  platform: game.platform,
+                  category: null,
+                  imageUrl: game.imageUrl,
+                  coverFit: "cover",
+                  stock: 999,
+                  isActive: true,
+                  isPreVenda: false,
+                  showInEconomia: true,
+                  economiaLicenseType: "secundaria"
+                });
                 setSeedLog(l => [...l, `[+] Inserido: ${game.name}`]);
                 inserted++;
               }
@@ -2222,9 +2250,9 @@ export default function AdminDashboard() {
               setSeedLog(l => [...l, `[!] Erro em ${game.name}: ${e.message}`]);
             }
           }
-          setSeedLog(l => [...l, `\n✅ Concluído! Inseridos: ${inserted}, Atualizados: ${updated}`]);
+          toast.success(`Catálogo populado! Inseridos: ${inserted} | Atualizados: ${updated}`);
           setSeeding(false);
-          toast.success("Processo de seeding concluído!");
+          adminDigitalProductsQuery.refetch();
         }
       }
     });
@@ -2873,13 +2901,34 @@ export default function AdminDashboard() {
                     <div className="mt-2 pt-2 border-t border-slate-800 flex items-center justify-between">
                       <span className="text-[10px] text-slate-400 font-bold">⚡ Economia:</span>
                       <button
-                        onClick={async (e) => {
+                        onClick={(e) => {
                           e.stopPropagation();
                           const currentVal = game.showInEconomia !== false;
-                          await updateDoc(doc(db, "digital_products", game.id), {
-                            showInEconomia: !currentVal
+                          
+                          // Reconstruímos o payload necessário para a mutation
+                          const payload = {
+                            name: game.name,
+                            price: game.price,
+                            pricePrimary: game.pricePrimary ?? null,
+                            priceSecondary: game.priceSecondary ?? null,
+                            type: game.type as any,
+                            platform: game.platform ?? null,
+                            category: game.category ?? null,
+                            imageUrl: game.imageUrl ?? null,
+                            coverFit: game.coverFit ?? null,
+                            stock: game.stock ?? 1,
+                            isActive: game.isActive ?? true,
+                            isPreVenda: game.isPreVenda ?? false,
+                            economiaLicenseType: game.economiaLicenseType ?? null,
+                            showInEconomia: !currentVal,
+                            id: game.id,
+                          };
+                          
+                          adminUpdateGameMutation.mutate(payload, {
+                            onSuccess: () => {
+                              toast.success(!currentVal ? "Jogo ativado na página Jogue com Economia!" : "Jogo removido do Jogue com Economia.");
+                            }
                           });
-                          toast.success(!currentVal ? "Jogo ativado na página Jogue com Economia!" : "Jogo removido do Jogue com Economia.");
                         }}
                         className={`text-[9px] px-2 py-0.5 rounded font-black uppercase transition-all ${
                           game.showInEconomia !== false

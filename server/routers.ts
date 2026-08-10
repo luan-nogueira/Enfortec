@@ -171,6 +171,7 @@ export const appRouter = router({
           estado: input.estado || null,
           cidade: input.cidade || null,
           bairro: input.bairro || null,
+          status: "aprovado",
         });
         return result;
       }),
@@ -209,6 +210,7 @@ export const appRouter = router({
         type: z.enum(["jogo", "gift_card", "licenca", "assinatura", "outro"]),
         keyOrCode: z.string().optional(),
         downloadUrl: z.string().optional(),
+        platform: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const database = await getDb();
@@ -235,8 +237,104 @@ export const appRouter = router({
           type: input.type,
           keyOrCode: input.keyOrCode,
           downloadUrl: input.downloadUrl,
+          platform: input.platform || null,
         });
         return result;
+      }),
+    adminList: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+      return db.getAllDigitalProducts();
+    }),
+    adminCreate: protectedProcedure
+      .input(z.object({
+        name: z.string().min(3),
+        description: z.string().optional(),
+        price: z.number().positive(),
+        pricePrimary: z.number().nullable().optional(),
+        priceSecondary: z.number().nullable().optional(),
+        type: z.enum(["jogo", "gift_card", "licenca", "assinatura", "outro"]),
+        imageUrl: z.string().optional(),
+        coverFit: z.string().optional(),
+        platform: z.string().optional(),
+        category: z.string().optional(),
+        stock: z.number().min(0).optional(),
+        isActive: z.boolean().optional(),
+        isPreVenda: z.boolean().optional(),
+        showInEconomia: z.boolean().optional(),
+        economiaLicenseType: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        
+        return database.insert(digitalProducts).values({
+          name: input.name,
+          description: input.description,
+          price: input.price.toString(),
+          pricePrimary: input.pricePrimary?.toString() || null,
+          priceSecondary: input.priceSecondary?.toString() || null,
+          type: input.type,
+          imageUrl: input.imageUrl,
+          coverFit: input.coverFit,
+          platform: input.platform,
+          category: input.category,
+          stock: input.stock !== undefined ? input.stock : 1,
+          isActive: input.isActive !== undefined ? input.isActive : true,
+          isPreVenda: input.isPreVenda,
+          showInEconomia: input.showInEconomia,
+          economiaLicenseType: input.economiaLicenseType,
+        });
+      }),
+    adminUpdate: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().min(3),
+        description: z.string().optional(),
+        price: z.number().positive(),
+        pricePrimary: z.number().nullable().optional(),
+        priceSecondary: z.number().nullable().optional(),
+        type: z.enum(["jogo", "gift_card", "licenca", "assinatura", "outro"]),
+        imageUrl: z.string().optional(),
+        coverFit: z.string().optional(),
+        platform: z.string().optional(),
+        category: z.string().optional(),
+        stock: z.number().min(0).optional(),
+        isActive: z.boolean().optional(),
+        isPreVenda: z.boolean().optional(),
+        showInEconomia: z.boolean().optional(),
+        economiaLicenseType: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        
+        return database.update(digitalProducts).set({
+          name: input.name,
+          description: input.description,
+          price: input.price.toString(),
+          pricePrimary: input.pricePrimary?.toString() || null,
+          priceSecondary: input.priceSecondary?.toString() || null,
+          type: input.type,
+          imageUrl: input.imageUrl,
+          coverFit: input.coverFit,
+          platform: input.platform,
+          category: input.category,
+          stock: input.stock !== undefined ? input.stock : 1,
+          isActive: input.isActive !== undefined ? input.isActive : true,
+          isPreVenda: input.isPreVenda,
+          showInEconomia: input.showInEconomia,
+          economiaLicenseType: input.economiaLicenseType,
+        }).where(eq(digitalProducts.id, input.id));
+      }),
+    adminDelete: protectedProcedure
+      .input(z.number())
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        return database.delete(digitalProducts).where(eq(digitalProducts.id, input));
       }),
   }),
 

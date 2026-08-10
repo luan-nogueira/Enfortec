@@ -44,6 +44,38 @@ const GAME_BADGES: Record<string, { label: string; color: string }> = {
   "SHADOW OF MORDOR": { label: "💰 Oferta", color: "bg-green-600" },
 };
 
+function getGamePlatform(product: any): string {
+  if (!product) return "PS4/PS5";
+  if (product.platform && typeof product.platform === "string" && product.platform.trim() !== "") {
+    return product.platform;
+  }
+  const nameUpper = (product.name || "").toUpperCase();
+  if (
+    nameUpper.includes("ALAN WAKE 2") ||
+    nameUpper.includes("ASTRO BOT") ||
+    nameUpper.includes("DEMON'S SOULS") ||
+    nameUpper.includes("DEMONS SOULS") ||
+    nameUpper.includes("SPIDER-MAN 2") ||
+    nameUpper.includes("SPIDERMAN 2") ||
+    nameUpper.includes("RETURNAL") ||
+    nameUpper.includes("RIFT APART") ||
+    nameUpper.includes("FINAL FANTASY 16") ||
+    nameUpper.includes("FINAL FANTASY XVI") ||
+    nameUpper.includes("STELLAR BLADE") ||
+    nameUpper.includes("VERSÃO PS5") ||
+    nameUpper.includes("(PS5)")
+  ) {
+    return "PS5";
+  }
+  if (
+    nameUpper.includes("VERSÃO PS4") ||
+    nameUpper.includes("(PS4)")
+  ) {
+    return "PS4";
+  }
+  return "PS4/PS5";
+}
+
 function getGameBadge(product: any) {
   if (product.isPreVenda || product.name?.toLowerCase().includes("pré-venda") || product.name?.toLowerCase().includes("pre-venda") || product.name?.toLowerCase().includes("prevenda")) {
     return { label: "📅 Pré-Venda", color: "bg-amber-600 shadow-[0_0_10px_rgba(217,119,6,0.5)] border border-amber-500/30" };
@@ -72,6 +104,19 @@ export default function DigitalMedia() {
     const params = new URLSearchParams(window.location.search);
     return params.get("genre") || null;
   });
+
+  useEffect(() => {
+    const syncFromUrl = () => {
+      const params = new URLSearchParams(window.location.search);
+      setSearchTerm(params.get("search") || "");
+      setSelectedType(params.get("type") || null);
+      setSelectedPlatform(params.get("platform") || null);
+      setSelectedGenre(params.get("genre") || null);
+    };
+
+    window.addEventListener("popstate", syncFromUrl);
+    return () => window.removeEventListener("popstate", syncFromUrl);
+  }, []);
   const [showPreVenda, setShowPreVenda] = useState(false);
   const [sortOrder, setSortOrder] = useState<"az" | "za" | "asc" | "desc">("az");
   const [products, setProducts] = useState<any[]>([]);
@@ -325,23 +370,25 @@ export default function DigitalMedia() {
 
     let matchesPlatform = true;
     if (selectedPlatform && selectedType !== "assinatura" && selectedGenre !== "Assinaturas") {
-      const pPlat = (p.platform || "").toLowerCase();
+      const plat = getGamePlatform(p);
+      const platLower = plat.toLowerCase();
+
       if (selectedPlatform === "PS5") {
-        matchesPlatform = pPlat === "ps5" || (pPlat.includes("ps5") && !pPlat.includes("ps4"));
+        matchesPlatform = platLower === "ps5" || platLower === "ps4/ps5" || platLower.includes("ps5");
       } else if (selectedPlatform === "PS4") {
-        matchesPlatform = pPlat === "ps4" || (pPlat.includes("ps4") && !pPlat.includes("ps5"));
+        matchesPlatform = platLower === "ps4" || platLower === "ps4/ps5" || platLower.includes("ps4");
       } else if (selectedPlatform === "PS4/PS5") {
-        matchesPlatform = pPlat.includes("ps4") && pPlat.includes("ps5");
+        matchesPlatform = platLower === "ps4/ps5" || (platLower.includes("ps4") && platLower.includes("ps5"));
       } else {
-        matchesPlatform = pPlat === selectedPlatform.toLowerCase();
+        matchesPlatform = platLower.includes(selectedPlatform.toLowerCase());
       }
     }
 
     let matchesGenre = true;
     if (selectedGenre) {
-      if (selectedGenre === "Pré Venda") {
-        matchesGenre = p.isPreVenda === true || nameLower.includes("pré-venda") || nameLower.includes("pre-venda") || nameLower.includes("prevenda") || (p.category && p.category.toLowerCase() === "pré venda");
-      } else if (selectedGenre === "Assinaturas") {
+      if (selectedGenre === "Pré Venda" || selectedGenre === "Pré-Venda" || selectedGenre === "Pre Venda") {
+        matchesGenre = p.isPreVenda === true || nameLower.includes("pré-venda") || nameLower.includes("pre-venda") || nameLower.includes("prevenda") || (p.category && p.category.toLowerCase().includes("pré"));
+      } else if (selectedGenre === "Assinaturas" || selectedGenre === "Assinatura") {
         const isTypeAssinatura = p.type === "assinatura";
         const isCategoryAssinatura = p.category && p.category.toLowerCase().includes("assinatura");
         const isNameAssinatura = nameLower.includes("ps plus") || nameLower.includes("essential") || nameLower.includes("extra") || nameLower.includes("deluxe") || nameLower.includes("game pass") || nameLower.includes("assinatura");
@@ -642,11 +689,11 @@ export default function DigitalMedia() {
                       <span 
                         onClick={(e) => {
                           e.stopPropagation();
-                          setSelectedPlatform(product.platform || "PS4/PS5");
+                          setSelectedPlatform(getGamePlatform(product));
                         }}
                         className="text-[8px] sm:text-[10px] bg-red-600 hover:bg-red-700 text-white px-1.5 sm:px-2 py-0.5 rounded font-black uppercase tracking-wider cursor-pointer transition-colors shadow-lg border border-red-500/20"
                       >
-                        {product.platform || "PS4/PS5"}
+                        {getGamePlatform(product)}
                       </span>
                     </div>
                   </div>
@@ -744,7 +791,7 @@ export default function DigitalMedia() {
               </div>
               <div>
                 <h4 className="font-bold text-white line-clamp-2">{selectedProduct?.name}</h4>
-                <p className="text-xs text-slate-500">{selectedProduct?.platform || "PS4/PS5"}</p>
+                <p className="text-xs text-slate-500">{getGamePlatform(selectedProduct)}</p>
                 <div className="mt-2 text-lg font-black text-red-500">
                   R$ {price.toFixed(2).replace('.', ',')}
                 </div>

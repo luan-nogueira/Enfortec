@@ -186,6 +186,12 @@ export async function getActiveDigitalProducts() {
   return db.select().from(digitalProducts).where(eq(digitalProducts.isActive, true)).orderBy(desc(digitalProducts.createdAt));
 }
 
+export async function getAllDigitalProducts() {
+  const db = getDb();
+  if (!db) return [];
+  return db.select().from(digitalProducts).orderBy(desc(digitalProducts.createdAt));
+}
+
 export async function getDigitalProductsBySellerId(sellerId: number) {
   const db = getDb();
   if (!db) return [];

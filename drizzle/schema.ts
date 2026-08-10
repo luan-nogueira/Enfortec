@@ -114,6 +114,12 @@ export const digitalProducts = pgTable("digitalProducts", {
   stockPrimary: integer("stockPrimary").default(0),
   stockSecondary: integer("stockSecondary").default(0),
   isActive: boolean("isActive").default(true),
+  platform: varchar("platform", { length: 50 }),
+  category: varchar("category", { length: 100 }),
+  coverFit: varchar("coverFit", { length: 20 }),
+  isPreVenda: boolean("isPreVenda").default(false),
+  showInEconomia: boolean("showInEconomia").default(false),
+  economiaLicenseType: varchar("economiaLicenseType", { length: 50 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => new Date()),
 });

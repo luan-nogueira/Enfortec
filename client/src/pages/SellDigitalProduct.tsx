@@ -17,6 +17,7 @@ export default function SellDigitalProduct() {
     hasPrimary: true,
     hasSecondary: true,
     type: "jogo" as "jogo" | "gift_card" | "licenca" | "assinatura" | "outro",
+    platform: "PS4/PS5",
     keyOrCode: "",
     downloadUrl: "",
   });
@@ -64,6 +65,7 @@ export default function SellDigitalProduct() {
         pricePrimary: formData.hasPrimary ? parseFloat(formData.price) : undefined,
         priceSecondary: formData.hasSecondary ? parseFloat(formData.priceSecondary) : undefined,
         type: formData.type,
+        platform: formData.type === "jogo" ? formData.platform : undefined,
         keyOrCode: formData.keyOrCode.trim() || undefined,
         downloadUrl: formData.downloadUrl.trim() || undefined,
       });
@@ -121,6 +123,26 @@ export default function SellDigitalProduct() {
                   <option value="outro">Outro</option>
                 </select>
               </div>
+
+              {/* Platform Selector (if type is game) */}
+              {formData.type === "jogo" && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                    Plataforma do Jogo *
+                  </label>
+                  <select
+                    name="platform"
+                    value={formData.platform}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-red-600 text-sm"
+                    disabled={isLoading}
+                  >
+                    <option value="PS5">PlayStation 5 (Exclusivo PS5)</option>
+                    <option value="PS4">PlayStation 4 (Exclusivo PS4)</option>
+                    <option value="PS4/PS5">Dual Entitlement (PS4 & PS5)</option>
+                  </select>
+                </div>
+              )}
 
               {/* Product Name */}
               <div>
