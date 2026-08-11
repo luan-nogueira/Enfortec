@@ -179,6 +179,20 @@ export async function getUsedProductsBySellerId(sellerId: number) {
   return db.select().from(usedProducts).where(eq(usedProducts.sellerId, sellerId)).orderBy(desc(usedProducts.createdAt));
 }
 
+export async function getAllUsedProductsWithSeller() {
+  const db = getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({
+      product: usedProducts,
+      sellerStoreName: sellers.storeName,
+    })
+    .from(usedProducts)
+    .leftJoin(sellers, eq(usedProducts.sellerId, sellers.id))
+    .orderBy(desc(usedProducts.createdAt));
+  return rows.map(r => ({ ...r.product, sellerStoreName: r.sellerStoreName }));
+}
+
 // Digital Products queries
 export async function getActiveDigitalProducts() {
   const db = getDb();

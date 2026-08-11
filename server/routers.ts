@@ -244,6 +244,31 @@ export const appRouter = router({
   usedProducts: router({
     list: publicProcedure.query(() => db.getApprovedUsedProducts()),
     getByUserId: protectedProcedure.query(({ ctx }) => db.getUsedProductsBySellerId(ctx.user.id)),
+    adminList: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+      return db.getAllUsedProductsWithSeller();
+    }),
+    adminToggleBoost: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+
+        const [product] = await database.select().from(usedProducts).where(eq(usedProducts.id, input.id)).limit(1);
+        if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Anúncio não encontrado" });
+
+        const isCurrentlyBoosted = Boolean(product.boostedUntil && new Date(product.boostedUntil).getTime() > Date.now());
+        const boostedUntil = isCurrentlyBoosted ? null : (() => {
+          const d = new Date();
+          d.setDate(d.getDate() + 3);
+          return d;
+        })();
+
+        await database.update(usedProducts).set({ boostedUntil }).where(eq(usedProducts.id, input.id));
+        return { success: true, boosted: !isCurrentlyBoosted };
+      }),
     create: protectedProcedure
       .input(z.object({
         name: z.string().min(3),

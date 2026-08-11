@@ -8,7 +8,7 @@ import { db, storage } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, onSnapshot, doc, updateDoc, setDoc, deleteDoc, query, orderBy, serverTimestamp, addDoc, getDoc } from "firebase/firestore";
 import { useLocation } from "wouter";
-import { Shield, User, UserCheck, UserPlus, ArrowLeft, Plus, X, Lock, Mail, Trash2, MessageCircle, Send, Coins, Gift, Check, Clock, LogOut, Gamepad2, Edit, Menu, BarChart3, Users, ShoppingBag, Tag, Image, Percent, Ban, Trophy, ExternalLink, Flame, Copy, Settings, Bell, Filter, CheckCircle2, ShieldAlert } from "lucide-react";
+import { Shield, User, UserCheck, UserPlus, ArrowLeft, Plus, X, Lock, Mail, Trash2, MessageCircle, Send, Coins, Gift, Check, Clock, LogOut, Gamepad2, Edit, Menu, BarChart3, Users, ShoppingBag, Tag, Image, Percent, Ban, Trophy, ExternalLink, Flame, Copy, Settings, Bell, Filter, CheckCircle2, ShieldAlert, Package, Store, Star, MapPin } from "lucide-react";
 import { useState, useEffect, useRef, useMemo } from "react";
 import {
   Dialog,
@@ -936,6 +936,147 @@ export default function AdminDashboard() {
   const adminUpdateRoleMutation = trpc.auth.adminUpdateRole.useMutation();
   const adminCreditCoinsMutation = trpc.auth.adminCreditCoins.useMutation();
 
+  // Mídia Física / Usados
+  const adminUsedProductsQuery = trpc.usedProducts.adminList.useQuery(undefined, { enabled: !!(isAuthenticated && isAdmin) });
+  const usedProductsListAdmin = adminUsedProductsQuery.data || [];
+  const adminToggleUsedBoostMutation = trpc.usedProducts.adminToggleBoost.useMutation({
+    onSuccess: (data) => {
+      toast.success(data.boosted ? "Anúncio destacado por 3 dias!" : "Destaque removido.");
+      adminUsedProductsQuery.refetch();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao destacar anúncio."),
+  });
+  const adminDeleteUsedProductMutation = trpc.usedProducts.delete.useMutation({
+    onSuccess: () => {
+      toast.success("Anúncio removido com sucesso!");
+      adminUsedProductsQuery.refetch();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao remover anúncio."),
+  });
+  const handleDeleteUsedProduct = (id: number, name: string) => {
+    toast(`Tem certeza que deseja excluir o anúncio "${name}"?`, {
+      action: {
+        label: "Excluir",
+        onClick: () => adminDeleteUsedProductMutation.mutate({ id }),
+      },
+    });
+  };
+
+  // Loja (produtos físicos da própria loja)
+  const adminStoreProductsQuery = trpc.products.adminList.useQuery(undefined, { enabled: !!(isAuthenticated && isAdmin) });
+  const storeProductsListAdmin = adminStoreProductsQuery.data || [];
+  const [showStoreProductModal, setShowStoreProductModal] = useState(false);
+  const [editingStoreProductId, setEditingStoreProductId] = useState<number | null>(null);
+  const [storeProductName, setStoreProductName] = useState("");
+  const [storeProductDescription, setStoreProductDescription] = useState("");
+  const [storeProductPrice, setStoreProductPrice] = useState("");
+  const [storeProductCategory, setStoreProductCategory] = useState("Jogos (Mídia Digital)");
+  const [storeProductStock, setStoreProductStock] = useState("1");
+  const [storeProductImageFile, setStoreProductImageFile] = useState<File | null>(null);
+  const [savingStoreProduct, setSavingStoreProduct] = useState(false);
+
+  const resetStoreProductForm = () => {
+    setEditingStoreProductId(null);
+    setStoreProductName("");
+    setStoreProductDescription("");
+    setStoreProductPrice("");
+    setStoreProductCategory("Jogos (Mídia Digital)");
+    setStoreProductStock("1");
+    setStoreProductImageFile(null);
+  };
+
+  const openEditStoreProduct = (p: any) => {
+    setEditingStoreProductId(p.id);
+    setStoreProductName(p.name);
+    setStoreProductDescription(p.description || "");
+    setStoreProductPrice(p.price ? String(p.price) : "");
+    setStoreProductCategory(p.category);
+    setStoreProductStock(p.stock ? String(p.stock) : "0");
+    setStoreProductImageFile(null);
+    setShowStoreProductModal(true);
+  };
+
+  const createStoreProductMutation = trpc.products.create.useMutation({
+    onSuccess: () => {
+      toast.success("Produto adicionado à Loja!");
+      adminStoreProductsQuery.refetch();
+      setShowStoreProductModal(false);
+      resetStoreProductForm();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao salvar produto."),
+  });
+  const updateStoreProductMutation = trpc.products.update.useMutation({
+    onSuccess: () => {
+      toast.success("Produto atualizado!");
+      adminStoreProductsQuery.refetch();
+      setShowStoreProductModal(false);
+      resetStoreProductForm();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao salvar produto."),
+  });
+  const deleteStoreProductMutation = trpc.products.delete.useMutation({
+    onSuccess: () => {
+      toast.success("Produto removido da Loja.");
+      adminStoreProductsQuery.refetch();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao remover produto."),
+  });
+
+  const handleDeleteStoreProduct = (id: number, name: string) => {
+    toast(`Tem certeza que deseja excluir "${name}" da Loja?`, {
+      action: {
+        label: "Excluir",
+        onClick: () => deleteStoreProductMutation.mutate(id),
+      },
+    });
+  };
+
+  const handleSubmitStoreProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStoreProductId && !storeProductImageFile) {
+      toast.warning("Selecione uma imagem para o produto.");
+      return;
+    }
+    if (!storeProductPrice || parseFloat(storeProductPrice) <= 0) {
+      toast.warning("Informe um preço válido.");
+      return;
+    }
+
+    setSavingStoreProduct(true);
+    try {
+      let images: string[] | undefined;
+      if (storeProductImageFile) {
+        const imageRef = ref(storage, `store_products/${Date.now()}_${storeProductImageFile.name}`);
+        const uploadResult = await uploadBytes(imageRef, storeProductImageFile);
+        const downloadUrl = await getDownloadURL(uploadResult.ref);
+        images = [downloadUrl];
+      }
+
+      if (editingStoreProductId) {
+        await updateStoreProductMutation.mutateAsync({
+          id: editingStoreProductId,
+          name: storeProductName,
+          description: storeProductDescription,
+          price: parseFloat(storeProductPrice),
+          category: storeProductCategory,
+          stock: parseInt(storeProductStock) || 0,
+          ...(images ? { images } : {}),
+        });
+      } else {
+        await createStoreProductMutation.mutateAsync({
+          name: storeProductName,
+          description: storeProductDescription,
+          price: parseFloat(storeProductPrice),
+          category: storeProductCategory,
+          stock: parseInt(storeProductStock) || 0,
+          images,
+        });
+      }
+    } finally {
+      setSavingStoreProduct(false);
+    }
+  };
+
   // Jogos
   const adminDigitalProductsQuery = trpc.digitalProducts.adminList.useQuery(undefined, { enabled: !!(isAuthenticated && isAdmin) });
   const gamesList = adminDigitalProductsQuery.data || [];
@@ -1532,10 +1673,12 @@ export default function AdminDashboard() {
       badge: allChats.some(c => c.unreadByAdmin),
       section: "Atendimento",
     },
-    { value: "jogos", label: "Gerenciar Jogos", icon: Gamepad2, section: "Catálogo & Vendas" },
-    { value: "vendas", label: "Gerenciar Vendas", icon: ShoppingBag, section: "Catálogo & Vendas" },
-    { value: "premios", label: "Gerenciar Prêmios", icon: Gift, section: "Catálogo & Vendas" },
-    { value: "platinador", label: "Clube Platinador", icon: Trophy, section: "Catálogo & Vendas" },
+    { value: "jogos", label: "Gerenciar Jogos", icon: Gamepad2, section: "Catálogo" },
+    { value: "loja", label: "Loja (Produtos Físicos)", icon: Store, section: "Catálogo" },
+    { value: "midia_fisica", label: "Mídia Física / Usados", icon: Package, section: "Catálogo" },
+    { value: "vendas", label: "Gerenciar Vendas", icon: ShoppingBag, section: "Vendas & Clube" },
+    { value: "premios", label: "Gerenciar Prêmios", icon: Gift, section: "Vendas & Clube" },
+    { value: "platinador", label: "Clube Platinador", icon: Trophy, section: "Vendas & Clube" },
     { value: "usuarios", label: "Gerenciar Acessos", icon: Users, section: "Clientes" },
     {
       value: "referrals",
@@ -2974,6 +3117,168 @@ export default function AdminDashboard() {
                 </Card>
               ))}
             </div>
+          </TabsContent>
+
+          <TabsContent value="loja">
+            <div className="flex justify-between items-center mb-8 border-l-4 border-red-600 pl-4">
+              <h2 className="text-xl font-bold text-white uppercase tracking-widest text-sm italic">Loja (Produtos Físicos)</h2>
+              <Button onClick={() => { resetStoreProductForm(); setShowStoreProductModal(true); }} className="bg-red-600 hover:bg-red-700 font-bold btn-neon flex items-center gap-2">
+                <Plus className="w-5 h-5" /> Adicionar Produto
+              </Button>
+            </div>
+
+            {adminStoreProductsQuery.isLoading ? (
+              <p className="text-slate-400 text-sm">Carregando produtos...</p>
+            ) : storeProductsListAdmin.length === 0 ? (
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center">
+                <Store className="w-12 h-12 text-slate-700 mx-auto mb-3" />
+                <p className="text-slate-400 text-sm">Nenhum produto cadastrado na Loja ainda. Colaboradores também podem cadastrar pelo Portal do Colaborador.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {storeProductsListAdmin.map((p: any) => (
+                  <Card key={p.id} className={`bg-slate-900/40 backdrop-blur-md border-red-600/10 p-4 hover:border-red-600/40 transition-all duration-500 card-neon relative overflow-hidden ${p.isActive === false ? 'opacity-50' : ''}`}>
+                    <div className="aspect-[16/9] w-full rounded-md overflow-hidden mb-4 bg-slate-800 flex items-center justify-center">
+                      {p.images?.[0] ? (
+                        <img src={p.images[0]} alt={p.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <Store className="w-10 h-10 text-slate-600" />
+                      )}
+                    </div>
+                    <h3 className="font-bold text-white text-sm line-clamp-2 mb-1" title={p.name}>{p.name}</h3>
+                    <p className="text-xs text-slate-400 mb-2">{p.category}</p>
+                    <div className="flex justify-between items-center text-xs mb-3">
+                      <span className="text-green-400 font-bold">R$ {Number(p.price || 0).toFixed(2)}</span>
+                      <span className={`px-2 py-0.5 rounded-full font-bold uppercase text-[10px] ${p.stock > 0 ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"}`}>
+                        {p.stock || 0} un.
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Button size="sm" onClick={() => openEditStoreProduct(p)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white text-xs h-8">
+                        <Edit className="w-3.5 h-3.5 mr-1" /> Editar
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => handleDeleteStoreProduct(p.id, p.name)} className="text-slate-500 hover:text-red-500 h-8 w-8 p-0">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            <Dialog open={showStoreProductModal} onOpenChange={(open) => { setShowStoreProductModal(open); if (!open) resetStoreProductForm(); }}>
+              <DialogContent className="bg-slate-900 border-red-600/30 text-white sm:max-w-[500px] card-neon max-h-[85dvh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="text-xl font-bold text-neon">{editingStoreProductId ? "Editar Produto" : "Adicionar Produto à Loja"}</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmitStoreProduct} className="space-y-4">
+                  <div>
+                    <Label className="text-slate-300">Nome do Produto</Label>
+                    <Input required value={storeProductName} onChange={e => setStoreProductName(e.target.value)} className="bg-slate-950 border-red-600/30" placeholder="Ex: Controle DualSense" />
+                  </div>
+                  <div>
+                    <Label className="text-slate-300">Preço (R$)</Label>
+                    <Input type="number" step="0.01" required value={storeProductPrice} onChange={e => setStoreProductPrice(e.target.value)} className="bg-slate-950 border-red-600/30" placeholder="0.00" />
+                  </div>
+                  <div>
+                    <Label className="text-slate-300">Categoria</Label>
+                    <select
+                      required
+                      value={storeProductCategory}
+                      onChange={e => setStoreProductCategory(e.target.value)}
+                      className="w-full flex h-10 items-center justify-between rounded-md border border-red-600/30 bg-slate-950 px-3 py-2 text-sm text-slate-300"
+                    >
+                      <option value="Jogos (Mídia Digital)">Jogos (Mídia Digital)</option>
+                      <option value="Jogos (Físico)">Jogos (Físico)</option>
+                      <option value="Eletrônicos">Eletrônicos</option>
+                      <option value="Periféricos">Periféricos</option>
+                      <option value="Hardware">Hardware</option>
+                      <option value="Consoles">Consoles</option>
+                      <option value="Acessórios">Acessórios</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label className="text-slate-300">Quantidade em Estoque</Label>
+                    <Input type="number" required value={storeProductStock} onChange={e => setStoreProductStock(e.target.value)} className="bg-slate-950 border-red-600/30" placeholder="0" />
+                  </div>
+                  <div>
+                    <Label className="text-slate-300">Foto do Produto {editingStoreProductId && "(Opcional para não alterar)"}</Label>
+                    <Input
+                      required={!editingStoreProductId}
+                      type="file"
+                      accept="image/*"
+                      onChange={e => { if (e.target.files?.[0]) setStoreProductImageFile(e.target.files[0]); }}
+                      className="bg-slate-950 border-red-600/30 file:text-red-500 file:bg-slate-900 file:border-0 file:mr-4 file:py-2 file:px-4 file:rounded-md cursor-pointer"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-slate-300">Descrição Curta</Label>
+                    <Input required value={storeProductDescription} onChange={e => setStoreProductDescription(e.target.value)} className="bg-slate-950 border-red-600/30" placeholder="Detalhes do produto..." />
+                  </div>
+                  <Button type="submit" disabled={savingStoreProduct} className="w-full bg-red-600 hover:bg-red-700 btn-neon">
+                    {savingStoreProduct ? "Salvando..." : editingStoreProductId ? "Atualizar Produto" : "Salvar na Loja"}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </TabsContent>
+
+          <TabsContent value="midia_fisica">
+            <h2 className="text-xl font-bold text-white mb-8 border-l-4 border-red-600 pl-4 uppercase tracking-widest text-sm italic">Mídia Física / Usados</h2>
+
+            {adminUsedProductsQuery.isLoading ? (
+              <p className="text-slate-400 text-sm">Carregando anúncios...</p>
+            ) : usedProductsListAdmin.length === 0 ? (
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center">
+                <Package className="w-12 h-12 text-slate-700 mx-auto mb-3" />
+                <p className="text-slate-400 text-sm">Nenhum anúncio de mídia física cadastrado ainda.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {usedProductsListAdmin.map((p: any) => {
+                  const isBoosted = Boolean(p.boostedUntil && new Date(p.boostedUntil).getTime() > Date.now());
+                  return (
+                    <Card key={p.id} className={`bg-slate-900/40 backdrop-blur-md border-red-600/10 p-4 hover:border-red-600/40 transition-all duration-500 card-neon relative overflow-hidden ${isBoosted ? 'border-yellow-500/40' : ''}`}>
+                      <div className="aspect-[16/9] w-full rounded-md overflow-hidden mb-4 bg-slate-800 flex items-center justify-center relative">
+                        {p.images?.[0] ? (
+                          <img src={p.images[0]} alt={p.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <Package className="w-10 h-10 text-slate-600" />
+                        )}
+                        {isBoosted && (
+                          <span className="absolute top-2 right-2 bg-yellow-500 text-slate-950 text-[9px] font-black uppercase px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <Star className="w-2.5 h-2.5 fill-slate-950" /> Destaque
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="font-bold text-white text-sm line-clamp-2 mb-1" title={p.name}>{p.name}</h3>
+                      <p className="text-xs text-slate-400 mb-0.5">Vendedor: <span className="text-slate-300">{p.sellerStoreName || "—"}</span></p>
+                      {(p.bairro || p.cidade) && (
+                        <p className="text-[11px] text-slate-500 mb-1 flex items-center gap-1">
+                          <MapPin className="w-3 h-3" /> {[p.bairro, p.cidade, p.estado].filter(Boolean).join(", ")}
+                        </p>
+                      )}
+                      <div className="flex justify-between items-center text-xs mb-3 mt-1">
+                        <span className="text-green-400 font-bold">R$ {Number(p.price || 0).toFixed(2)}</span>
+                        <span className="px-2 py-0.5 rounded-full font-bold uppercase text-[10px] bg-slate-800 text-slate-400">{p.condition}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          size="sm"
+                          onClick={() => adminToggleUsedBoostMutation.mutate({ id: p.id })}
+                          className={`flex-1 text-xs h-8 ${isBoosted ? "bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400" : "bg-slate-800 hover:bg-slate-700 text-white"}`}
+                        >
+                          <Star className="w-3.5 h-3.5 mr-1" /> {isBoosted ? "Remover Destaque" : "Destacar"}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => handleDeleteUsedProduct(p.id, p.name)} className="text-slate-500 hover:text-red-500 h-8 w-8 p-0">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="referrals">
