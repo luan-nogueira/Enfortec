@@ -146,7 +146,7 @@ export default function SellerChatDialog({
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="bg-slate-900 border-green-600/30 text-white sm:max-w-md card-neon p-0 gap-0 overflow-hidden">
+        <DialogContent className="bg-slate-900 border-green-600/30 text-white w-[94vw] sm:max-w-md card-neon p-0 gap-0 overflow-hidden rounded-2xl z-[90]">
           <DialogHeader className="p-4 bg-gradient-to-r from-green-800 via-emerald-700 to-green-800 border-b border-green-500/30">
             <DialogTitle className="text-base font-black text-white flex items-center gap-2">
               <MessageCircle className="w-5 h-5 text-green-300" />
@@ -159,14 +159,14 @@ export default function SellerChatDialog({
           </DialogHeader>
 
           <div className="px-3.5 py-2 bg-slate-950 border-b border-slate-800 flex items-center gap-1.5">
-            <ShieldCheck className="w-3 h-3 text-green-500 shrink-0" />
-            <p className="text-[9px] text-slate-500 leading-tight">
+            <ShieldCheck className="w-3.5 h-3.5 text-green-500 shrink-0" />
+            <p className="text-[10px] text-slate-400 leading-tight">
               Conversa direta e privada com {isStoreThread ? "a loja" : "o vendedor"}. Combine tudo por
               aqui e finalize a compra pela plataforma para manter a garantia Eforte.
             </p>
           </div>
 
-          <div ref={scrollRef} className="h-80 overflow-y-auto p-3.5 space-y-3 bg-slate-950/60 flex-1">
+          <div ref={scrollRef} className="h-72 sm:h-80 overflow-y-auto p-3.5 space-y-3 bg-slate-950/60 flex-1">
             {messages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center px-6 gap-2">
                 <MessageCircle className="w-10 h-10 text-slate-700" />
@@ -184,7 +184,7 @@ export default function SellerChatDialog({
                 return (
                   <div key={msg.id} className={`flex flex-col ${isMine ? "items-end" : "items-start"}`}>
                     <div
-                      className={`max-w-[88%] p-2.5 rounded-2xl text-xs font-medium whitespace-pre-wrap leading-relaxed ${
+                      className={`max-w-[88%] p-3 rounded-2xl text-xs font-medium whitespace-pre-wrap leading-relaxed ${
                         isMine
                           ? "bg-green-700 text-white rounded-br-none shadow-md"
                           : isFromSupport
@@ -210,20 +210,20 @@ export default function SellerChatDialog({
             )}
           </div>
 
-          <form onSubmit={handleSend} className="p-2.5 bg-slate-950 border-t border-slate-800 flex gap-2 shrink-0">
+          <form onSubmit={handleSend} className="p-3 bg-slate-950 border-t border-slate-800 flex gap-2 shrink-0 pb-4 sm:pb-3">
             <Input
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder={`Pergunte sobre ${productName}...`}
-              className="bg-slate-900 border-slate-800 text-white text-xs focus-visible:ring-green-600 h-9 rounded-xl"
+              className="bg-slate-900 border-slate-800 text-white text-sm focus-visible:ring-green-600 h-11 rounded-xl px-3.5 flex-1"
               disabled={sending}
             />
             <Button
               type="submit"
-              size="icon"
-              className="bg-green-600 hover:bg-green-700 h-9 w-9 shrink-0 rounded-xl"
+              className="bg-green-600 hover:bg-green-700 h-11 px-4 text-xs font-black shrink-0 rounded-xl flex items-center justify-center gap-1.5 active:scale-95 shadow-md"
               disabled={sending || !message.trim()}
             >
+              <span>Enviar</span>
               <Send className="w-3.5 h-3.5" />
             </Button>
           </form>

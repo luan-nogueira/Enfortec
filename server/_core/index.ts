@@ -244,9 +244,10 @@ async function startServer() {
         "createdAt" timestamp DEFAULT now() NOT NULL
       )`);
       
-      // Adicionar colunas de localização nos produtos usados
+      // Adicionar colunas de localização e categoria nos produtos usados
       await sql.query(`ALTER TABLE "usedProducts" ADD COLUMN IF NOT EXISTS "estado" varchar(50)`);
       await sql.query(`ALTER TABLE "usedProducts" ADD COLUMN IF NOT EXISTS "cidade" varchar(100)`);
+      await sql.query(`ALTER TABLE "usedProducts" ADD COLUMN IF NOT EXISTS "category" varchar(50) DEFAULT 'midia_fisica'`);
       console.log("[Database] Migrações de inicialização concluídas com sucesso.");
     } catch (migErr: any) {
       console.warn("[Database] Aviso: Falha na migração automática de inicialização:", migErr.message);

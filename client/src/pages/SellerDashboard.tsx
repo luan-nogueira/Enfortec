@@ -601,8 +601,8 @@ export default function SellerDashboard() {
               {usedProducts.map((product) => (
                 <Card key={product.id} className="p-0 card-neon overflow-hidden border-red-600/30">
                   <div className="h-48 w-full bg-slate-900 border-b border-red-600/20">
-                    {product.imageUrl ? (
-                      <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                    {(product.images && product.images.length > 0 && product.images[0]) || product.imageUrl ? (
+                      <img src={(product.images && product.images[0]) || product.imageUrl} alt={product.name} className="w-full h-full object-contain" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-slate-600">
                         <ShoppingCart className="w-12 h-12" />
@@ -627,9 +627,13 @@ export default function SellerDashboard() {
                     <div className="flex flex-col gap-3 pt-4 border-t border-red-600/10">
                       <div className="flex justify-between items-center">
                         <div className="flex flex-col text-red-500 font-bold text-sm">
-                          {product.pricePS4 ? <span>PS4: R$ {product.pricePS4.toFixed(2)}</span> : null}
-                          {product.pricePS5 ? <span>PS5: R$ {product.pricePS5.toFixed(2)}</span> : null}
-                          {!product.pricePS4 && !product.pricePS5 && <span>Sob Consulta</span>}
+                          {product.pricePS4 ? <span>PS4: R$ {Number(product.pricePS4).toFixed(2)}</span> : null}
+                          {product.pricePS5 ? <span>PS5: R$ {Number(product.pricePS5).toFixed(2)}</span> : null}
+                          {!product.pricePS4 && !product.pricePS5 && (
+                            Number(product.price) > 0
+                              ? <span>R$ {Number(product.price).toFixed(2)}</span>
+                              : <span>Sob Consulta</span>
+                          )}
                         </div>
                         <span className="text-xs bg-red-600/20 text-red-400 px-3 py-1 rounded-full font-medium">
                           {product.status}

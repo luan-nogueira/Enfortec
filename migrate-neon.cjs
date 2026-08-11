@@ -41,6 +41,9 @@ async function run() {
   console.log("5. Adding 'cidade' column to 'usedProducts' table if not exists...");
   await sql`ALTER TABLE "usedProducts" ADD COLUMN IF NOT EXISTS "cidade" varchar(100)`;
   
+  console.log("6. Adding 'category' column to 'usedProducts' table if not exists...");
+  await sql`ALTER TABLE "usedProducts" ADD COLUMN IF NOT EXISTS "category" varchar(50) DEFAULT 'midia_fisica'`;
+  
   console.log("Migrations successfully completed!");
 }
 

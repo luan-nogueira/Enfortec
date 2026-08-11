@@ -312,7 +312,7 @@ export default function FloatingChat() {
         />
       )}
 
-      <div className={`fixed ${isOpen ? "inset-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2" : "bottom-20 right-4 sm:bottom-6 sm:right-6"} ${isOpen ? "z-[100]" : "z-[80]"}`}>
+      <div className={`fixed ${isOpen ? "inset-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2" : "bottom-20 right-4 sm:bottom-6 sm:right-6"} ${isOpen ? "z-[100]" : "z-30"}`}>
         {!isOpen && (
           <Button
             onClick={() => setIsOpen(true)}

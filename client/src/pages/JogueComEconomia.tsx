@@ -48,16 +48,43 @@ export default function JogueComEconomia() {
     return priceA - priceB; // Lowest price first
   });
 
+  const isPrimaryAvailable = (prod: any) => {
+    if (!prod) return false;
+    const lic = prod.economiaLicenseType;
+    if (lic === "secundaria") return false;
+    if (lic === "primaria" || lic === "ambas") return true;
+    const pPrimary = Number(prod.pricePrimary ?? prod.price_primary);
+    return pPrimary > 0;
+  };
+
+  const isSecondaryAvailable = (prod: any) => {
+    if (!prod) return false;
+    const lic = prod.economiaLicenseType;
+    if (lic === "primaria") return false;
+    if (lic === "secundaria" || lic === "ambas") return true;
+    const pSec = Number(prod.priceSecondary ?? prod.price_secondary);
+    return pSec > 0 || !isPrimaryAvailable(prod);
+  };
+
   const handleOpenBuyModal = (product: any) => {
     setSelectedProduct(product);
-    const defaultType = product.economiaLicenseType === "primaria" ? "primaria" : "secundaria";
-    setSelectedAccountType(defaultType);
+    const allowPrim = isPrimaryAvailable(product);
+    const allowSec = isSecondaryAvailable(product);
+    if (!allowPrim && allowSec) {
+      setSelectedAccountType("secundaria");
+    } else if (allowPrim && !allowSec) {
+      setSelectedAccountType("primaria");
+    } else {
+      setSelectedAccountType(product.economiaLicenseType === "primaria" ? "primaria" : "secundaria");
+    }
   };
 
   const getItemPrice = (product: any, accType: "primaria" | "secundaria") => {
     const secPrice = Number(product.priceSecondary ?? product.price_secondary);
     const primPrice = Number(product.pricePrimary ?? product.price_primary ?? product.price);
-    if (accType === "secundaria" && secPrice > 0) return secPrice;
+    if (accType === "secundaria") {
+      return secPrice > 0 ? secPrice : Number(product.price || 0);
+    }
     return primPrice > 0 ? primPrice : (secPrice > 0 ? secPrice : Number(product.price || 0));
   };
 
@@ -319,43 +346,56 @@ export default function JogueComEconomia() {
                 <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
                   Escolha o Tipo de Licença *
                 </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedAccountType("primaria")}
-                    className={`p-2 rounded-lg border text-left transition-all ${
-                      selectedAccountType === "primaria"
-                        ? "bg-red-600/20 border-red-500 text-white shadow-md font-bold"
-                        : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700"
-                    }`}
-                  >
-                    <div className="text-xs font-bold flex justify-between items-center">
-                      <span>👤 Primária</span>
-                      {selectedAccountType === "primaria" && <span className="text-[8px] bg-red-600 text-white px-1 rounded">OK</span>}
-                    </div>
-                    <div className="text-xs text-red-400 font-black mt-1">
-                      R$ {getItemPrice(selectedProduct, "primaria").toFixed(2)}
-                    </div>
-                  </button>
+                {(() => {
+                  const primAllowed = isPrimaryAvailable(selectedProduct);
+                  const secAllowed = isSecondaryAvailable(selectedProduct);
 
-                  <button
-                    type="button"
-                    onClick={() => setSelectedAccountType("secundaria")}
-                    className={`p-2 rounded-lg border text-left transition-all ${
-                      selectedAccountType === "secundaria"
-                        ? "bg-red-600/20 border-red-500 text-white shadow-md font-bold"
-                        : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700"
-                    }`}
-                  >
-                    <div className="text-xs font-bold flex justify-between items-center">
-                      <span>👥 Secundária</span>
-                      {selectedAccountType === "secundaria" && <span className="text-[8px] bg-red-600 text-white px-1 rounded">OK</span>}
+                  return (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        disabled={!primAllowed}
+                        onClick={() => primAllowed && setSelectedAccountType("primaria")}
+                        className={`p-2.5 rounded-lg border text-left transition-all ${
+                          !primAllowed
+                            ? "bg-slate-950 border-slate-900 text-slate-600 opacity-50 cursor-not-allowed"
+                            : selectedAccountType === "primaria"
+                            ? "bg-red-600/20 border-red-500 text-white shadow-md font-bold"
+                            : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700"
+                        }`}
+                      >
+                        <div className="text-xs font-bold flex justify-between items-center">
+                          <span>👤 Primária</span>
+                          {selectedAccountType === "primaria" && primAllowed && <span className="text-[8px] bg-red-600 text-white px-1 rounded">OK</span>}
+                        </div>
+                        <div className="text-xs font-black mt-1">
+                          {primAllowed ? <span className="text-red-400">R$ {getItemPrice(selectedProduct, "primaria").toFixed(2)}</span> : <span className="text-slate-600 text-[10px]">Indisponível</span>}
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={!secAllowed}
+                        onClick={() => secAllowed && setSelectedAccountType("secundaria")}
+                        className={`p-2.5 rounded-lg border text-left transition-all ${
+                          !secAllowed
+                            ? "bg-slate-950 border-slate-900 text-slate-600 opacity-50 cursor-not-allowed"
+                            : selectedAccountType === "secundaria"
+                            ? "bg-red-600/20 border-red-500 text-white shadow-md font-bold"
+                            : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700"
+                        }`}
+                      >
+                        <div className="text-xs font-bold flex justify-between items-center">
+                          <span>👥 Secundária</span>
+                          {selectedAccountType === "secundaria" && secAllowed && <span className="text-[8px] bg-red-600 text-white px-1 rounded">OK</span>}
+                        </div>
+                        <div className="text-xs font-black mt-1">
+                          {secAllowed ? <span className="text-red-400">R$ {getItemPrice(selectedProduct, "secundaria").toFixed(2)}</span> : <span className="text-slate-600 text-[10px]">Indisponível</span>}
+                        </div>
+                      </button>
                     </div>
-                    <div className="text-xs text-red-400 font-black mt-1">
-                      R$ {getItemPrice(selectedProduct, "secundaria").toFixed(2)}
-                    </div>
-                  </button>
-                </div>
+                  );
+                })()}
               </div>
 
               {user && user.forteCoins > 0 && (

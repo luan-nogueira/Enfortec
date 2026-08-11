@@ -1,7 +1,7 @@
 import { Express } from "express";
 import axios from "axios";
 import * as db from "../db";
-import { orders, users, coupons } from "../../drizzle/schema";
+import { orders, users, coupons, platinadorSubscriptions } from "../../drizzle/schema";
 import { verifyFirebaseToken } from "./context";
 import { eq } from "drizzle-orm";
 
@@ -364,7 +364,39 @@ export function registerPaymentRoute(app: Express) {
 
       // Registra o pedido no banco com status "pago"
       const database = await db.getDb();
-      if (database) {
+      if (database && (productType as string) === "platinador") {
+        // Assinatura Clube Platinador: não é um "pedido" de produto (a tabela orders só aceita
+        // productType store/used/digital), então ativamos/renovamos a assinatura diretamente.
+        if (buyerId > 0) {
+          const now = new Date();
+          const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+          const existing = await database
+            .select()
+            .from(platinadorSubscriptions)
+            .where(eq(platinadorSubscriptions.userId, buyerId))
+            .limit(1);
+
+          if (existing.length > 0) {
+            await database
+              .update(platinadorSubscriptions)
+              .set({ status: "ativa", startsAt: now, expiresAt, paymentId: paymentId ? String(paymentId) : null })
+              .where(eq(platinadorSubscriptions.id, existing[0].id));
+          } else {
+            await database.insert(platinadorSubscriptions).values({
+              userId: buyerId,
+              status: "ativa",
+              planName: "Clube Platinador VIP",
+              price: totalPrice,
+              startsAt: now,
+              expiresAt,
+              paymentId: paymentId ? String(paymentId) : null,
+            });
+          }
+          console.log(`[InfinitePay Webhook] Assinatura Platinador ativada/renovada para o usuário ${buyerId} até ${expiresAt.toISOString()}.`);
+        } else {
+          console.warn("[InfinitePay Webhook] Pagamento Platinador recebido sem buyerId identificável — assinatura não pôde ser ativada automaticamente.");
+        }
+      } else if (database) {
         // Tenta obter a comissão real do banco
         let commissionPct = "6.00";
         try {

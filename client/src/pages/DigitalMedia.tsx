@@ -373,12 +373,18 @@ export default function DigitalMedia() {
       const plat = getGamePlatform(p);
       const platLower = plat.toLowerCase();
 
-      if (selectedPlatform === "PS5") {
-        matchesPlatform = platLower === "ps5" || platLower === "ps4/ps5" || platLower.includes("ps5");
-      } else if (selectedPlatform === "PS4") {
-        matchesPlatform = platLower === "ps4" || platLower === "ps4/ps5" || platLower.includes("ps4");
+      if (selectedPlatform === "PS5_ONLY" || selectedPlatform === "PS5") {
+        // Apenas jogos exclusivamente de PS5
+        matchesPlatform = platLower === "ps5";
+      } else if (selectedPlatform === "PS4_ONLY" || selectedPlatform === "PS4") {
+        // Apenas jogos exclusivamente de PS4
+        matchesPlatform = platLower === "ps4";
       } else if (selectedPlatform === "PS4/PS5") {
+        // Dual entitlement / cross-gen PS4 & PS5
         matchesPlatform = platLower === "ps4/ps5" || (platLower.includes("ps4") && platLower.includes("ps5"));
+      } else if (selectedPlatform === "PS5_ALL") {
+        // PS5 Exclusivo + Dual PS4/PS5
+        matchesPlatform = platLower === "ps5" || platLower === "ps4/ps5" || platLower.includes("ps5");
       } else {
         matchesPlatform = platLower.includes(selectedPlatform.toLowerCase());
       }
@@ -564,34 +570,34 @@ export default function DigitalMedia() {
                 Todas
               </button>
               <button
-                onClick={() => setSelectedPlatform("PS5")}
+                onClick={() => setSelectedPlatform("PS5_ONLY")}
                 className={`px-2.5 py-1 rounded-md text-[10px] sm:text-xs font-bold uppercase transition flex items-center gap-1 ${
-                  selectedPlatform === "PS5"
-                    ? "bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]"
+                  selectedPlatform === "PS5_ONLY" || selectedPlatform === "PS5"
+                    ? "bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)] font-black"
                     : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-700"
                 }`}
               >
-                🎮 PS5
+                🔥 Somente PS5
               </button>
               <button
-                onClick={() => setSelectedPlatform("PS4")}
+                onClick={() => setSelectedPlatform("PS4_ONLY")}
                 className={`px-2.5 py-1 rounded-md text-[10px] sm:text-xs font-bold uppercase transition flex items-center gap-1 ${
-                  selectedPlatform === "PS4"
-                    ? "bg-sky-600 text-white shadow-[0_0_15px_rgba(3,105,161,0.4)]"
+                  selectedPlatform === "PS4_ONLY" || selectedPlatform === "PS4"
+                    ? "bg-sky-600 text-white shadow-[0_0_15px_rgba(3,105,161,0.4)] font-black"
                     : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-700"
                 }`}
               >
-                🎮 PS4
+                🎮 Somente PS4
               </button>
               <button
                 onClick={() => setSelectedPlatform("PS4/PS5")}
                 className={`px-2.5 py-1 rounded-md text-[10px] sm:text-xs font-bold uppercase transition flex items-center gap-1 ${
                   selectedPlatform === "PS4/PS5"
-                    ? "bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.4)]"
+                    ? "bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.4)] font-black"
                     : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-700"
                 }`}
               >
-                🌟 Dual
+                🌟 Dual (PS4 & PS5)
               </button>
               <button
                 onClick={() => setShowPreVenda(!showPreVenda)}

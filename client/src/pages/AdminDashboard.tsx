@@ -2215,7 +2215,7 @@ export default function AdminDashboard() {
                   priceSecondary: null,
                   type: "jogo",
                   platform: game.platform,
-                  category: null,
+                  category: undefined,
                   imageUrl: game.imageUrl,
                   coverFit: "cover",
                   stock: 999,
@@ -2234,7 +2234,7 @@ export default function AdminDashboard() {
                   priceSecondary: null,
                   type: "jogo",
                   platform: game.platform,
-                  category: null,
+                  category: undefined,
                   imageUrl: game.imageUrl,
                   coverFit: "cover",
                   stock: 999,
@@ -2875,19 +2875,19 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                     <p className="text-xs text-slate-400 mb-1">Plataforma: <span className="text-white font-medium">{game.platform}</span></p>
-                    {(game.priceSecondary || game.price_secondary) ? (
+                    {game.priceSecondary ? (
                       <div className="text-xs space-y-0.5 my-1 bg-slate-950/60 p-1.5 rounded border border-slate-800">
                         <div className="flex justify-between items-center">
                           <span className="text-slate-400 font-bold">👤 Primária:</span>
-                          <span className="text-green-400 font-bold">R$ {Number(game.pricePrimary || game.price_primary || game.price || 0).toFixed(2).replace('.', ',')}</span>
+                          <span className="text-green-400 font-bold">R$ {Number(game.pricePrimary || game.price || 0).toFixed(2).replace('.', ',')}</span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-slate-400 font-bold">👥 Secundária:</span>
-                          <span className="text-slate-300 font-bold">R$ {Number(game.priceSecondary || game.price_secondary).toFixed(2).replace('.', ',')}</span>
+                          <span className="text-slate-300 font-bold">R$ {Number(game.priceSecondary).toFixed(2).replace('.', ',')}</span>
                         </div>
                       </div>
                     ) : (
-                      <p className="text-xs text-slate-400 mb-1">Preço: <span className="text-green-400 font-bold">R$ {Number(game.pricePrimary || game.price_primary || game.price || 0).toFixed(2).replace('.', ',')}</span></p>
+                      <p className="text-xs text-slate-400 mb-1">Preço: <span className="text-green-400 font-bold">R$ {Number(game.pricePrimary || game.price || 0).toFixed(2).replace('.', ',')}</span></p>
                     )}
                     <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-800/50">
                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border ${game.isActive ? "bg-green-500/10 text-green-500 border-green-500/20" : "bg-red-500/10 text-red-500 border-red-500/20"}`}>
@@ -2908,18 +2908,18 @@ export default function AdminDashboard() {
                           // Reconstruímos o payload necessário para a mutation
                           const payload = {
                             name: game.name,
-                            price: game.price,
-                            pricePrimary: game.pricePrimary ?? null,
-                            priceSecondary: game.priceSecondary ?? null,
+                            price: Number(game.price),
+                            pricePrimary: game.pricePrimary != null ? Number(game.pricePrimary) : null,
+                            priceSecondary: game.priceSecondary != null ? Number(game.priceSecondary) : null,
                             type: game.type as any,
-                            platform: game.platform ?? null,
-                            category: game.category ?? null,
-                            imageUrl: game.imageUrl ?? null,
-                            coverFit: game.coverFit ?? null,
+                            platform: game.platform ?? undefined,
+                            category: game.category ?? undefined,
+                            imageUrl: game.imageUrl ?? undefined,
+                            coverFit: game.coverFit ?? undefined,
                             stock: game.stock ?? 1,
                             isActive: game.isActive ?? true,
                             isPreVenda: game.isPreVenda ?? false,
-                            economiaLicenseType: game.economiaLicenseType ?? null,
+                            economiaLicenseType: game.economiaLicenseType ?? undefined,
                             showInEconomia: !currentVal,
                             id: game.id,
                           };

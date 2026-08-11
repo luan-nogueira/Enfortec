@@ -81,6 +81,7 @@ export const usedProducts = pgTable("usedProducts", {
   sellerId: integer("sellerId").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
+  category: varchar("category", { length: 50 }).default("midia_fisica"),
   price: numeric("price", { precision: 10, scale: 2 }).notNull(),
   condition: conditionEnum("condition").notNull(),
   images: json("images").$type<string[]>().default([]),

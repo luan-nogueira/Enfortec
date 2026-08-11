@@ -135,6 +135,7 @@ export const appRouter = router({
       .input(z.object({
         name: z.string().min(3),
         description: z.string(),
+        category: z.string().optional(),
         price: z.number().positive(),
         condition: z.enum(["novo", "como_novo", "bom", "aceitavel"]),
         images: z.array(z.string()).optional(),
@@ -164,6 +165,7 @@ export const appRouter = router({
           sellerId: seller.id,
           name: input.name,
           description: input.description,
+          category: input.category || "midia_fisica",
           price: input.price.toString(),
           condition: input.condition,
           images: input.images || [],

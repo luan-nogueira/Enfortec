@@ -49,11 +49,38 @@ const BRAZIL_STATES = [
   { uf: "TO", name: "Tocantins" }
 ];
 
+function getUsedProductImage(product: any): string | null {
+  if (!product) return null;
+  if (Array.isArray(product.images) && product.images.length > 0 && product.images[0]) {
+    return product.images[0];
+  }
+  if (product.imageUrl) return product.imageUrl;
+  return null;
+}
+
+function getUsedCategoryLabel(product: any): string {
+  if (!product) return "MÍDIA FÍSICA / USADO";
+  const cat = product.category || "";
+  if (cat === "colecionavel") return "Action Figure / Colecionável";
+  if (cat === "console") return "Console de Videogame";
+  if (cat === "acessorio") return "Controle / Acessório";
+  if (cat === "midia_fisica") return "Mídia Física";
+
+  const desc = (product.description || "").toUpperCase();
+  if (desc.includes("[COLECIONAVEL]")) return "Action Figure / Colecionável";
+  if (desc.includes("[CONSOLE]")) return "Console de Videogame";
+  if (desc.includes("[ACESSORIO]")) return "Controle / Acessório";
+  if (desc.includes("[MIDIA_FISICA]")) return "Mídia Física";
+
+  return "Desapego Gamer";
+}
+
 export default function UsedMarketplace() {
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCondition, setSelectedCondition] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedState, setSelectedState] = useState<string | null>(null);
   
   // Localização do Comprador
@@ -147,7 +174,7 @@ export default function UsedMarketplace() {
 
   const handleFinalizeBargain = () => {
     if (!selectedBargainProduct || !bargainOffer.trim()) return;
-    const price = parseFloat(selectedBargainProduct.pricePS4 || selectedBargainProduct.pricePS5 || 0);
+    const price = parseFloat(selectedBargainProduct.price || 0);
     const message = `Olá! Tenho interesse no produto usado: ${selectedBargainProduct.name} anunciado por ${selectedBargainProduct.sellerName || "vendedor"} (Preço original: R$ ${price.toFixed(2).replace('.', ',')}). Gostaria de pechinchar: você fecharia por R$ ${parseFloat(bargainOffer).toFixed(2).replace('.', ',')}?`;
     const phone = "5543984253691";
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
@@ -155,7 +182,7 @@ export default function UsedMarketplace() {
   };
 
   const handleBuyClick = (product: any) => {
-    const price = parseFloat(product.pricePS4 || product.pricePS5 || 0);
+    const price = parseFloat(product.price || 0);
     if (price === 0) {
       const msg = encodeURIComponent(`Olá! Tenho interesse no jogo USADO: ${product.name} anunciado por ${product.sellerName || "vendedor"}. Como faço para comprar?`);
       window.open(`https://wa.me/5543984253691?text=${msg}`, '_blank');
@@ -168,7 +195,7 @@ export default function UsedMarketplace() {
 
   const handleFinalizePurchase = async () => {
     if (!selectedProduct) return;
-    const price = parseFloat(selectedProduct.pricePS4 || selectedProduct.pricePS5 || 0);
+    const price = parseFloat(selectedProduct.price || 0);
 
     if (!customerName.trim() || !customerEmail.trim() || !customerPhone.trim()) {
       setCheckoutError("Por favor, preencha todos os dados de contato (Nome, E-mail e WhatsApp).");
@@ -289,6 +316,13 @@ export default function UsedMarketplace() {
       p.description?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCondition = !selectedCondition || p.condition === selectedCondition;
     
+    let matchesCategory = true;
+    if (selectedCategory) {
+      const cat = p.category || "";
+      const desc = (p.description || "").toLowerCase();
+      matchesCategory = cat === selectedCategory || desc.includes(`[${selectedCategory.toLowerCase()}]`);
+    }
+
     // Filtro por CEP (Bairro/Cidade/Estado) se o usuário digitou o CEP, ou filtro por estado selecionado manualmente
     let matchesLocation = true;
     if (buyerBairro && buyerCidade) {
@@ -300,7 +334,7 @@ export default function UsedMarketplace() {
       matchesLocation = p.estado === selectedState;
     }
 
-    return matchesSearch && matchesCondition && matchesLocation;
+    return matchesSearch && matchesCondition && matchesCategory && matchesLocation;
   });
 
   const sortedProducts = [...filteredProducts].sort((a, b) => {
@@ -311,6 +345,13 @@ export default function UsedMarketplace() {
     return 0; // ambos turbinados ou nenhum turbinado, mantém a ordem original (createdAt decrescente)
   });
 
+  const usedCategories = [
+    { value: "midia_fisica", label: "📦 Mídias Físicas" },
+    { value: "colecionavel", label: "🧸 Action Figures & Colecionáveis" },
+    { value: "console", label: "🎮 Consoles" },
+    { value: "acessorio", label: "🎧 Controles & Acessórios" },
+  ];
+
   const conditions = [
     { value: "novo", label: "Novo" },
     { value: "como_novo", label: "Como Novo" },
@@ -318,7 +359,7 @@ export default function UsedMarketplace() {
     { value: "aceitavel", label: "Aceitável" },
   ];
 
-  const price = selectedProduct ? parseFloat(selectedProduct.pricePS4 || selectedProduct.pricePS5 || 0) : 0;
+  const price = selectedProduct ? parseFloat(selectedProduct.price || 0) : 0;
   const couponDiscount = appliedCoupon ? price * (discountPercentage / 100) : 0;
   const finalPriceVal = Math.max(0, price - couponDiscount);
 
@@ -404,8 +445,38 @@ export default function UsedMarketplace() {
 
       {/* Filters */}
       <div className="bg-slate-900/50 border-b border-red-600/20">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex gap-1.5 sm:gap-2 flex-wrap items-center">
+        <div className="container mx-auto px-4 py-3 space-y-3">
+          {/* Category Tabs */}
+          <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 scrollbar-none items-center">
+            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider shrink-0 mr-1">Categoria:</span>
+            <button
+              onClick={() => setSelectedCategory(null)}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold transition shrink-0 ${
+                selectedCategory === null
+                  ? "bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)]"
+                  : "bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700"
+              }`}
+            >
+              Todas as Categorias
+            </button>
+            {usedCategories.map(cat => (
+              <button
+                key={cat.value}
+                onClick={() => setSelectedCategory(cat.value)}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold transition shrink-0 ${
+                  selectedCategory === cat.value
+                    ? "bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)]"
+                    : "bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700"
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Condition & Location Filters */}
+          <div className="flex gap-1.5 sm:gap-2 flex-wrap items-center pt-1 border-t border-slate-800/60">
+            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider shrink-0 mr-1">Estado do Item:</span>
             <button
               onClick={() => setSelectedCondition(null)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
@@ -461,49 +532,53 @@ export default function UsedMarketplace() {
           </div>
         ) : (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
-            {sortedProducts.map((product) => (
-              <div
-                key={product.id}
-                className={`group relative bg-slate-900/40 rounded-2xl sm:rounded-3xl border overflow-hidden transition-all duration-500 flex flex-col h-full ${
-                  Boolean(product.boostedUntil && new Date(product.boostedUntil).getTime() > Date.now())
-                    ? 'border-yellow-500/50 shadow-[0_0_20px_rgba(234,179,8,0.2)] hover:border-yellow-400 hover:shadow-[0_0_30px_rgba(234,179,8,0.4)]'
-                    : 'border-red-600/10 hover:border-red-600/40 hover:shadow-[0_20px_50px_rgba(220,38,38,0.15)]'
-                }`}
-              >
-                {/* Image Section with vertical case cover aspect ratio */}
-                <div className="relative aspect-[3/4] w-full overflow-hidden bg-slate-950 flex items-center justify-center">
-                  {product.imageUrl ? (
-                    <img 
-                      src={product.imageUrl} 
-                      alt={product.name} 
-                      className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105" 
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-slate-800">
-                      <ShoppingCart className="w-10 h-10 sm:w-16 sm:h-16" />
-                    </div>
-                  )}
-                  
-                  {/* Badge */}
-                  <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10 flex gap-1 sm:gap-2 flex-col items-end">
-                    {Boolean(product.boostedUntil && new Date(product.boostedUntil).getTime() > Date.now()) && (
-                      <span className="bg-yellow-500 text-slate-950 text-[8px] sm:text-[10px] px-2 py-0.5 sm:px-3 sm:py-1.5 rounded-full font-black uppercase tracking-wider shadow-xl border border-white/10 flex items-center gap-1">
-                        <Star className="w-2.5 h-2.5 fill-slate-950" /> DESTAQUE
-                      </span>
+            {sortedProducts.map((product) => {
+              const mainImg = getUsedProductImage(product);
+              const categoryLabel = getUsedCategoryLabel(product);
+
+              return (
+                <div
+                  key={product.id}
+                  className={`group relative bg-slate-900/40 rounded-2xl sm:rounded-3xl border overflow-hidden transition-all duration-500 flex flex-col h-full ${
+                    Boolean(product.boostedUntil && new Date(product.boostedUntil).getTime() > Date.now())
+                      ? 'border-yellow-500/50 shadow-[0_0_20px_rgba(234,179,8,0.2)] hover:border-yellow-400 hover:shadow-[0_0_30px_rgba(234,179,8,0.4)]'
+                      : 'border-red-600/10 hover:border-red-600/40 hover:shadow-[0_20px_50px_rgba(220,38,38,0.15)]'
+                  }`}
+                >
+                  {/* Image Section with vertical case cover aspect ratio */}
+                  <div className="relative aspect-[3/4] w-full overflow-hidden bg-slate-950 flex items-center justify-center">
+                    {mainImg ? (
+                      <img 
+                        src={mainImg} 
+                        alt={product.name} 
+                        className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105" 
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-slate-800">
+                        <ShoppingCart className="w-10 h-10 sm:w-16 sm:h-16" />
+                      </div>
                     )}
-                    <span className="bg-red-600 text-white text-[8px] sm:text-[10px] px-2 py-0.5 sm:px-3 sm:py-1.5 rounded-full font-black uppercase tracking-wider shadow-xl border border-white/10">
-                      USADO
-                    </span>
+                    
+                    {/* Badge */}
+                    <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10 flex gap-1 sm:gap-2 flex-col items-end">
+                      {Boolean(product.boostedUntil && new Date(product.boostedUntil).getTime() > Date.now()) && (
+                        <span className="bg-yellow-500 text-slate-950 text-[8px] sm:text-[10px] px-2 py-0.5 sm:px-3 sm:py-1.5 rounded-full font-black uppercase tracking-wider shadow-xl border border-white/10 flex items-center gap-1">
+                          <Star className="w-2.5 h-2.5 fill-slate-950" /> DESTAQUE
+                        </span>
+                      )}
+                      <span className="bg-red-600 text-white text-[8px] sm:text-[10px] px-2 py-0.5 sm:px-3 sm:py-1.5 rounded-full font-black uppercase tracking-wider shadow-xl border border-white/10">
+                        USADO
+                      </span>
+                    </div>
+
+                    <div className="absolute bottom-0 left-0 right-0 h-16 sm:h-24 bg-gradient-to-t from-slate-950 to-transparent" />
                   </div>
 
-                  <div className="absolute bottom-0 left-0 right-0 h-16 sm:h-24 bg-gradient-to-t from-slate-950 to-transparent" />
-                </div>
-
-                {/* Content */}
-                <div className="p-3 sm:p-6 flex-1 flex flex-col justify-between">
-                  <div>
-                    <h3 className="text-sm sm:text-xl font-black text-white line-clamp-2 sm:line-clamp-1 mb-0.5 sm:mb-1">{product.name}</h3>
-                    <p className="text-slate-500 text-[8px] sm:text-[10px] font-bold uppercase tracking-widest">{product.category || "JOGO USADO"}</p>
+                  {/* Content */}
+                  <div className="p-3 sm:p-6 flex-1 flex flex-col justify-between">
+                    <div>
+                      <h3 className="text-sm sm:text-xl font-black text-white line-clamp-2 sm:line-clamp-1 mb-0.5 sm:mb-1">{product.name}</h3>
+                      <p className="text-red-400 text-[8px] sm:text-[10px] font-black uppercase tracking-widest">{categoryLabel}</p>
                     {product.bairro && product.cidade ? (
                       <span className="flex items-center text-[10px] sm:text-xs text-slate-400 max-w-[50%] truncate">
                         <MapPin className="w-3 h-3 mr-1" />
@@ -531,7 +606,7 @@ export default function UsedMarketplace() {
                     <div className="flex justify-between items-center gap-2">
                       <div className="flex flex-col">
                         <span className="text-base sm:text-2xl font-black text-red-500 tracking-tighter">
-                          R$ {parseFloat(product.pricePS4 || product.pricePS5 || 0).toFixed(2).replace('.', ',')}
+                          R$ {parseFloat(product.price || 0).toFixed(2).replace('.', ',')}
                         </span>
                         <span className="text-[8px] sm:text-[10px] text-slate-500 font-bold italic">Valor Unitário</span>
                       </div>
@@ -582,7 +657,7 @@ export default function UsedMarketplace() {
                               sellerName={product.sellerName || "Vendedor"}
                               buttonLabel="Falar Vendedor"
                             />
-                            {parseFloat(product.pricePS4 || product.pricePS5 || 0) > 0 && (
+                            {parseFloat(product.price || 0) > 0 && (
                               <Button
                                 onClick={() => handleBargainClick(product)}
                                 className="w-full bg-slate-900 border border-red-600/30 hover:border-red-600/60 text-red-500 font-bold text-[10px] sm:text-xs h-10 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center gap-1"
@@ -597,7 +672,8 @@ export default function UsedMarketplace() {
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -614,12 +690,18 @@ export default function UsedMarketplace() {
 
           <div className="py-6 space-y-4">
             <div className="flex gap-4 items-start mb-4">
-              <div className="w-20 h-20 rounded bg-slate-800 overflow-hidden border border-red-600/20">
-                <img src={selectedProduct?.imageUrl} alt={selectedProduct?.name} className="w-full h-full object-cover" />
+              <div className="w-20 h-20 rounded bg-slate-800 overflow-hidden border border-red-600/20 shrink-0">
+                {getUsedProductImage(selectedProduct) ? (
+                  <img src={getUsedProductImage(selectedProduct)!} alt={selectedProduct?.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-slate-600">
+                    <ShoppingCart className="w-8 h-8" />
+                  </div>
+                )}
               </div>
               <div>
                 <h4 className="font-bold text-white line-clamp-2">{selectedProduct?.name}</h4>
-                <p className="text-xs text-slate-500">{selectedProduct?.category || "Jogo Usado"}</p>
+                <p className="text-xs text-red-400 font-bold uppercase">{getUsedCategoryLabel(selectedProduct)}</p>
                 <p className="text-xs text-slate-400 mt-1">Anunciado por: <strong className="text-white">{selectedProduct?.sellerName || "Vendedor"}</strong></p>
               </div>
             </div>
@@ -768,13 +850,19 @@ export default function UsedMarketplace() {
           
           <div className="py-6 space-y-4">
             <div className="flex gap-4 items-start mb-6">
-              <div className="w-20 h-20 rounded bg-slate-800 overflow-hidden border border-red-600/20">
-                <img src={selectedBargainProduct?.imageUrl} alt={selectedBargainProduct?.name} className="w-full h-full object-cover" />
+              <div className="w-20 h-20 rounded bg-slate-800 overflow-hidden border border-red-600/20 shrink-0">
+                {getUsedProductImage(selectedBargainProduct) ? (
+                  <img src={getUsedProductImage(selectedBargainProduct)!} alt={selectedBargainProduct?.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-slate-600">
+                    <ShoppingCart className="w-8 h-8" />
+                  </div>
+                )}
               </div>
               <div>
                 <h4 className="font-bold text-white line-clamp-2">{selectedBargainProduct?.name}</h4>
                 <p className="text-xs text-slate-500">
-                  Preço original: R$ {selectedBargainProduct ? parseFloat(selectedBargainProduct.pricePS4 || selectedBargainProduct.pricePS5 || 0).toFixed(2).replace('.', ',') : "0,00"}
+                  Preço original: R$ {selectedBargainProduct ? parseFloat(selectedBargainProduct.price || 0).toFixed(2).replace('.', ',') : "0,00"}
                 </p>
               </div>
             </div>

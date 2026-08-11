@@ -166,6 +166,7 @@ export default function AddUsedProduct() {
       await createProductMutation.mutateAsync({
         name: formData.name.trim(),
         description: `[${formData.category.toUpperCase()}] ${formData.description.trim()}`,
+        category: formData.category,
         price: parseFloat(formData.price),
         condition: formData.condition,
         images: formData.images,
