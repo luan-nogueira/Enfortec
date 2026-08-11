@@ -1800,7 +1800,11 @@ export default function AdminDashboard() {
       await updateDoc(doc(db, "users", userId), {
         role: newRole
       });
-      toast.success("Permissão atualizada com sucesso!");
+      toast.success(
+        newRole === "user"
+          ? "Colaborador removido. A conta continua ativa normalmente — ela só sai desta lista, que mostra apenas quem tem acesso especial."
+          : "Permissão atualizada com sucesso!"
+      );
     } catch (error: any) {
       console.error("Erro ao atualizar papel:", error);
       toast.error(error?.message || "Erro ao atualizar permissão.");
@@ -1820,7 +1824,11 @@ export default function AdminDashboard() {
       await updateDoc(doc(db, "users", userId), {
         role: newRole
       });
-      toast.success("Permissão atualizada com sucesso!");
+      toast.success(
+        newRole === "user"
+          ? "Gestor removido. A conta continua ativa normalmente — ela só sai desta lista, que mostra apenas quem tem acesso especial."
+          : "Permissão atualizada com sucesso!"
+      );
     } catch (error: any) {
       console.error("Erro ao atualizar papel:", error);
       toast.error(error?.message || "Erro ao atualizar permissão.");
@@ -2775,9 +2783,14 @@ export default function AdminDashboard() {
                         <p className="text-xs text-slate-500">{u.email}</p>
                       </div>
                     </div>
-                    <div className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all duration-300 ${u.role === 'admin' ? 'bg-red-500/10 text-red-400 border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.15)]' : u.role === 'collaborator' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.15)]' : 'bg-slate-800/80 text-slate-400 border-slate-700/50'}`}>
-                      {u.role}
-                    </div>
+                    {(() => {
+                      const displayRole = u.email === 'luanmnogueira@gmail.com' ? 'admin' : u.role;
+                      return (
+                        <div className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all duration-300 ${displayRole === 'admin' ? 'bg-red-500/10 text-red-400 border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.15)]' : displayRole === 'collaborator' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.15)]' : 'bg-slate-800/80 text-slate-400 border-slate-700/50'}`}>
+                          {displayRole}
+                        </div>
+                      );
+                    })()}
                     {u.email !== 'luanmnogueira@gmail.com' && (
                       <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(u.id, u.email)} className="text-slate-600 hover:text-red-500 -mt-2 -mr-2 relative z-20">
                         <Trash2 className="w-4 h-4" />
