@@ -809,6 +809,30 @@ export const appRouter = router({
       return [];
     }),
 
+    // Comprovações aprovadas, expostas publicamente (sem dados sensíveis) para o
+    // mural de platinadores por desafio e o ranking geral do clube.
+    getApprovedSubmissions: publicProcedure.query(async () => {
+      const database = await getDb();
+      if (database) {
+        try {
+          const list = await database
+            .select({
+              challengeId: platinumSubmissions.challengeId,
+              psnId: platinumSubmissions.psnId,
+              coinsAwarded: platinumSubmissions.coinsAwarded,
+              reviewedAt: platinumSubmissions.reviewedAt,
+            })
+            .from(platinumSubmissions)
+            .where(eq(platinumSubmissions.status, "aprovado"))
+            .orderBy(desc(platinumSubmissions.reviewedAt));
+          return list;
+        } catch (e) {
+          console.error("[TRPC Platinador] Error fetching approved submissions:", e);
+        }
+      }
+      return [];
+    }),
+
     adminCreateChallenge: protectedProcedure
       .input(
         z.object({

@@ -12,7 +12,31 @@ import { getLoginUrl } from "@/const";
 import UserProfileButton from "@/components/UserProfileButton";
 import { storage } from "@/lib/firebase";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
-import { Trophy, Flame, ShieldCheck, CheckCircle, Coins, MessageSquare, ExternalLink, Zap, Star, Gamepad2, ArrowLeft, Clock, Sparkles, Check, AlertCircle, Award, Upload, Image as ImageIcon } from "lucide-react";
+import { Trophy, Flame, ShieldCheck, CheckCircle, Coins, MessageSquare, ExternalLink, Zap, Star, Gamepad2, ArrowLeft, Clock, Sparkles, Check, AlertCircle, Award, Upload, Image as ImageIcon, Medal, Users } from "lucide-react";
+
+function useApprovedSubmissions() {
+  const query = trpc.platinador.getApprovedSubmissions.useQuery();
+  const approved = query.data || [];
+
+  const byChallenge = new Map<number, typeof approved>();
+  for (const sub of approved) {
+    const list = byChallenge.get(sub.challengeId) || [];
+    list.push(sub);
+    byChallenge.set(sub.challengeId, list);
+  }
+
+  const byPlayer = new Map<string, { psnId: string; platinums: number; coins: number }>();
+  for (const sub of approved) {
+    const key = sub.psnId;
+    const cur = byPlayer.get(key) || { psnId: sub.psnId, platinums: 0, coins: 0 };
+    cur.platinums += 1;
+    cur.coins += sub.coinsAwarded || 0;
+    byPlayer.set(key, cur);
+  }
+  const ranking = Array.from(byPlayer.values()).sort((a, b) => b.platinums - a.platinums || b.coins - a.coins);
+
+  return { isLoading: query.isLoading, byChallenge, ranking };
+}
 
 export default function PlatinadorPage() {
   const { user, loading } = useAuth();
@@ -53,6 +77,7 @@ export default function PlatinadorPage() {
   const submissionsQuery = trpc.platinador.getUserSubmissions.useQuery(undefined, {
     enabled: !!user,
   });
+  const { byChallenge: completersByChallenge, ranking: platinadorRanking } = useApprovedSubmissions();
 
   // Mutations
   const updatePsnMutation = trpc.platinador.updatePsnId.useMutation({
@@ -413,6 +438,27 @@ export default function PlatinadorPage() {
                     <CardDescription className="text-gray-400 text-xs line-clamp-2">
                       {challenge.description}
                     </CardDescription>
+                    {(() => {
+                      const completers = completersByChallenge.get(challenge.id) || [];
+                      if (completers.length === 0) return null;
+                      return (
+                        <div className="pt-2 mt-1 border-t border-gray-800/60">
+                          <p className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1.5 mb-1">
+                            <Users className="w-3.5 h-3.5" /> {completers.length} platinador{completers.length !== 1 ? "es" : ""} já conquistou{completers.length !== 1 ? "aram" : ""} essa
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            {completers.slice(0, 6).map((c, i) => (
+                              <span key={i} className="text-[10px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded-full font-medium">
+                                {c.psnId}
+                              </span>
+                            ))}
+                            {completers.length > 6 && (
+                              <span className="text-[10px] text-gray-500 px-1.5 py-0.5">+{completers.length - 6}</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </CardHeader>
 
                   <CardFooter className="mt-auto pt-4 border-t border-gray-800/60">
@@ -521,6 +567,48 @@ export default function PlatinadorPage() {
           </div>
         </section>
 
+        {/* RANKING DE PLATINADORES */}
+        {platinadorRanking.length > 0 && (
+          <section className="space-y-6">
+            <div className="text-center space-y-2">
+              <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight flex items-center justify-center gap-2">
+                <Medal className="w-7 h-7 text-amber-400" /> Ranking de <span className="text-[#dc143c]">Platinadores</span>
+              </h2>
+              <p className="text-gray-400 text-sm max-w-2xl mx-auto">
+                Quem mais platinou no Clube Eforte Games até agora
+              </p>
+            </div>
+
+            <div className="bg-[#121212] border border-gray-800 rounded-2xl overflow-hidden max-w-2xl mx-auto">
+              <div className="divide-y divide-gray-800">
+                {platinadorRanking.slice(0, 10).map((player, index) => (
+                  <div key={player.psnId} className="p-4 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm shrink-0 ${
+                        index === 0 ? "bg-amber-400 text-black" :
+                        index === 1 ? "bg-gray-300 text-black" :
+                        index === 2 ? "bg-amber-700 text-white" :
+                        "bg-gray-800 text-gray-400"
+                      }`}>
+                        {index + 1}
+                      </div>
+                      <span className="font-bold text-white text-sm">{player.psnId}</span>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs">
+                      <span className="flex items-center gap-1.5 text-gray-300 font-semibold">
+                        <Trophy className="w-3.5 h-3.5 text-[#dc143c]" /> {player.platinums} platina{player.platinums !== 1 ? "s" : ""}
+                      </span>
+                      <span className="flex items-center gap-1.5 text-amber-400 font-semibold">
+                        <Coins className="w-3.5 h-3.5" /> {player.coins}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* HISTÓRICO DE SUBMISSÕES DO USUÁRIO */}
         {user && submissionsQuery.data && submissionsQuery.data.length > 0 && (
           <section className="space-y-4 pt-6 border-t border-gray-800">
@@ -530,12 +618,14 @@ export default function PlatinadorPage() {
 
             <div className="bg-[#121212] border border-gray-800 rounded-2xl overflow-hidden">
               <div className="divide-y divide-gray-800">
-                {submissionsQuery.data.map((sub: any) => (
+                {submissionsQuery.data.map((sub: any) => {
+                  const challenge = challengesQuery.data?.find((ch: any) => ch.id === sub.challengeId);
+                  return (
                   <div key={sub.id} className="p-4 flex items-center justify-between gap-4">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-sm text-white">
-                          Desafio #{sub.challengeId}
+                          {challenge?.gameTitle || `Desafio #${sub.challengeId}`}
                         </span>
                         <span className="text-xs text-gray-400">• PSN: {sub.psnId}</span>
                       </div>
@@ -570,7 +660,8 @@ export default function PlatinadorPage() {
                       )}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </section>
