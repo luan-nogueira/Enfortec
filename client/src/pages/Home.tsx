@@ -628,8 +628,7 @@ export default function Home() {
                 { id: null, label: "🎮 Todos Consoles" },
                 { id: "PS5", label: "🔵 PS5" },
                 { id: "PS4", label: "🔷 PS4" },
-                { id: "Xbox", label: "🟢 Xbox" },
-                { id: "Switch", label: "🔴 Switch" },
+                { id: "PS4/PS5", label: "🌟 Dual (PS4 & PS5)" },
               ].map((plat) => (
                 <button
                   key={plat.label}

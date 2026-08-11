@@ -19,6 +19,20 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
+function ProductCardSkeleton() {
+  return (
+    <div className="relative bg-slate-950 rounded-2xl sm:rounded-[2rem] overflow-hidden border border-red-600/20 flex flex-col h-full">
+      <div className="h-40 sm:h-80 skeleton-shimmer" />
+      <div className="p-3 sm:p-6 flex-1 flex flex-col gap-3">
+        <div className="h-3.5 w-4/5 rounded skeleton-shimmer" />
+        <div className="h-2.5 w-1/2 rounded skeleton-shimmer" />
+        <div className="h-8 w-2/3 rounded skeleton-shimmer mt-auto" />
+        <div className="h-10 w-full rounded-xl skeleton-shimmer" />
+      </div>
+    </div>
+  );
+}
+
 export default function Store() {
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
@@ -388,8 +402,10 @@ export default function Store() {
         </div>
 
         {isLoading ? (
-          <div className="text-center py-12">
-            <p className="text-slate-400 text-lg">Carregando produtos...</p>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <ProductCardSkeleton key={i} />
+            ))}
           </div>
         ) : filteredProducts.length === 0 ? (
           <div className="text-center py-12">
