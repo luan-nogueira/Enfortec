@@ -33,6 +33,15 @@ function ProductCardSkeleton() {
   );
 }
 
+function getStoreProductImage(product: any): string | null {
+  if (!product) return null;
+  if (Array.isArray(product.images) && product.images.length > 0 && product.images[0]) {
+    return product.images[0];
+  }
+  if (product.imageUrl) return product.imageUrl;
+  return null;
+}
+
 export default function Store() {
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
@@ -406,11 +415,11 @@ export default function Store() {
               <div key={product.id} className="relative bg-slate-950 rounded-2xl sm:rounded-[2rem] overflow-hidden border border-red-600/20 shadow-2xl group transition-all hover:border-red-600/50 flex flex-col h-full">
                 {/* Image Container with Logo Overlay */}
                 <div className="relative h-40 sm:h-80 overflow-hidden">
-                  {product.imageUrl ? (
-                    <img 
-                      src={product.imageUrl} 
-                      alt={product.name} 
-                      className={`w-full h-full ${product.coverFit === 'contain' ? 'object-contain bg-slate-900/60 p-2' : 'object-cover'} transition-transform duration-700 group-hover:scale-110`} 
+                  {getStoreProductImage(product) ? (
+                    <img
+                      src={getStoreProductImage(product)!}
+                      alt={product.name}
+                      className={`w-full h-full ${product.coverFit === 'contain' ? 'object-contain bg-slate-900/60 p-2' : 'object-cover'} transition-transform duration-700 group-hover:scale-110`}
                     />
                   ) : (
                     <div className="w-full h-full bg-slate-900 flex items-center justify-center">
@@ -506,7 +515,7 @@ export default function Store() {
             <div className="flex gap-4 items-start mb-6">
               <div className="w-20 h-20 rounded bg-slate-800 overflow-hidden border border-red-600/20 flex items-center justify-center">
                 <img
-                  src={selectedProduct?.imageUrl}
+                  src={getStoreProductImage(selectedProduct) || undefined}
                   alt={selectedProduct?.name}
                   className={`w-full h-full ${selectedProduct?.coverFit === 'contain' ? 'object-contain p-1' : 'object-cover'}`}
                 />
@@ -710,7 +719,7 @@ export default function Store() {
           <div className="py-6 space-y-4">
             <div className="flex gap-4 items-start mb-6">
               <div className="w-20 h-20 rounded bg-slate-800 overflow-hidden border border-red-600/20">
-                <img src={selectedBargainProduct?.imageUrl} alt={selectedBargainProduct?.name} className="w-full h-full object-cover" />
+                <img src={getStoreProductImage(selectedBargainProduct) || undefined} alt={selectedBargainProduct?.name} className="w-full h-full object-cover" />
               </div>
               <div>
                 <h4 className="font-bold text-white line-clamp-2">{selectedBargainProduct?.name}</h4>

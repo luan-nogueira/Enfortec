@@ -88,7 +88,7 @@ export const appRouter = router({
     adminUpdateRole: protectedProcedure
       .input(z.object({
         openId: z.string(),
-        role: z.enum(["user", "admin", "vendedor"]),
+        role: z.enum(["user", "admin", "vendedor", "collaborator"]),
       }))
       .mutation(async ({ ctx, input }) => {
         if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem alterar permissões." });
@@ -142,6 +142,68 @@ export const appRouter = router({
   products: router({
     list: publicProcedure.query(() => db.getActiveProducts()),
     getById: publicProcedure.input(z.number()).query(({ input }) => db.getProductById(input)),
+    adminList: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin" && ctx.user.role !== "collaborator") throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+      const database = await getDb();
+      if (!database) throw new Error("Database not available");
+      return database.select().from(products).orderBy(desc(products.createdAt));
+    }),
+    create: protectedProcedure
+      .input(z.object({
+        name: z.string().min(3),
+        description: z.string().optional(),
+        price: z.number().positive(),
+        category: z.string().min(1),
+        stock: z.number().min(0).optional(),
+        images: z.array(z.string()).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin" && ctx.user.role !== "collaborator") throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        return database.insert(products).values({
+          name: input.name,
+          description: input.description,
+          price: input.price.toString(),
+          category: input.category,
+          stock: input.stock ?? 0,
+          images: input.images || [],
+        });
+      }),
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().min(3),
+        description: z.string().optional(),
+        price: z.number().positive(),
+        category: z.string().min(1),
+        stock: z.number().min(0).optional(),
+        images: z.array(z.string()).optional(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin" && ctx.user.role !== "collaborator") throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        const updateValues: any = {
+          name: input.name,
+          description: input.description,
+          price: input.price.toString(),
+          category: input.category,
+        };
+        if (input.stock !== undefined) updateValues.stock = input.stock;
+        if (input.images !== undefined) updateValues.images = input.images;
+        if (input.isActive !== undefined) updateValues.isActive = input.isActive;
+        return database.update(products).set(updateValues).where(eq(products.id, input.id));
+      }),
+    delete: protectedProcedure
+      .input(z.number())
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin" && ctx.user.role !== "collaborator") throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        return database.delete(products).where(eq(products.id, input));
+      }),
   }),
 
   // Sellers Router

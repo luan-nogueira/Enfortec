@@ -43,7 +43,10 @@ async function run() {
   
   console.log("6. Adding 'category' column to 'usedProducts' table if not exists...");
   await sql`ALTER TABLE "usedProducts" ADD COLUMN IF NOT EXISTS "category" varchar(50) DEFAULT 'midia_fisica'`;
-  
+
+  console.log("7. Adding 'collaborator' value to 'role' enum if not exists...");
+  await sql`ALTER TYPE "role" ADD VALUE IF NOT EXISTS 'collaborator'`;
+
   console.log("Migrations successfully completed!");
 }
 

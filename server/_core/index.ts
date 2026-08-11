@@ -231,6 +231,7 @@ async function startServer() {
       console.log("[Database] Executando migrações de inicialização...");
       await sql.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "cpf" varchar(18)`);
       await sql.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "forteCoins" integer DEFAULT 10 NOT NULL`);
+      await sql.query(`ALTER TYPE "role" ADD VALUE IF NOT EXISTS 'collaborator'`);
       
       // Criar tabela de cupons se não existir
       await sql.query(`CREATE TABLE IF NOT EXISTS "coupons" (

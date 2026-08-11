@@ -3,55 +3,55 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { db } from "@/lib/firebase";
-import { collection, addDoc, getDocs, deleteDoc, doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
+import { trpc } from "@/lib/trpc";
 import { Plus, Trash2, Edit2, Store, Package } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
-
-interface Product {
-  id: string;
-  name: string;
-  description: string;
-  pricePS4?: number;
-  pricePS5?: number;
-  category: string;
-  imageUrl: string;
-  stock: number;
-}
 
 export default function CollaboratorDashboard() {
   const { user, isAuthenticated, isCollaborator, loading: authLoading } = useAuth();
   const [, navigate] = useLocation();
-  const [products, setProducts] = useState<Product[]>([]);
-  
+
+  // Produtos vêm do Postgres (mesma tabela lida pela Loja pública)
+  const productsQuery = trpc.products.adminList.useQuery(undefined, { enabled: isAuthenticated && isCollaborator });
+  const products = productsQuery.data || [];
+
+  const createMutation = trpc.products.create.useMutation({
+    onSuccess: () => {
+      toast.success("Produto adicionado com sucesso!");
+      productsQuery.refetch();
+      cancelEdit();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao salvar produto."),
+  });
+  const updateMutation = trpc.products.update.useMutation({
+    onSuccess: () => {
+      toast.success("Produto atualizado com sucesso!");
+      productsQuery.refetch();
+      cancelEdit();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao salvar produto."),
+  });
+  const deleteMutation = trpc.products.delete.useMutation({
+    onSuccess: () => {
+      toast.success("Produto excluído com sucesso!");
+      productsQuery.refetch();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao deletar produto."),
+  });
+
   // Formulário
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [pricePS4, setPricePS4] = useState("");
-  const [pricePS5, setPricePS5] = useState("");
+  const [price, setPrice] = useState("");
   const [category, setCategory] = useState("Jogos (Mídia Digital)");
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [stock, setStock] = useState("1"); // Padrão 1
+  const [stock, setStock] = useState("1");
   const [loading, setLoading] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-
-  // Escutar produtos do Firestore em tempo real
-  useEffect(() => {
-    const productsRef = collection(db, "store_products");
-    const unsubscribe = onSnapshot(productsRef, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Product[];
-      setProducts(data);
-    });
-
-    return () => unsubscribe();
-  }, []);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   if (authLoading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">Carregando permissões...</div>;
 
@@ -62,7 +62,7 @@ export default function CollaboratorDashboard() {
           <Package className="w-16 h-16 text-red-600 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-white mb-2">Acesso Restrito</h2>
           <p className="text-slate-400 mb-6">
-            Você não tem permissão para acessar o Portal do Colaborador. 
+            Você não tem permissão para acessar o Portal do Colaborador.
             Entre em contato com o gestor para solicitar acesso.
           </p>
           <Button onClick={() => navigate("/")} className="w-full bg-red-600 hover:bg-red-700 btn-neon">Voltar para a Loja</Button>
@@ -77,61 +77,53 @@ export default function CollaboratorDashboard() {
       toast.warning("Por favor, selecione uma imagem.");
       return;
     }
-    
+    if (!price || parseFloat(price) <= 0) {
+      toast.warning("Informe um preço válido.");
+      return;
+    }
+
     setLoading(true);
     try {
-      let downloadUrl = "";
+      let images: string[] | undefined;
       if (imageFile) {
-        // Upload nova imagem se foi selecionada
         const imageRef = ref(storage, `store_products/${Date.now()}_${imageFile.name}`);
         const uploadResult = await uploadBytes(imageRef, imageFile);
-        downloadUrl = await getDownloadURL(uploadResult.ref);
-      }
-
-      const productData: any = {
-        name,
-        description,
-        pricePS4: pricePS4 ? parseFloat(pricePS4) : null,
-        pricePS5: pricePS5 ? parseFloat(pricePS5) : null,
-        category,
-        stock: parseInt(stock) || 0,
-        collaboratorId: user?.id,
-        collaboratorName: user?.name || user?.email,
-      };
-
-      if (downloadUrl) {
-        productData.imageUrl = downloadUrl;
+        const downloadUrl = await getDownloadURL(uploadResult.ref);
+        images = [downloadUrl];
       }
 
       if (editingId) {
-        // Atualizar existente
-        await updateDoc(doc(db, "store_products", editingId), productData);
-        toast.success("Produto atualizado com sucesso!");
+        await updateMutation.mutateAsync({
+          id: editingId,
+          name,
+          description,
+          price: parseFloat(price),
+          category,
+          stock: parseInt(stock) || 0,
+          ...(images ? { images } : {}),
+        });
       } else {
-        // Criar novo
-        productData.createdAt = new Date().toISOString();
-        await addDoc(collection(db, "store_products"), productData);
-        toast.success("Produto adicionado com sucesso!");
+        await createMutation.mutateAsync({
+          name,
+          description,
+          price: parseFloat(price),
+          category,
+          stock: parseInt(stock) || 0,
+          images,
+        });
       }
-
-      // Limpar form
-      cancelEdit();
-    } catch (error) {
-      console.error("Erro ao salvar produto:", error);
-      toast.error("Erro ao salvar produto. Verifique os dados de acesso e a conexão com o servidor.");
     } finally {
       setLoading(false);
     }
   };
 
-  const startEditing = (product: Product) => {
+  const startEditing = (product: any) => {
     setEditingId(product.id);
     setName(product.name);
-    setDescription(product.description);
-    setPricePS4(product.pricePS4 ? product.pricePS4.toString() : "");
-    setPricePS5(product.pricePS5 ? product.pricePS5.toString() : "");
+    setDescription(product.description || "");
+    setPrice(product.price ? String(product.price) : "");
     setCategory(product.category);
-    setStock(product.stock ? product.stock.toString() : "0");
+    setStock(product.stock ? String(product.stock) : "0");
     setImageFile(null); // obriga a não mexer na imagem a não ser que escolha outra
   };
 
@@ -139,27 +131,18 @@ export default function CollaboratorDashboard() {
     setEditingId(null);
     setName("");
     setDescription("");
-    setPricePS4("");
-    setPricePS5("");
+    setPrice("");
     setStock("1");
     setImageFile(null);
     const fileInput = document.getElementById("imageUpload") as HTMLInputElement;
     if (fileInput) fileInput.value = "";
   };
 
-  const handleDeleteProduct = async (id: string) => {
+  const handleDeleteProduct = (id: number) => {
     toast("Tem certeza que deseja excluir este produto?", {
       action: {
         label: "Excluir",
-        onClick: async () => {
-          try {
-            await deleteDoc(doc(db, "store_products", id));
-            toast.success("Produto excluído com sucesso!");
-          } catch (error) {
-            console.error("Erro ao deletar:", error);
-            toast.error("Erro ao deletar produto.");
-          }
-        }
+        onClick: () => deleteMutation.mutate(id),
       }
     });
   };
@@ -178,7 +161,7 @@ export default function CollaboratorDashboard() {
       </div>
 
       <div className="container mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
+
         {/* Formulário de Adição */}
         <Card className="p-6 bg-slate-900 border-red-600/30 card-neon lg:col-span-1 h-fit">
           <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
@@ -190,21 +173,15 @@ export default function CollaboratorDashboard() {
               <Label className="text-slate-300">Nome do Produto</Label>
               <Input required value={name} onChange={e => setName(e.target.value)} className="bg-slate-950 border-red-600/30" placeholder="Ex: Teclado Mecânico" />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-slate-300">Preço PS4 (R$)</Label>
-                <Input type="number" step="0.01" value={pricePS4} onChange={e => setPricePS4(e.target.value)} className="bg-slate-950 border-red-600/30" placeholder="0.00" />
-              </div>
-              <div>
-                <Label className="text-slate-300">Preço PS5 (R$)</Label>
-                <Input type="number" step="0.01" value={pricePS5} onChange={e => setPricePS5(e.target.value)} className="bg-slate-950 border-red-600/30" placeholder="0.00" />
-              </div>
+            <div>
+              <Label className="text-slate-300">Preço (R$)</Label>
+              <Input type="number" step="0.01" required value={price} onChange={e => setPrice(e.target.value)} className="bg-slate-950 border-red-600/30" placeholder="0.00" />
             </div>
             <div>
               <Label className="text-slate-300">Categoria</Label>
-              <select 
-                required 
-                value={category} 
+              <select
+                required
+                value={category}
                 onChange={e => setCategory(e.target.value)}
                 className="w-full flex h-10 items-center justify-between rounded-md border border-red-600/30 bg-slate-950 px-3 py-2 text-sm text-slate-300"
               >
@@ -223,17 +200,17 @@ export default function CollaboratorDashboard() {
             </div>
             <div>
               <Label className="text-slate-300">Foto do Produto do seu PC {editingId && "(Opcional para não alterar)"}</Label>
-              <Input 
+              <Input
                 id="imageUpload"
                 required={!editingId}
-                type="file" 
+                type="file"
                 accept="image/*"
                 onChange={e => {
                   if (e.target.files && e.target.files[0]) {
                     setImageFile(e.target.files[0]);
                   }
-                }} 
-                className="bg-slate-950 border-red-600/30 file:text-red-500 file:bg-slate-900 file:border-0 file:mr-4 file:py-2 file:px-4 file:rounded-md cursor-pointer" 
+                }}
+                className="bg-slate-950 border-red-600/30 file:text-red-500 file:bg-slate-900 file:border-0 file:mr-4 file:py-2 file:px-4 file:rounded-md cursor-pointer"
               />
             </div>
             <div>
@@ -259,7 +236,7 @@ export default function CollaboratorDashboard() {
             <Package className="w-5 h-5 text-red-500" />
             Produtos da Loja ({products.length})
           </h2>
-          
+
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
@@ -273,17 +250,29 @@ export default function CollaboratorDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {products.length === 0 ? (
+                {productsQuery.isLoading ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-slate-500">
+                    <td colSpan={6} className="py-8 text-center text-slate-500">
+                      Carregando produtos...
+                    </td>
+                  </tr>
+                ) : products.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-slate-500">
                       Nenhum produto cadastrado na loja ainda.
                     </td>
                   </tr>
                 ) : (
-                  products.map(product => (
+                  products.map((product: any) => (
                     <tr key={product.id} className="border-b border-red-600/10 hover:bg-slate-800/50 transition">
                       <td className="py-3 pl-2">
-                        <img src={product.imageUrl} alt={product.name} className="w-12 h-12 object-cover rounded bg-slate-800" />
+                        {product.images?.[0] ? (
+                          <img src={product.images[0]} alt={product.name} className="w-12 h-12 object-cover rounded bg-slate-800" />
+                        ) : (
+                          <div className="w-12 h-12 rounded bg-slate-800 flex items-center justify-center text-slate-600">
+                            <Package className="w-5 h-5" />
+                          </div>
+                        )}
                       </td>
                       <td className="py-3 font-medium text-white">{product.name}</td>
                       <td className="py-3 text-slate-400">{product.category}</td>
@@ -293,9 +282,7 @@ export default function CollaboratorDashboard() {
                         </span>
                       </td>
                       <td className="py-3 text-red-400 font-bold text-sm">
-                        {product.pricePS4 ? <div>PS4: R$ {product.pricePS4.toFixed(2)}</div> : null}
-                        {product.pricePS5 ? <div>PS5: R$ {product.pricePS5.toFixed(2)}</div> : null}
-                        {!product.pricePS4 && !product.pricePS5 && "Sob Consulta"}
+                        R$ {Number(product.price || 0).toFixed(2)}
                       </td>
                       <td className="py-3">
                         <Button variant="ghost" size="icon" className="text-slate-400 hover:text-blue-500 mr-1" onClick={() => startEditing(product)}>

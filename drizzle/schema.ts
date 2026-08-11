@@ -7,7 +7,7 @@ import { relations } from "drizzle-orm";
  */
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
-export const roleEnum = pgEnum("role", ["user", "admin", "vendedor"]);
+export const roleEnum = pgEnum("role", ["user", "admin", "vendedor", "collaborator"]);
 export const conditionEnum = pgEnum("condition", ["novo", "como_novo", "bom", "aceitavel"]);
 export const usedStatusEnum = pgEnum("used_status", ["pendente", "aprovado", "rejeitado", "vendido"]);
 export const digitalTypeEnum = pgEnum("digital_type", ["jogo", "gift_card", "licenca", "assinatura", "outro"]);

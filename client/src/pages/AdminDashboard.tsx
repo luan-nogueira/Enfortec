@@ -1794,13 +1794,16 @@ export default function AdminDashboard() {
   const handleToggleCollaborator = async (userId: string, currentRole: string) => {
     const newRole = currentRole === "collaborator" ? "user" : "collaborator";
     try {
+      // Precisa existir no Postgres também: é o que autoriza as mutations do
+      // Portal do Colaborador (criar/editar/excluir produtos da Loja real).
+      await adminUpdateRoleMutation.mutateAsync({ openId: userId, role: newRole as "user" | "collaborator" });
       await updateDoc(doc(db, "users", userId), {
         role: newRole
       });
       toast.success("Permissão atualizada com sucesso!");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao atualizar papel:", error);
-      toast.error("Erro ao atualizar permissão.");
+      toast.error(error?.message || "Erro ao atualizar permissão.");
     }
   };
 
@@ -1838,7 +1841,7 @@ export default function AdminDashboard() {
       
       if (existingUser) {
         // Usuário já existe, apenas promove ele para o novo cargo
-        if (newUserRole === "admin" || newUserRole === "user") {
+        if (newUserRole === "admin" || newUserRole === "user" || newUserRole === "collaborator") {
           await adminUpdateRoleMutation.mutateAsync({ openId: existingUser.id, role: newUserRole });
         }
         await updateDoc(doc(db, "users", existingUser.id), {
