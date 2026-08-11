@@ -262,7 +262,8 @@ export function useAuth(options?: UseAuthOptions) {
                   referredBy: userData?.referredBy || null,
                   loginMethod: finalLoginMethod,
                   acceptedForteCoinsTerms: userData?.acceptedForteCoinsTerms || false,
-                  acceptedGamesTerms: userData?.acceptedGamesTerms || false
+                  acceptedGamesTerms: userData?.acceptedGamesTerms || false,
+                  pendingRefund: userData?.pendingRefund || null
                 },
                 role: role,
                 loading: false,

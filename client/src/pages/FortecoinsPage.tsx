@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import UserProfileButton from "@/components/UserProfileButton";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { trpc } from "@/lib/trpc";
 import { ArrowLeft, Coins, Copy, Gift, HelpCircle, CheckCircle, Clock, AlertTriangle, LogOut, MessageCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
@@ -29,6 +30,7 @@ const PREDEFINED_PRIZES: Prize[] = [
 export default function FortecoinsPage() {
   const { user, isAuthenticated, loading, logout } = useAuth();
   const [, navigate] = useLocation();
+  const redeemCoinsMutation = trpc.auth.redeemCoins.useMutation();
   const [referrals, setReferrals] = useState<any[]>([]);
   const [redemptions, setRedemptions] = useState<any[]>([]);
   const [redeemingId, setRedeemingId] = useState<string | null>(null);
@@ -140,20 +142,21 @@ export default function FortecoinsPage() {
 
     setRedeemingId(prize.id);
     try {
-      // 1. Obter saldo atualizado em tempo real para evitar double spend
-      const userRef = doc(db, "users", user.id);
-      const userSnap = await getDoc(userRef);
-      const currentCoins = userSnap.data()?.forteCoins ?? 0;
-
-      if (currentCoins < prize.cost) {
-        toast.error("Saldo de Fortecoins insuficiente!");
+      // 1. Deduzir pontos no Postgres (saldo real, com checagem de saldo no servidor
+      // para evitar double spend — o Firestore é só espelho para a UI).
+      try {
+        await redeemCoinsMutation.mutateAsync({ amount: prize.cost });
+      } catch (err: any) {
+        toast.error(err?.message || "Saldo de Fortecoins insuficiente!");
         setRedeemingId(null);
         return;
       }
 
-      // 2. Deduzir pontos
+      const userRef = doc(db, "users", user.id);
+      const userSnap = await getDoc(userRef);
+      const currentCoins = userSnap.data()?.forteCoins ?? 0;
       await updateDoc(userRef, {
-        forteCoins: currentCoins - prize.cost
+        forteCoins: Math.max(0, currentCoins - prize.cost)
       });
 
       // 3. Registrar o resgate

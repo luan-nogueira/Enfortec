@@ -297,11 +297,14 @@ function PlatinadorAdminTab() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
-                {submissionsQuery.data.map((sub: any) => (
+                {submissionsQuery.data.map((sub: any) => {
+                  const challenge = challengesQuery.data?.find((ch: any) => ch.id === sub.challengeId);
+                  const rewardCoins = challenge?.rewardCoins ?? 500;
+                  return (
                   <tr key={sub.id} className="hover:bg-slate-800/40">
                     <td className="p-3 text-xs">#{sub.id}<br /><span className="text-[10px] text-slate-500">{new Date(sub.submittedAt).toLocaleDateString("pt-BR")}</span></td>
                     <td className="p-3 font-bold text-white">{sub.psnId}</td>
-                    <td className="p-3 text-xs text-slate-400">#{sub.challengeId}</td>
+                    <td className="p-3 text-xs text-slate-400">{challenge?.gameTitle || `#${sub.challengeId}`}</td>
                     <td className="p-3">
                       <a href={sub.proofUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline flex items-center gap-1">
                         Ver Foto <ExternalLink className="w-3 h-3" />
@@ -315,8 +318,8 @@ function PlatinadorAdminTab() {
                     <td className="p-3 text-right">
                       {sub.status === "pendente" && (
                         <div className="flex gap-2 justify-end">
-                          <Button size="sm" onClick={() => approveMutation.mutate({ submissionId: sub.id, coinsToAward: 500 })} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold">
-                            Aprovar (+500 Coins)
+                          <Button size="sm" onClick={() => approveMutation.mutate({ submissionId: sub.id, coinsToAward: rewardCoins })} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold">
+                            Aprovar (+{rewardCoins} Coins)
                           </Button>
                           <Button size="sm" variant="destructive" onClick={() => { const reason = prompt("Motivo da rejeição:") || "Foto ilegível"; rejectMutation.mutate({ submissionId: sub.id, adminNotes: reason }); }} className="text-xs font-bold">
                             Rejeitar
@@ -325,7 +328,8 @@ function PlatinadorAdminTab() {
                       )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -928,6 +932,9 @@ export default function AdminDashboard() {
       deliveryDetails: deliveryInstructions.trim()
     });
   };
+
+  const adminUpdateRoleMutation = trpc.auth.adminUpdateRole.useMutation();
+  const adminCreditCoinsMutation = trpc.auth.adminCreditCoins.useMutation();
 
   // Jogos
   const adminDigitalProductsQuery = trpc.digitalProducts.adminList.useQuery(undefined, { enabled: !!(isAuthenticated && isAdmin) });
@@ -1804,13 +1811,16 @@ export default function AdminDashboard() {
     }
     const newRole = currentRole === "admin" ? "user" : "admin";
     try {
+      // Postgres é quem autoriza de verdade as mutations administrativas do tRPC —
+      // sem essa chamada, o usuário "vira admin" só na UI e todo botão do painel falha para ele.
+      await adminUpdateRoleMutation.mutateAsync({ openId: userId, role: newRole });
       await updateDoc(doc(db, "users", userId), {
         role: newRole
       });
       toast.success("Permissão atualizada com sucesso!");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao atualizar papel:", error);
-      toast.error("Erro ao atualizar permissão.");
+      toast.error(error?.message || "Erro ao atualizar permissão.");
     }
   };
 
@@ -1828,6 +1838,9 @@ export default function AdminDashboard() {
       
       if (existingUser) {
         // Usuário já existe, apenas promove ele para o novo cargo
+        if (newUserRole === "admin" || newUserRole === "user") {
+          await adminUpdateRoleMutation.mutateAsync({ openId: existingUser.id, role: newUserRole });
+        }
         await updateDoc(doc(db, "users", existingUser.id), {
           role: newUserRole
         });
@@ -1912,19 +1925,19 @@ export default function AdminDashboard() {
               confirmedAt: new Date().toISOString()
             });
 
-            // 2. Incrementar moedas do indicador
+            // 2. Incrementar moedas do indicador (Postgres é o saldo real usado no checkout)
+            await adminCreditCoinsMutation.mutateAsync({ openId: referral.referrerId, amount: rewardAmount });
+
+            // 3. Refletir no Firestore para a UI atualizar na hora
             const referrerRef = doc(db, "users", referral.referrerId);
             const referrerSnap = await getDoc(referrerRef);
-            
             if (referrerSnap.exists()) {
               const currentCoins = referrerSnap.data()?.forteCoins ?? 0;
               await updateDoc(referrerRef, {
                 forteCoins: currentCoins + rewardAmount
               });
-              toast.success(`Sucesso! Compra de jogo confirmada e ${rewardAmount} Fortecoins adicionados ao saldo do padrinho.`);
-            } else {
-              toast.error(`A indicação foi marcada como paga, mas o padrinho correspondente (${referral.referrerId}) não foi localizado no servidor.`);
             }
+            toast.success(`Sucesso! Compra de jogo confirmada e ${rewardAmount} Fortecoins adicionados ao saldo do padrinho.`);
           } catch (error) {
             console.error("Erro ao confirmar compra da indicação:", error);
             toast.error("Erro ao processar confirmação. Tente novamente.");
@@ -1993,7 +2006,9 @@ export default function AdminDashboard() {
         refusedAt: new Date().toISOString()
       });
 
-      // 3. Devolver as moedas para o usuário
+      // 3. Devolver as moedas para o usuário (Postgres é o saldo real usado no checkout)
+      await adminCreditCoinsMutation.mutateAsync({ openId: refusalUserId, amount: refusalCost });
+
       const userRef = doc(db, "users", refusalUserId);
       const userSnap = await getDoc(userRef);
       if (userSnap.exists()) {

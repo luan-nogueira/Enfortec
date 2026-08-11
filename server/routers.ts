@@ -85,6 +85,57 @@ export const appRouter = router({
 
         return { success: true };
       }),
+    adminUpdateRole: protectedProcedure
+      .input(z.object({
+        openId: z.string(),
+        role: z.enum(["user", "admin", "vendedor"]),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem alterar permissões." });
+
+        const database = await getDb();
+        if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indisponível." });
+
+        const targetUser = await db.getUserByOpenId(input.openId);
+        if (!targetUser) throw new TRPCError({ code: "NOT_FOUND", message: "Usuário não encontrado no banco de dados." });
+
+        await database.update(users).set({ role: input.role }).where(eq(users.id, targetUser.id));
+        return { success: true };
+      }),
+    adminCreditCoins: protectedProcedure
+      .input(z.object({
+        openId: z.string(),
+        amount: z.number(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem creditar ForteCoins." });
+
+        const database = await getDb();
+        if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indisponível." });
+
+        const targetUser = await db.getUserByOpenId(input.openId);
+        if (!targetUser) throw new TRPCError({ code: "NOT_FOUND", message: "Usuário não encontrado no banco de dados." });
+
+        const newBalance = Math.max(0, (targetUser.forteCoins || 0) + input.amount);
+        await database.update(users).set({ forteCoins: newBalance }).where(eq(users.id, targetUser.id));
+        return { success: true, newBalance };
+      }),
+    redeemCoins: protectedProcedure
+      .input(z.object({
+        amount: z.number().positive(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const database = await getDb();
+        if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indisponível." });
+
+        if ((ctx.user.forteCoins || 0) < input.amount) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Saldo de ForteCoins insuficiente." });
+        }
+
+        const newBalance = ctx.user.forteCoins - input.amount;
+        await database.update(users).set({ forteCoins: newBalance }).where(eq(users.id, ctx.user.id));
+        return { success: true, newBalance };
+      }),
   }),
 
   // Products Router - for store's own physical products
@@ -184,12 +235,26 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
-        
+
         const seller = await db.getSellerByUserId(ctx.user.id);
-        if (!seller) throw new Error("User is not a seller");
-        
+        if (!seller) throw new TRPCError({ code: "FORBIDDEN", message: "User is not a seller" });
+
+        const productResult = await database.select().from(usedProducts).where(eq(usedProducts.id, input.id)).limit(1);
+        const product = productResult[0];
+        if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Anúncio não encontrado" });
+        if (product.sellerId !== seller.id) throw new TRPCError({ code: "FORBIDDEN", message: "Este anúncio não pertence a você" });
+
+        const BOOST_COST = 10;
+        if ((ctx.user.forteCoins || 0) < BOOST_COST) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "ForteCoins insuficientes (necessário 10 FC)" });
+        }
+
         const boostedUntilDate = new Date();
         boostedUntilDate.setDate(boostedUntilDate.getDate() + 3);
+
+        await database.update(users)
+          .set({ forteCoins: ctx.user.forteCoins - BOOST_COST })
+          .where(eq(users.id, ctx.user.id));
 
         const result = await database.update(usedProducts)
           .set({ boostedUntil: boostedUntilDate })

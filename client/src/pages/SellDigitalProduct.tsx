@@ -41,18 +41,25 @@ export default function SellDigitalProduct() {
       return;
     }
 
-    if (formData.hasPrimary && (!formData.price || parseFloat(formData.price) <= 0)) {
-      toast.error("Insira o valor da Conta Primária");
-      return;
-    }
+    const isLicenseType = formData.type === "jogo" || formData.type === "assinatura";
 
-    if (formData.hasSecondary && (!formData.priceSecondary || parseFloat(formData.priceSecondary) <= 0)) {
-      toast.error("Insira o valor da Conta Secundária");
-      return;
-    }
+    if (isLicenseType) {
+      if (formData.hasPrimary && (!formData.price || parseFloat(formData.price) <= 0)) {
+        toast.error("Insira o valor da Conta Primária");
+        return;
+      }
 
-    if (!formData.hasPrimary && !formData.hasSecondary) {
-      toast.error("Selecione pelo menos um tipo de conta (Primária ou Secundária)");
+      if (formData.hasSecondary && (!formData.priceSecondary || parseFloat(formData.priceSecondary) <= 0)) {
+        toast.error("Insira o valor da Conta Secundária");
+        return;
+      }
+
+      if (!formData.hasPrimary && !formData.hasSecondary) {
+        toast.error("Selecione pelo menos um tipo de conta (Primária ou Secundária)");
+        return;
+      }
+    } else if (!formData.price || parseFloat(formData.price) <= 0) {
+      toast.error("Insira o preço do produto");
       return;
     }
 
@@ -61,9 +68,11 @@ export default function SellDigitalProduct() {
       await createProductMutation.mutateAsync({
         name: formData.name.trim(),
         description: formData.description.trim(),
-        price: formData.hasPrimary ? parseFloat(formData.price) : parseFloat(formData.priceSecondary),
-        pricePrimary: formData.hasPrimary ? parseFloat(formData.price) : undefined,
-        priceSecondary: formData.hasSecondary ? parseFloat(formData.priceSecondary) : undefined,
+        price: isLicenseType
+          ? (formData.hasPrimary ? parseFloat(formData.price) : parseFloat(formData.priceSecondary))
+          : parseFloat(formData.price),
+        pricePrimary: isLicenseType && formData.hasPrimary ? parseFloat(formData.price) : undefined,
+        priceSecondary: isLicenseType && formData.hasSecondary ? parseFloat(formData.priceSecondary) : undefined,
         type: formData.type,
         platform: formData.type === "jogo" ? formData.platform : undefined,
         keyOrCode: formData.keyOrCode.trim() || undefined,
@@ -246,10 +255,31 @@ export default function SellDigitalProduct() {
                 </div>
               )}
 
+              {/* Preço único (Gift Card, Licença, Outro) */}
+              {formData.type !== "jogo" && formData.type !== "assinatura" && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                    Preço (R$) *
+                  </label>
+                  <Input
+                    type="number"
+                    name="price"
+                    placeholder="0.00"
+                    step="0.01"
+                    min="0"
+                    value={formData.price}
+                    onChange={handleInputChange}
+                    disabled={isLoading}
+                    className="bg-slate-950 border-slate-800 text-white rounded-xl"
+                    required
+                  />
+                </div>
+              )}
+
               {/* Download URL (for games) */}
               {(formData.type as string) === "jogo" && (
                 <div>
-                  <label className="block text-sm font-semibold text-slate-900 mb-2">
+                  <label className="block text-sm font-semibold text-slate-300 mb-2">
                     URL de Download *
                   </label>
                   <Input
@@ -270,7 +300,7 @@ export default function SellDigitalProduct() {
               {/* Key/Code (for gift cards and licenses) */}
               {((formData.type as string) === "gift_card" || (formData.type as string) === "licenca") && (
                 <div>
-                  <label className="block text-sm font-semibold text-slate-900 mb-2">
+                  <label className="block text-sm font-semibold text-slate-300 mb-2">
                     Código/Chave *
                   </label>
                   <Input

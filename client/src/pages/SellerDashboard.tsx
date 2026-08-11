@@ -266,27 +266,9 @@ export default function SellerDashboard() {
         onClick: async () => {
           try {
             setLoading(true);
-            const userRef = doc(db, "users", user.id);
-            const userSnap = await getDoc(userRef);
-            const currentCoins = userSnap.data()?.forteCoins ?? 0;
-
-            if (currentCoins < 10) {
-              toast.error("Você não tem ForteCoins suficientes (necessário 10 FC).");
-              return;
-            }
-
-            // Deduz as moedas
-            await updateDoc(userRef, {
-              forteCoins: currentCoins - 10
-            });
-
-            // Adiciona 3 dias
-            const boostedUntilDate = new Date();
-            boostedUntilDate.setDate(boostedUntilDate.getDate() + 3);
-
-            // Atualiza via tRPC no Postgres
+            // O saldo e a titularidade do anúncio são validados e debitados no servidor (Postgres),
+            // que é a fonte de verdade real usada no checkout — não faz sentido debitar no Firestore aqui.
             await boostProductMutation.mutateAsync({ id: Number(product.id) });
-
             toast.success("Anúncio turbinado com sucesso! ⭐");
           } catch (error: any) {
             console.error("Erro ao turbinar:", error);

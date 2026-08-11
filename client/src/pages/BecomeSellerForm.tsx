@@ -76,8 +76,8 @@ export default function BecomeSellerForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!storeName.trim()) {
-      toast.error("Nome da loja é obrigatório");
+    if (storeName.trim().length < 3) {
+      toast.error("Nome da loja deve ter pelo menos 3 caracteres");
       return;
     }
 
@@ -91,12 +91,18 @@ export default function BecomeSellerForm() {
       localStorage.setItem(targetKey, JSON.stringify({ storeName: storeName.trim() }));
       toast.success("Loja de revendedor criada com sucesso!");
       navigate("/vendedor");
-    } catch (error) {
-      console.warn("[BecomeSellerForm] Failed to register seller in MySQL, falling back to local registration:", error);
-      const targetKey = user?.id ? `is_seller_${user.id}` : `is_seller_generic`;
-      localStorage.setItem(targetKey, JSON.stringify({ storeName: storeName.trim() }));
-      toast.success("Loja de revendedor criada com sucesso!");
-      navigate("/vendedor");
+    } catch (error: any) {
+      // Só faz fallback local se for falha de rede (servidor inacessível) — erros de
+      // validação/servidor devem ser mostrados ao usuário, não escondidos como sucesso.
+      if (error instanceof TypeError && error.message.includes("fetch")) {
+        console.warn("[BecomeSellerForm] Network error, falling back to local registration:", error);
+        const targetKey = user?.id ? `is_seller_${user.id}` : `is_seller_generic`;
+        localStorage.setItem(targetKey, JSON.stringify({ storeName: storeName.trim() }));
+        toast.success("Loja de revendedor criada com sucesso!");
+        navigate("/vendedor");
+      } else {
+        toast.error(error?.message || "Erro ao criar loja de revendedor. Tente novamente.");
+      }
     } finally {
       setIsLoading(false);
     }

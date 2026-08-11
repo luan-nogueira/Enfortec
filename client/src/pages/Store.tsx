@@ -42,7 +42,6 @@ export default function Store() {
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
-  const [chosenVersion, setChosenVersion] = useState<"PS4" | "PS5" | null>(null);
   const [showGuide, setShowGuide] = useState(true);
   const [showTermsDialog, setShowTermsDialog] = useState(false);
   const [termsScrolled, setTermsScrolled] = useState(false);
@@ -96,21 +95,17 @@ export default function Store() {
   }, [selectedProduct, user]);
 
   const [selectedBargainProduct, setSelectedBargainProduct] = useState<any | null>(null);
-  const [chosenBargainVersion, setChosenBargainVersion] = useState<"PS4" | "PS5" | null>(null);
   const [bargainOffer, setBargainOffer] = useState("");
 
   const handleBargainClick = (product: any) => {
     setSelectedBargainProduct(product);
     setBargainOffer("");
-    if (product.pricePS4 && !product.pricePS5) setChosenBargainVersion("PS4");
-    else if (!product.pricePS4 && product.pricePS5) setChosenBargainVersion("PS5");
-    else setChosenBargainVersion(null);
   };
 
   const handleFinalizeBargain = () => {
-    if (!selectedBargainProduct || !chosenBargainVersion || !bargainOffer.trim()) return;
-    const originalPrice = chosenBargainVersion === "PS4" ? selectedBargainProduct.pricePS4 : selectedBargainProduct.pricePS5;
-    const message = `Olá! Tenho interesse no produto: ${selectedBargainProduct.name} (${chosenBargainVersion}) (Preço original: R$ ${originalPrice.toFixed(2)}). Gostaria de pechinchar: você fecharia por R$ ${parseFloat(bargainOffer).toFixed(2)}?`;
+    if (!selectedBargainProduct || !bargainOffer.trim()) return;
+    const originalPrice = Number(selectedBargainProduct.price || 0);
+    const message = `Olá! Tenho interesse no produto: ${selectedBargainProduct.name} (Preço original: R$ ${originalPrice.toFixed(2)}). Gostaria de pechinchar: você fecharia por R$ ${parseFloat(bargainOffer).toFixed(2)}?`;
     const phone = "5543984253691";
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
     setSelectedBargainProduct(null);
@@ -134,17 +129,13 @@ export default function Store() {
   const handleBuyClick = (product: any) => {
     setSelectedProduct(product);
     setCheckoutError(null);
-    // Se só tiver um preço, já seleciona a versão automaticamente
-    if (product.pricePS4 && !product.pricePS5) setChosenVersion("PS4");
-    else if (!product.pricePS4 && product.pricePS5) setChosenVersion("PS5");
-    else setChosenVersion(null);
   };
 
   const handleFinalizePurchase = async () => {
-    if (!selectedProduct || !chosenVersion) return;
-    
-    const price = chosenVersion === "PS4" ? selectedProduct.pricePS4 : selectedProduct.pricePS5;
-    
+    if (!selectedProduct) return;
+
+    const price = Number(selectedProduct.price || 0);
+
     if (!customerName.trim() || !customerEmail.trim() || !customerPhone.trim()) {
       setCheckoutError("Por favor, preencha todos os dados de contato (Nome, E-mail e WhatsApp).");
       return;
@@ -191,7 +182,7 @@ export default function Store() {
           ...(token ? { Authorization: `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
-          name: `${selectedProduct.name} (${chosenVersion})`,
+          name: selectedProduct.name,
           price: price,
           redirectUrl: `${window.location.origin}/minhas-compras`,
           productType: "store",
@@ -261,7 +252,7 @@ export default function Store() {
 
       // Só vai para WhatsApp se for erro de rede (servidor offline)
       if (error instanceof TypeError && error.message.includes("fetch")) {
-        const message = `Olá! Quero comprar o produto: ${selectedProduct.name} (${chosenVersion}) no valor de R$ ${price.toFixed(2)}`;
+        const message = `Olá! Quero comprar o produto: ${selectedProduct.name} no valor de R$ ${price.toFixed(2)}`;
         const phone = "5543984253691";
         window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
         setSelectedProduct(null);
@@ -273,9 +264,7 @@ export default function Store() {
     }
   };
 
-  const price = chosenVersion 
-    ? (chosenVersion === "PS4" ? selectedProduct?.pricePS4 : selectedProduct?.pricePS5) || 0
-    : 0;
+  const price = Number(selectedProduct?.price || 0);
   const couponDiscount = appliedCoupon ? price * (discountPercentage / 100) : 0;
   const priceAfterCoupon = Math.max(0, price - couponDiscount);
   const coinsToUseVal = useCoins ? Math.min(user?.forteCoins || 0, Math.ceil(priceAfterCoupon * 10)) : 0;
@@ -454,24 +443,10 @@ export default function Store() {
                   <div className="flex flex-col gap-3 sm:gap-4 mt-auto">
                     <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5">
                       <div className="space-y-1.5 sm:space-y-3">
-                        {product.pricePS4 && (
-                          <div className="flex items-center gap-2 sm:gap-3">
-                            <div className="bg-[#003791] px-1.5 py-0.5 sm:px-2 sm:py-1 rounded flex items-center justify-center w-10 sm:w-14 shadow-lg border border-white/10">
-                              <span className="text-white text-[8px] sm:text-[10px] font-black italic tracking-tighter">PS4</span>
-                            </div>
-                            <span className="text-sm sm:text-xl font-black text-red-600 tracking-tighter whitespace-nowrap">R$ {product.pricePS4.toFixed(2).replace('.', ',')}</span>
-                          </div>
-                        )}
-                        {product.pricePS5 && (
-                          <div className="flex items-center gap-2 sm:gap-3">
-                            <div className="bg-white px-1.5 py-0.5 sm:px-2 sm:py-1 rounded flex items-center justify-center w-10 sm:w-14 shadow-lg border border-black/10">
-                              <span className="text-black text-[8px] sm:text-[10px] font-black italic tracking-tighter">PS5</span>
-                            </div>
-                            <span className="text-sm sm:text-xl font-black text-red-600 tracking-tighter whitespace-nowrap">R$ {product.pricePS5.toFixed(2).replace('.', ',')}</span>
-                          </div>
-                        )}
-                        {!product.pricePS4 && !product.pricePS5 && (
-                           <span className="text-xs sm:text-lg font-black text-slate-500 italic">Sob Consulta</span>
+                        {Number(product.price) > 0 ? (
+                          <span className="text-sm sm:text-xl font-black text-red-600 tracking-tighter whitespace-nowrap">R$ {Number(product.price).toFixed(2).replace('.', ',')}</span>
+                        ) : (
+                          <span className="text-xs sm:text-lg font-black text-slate-500 italic">Sob Consulta</span>
                         )}
                       </div>
 
@@ -517,72 +492,32 @@ export default function Store() {
         )}
       </div>
 
-      {/* Modal de Seleção de Versão */}
+      {/* Modal de Confirmação de Compra */}
       <Dialog open={!!selectedProduct} onOpenChange={(open) => !open && setSelectedProduct(null)}>
         <DialogContent className="bg-slate-900 border-red-600/30 text-white sm:max-w-[425px] card-neon max-h-[85dvh] overflow-y-auto scrollbar-thin scrollbar-thumb-red-600/50">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-bold text-neon">Escolha a Versão</DialogTitle>
+            <DialogTitle className="text-2xl font-bold text-neon">Confirmar Compra</DialogTitle>
             <DialogDescription className="text-slate-400">
-              Selecione qual versão do jogo você deseja adquirir.
+              Preencha seus dados para finalizar o pedido.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="py-6 space-y-4">
             <div className="flex gap-4 items-start mb-6">
               <div className="w-20 h-20 rounded bg-slate-800 overflow-hidden border border-red-600/20 flex items-center justify-center">
-                <img 
-                  src={selectedProduct?.imageUrl} 
-                  alt={selectedProduct?.name} 
-                  className={`w-full h-full ${selectedProduct?.coverFit === 'contain' ? 'object-contain p-1' : 'object-cover'}`} 
+                <img
+                  src={selectedProduct?.imageUrl}
+                  alt={selectedProduct?.name}
+                  className={`w-full h-full ${selectedProduct?.coverFit === 'contain' ? 'object-contain p-1' : 'object-cover'}`}
                 />
               </div>
               <div>
                 <h4 className="font-bold text-white line-clamp-2">{selectedProduct?.name}</h4>
-                <p className="text-xs text-slate-500">ID: {selectedProduct?.id.substring(0, 8)}</p>
+                <p className="text-red-500 font-bold">R$ {Number(selectedProduct?.price || 0).toFixed(2)}</p>
               </div>
             </div>
 
-            <div className="space-y-3">
-              {selectedProduct?.pricePS4 && (
-                <button
-                  onClick={() => setChosenVersion("PS4")}
-                  className={`w-full p-4 rounded-xl border transition-all flex justify-between items-center ${
-                    chosenVersion === "PS4" 
-                    ? "border-red-500 bg-red-500/10" 
-                    : "border-slate-700 bg-slate-800 hover:border-red-500/50"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${chosenVersion === "PS4" ? "border-red-500 bg-red-500" : "border-slate-500"}`}>
-                      {chosenVersion === "PS4" && <Check className="w-3 h-3 text-white" />}
-                    </div>
-                    <span className="font-bold">Versão PS4</span>
-                  </div>
-                  <span className="text-red-500 font-bold">R$ {selectedProduct.pricePS4.toFixed(2)}</span>
-                </button>
-              )}
-
-              {selectedProduct?.pricePS5 && (
-                <button
-                  onClick={() => setChosenVersion("PS5")}
-                  className={`w-full p-4 rounded-xl border transition-all flex justify-between items-center ${
-                    chosenVersion === "PS5" 
-                    ? "border-red-500 bg-red-500/10" 
-                    : "border-slate-700 bg-slate-800 hover:border-red-500/50"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${chosenVersion === "PS5" ? "border-red-500 bg-red-500" : "border-slate-500"}`}>
-                      {chosenVersion === "PS5" && <Check className="w-3 h-3 text-white" />}
-                    </div>
-                    <span className="font-bold">Versão PS5</span>
-                  </div>
-                  <span className="text-red-500 font-bold">R$ {selectedProduct.pricePS5.toFixed(2)}</span>
-                </button>
-              )}
-            </div>
-
-            {chosenVersion && (
+            {selectedProduct && (
               <div className="space-y-4 pt-4 border-t border-slate-800 animate-in fade-in slide-in-from-top-2 duration-300">
                 <h4 className="font-bold text-sm text-slate-300 flex items-center gap-2">
                   <span>📋 Dados para Entrega (WhatsApp/Contato)</span>
@@ -752,7 +687,7 @@ export default function Store() {
               </div>
             )}
             <Button 
-              disabled={!chosenVersion || isProcessingCheckout || !acceptedTerms}
+              disabled={isProcessingCheckout || !acceptedTerms}
               onClick={handleFinalizePurchase}
               className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-12 text-lg btn-neon disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -779,40 +714,8 @@ export default function Store() {
               </div>
               <div>
                 <h4 className="font-bold text-white line-clamp-2">{selectedBargainProduct?.name}</h4>
-                <p className="text-xs text-slate-500">Qual versão você quer propor?</p>
+                <p className="text-slate-400 font-bold">Preço atual: R$ {Number(selectedBargainProduct?.price || 0).toFixed(2)}</p>
               </div>
-            </div>
-
-            <div className="space-y-3">
-              {selectedBargainProduct?.pricePS4 && (
-                <button
-                  type="button"
-                  onClick={() => setChosenBargainVersion("PS4")}
-                  className={`w-full p-3.5 rounded-xl border transition-all flex justify-between items-center ${
-                    chosenBargainVersion === "PS4" 
-                    ? "border-red-500 bg-red-500/10" 
-                    : "border-slate-700 bg-slate-800 hover:border-red-500/50"
-                  }`}
-                >
-                  <span className="font-bold">Versão PS4</span>
-                  <span className="text-slate-400 font-bold">R$ {selectedBargainProduct.pricePS4.toFixed(2)}</span>
-                </button>
-              )}
-
-              {selectedBargainProduct?.pricePS5 && (
-                <button
-                  type="button"
-                  onClick={() => setChosenBargainVersion("PS5")}
-                  className={`w-full p-3.5 rounded-xl border transition-all flex justify-between items-center ${
-                    chosenBargainVersion === "PS5" 
-                    ? "border-red-500 bg-red-500/10" 
-                    : "border-slate-700 bg-slate-800 hover:border-red-500/50"
-                  }`}
-                >
-                  <span className="font-bold">Versão PS5</span>
-                  <span className="text-slate-400 font-bold">R$ {selectedBargainProduct.pricePS5.toFixed(2)}</span>
-                </button>
-              )}
             </div>
 
             <div className="space-y-2 pt-2">
@@ -830,7 +733,7 @@ export default function Store() {
 
           <DialogFooter className="pb-4 sm:pb-0">
             <Button 
-              disabled={!chosenBargainVersion || !bargainOffer.trim()}
+              disabled={!bargainOffer.trim()}
               onClick={handleFinalizeBargain}
               className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-12 text-lg rounded-xl shadow-lg shadow-green-600/20"
             >
