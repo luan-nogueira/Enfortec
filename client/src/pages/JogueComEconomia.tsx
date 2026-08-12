@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { collection, onSnapshot, query, limit } from "firebase/firestore";
 
 export default function JogueComEconomia() {
@@ -103,9 +103,13 @@ export default function JogueComEconomia() {
 
       const accountLabel = selectedAccountType === "primaria" ? "Conta Primária" : "Conta Secundária";
 
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
       const res = await fetch("/api/infinitepay/checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           name: `${selectedProduct.name} - ${accountLabel}`,
           price: finalPrice,
