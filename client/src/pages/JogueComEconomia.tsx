@@ -111,12 +111,15 @@ export default function JogueComEconomia() {
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
+      } else if (data.paidWithCoins) {
+        toast.success("Compra realizada com sucesso utilizando suas ForteCoins!");
+        navigate("/minhas-compras");
       } else {
-        toast.error("Erro ao gerar link de pagamento.");
+        toast.error(data.error || "Erro ao gerar link de pagamento.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Erro checkout:", err);
-      toast.error("Ocorreu um erro no checkout.");
+      toast.error(err?.message || "Ocorreu um erro no checkout.");
     } finally {
       setIsProcessingCheckout(false);
     }
