@@ -176,6 +176,26 @@ export default function FloatingChat() {
   const welcomeStarted = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [catalog, setCatalog] = useState<{name: string; price: number}[]>([]);
+  const [mobileViewport, setMobileViewport] = useState<{ height: number; offsetTop: number } | null>(null);
+
+  // No mobile, elementos fixos acompanham o layout viewport (tela toda) e não o
+  // visual viewport (área acima do teclado), deixando um vão entre o input e o teclado.
+  // Aqui sincronizamos a altura/posição do painel com o visualViewport em tempo real.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!isOpen || !vv || window.innerWidth >= 640) {
+      setMobileViewport(null);
+      return;
+    }
+    const update = () => setMobileViewport({ height: vv.height, offsetTop: vv.offsetTop });
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     const fetchCatalog = async () => {
@@ -324,7 +344,9 @@ export default function FloatingChat() {
         )}
 
         {isOpen && (
-          <Card className="w-full h-full sm:w-[600px] sm:max-w-none sm:h-[650px] flex flex-col bg-slate-900 border-red-600/40 shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden sm:rounded-2xl animate-in zoom-in-95 duration-200 rounded-none border-0 sm:border">
+          <Card
+            style={mobileViewport ? { height: `${mobileViewport.height}px`, marginTop: `${mobileViewport.offsetTop}px` } : undefined}
+            className="w-full h-full sm:w-[600px] sm:max-w-none sm:h-[650px] flex flex-col bg-slate-900 border-red-600/40 shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden sm:rounded-2xl animate-in zoom-in-95 duration-200 rounded-none border-0 sm:border">
             {/* Header */}
             <div className="p-3.5 bg-gradient-to-r from-red-700 via-red-600 to-red-700 flex justify-between items-center shrink-0 border-b border-red-500/30 shadow-md">
               <div className="flex items-center gap-2.5">

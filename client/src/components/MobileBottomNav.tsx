@@ -167,7 +167,10 @@ export default function MobileBottomNav() {
   return (
     <>
       {/* Bottom Bar fixed on Mobile */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-[9999] bg-[#080808]/95 backdrop-blur-xl border-t border-[#dc143c]/30 px-2 py-1.5 shadow-[0_-5px_20px_rgba(0,0,0,0.8)] pb-[calc(6px+env(safe-area-inset-bottom,0px))]">
+      <nav
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-[9999] bg-[#080808]/95 backdrop-blur-xl border-t border-[#dc143c]/30 px-2 py-1.5 shadow-[0_-5px_20px_rgba(0,0,0,0.8)] pb-[calc(6px+env(safe-area-inset-bottom,0px))]"
+        style={{ transform: "translateZ(0)", WebkitTransform: "translateZ(0)", backfaceVisibility: "hidden" }}
+      >
         <div className="grid grid-cols-5 items-center justify-between max-w-md mx-auto">
           {navItems.map((item) => {
             const Icon = item.icon;

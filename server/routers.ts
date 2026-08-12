@@ -1035,6 +1035,97 @@ export const appRouter = router({
 
         return { success: true, message: "Submissão rejeitada." };
       }),
+
+    adminUpdateSubmission: protectedProcedure
+      .input(
+        z.object({
+          submissionId: z.number(),
+          psnId: z.string().min(2).optional(),
+          coinsAwarded: z.number().min(0).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin")
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores" });
+
+        const database = await getDb();
+        if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indisponível" });
+
+        const subs = await database
+          .select()
+          .from(platinumSubmissions)
+          .where(eq(platinumSubmissions.id, input.submissionId))
+          .limit(1);
+
+        if (subs.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Submissão não encontrada" });
+        const sub = subs[0];
+
+        const updateData: Partial<typeof platinumSubmissions.$inferInsert> = {};
+        if (input.psnId !== undefined) updateData.psnId = input.psnId.trim();
+
+        // Se a recompensa de uma submissão já aprovada mudar, ajusta o saldo do
+        // jogador pela diferença — senão o rank fica fora de sincronia com o
+        // saldo real de ForteCoins.
+        if (input.coinsAwarded !== undefined && input.coinsAwarded !== sub.coinsAwarded) {
+          updateData.coinsAwarded = input.coinsAwarded;
+          if (sub.status === "aprovado") {
+            const delta = input.coinsAwarded - (sub.coinsAwarded || 0);
+            const targetUsers = await database.select().from(users).where(eq(users.id, sub.userId)).limit(1);
+            if (targetUsers.length > 0) {
+              const currentCoins = targetUsers[0].forteCoins || 0;
+              await database
+                .update(users)
+                .set({ forteCoins: Math.max(0, currentCoins + delta) })
+                .where(eq(users.id, sub.userId));
+            }
+          }
+        }
+
+        if (Object.keys(updateData).length > 0) {
+          await database
+            .update(platinumSubmissions)
+            .set(updateData)
+            .where(eq(platinumSubmissions.id, input.submissionId));
+        }
+
+        return { success: true };
+      }),
+
+    adminDeleteSubmission: protectedProcedure
+      .input(z.object({ submissionId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin")
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores" });
+
+        const database = await getDb();
+        if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indisponível" });
+
+        const subs = await database
+          .select()
+          .from(platinumSubmissions)
+          .where(eq(platinumSubmissions.id, input.submissionId))
+          .limit(1);
+
+        if (subs.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Submissão não encontrada" });
+        const sub = subs[0];
+
+        // Remover uma platina já aprovada do ranking exige estornar os ForteCoins
+        // creditados na aprovação, senão o jogador fica com saldo indevido.
+        if (sub.status === "aprovado" && sub.coinsAwarded) {
+          const targetUsers = await database.select().from(users).where(eq(users.id, sub.userId)).limit(1);
+          if (targetUsers.length > 0) {
+            const currentCoins = targetUsers[0].forteCoins || 0;
+            await database
+              .update(users)
+              .set({ forteCoins: Math.max(0, currentCoins - sub.coinsAwarded) })
+              .where(eq(users.id, sub.userId));
+          }
+        }
+
+        await database.delete(platinumSubmissions).where(eq(platinumSubmissions.id, input.submissionId));
+
+        return { success: true, message: "Submissão removida do ranking." };
+      }),
   }),
 });
 

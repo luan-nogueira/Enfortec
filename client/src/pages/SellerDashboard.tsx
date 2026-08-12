@@ -299,23 +299,23 @@ export default function SellerDashboard() {
     <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900">
       {/* Header */}
       <div className="bg-slate-950/80 backdrop-blur-md border-b border-red-600/20 sticky top-0 z-40">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center gap-4">
-            <Flame className="w-8 h-8 text-red-500" />
+        <div className="container mx-auto px-4 py-3 sm:py-6">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <Flame className="w-6 h-6 sm:w-8 sm:h-8 text-red-500 shrink-0" />
             <div>
-              <h1 className="text-3xl font-bold text-neon">Portal de Desapego</h1>
-              <p className="text-slate-400 text-sm">Venda seus itens usados para a comunidade</p>
+              <h1 className="text-lg sm:text-3xl font-bold text-neon">Portal de Desapego</h1>
+              <p className="text-slate-400 text-xs sm:text-sm">Venda seus itens usados para a comunidade</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-4 sm:py-8">
         {/* KPI Cards (Saldo Escrow vs Liberado & Reputação) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
           {/* Card 1: Saldo Liberado */}
-          <Card className="p-6 card-neon border-emerald-500/30 flex flex-col justify-between">
+          <Card className="p-4 sm:p-6 card-neon border-emerald-500/30 flex flex-col justify-between">
             <div>
               <div className="flex justify-between items-center mb-2">
                 <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">💰 Saldo Liberado (Saque PIX)</p>
@@ -341,7 +341,7 @@ export default function SellerDashboard() {
           </Card>
 
           {/* Card 2: Saldo Retido em Escrow */}
-          <Card className="p-6 card-neon border-amber-500/30 flex flex-col justify-between">
+          <Card className="p-4 sm:p-6 card-neon border-amber-500/30 flex flex-col justify-between">
             <div>
               <div className="flex justify-between items-center mb-2">
                 <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">🔒 Saldo Retido (Escrow)</p>
@@ -360,7 +360,7 @@ export default function SellerDashboard() {
           </Card>
 
           {/* Card 3: Produtos Ativos */}
-          <Card className="p-6 card-neon flex flex-col justify-between">
+          <Card className="p-4 sm:p-6 card-neon flex flex-col justify-between">
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">📦 Anúncios Ativos</p>
@@ -374,7 +374,7 @@ export default function SellerDashboard() {
           </Card>
 
           {/* Card 4: Reputação da Loja & Selo Verificado */}
-          <Card className="p-6 card-neon border-red-500/30 flex flex-col justify-between">
+          <Card className="p-4 sm:p-6 card-neon border-red-500/30 flex flex-col justify-between">
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">⭐ Status da Loja</p>
@@ -391,11 +391,11 @@ export default function SellerDashboard() {
         </div>
 
         {/* Tabs */}
-        <div className="mb-8">
-          <div className="flex gap-4 border-b border-red-600/20">
+        <div className="mb-6 sm:mb-8">
+          <div className="flex gap-2 sm:gap-4 border-b border-red-600/20 overflow-x-auto scrollbar-none">
             <button
               onClick={() => setActiveTab("vendas")}
-              className={`px-6 py-3 font-bold transition ${
+              className={`px-3 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base font-bold transition whitespace-nowrap shrink-0 ${
                 activeTab === "vendas"
                   ? "text-red-500 border-b-2 border-red-500"
                   : "text-slate-400 hover:text-white"
@@ -405,7 +405,7 @@ export default function SellerDashboard() {
             </button>
             <button
               onClick={() => setActiveTab("produtos")}
-              className={`px-6 py-3 font-bold transition ${
+              className={`px-3 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base font-bold transition whitespace-nowrap shrink-0 ${
                 activeTab === "produtos"
                   ? "text-red-500 border-b-2 border-red-500"
                   : "text-slate-400 hover:text-white"
@@ -415,7 +415,7 @@ export default function SellerDashboard() {
             </button>
             <button
               onClick={() => setActiveTab("mensagens")}
-              className={`px-6 py-3 font-bold transition flex items-center gap-2 ${
+              className={`px-3 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base font-bold transition flex items-center gap-2 whitespace-nowrap shrink-0 ${
                 activeTab === "mensagens"
                   ? "text-red-500 border-b-2 border-red-500"
                   : "text-slate-400 hover:text-white"
@@ -431,7 +431,7 @@ export default function SellerDashboard() {
             </button>
             <button
               onClick={() => setActiveTab("avaliacoes")}
-              className={`px-6 py-3 font-bold transition ${
+              className={`px-3 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base font-bold transition whitespace-nowrap shrink-0 ${
                 activeTab === "avaliacoes"
                   ? "text-red-500 border-b-2 border-red-500"
                   : "text-slate-400 hover:text-white"
@@ -471,16 +471,25 @@ export default function SellerDashboard() {
 
         {activeTab === "produtos" && (
           <div>
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-6">
               <h2 className="text-2xl font-bold text-white">Meus Produtos Anunciados</h2>
-              <Button onClick={() => setShowAddForm(!showAddForm)} className="bg-red-600 hover:bg-red-700 btn-neon">
-                {showAddForm ? "Cancelar" : <><Plus className="w-4 h-4 mr-2" /> Novo Produto</>}
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button onClick={() => navigate("/digital/vender")} className="bg-purple-600 hover:bg-purple-700 btn-neon">
+                  <Plus className="w-4 h-4 mr-2" /> Vender Conta / Mídia Digital
+                </Button>
+                <Button onClick={() => setShowAddForm(!showAddForm)} className="bg-red-600 hover:bg-red-700 btn-neon">
+                  {showAddForm ? "Cancelar" : <><Plus className="w-4 h-4 mr-2" /> Novo Produto Físico</>}
+                </Button>
+              </div>
             </div>
-            
+
             {showAddForm && (
               <Card className="p-6 card-neon mb-8">
-                <h3 className="text-lg font-bold text-white mb-4">Anunciar Produto</h3>
+                <h3 className="text-lg font-bold text-white mb-1">Anunciar Produto Físico</h3>
+                <p className="text-xs text-slate-500 mb-4">
+                  Este formulário é apenas para mídia física, consoles e acessórios. Para vender contas ou mídia digital,
+                  use o botão "Vender Conta / Mídia Digital" acima.
+                </p>
                 <form onSubmit={handleAddProduct} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
                     <Label className="text-slate-300">Nome do Produto</Label>

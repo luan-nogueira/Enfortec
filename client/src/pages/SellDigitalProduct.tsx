@@ -101,17 +101,17 @@ export default function SellDigitalProduct() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white py-12">
+    <div className="min-h-screen bg-slate-950 text-white py-6 sm:py-12">
       <div className="container mx-auto px-4">
         <div className="max-w-2xl mx-auto">
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-black text-white mb-2 uppercase">VENDER MINHA CONTA EFORTEGAMES 🎮</h1>
-            <p className="text-slate-400">Cadastre suas contas Primárias ou Secundárias de jogos digitais e assinaturas</p>
+          <div className="mb-5 sm:mb-8">
+            <h1 className="text-xl sm:text-3xl font-black text-white mb-2 uppercase">VENDER MINHA CONTA EFORTEGAMES 🎮</h1>
+            <p className="text-slate-400 text-sm sm:text-base">Cadastre suas contas Primárias ou Secundárias de jogos digitais e assinaturas</p>
           </div>
 
           {/* Form Card */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-xl p-8">
+          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-xl p-4 sm:p-8">
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Product Type */}
               <div>

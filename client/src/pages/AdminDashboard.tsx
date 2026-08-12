@@ -103,6 +103,80 @@ function PlatinadorAdminTab() {
     },
   });
 
+  const updateSubmissionMutation = trpc.platinador.adminUpdateSubmission.useMutation({
+    onError: (err: any) => toast.error(err.message || "Erro ao atualizar."),
+  });
+
+  const deleteSubmissionMutation = trpc.platinador.adminDeleteSubmission.useMutation({
+    onError: (err: any) => toast.error(err.message || "Erro ao remover."),
+  });
+
+  // Ranking do Clube: agrupa as submissões aprovadas por PSN ID (mesma lógica
+  // da página pública), mas guardando os IDs das submissões pra permitir
+  // editar/remover o jogador diretamente daqui.
+  const platinadorRanking = useMemo(() => {
+    const map = new Map<string, { psnId: string; platinums: number; coins: number; submissionIds: number[] }>();
+    (submissionsQuery.data || []).forEach((sub: any) => {
+      if (sub.status !== "aprovado") return;
+      const cur = map.get(sub.psnId) || { psnId: sub.psnId, platinums: 0, coins: 0, submissionIds: [] as number[] };
+      cur.platinums += 1;
+      cur.coins += sub.coinsAwarded || 0;
+      cur.submissionIds.push(sub.id);
+      map.set(sub.psnId, cur);
+    });
+    return Array.from(map.values()).sort((a, b) => b.platinums - a.platinums || b.coins - a.coins);
+  }, [submissionsQuery.data]);
+
+  const handleEditSubmissionPsnId = (submissionId: number, currentPsnId: string) => {
+    const newPsnId = prompt("Novo PSN ID:", currentPsnId);
+    if (!newPsnId || !newPsnId.trim() || newPsnId.trim() === currentPsnId) return;
+    updateSubmissionMutation.mutate(
+      { submissionId, psnId: newPsnId.trim() },
+      { onSuccess: () => { submissionsQuery.refetch(); toast.success("PSN ID atualizado!"); } }
+    );
+  };
+
+  const handleDeleteSubmission = (sub: any) => {
+    toast(`Remover esta platina de "${sub.psnId}" do ranking?${sub.coinsAwarded ? ` Estorna ${sub.coinsAwarded} ForteCoins do saldo dele.` : ""}`, {
+      action: {
+        label: "Remover",
+        onClick: () => {
+          deleteSubmissionMutation.mutate(
+            { submissionId: sub.id },
+            { onSuccess: () => { submissionsQuery.refetch(); toast.success("Platina removida do ranking."); } }
+          );
+        },
+      },
+    });
+  };
+
+  const handleRenamePlayer = (player: { psnId: string; submissionIds: number[] }) => {
+    const newPsnId = prompt("Novo PSN ID:", player.psnId);
+    if (!newPsnId || !newPsnId.trim() || newPsnId.trim() === player.psnId) return;
+    Promise.all(
+      player.submissionIds.map(id => updateSubmissionMutation.mutateAsync({ submissionId: id, psnId: newPsnId.trim() }))
+    ).then(() => {
+      submissionsQuery.refetch();
+      toast.success("PSN ID atualizado no ranking!");
+    });
+  };
+
+  const handleRemovePlayer = (player: { psnId: string; platinums: number; coins: number; submissionIds: number[] }) => {
+    toast(`Remover "${player.psnId}" do ranking? Isso apaga ${player.platinums} platina(s) aprovada(s) e estorna ${player.coins} ForteCoins do saldo dele.`, {
+      action: {
+        label: "Remover",
+        onClick: () => {
+          Promise.all(
+            player.submissionIds.map(id => deleteSubmissionMutation.mutateAsync({ submissionId: id }))
+          ).then(() => {
+            submissionsQuery.refetch();
+            toast.success(`"${player.psnId}" removido do ranking.`);
+          });
+        },
+      },
+    });
+  };
+
   const handleCreateChallenge = (e: React.FormEvent) => {
     e.preventDefault();
     if (!gameTitle.trim()) return toast.error("Insira o nome do jogo");
@@ -274,6 +348,58 @@ function PlatinadorAdminTab() {
         )}
       </Card>
 
+      {/* Ranking do Clube Platinador */}
+      <Card className="bg-[#121212] border-red-600/30 p-6 shadow-xl">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-bold text-white flex items-center gap-2">
+            <Trophy className="text-amber-400" /> Ranking do Clube Platinador
+          </h3>
+          <span className="text-xs text-slate-400 font-mono">
+            {platinadorRanking.length} jogador{platinadorRanking.length !== 1 ? "es" : ""} no ranking
+          </span>
+        </div>
+
+        {platinadorRanking.length === 0 ? (
+          <p className="text-slate-400 text-sm py-4">Nenhuma platina aprovada ainda — o ranking aparece aqui assim que a primeira comprovação for aprovada.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-slate-300">
+              <thead className="bg-slate-950 text-xs text-slate-400 uppercase">
+                <tr>
+                  <th className="p-3">#</th>
+                  <th className="p-3 text-white">PSN ID</th>
+                  <th className="p-3">Platinas</th>
+                  <th className="p-3">ForteCoins Ganhos</th>
+                  <th className="p-3 text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {platinadorRanking.map((player, idx) => (
+                  <tr key={player.psnId} className="hover:bg-slate-800/40">
+                    <td className="p-3 font-bold text-slate-400">
+                      {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `#${idx + 1}`}
+                    </td>
+                    <td className="p-3 font-bold text-white">{player.psnId}</td>
+                    <td className="p-3">{player.platinums}</td>
+                    <td className="p-3 text-amber-400 font-bold">{player.coins} FC</td>
+                    <td className="p-3 text-right">
+                      <div className="flex gap-2 justify-end">
+                        <Button size="sm" variant="ghost" onClick={() => handleRenamePlayer(player)} className="text-xs text-slate-300 hover:text-white hover:bg-slate-900 h-8 px-2.5">
+                          <Edit className="w-3.5 h-3.5 mr-1 text-blue-400" /> Editar
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => handleRemovePlayer(player)} className="text-xs text-red-400 hover:text-red-300 hover:bg-red-950/30 h-8 px-2.5">
+                          <Trash2 className="w-3.5 h-3.5 mr-1" /> Remover
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
       {/* Comprovações de Platina para Aprovação */}
       <Card className="bg-[#121212] border-red-600/30 p-6 shadow-xl">
         <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
@@ -323,6 +449,16 @@ function PlatinadorAdminTab() {
                           </Button>
                           <Button size="sm" variant="destructive" onClick={() => { const reason = prompt("Motivo da rejeição:") || "Foto ilegível"; rejectMutation.mutate({ submissionId: sub.id, adminNotes: reason }); }} className="text-xs font-bold">
                             Rejeitar
+                          </Button>
+                        </div>
+                      )}
+                      {sub.status === "aprovado" && (
+                        <div className="flex gap-2 justify-end">
+                          <Button size="sm" variant="ghost" title="Editar PSN ID" onClick={() => handleEditSubmissionPsnId(sub.id, sub.psnId)} className="text-xs text-slate-300 hover:text-white hover:bg-slate-900 h-8 px-2">
+                            <Edit className="w-3.5 h-3.5 text-blue-400" />
+                          </Button>
+                          <Button size="sm" variant="ghost" title="Remover esta platina" onClick={() => handleDeleteSubmission(sub)} className="text-xs text-red-400 hover:text-red-300 hover:bg-red-950/30 h-8 px-2">
+                            <Trash2 className="w-3.5 h-3.5" />
                           </Button>
                         </div>
                       )}
@@ -875,6 +1011,9 @@ export default function AdminDashboard() {
 
   const { data: sales, isLoading: loadingSales, refetch: refetchSales } = trpc.orders.listAll.useQuery(undefined, {
     enabled: isAuthenticated && isAdmin,
+    // Pedidos não são real-time (vêm do Postgres via tRPC, diferente do resto que é Firestore
+    // onSnapshot) — sem polling, uma venda nova só apareceria depois de recarregar a página.
+    refetchInterval: 15000,
   });
 
   const deliverOrderMutation = trpc.orders.deliverOrder.useMutation({
@@ -1655,6 +1794,34 @@ export default function AdminDashboard() {
 
   const pendingNotifCount = useMemo(() => {
     return notificationFeed.filter(item => item.status === "pendente").length;
+  }, [notificationFeed]);
+
+  // Pop-up em tempo real: dispara um toast quando surge uma notificação pendente
+  // nova (venda, mensagem de cliente, resgate, indicação) enquanto o gestor está
+  // com o painel aberto. Na primeira carga só registra o que já existe, sem
+  // alertar — senão toda pendência antiga viraria um pop-up ao abrir o painel.
+  const seenNotifIdsRef = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const pendingIds = notificationFeed.filter(n => n.status === "pendente").map(n => n.id as string);
+
+    if (seenNotifIdsRef.current === null) {
+      seenNotifIdsRef.current = new Set(pendingIds);
+      return;
+    }
+
+    const newOnes = notificationFeed.filter(n => n.status === "pendente" && !seenNotifIdsRef.current!.has(n.id));
+    newOnes.forEach(n => {
+      toast(n.title, {
+        description: n.subtitle,
+        duration: 8000,
+        action: {
+          label: "Ver",
+          onClick: () => setActiveTab("notificacoes"),
+        },
+      });
+    });
+
+    seenNotifIdsRef.current = new Set(pendingIds);
   }, [notificationFeed]);
 
   const menuItems = useMemo(() => [
@@ -2568,7 +2735,19 @@ export default function AdminDashboard() {
               </h1>
             </div>
             
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <button
+                onClick={() => setActiveTab("notificacoes")}
+                className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-red-600/40 flex items-center justify-center transition-all shrink-0"
+                title="Central de Notificações"
+              >
+                <Bell className="w-4 h-4 sm:w-5 sm:h-5 text-slate-300" />
+                {pendingNotifCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-black flex items-center justify-center border-2 border-slate-900 animate-pulse">
+                    {pendingNotifCount > 9 ? "9+" : pendingNotifCount}
+                  </span>
+                )}
+              </button>
               <Button onClick={() => setShowCreateModal(true)} className="bg-red-600 hover:bg-red-700 font-bold btn-neon flex items-center gap-1.5 h-9 text-xs sm:h-10 sm:text-sm">
                 <Plus className="w-4 h-4" />
                 Criar Novo Acesso

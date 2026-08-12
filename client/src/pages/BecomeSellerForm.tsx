@@ -128,40 +128,40 @@ export default function BecomeSellerForm() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-slate-200 py-12">
+    <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-slate-200 py-6 sm:py-12">
       <div className="container mx-auto px-4">
         <div className="max-w-2xl mx-auto">
           {/* Header */}
-          <div className="flex items-center gap-4 mb-8">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => navigate("/")} 
-              className="text-slate-400 hover:text-white hover:bg-slate-900/60"
+          <div className="flex items-center gap-3 sm:gap-4 mb-5 sm:mb-8">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/")}
+              className="text-slate-400 hover:text-white hover:bg-slate-900/60 shrink-0"
             >
-              <ArrowLeft className="w-6 h-6" />
+              <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
             </Button>
             <div>
-              <h1 className="text-3xl font-black text-neon flex items-center gap-2">
-                <Flame className="w-8 h-8 text-red-500" />
+              <h1 className="text-lg sm:text-3xl font-black text-neon flex items-center gap-2">
+                <Flame className="w-5 h-5 sm:w-8 sm:h-8 text-red-500 shrink-0" />
                 Parcerias & Revenda
               </h1>
-              <p className="text-slate-400 text-sm">Trabalhe conosco ou revenda seus itens para a nossa loja</p>
+              <p className="text-slate-400 text-xs sm:text-sm">Trabalhe conosco ou revenda seus itens para a nossa loja</p>
             </div>
           </div>
 
-          <div className="bg-slate-900/60 backdrop-blur-md border border-red-600/20 rounded-3xl p-8 shadow-2xl card-neon">
+          <div className="bg-slate-900/60 backdrop-blur-md border border-red-600/20 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-2xl card-neon">
               {isCheckingSeller ? (
                 <div className="text-center py-12">
                   <p className="text-slate-400">Verificando dados da loja...</p>
                 </div>
               ) : activeSeller ? (
-                <div className="text-center py-8 space-y-6">
-                  <div className="w-16 h-16 rounded-full bg-red-600/10 flex items-center justify-center border border-red-600/20 mx-auto">
-                    <Store className="w-8 h-8 text-red-500 animate-pulse" />
+                <div className="text-center py-6 sm:py-8 space-y-4 sm:space-y-6">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-red-600/10 flex items-center justify-center border border-red-600/20 mx-auto">
+                    <Store className="w-7 h-7 sm:w-8 sm:h-8 text-red-500 animate-pulse" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-black text-white uppercase tracking-tight">Seu Perfil de Vendas está Ativo!</h2>
+                    <h2 className="text-lg sm:text-2xl font-black text-white uppercase tracking-tight">Seu Perfil de Vendas está Ativo!</h2>
                     <p className="text-sm text-slate-400 mt-2">
                       Você já está cadastrado para vender contas (<strong>{activeSeller.storeName}</strong>).
                     </p>
@@ -268,8 +268,8 @@ export default function BecomeSellerForm() {
             </div>
 
           {/* Benefits Grid */}
-          <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-slate-900/40 border border-red-600/5 p-6 rounded-2xl card-neon text-center">
+          <div className="mt-8 sm:mt-12 grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+            <div className="bg-slate-900/40 border border-red-600/5 p-5 sm:p-6 rounded-2xl card-neon text-center">
               <div className="text-3xl mb-2">📊</div>
               <h3 className="font-bold text-white mb-1">Painel Completo</h3>
               <p className="text-xs text-slate-500">
