@@ -83,7 +83,10 @@ export default function SellerDashboard() {
 
   useEffect(() => {
     if (trpcUsedProducts || trpcDigitalProducts) {
-      setUsedProducts([...(trpcUsedProducts || []), ...(trpcDigitalProducts || [])]);
+      setUsedProducts([
+        ...(trpcUsedProducts || []).map((p: any) => ({ ...p, _source: "used" })),
+        ...(trpcDigitalProducts || []).map((p: any) => ({ ...p, _source: "digital" })),
+      ]);
     }
   }, [trpcUsedProducts, trpcDigitalProducts]);
 
@@ -254,6 +257,14 @@ export default function SellerDashboard() {
 
   const handleBoostProduct = async (product: any) => {
     if (!user?.id) return;
+
+    // Turbinar só existe pra produtos físicos/usados — a tabela de produtos digitais
+    // nem tem coluna de destaque. Sem essa guarda, o ID do produto digital podia ser
+    // interpretado como ID de um produto físico e turbinar o anúncio errado.
+    if (product._source === "digital") {
+      toast.error("Destaque pago ainda não está disponível para produtos digitais.");
+      return;
+    }
 
     if (Boolean(product.boostedUntil && new Date(product.boostedUntil).getTime() > Date.now())) {
       toast.info(`Este produto já está turbinado até ${new Date(product.boostedUntil).toLocaleDateString()}!`);
@@ -631,8 +642,9 @@ export default function SellerDashboard() {
                         </span>
                       </div>
                       
-                      <Button 
-                        size="sm" 
+                      {product._source !== "digital" && (
+                      <Button
+                        size="sm"
                         variant="outline"
                         disabled={loading || Boolean(product.boostedUntil && new Date(product.boostedUntil).getTime() > Date.now())}
                         onClick={() => handleBoostProduct(product)}
@@ -643,10 +655,11 @@ export default function SellerDashboard() {
                         }`}
                       >
                         <Flame className="w-3.5 h-3.5 mr-1.5" />
-                        {Boolean(product.boostedUntil && new Date(product.boostedUntil).getTime() > Date.now()) 
-                          ? 'Anúncio Turbinado' 
+                        {Boolean(product.boostedUntil && new Date(product.boostedUntil).getTime() > Date.now())
+                          ? 'Anúncio Turbinado'
                           : 'Turbinar Anúncio (10 FC)'}
                       </Button>
+                      )}
                     </div>
                   </div>
                 </Card>
