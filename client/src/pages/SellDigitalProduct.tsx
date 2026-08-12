@@ -5,6 +5,9 @@ import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
 import { useState } from "react";
 import { toast } from "sonner";
+import { storage } from "@/lib/firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { Upload, Image as ImageIcon, X, Loader2 } from "lucide-react";
 
 export default function SellDigitalProduct() {
   const { isAuthenticated } = useAuth();
@@ -20,8 +23,10 @@ export default function SellDigitalProduct() {
     platform: "PS4/PS5",
     keyOrCode: "",
     downloadUrl: "",
+    imageUrl: "",
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const createProductMutation = trpc.digitalProducts.create.useMutation();
 
@@ -31,6 +36,35 @@ export default function SellDigitalProduct() {
       ...prev,
       [name]: value,
     }));
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Por favor, selecione um arquivo de imagem válido.");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("A imagem deve ter no máximo 10MB");
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const imageRef = ref(storage, `digital_products/${Date.now()}_${file.name}`);
+      const uploadResult = await uploadBytes(imageRef, file);
+      const downloadUrl = await getDownloadURL(uploadResult.ref);
+      setFormData(prev => ({ ...prev, imageUrl: downloadUrl }));
+      toast.success("Foto da capa enviada com sucesso!");
+    } catch (error: any) {
+      console.error("Erro ao fazer upload da imagem:", error);
+      toast.error("Erro ao enviar imagem: " + (error?.message || "Erro desconhecido"));
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -77,6 +111,7 @@ export default function SellDigitalProduct() {
         platform: formData.type === "jogo" ? formData.platform : undefined,
         keyOrCode: formData.keyOrCode.trim() || undefined,
         downloadUrl: formData.downloadUrl.trim() || undefined,
+        imageUrl: formData.imageUrl.trim() || undefined,
       });
       toast.success("Anúncio publicado com sucesso!");
       navigate("/digital");
@@ -190,6 +225,72 @@ export default function SellDigitalProduct() {
                   disabled={isLoading}
                   required
                 />
+              </div>
+
+              {/* Product Cover Photo */}
+              <div className="space-y-3">
+                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                  Foto do Produto / Capa do Jogo
+                </label>
+
+                {formData.imageUrl ? (
+                  <div className="relative w-full max-w-xs aspect-video rounded-xl overflow-hidden border border-slate-800 bg-slate-950 group">
+                    <img 
+                      src={formData.imageUrl} 
+                      alt="Capa do produto" 
+                      className="w-full h-full object-cover rounded-xl"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, imageUrl: "" }))}
+                      className="absolute top-2 right-2 p-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full transition-colors shadow-lg"
+                      title="Remover imagem"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-4">
+                    <label className="w-full flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-800 hover:border-red-600/50 rounded-2xl bg-slate-950/60 hover:bg-slate-950 transition-all cursor-pointer group">
+                      {uploadingImage ? (
+                        <div className="flex flex-col items-center text-slate-400">
+                          <Loader2 className="w-8 h-8 animate-spin text-red-500 mb-2" />
+                          <span className="text-xs font-medium">Fazendo upload da imagem...</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center text-slate-400 group-hover:text-slate-200 transition-colors">
+                          <Upload className="w-8 h-8 mb-2 text-red-500" />
+                          <span className="text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
+                            Clique para Selecionar Imagem
+                          </span>
+                          <span className="text-[11px] text-slate-500">
+                            PNG, JPG ou WEBP (máx. 10MB)
+                          </span>
+                        </div>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileUpload}
+                        disabled={uploadingImage || isLoading}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                )}
+
+                {/* Optional Image URL Input */}
+                <div className="pt-1">
+                  <Input
+                    type="url"
+                    name="imageUrl"
+                    placeholder="Ou cole o link direto da imagem (https://...)"
+                    value={formData.imageUrl}
+                    onChange={handleInputChange}
+                    disabled={uploadingImage || isLoading}
+                    className="bg-slate-950 border-slate-800 text-white rounded-xl text-xs"
+                  />
+                </div>
               </div>
 
               {/* Toggles for Primary & Secondary accounts */}

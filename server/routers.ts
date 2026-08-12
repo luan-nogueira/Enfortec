@@ -388,6 +388,7 @@ export const appRouter = router({
         keyOrCode: z.string().optional(),
         downloadUrl: z.string().optional(),
         platform: z.string().optional(),
+        imageUrl: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const database = await getDb();
@@ -415,6 +416,7 @@ export const appRouter = router({
           keyOrCode: input.keyOrCode,
           downloadUrl: input.downloadUrl,
           platform: input.platform || null,
+          imageUrl: input.imageUrl || null,
         });
         return result;
       }),
