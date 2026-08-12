@@ -235,10 +235,10 @@ export default function Home() {
         <div className="max-w-[1600px] mx-auto px-4 py-3 flex justify-between items-center gap-3">
           
           {/* Logo & Desktop Menu Drawer Trigger */}
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => navigate("/")}>
-              <img src="/logo.png" alt="Eforte Games Logo" className="w-9 h-9 object-contain rounded-lg shadow-[0_0_15px_rgba(220,38,38,0.3)] border border-slate-800 bg-slate-950" />
-              <span className="text-xl sm:text-2xl font-black text-white tracking-tight">EFORTE<span className="text-red-500">GAMES</span></span>
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
+            <div className="flex items-center gap-1.5 sm:gap-2.5 cursor-pointer min-w-0" onClick={() => navigate("/")}>
+              <img src="/logo.png" alt="Eforte Games Logo" className="w-8 h-8 sm:w-9 sm:h-9 object-contain rounded-lg shadow-[0_0_15px_rgba(220,38,38,0.3)] border border-slate-800 bg-slate-950 shrink-0" />
+              <span className="text-base sm:text-2xl font-black text-white tracking-tight whitespace-nowrap">EFORTE<span className="text-red-500">GAMES</span></span>
             </div>
 
             {/* Desktop & Mobile Sheet Drawer Trigger Button */}
@@ -365,11 +365,11 @@ export default function Home() {
                 <UserProfileButton />
               </div>
             ) : (
-              <div className="flex gap-2">
-                <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white hover:bg-slate-900 text-xs" onClick={() => navigate("/login")}>
+              <div className="flex gap-1.5 sm:gap-2 shrink-0">
+                <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white hover:bg-slate-900 text-[11px] sm:text-xs px-2 sm:px-3 h-8" onClick={() => navigate("/login")}>
                   Entrar
                 </Button>
-                <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white text-xs px-3 shadow-[0_0_10px_rgba(220,38,38,0.3)]" onClick={() => navigate("/login")}>
+                <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 h-8 shadow-[0_0_10px_rgba(220,38,38,0.3)]" onClick={() => navigate("/login")}>
                   Cadastrar
                 </Button>
               </div>
@@ -453,7 +453,7 @@ export default function Home() {
                       e.stopPropagation();
                       prevSlide();
                     }}
-                    className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-950/70 hover:bg-red-600/90 text-white flex items-center justify-center border border-slate-800 hover:border-red-500/30 backdrop-blur-sm transition-all duration-300 z-20 shadow-[0_0_10px_rgba(0,0,0,0.5)]"
+                    className="absolute left-2 sm:left-4 top-4 sm:top-1/2 sm:-translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-950/70 hover:bg-red-600/90 text-white flex items-center justify-center border border-slate-800 hover:border-red-500/30 backdrop-blur-sm transition-all duration-300 z-20 shadow-[0_0_10px_rgba(0,0,0,0.5)]"
                   >
                     <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
@@ -462,7 +462,7 @@ export default function Home() {
                       e.stopPropagation();
                       nextSlide();
                     }}
-                    className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-950/70 hover:bg-red-600/90 text-white flex items-center justify-center border border-slate-800 hover:border-red-500/30 backdrop-blur-sm transition-all duration-300 z-20 shadow-[0_0_10px_rgba(0,0,0,0.5)]"
+                    className="absolute right-2 sm:right-4 top-4 sm:top-1/2 sm:-translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-950/70 hover:bg-red-600/90 text-white flex items-center justify-center border border-slate-800 hover:border-red-500/30 backdrop-blur-sm transition-all duration-300 z-20 shadow-[0_0_10px_rgba(0,0,0,0.5)]"
                   >
                     <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>

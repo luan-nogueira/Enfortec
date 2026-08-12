@@ -671,7 +671,7 @@ export default function UsedMarketplace() {
                               productName={product.name}
                               sellerId={product.sellerId || undefined}
                               sellerName={product.sellerName || "Vendedor"}
-                              buttonLabel="Falar Vendedor"
+                              buttonLabel="Vendedor"
                             />
                             {parseFloat(product.price || 0) > 0 && (
                               <Button

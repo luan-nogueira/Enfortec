@@ -177,6 +177,26 @@ export default function FloatingChat() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [catalog, setCatalog] = useState<{name: string; price: number}[]>([]);
   const [mobileViewport, setMobileViewport] = useState<{ height: number; offsetTop: number } | null>(null);
+  const [isPageScrolling, setIsPageScrolling] = useState(false);
+
+  // O botão flutuante fica fixo no canto inferior direito em toda página, então em
+  // telas de conteúdo longo (guias, grades de produto) ele acaba tampando texto/preço
+  // por baixo. Encolher/apagar ele enquanto a página está sendo rolada evita isso sem
+  // precisar reservar espaço em cada página individualmente.
+  useEffect(() => {
+    if (isOpen) return;
+    let timeout: ReturnType<typeof setTimeout>;
+    const onScroll = () => {
+      setIsPageScrolling(true);
+      clearTimeout(timeout);
+      timeout = setTimeout(() => setIsPageScrolling(false), 500);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      clearTimeout(timeout);
+    };
+  }, [isOpen]);
 
   // No mobile, elementos fixos acompanham o layout viewport (tela toda) e não o
   // visual viewport (área acima do teclado), deixando um vão entre o input e o teclado.
@@ -332,11 +352,13 @@ export default function FloatingChat() {
         />
       )}
 
-      <div className={`fixed ${isOpen ? "inset-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2" : "bottom-20 right-4 sm:bottom-6 sm:right-6"} ${isOpen ? "z-[100]" : "z-30"}`}>
+      <div className={`fixed ${isOpen ? "inset-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2" : "bottom-20 right-4 sm:bottom-6 sm:right-6"} ${isOpen ? "z-[10000]" : "z-30"}`}>
         {!isOpen && (
           <Button
             onClick={() => setIsOpen(true)}
-            className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 shadow-[0_8px_25px_rgba(220,38,38,0.5)] flex items-center justify-center p-0 transition-all hover:scale-110 active:scale-95 group relative border border-red-400/30"
+            className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 shadow-[0_8px_25px_rgba(220,38,38,0.5)] flex items-center justify-center p-0 transition-all duration-300 hover:scale-110 active:scale-95 group relative border border-red-400/30 ${
+              isPageScrolling ? "opacity-40 scale-75" : "opacity-100 scale-100"
+            }`}
           >
             <MessageCircle className="w-6 h-6 text-white group-hover:rotate-12 transition-transform" />
             <div className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-400 border-2 border-slate-950 rounded-full animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
@@ -346,7 +368,7 @@ export default function FloatingChat() {
         {isOpen && (
           <Card
             style={mobileViewport ? { height: `${mobileViewport.height}px`, marginTop: `${mobileViewport.offsetTop}px` } : undefined}
-            className="w-full h-full sm:w-[600px] sm:max-w-none sm:h-[650px] flex flex-col bg-slate-900 border-red-600/40 shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden sm:rounded-2xl animate-in zoom-in-95 duration-200 rounded-none border-0 sm:border">
+            className="w-full h-full sm:w-[600px] sm:max-w-none sm:h-[650px] flex flex-col gap-0 py-0 bg-slate-900 border-red-600/40 shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden sm:rounded-2xl animate-in zoom-in-95 duration-200 rounded-none border-0 sm:border">
             {/* Header */}
             <div className="p-3.5 bg-gradient-to-r from-red-700 via-red-600 to-red-700 flex justify-between items-center shrink-0 border-b border-red-500/30 shadow-md">
               <div className="flex items-center gap-2.5">
