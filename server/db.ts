@@ -464,8 +464,19 @@ export async function confirmOrderAndReview(orderId: number, buyerId: number, ra
   const sellerProfileResult = await db.select().from(sellers).where(eq(sellers.userId, order.sellerId)).limit(1);
   const sellerProfile = sellerProfileResult[0];
 
-  // Update order status
-  await db.update(orders).set({ status: 'entregue' }).where(eq(orders.id, orderId));
+  // Update order status — condicionado ao status que acabamos de ler (compare-and-swap).
+  // Sem essa trava, duas requisições concorrentes (clique duplo, retry de rede) passavam
+  // pela checagem de status acima antes de qualquer uma escrever, e as duas creditavam o
+  // saldo do vendedor — pagando a mesma venda duas vezes.
+  const updateResult = await db
+    .update(orders)
+    .set({ status: 'entregue' })
+    .where(and(eq(orders.id, orderId), eq(orders.status, order.status)))
+    .returning({ id: orders.id });
+
+  if (updateResult.length === 0) {
+    throw new Error("Este pedido já foi confirmado em outra requisição.");
+  }
 
   // Insert Review
   await db.insert(reviews).values({

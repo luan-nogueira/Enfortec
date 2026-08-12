@@ -3,39 +3,26 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import UserProfileButton from "@/components/UserProfileButton";
 import { Search, Gamepad2, Sparkles, Shield, Coins, Tag, Flame, Star, ShoppingCart, ArrowLeft, ArrowRight, ShieldCheck, Zap } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { auth, db } from "@/lib/firebase";
-import { collection, onSnapshot, query, limit } from "firebase/firestore";
+import { auth } from "@/lib/firebase";
+import { trpc } from "@/lib/trpc";
 
 export default function JogueComEconomia() {
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
-  const [products, setProducts] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [selectedAccountType, setSelectedAccountType] = useState<"primaria" | "secundaria">("secundaria");
   const [useCoins, setUseCoins] = useState(false);
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
 
-  useEffect(() => {
-    const qDigital = query(collection(db, "digital_products"));
-    const unsubDigital = onSnapshot(qDigital, (snapshot) => {
-      const data = snapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() }))
-        .filter((p: any) => p.isActive !== false);
-      setProducts(data);
-      setIsLoading(false);
-    }, (error) => {
-      console.error("Erro ao buscar jogos em JogueComEconomia:", error);
-      setIsLoading(false);
-    });
-
-    return () => unsubDigital();
-  }, []);
+  // Antes lia de uma coleção legada do Firestore, desincronizada do catálogo real
+  // (o toggle "Exibir em Jogue com Economia" do admin já mexe é no Postgres).
+  const { data: trpcProducts, isLoading } = trpc.digitalProducts.list.useQuery();
+  const products = trpcProducts || [];
 
   // Filter products: show only products explicitly enabled for Economia
   const filteredProducts = products.filter((product) => {
@@ -117,7 +104,7 @@ export default function JogueComEconomia() {
           productType: "digital",
           productId: selectedProduct.id,
           accountType: selectedAccountType,
-          coinsUsed: coinsUsed,
+          coinsToUse: coinsUsed,
         }),
       });
 
@@ -217,8 +204,8 @@ export default function JogueComEconomia() {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {filteredProducts.map((product) => {
               const licenseType = product.economiaLicenseType || "secundaria";
-              const secPrice = Number(product.priceSecondary ?? product.price_secondary ?? product.price);
-              const primPrice = Number(product.pricePrimary ?? product.price_primary ?? product.price);
+              const secPrice = Number(product.priceSecondary ?? product.price);
+              const primPrice = Number(product.pricePrimary ?? product.price);
               const hasSecondary = secPrice > 0;
 
               return (

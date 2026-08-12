@@ -1,9 +1,22 @@
 import { Express } from "express";
 import axios from "axios";
 import * as db from "../db";
-import { orders, users, coupons, platinadorSubscriptions } from "../../drizzle/schema";
+import { orders, users, coupons, platinadorSubscriptions, products, usedProducts, digitalProducts } from "../../drizzle/schema";
 import { verifyFirebaseToken } from "./context";
 import { eq } from "drizzle-orm";
+
+const PLATINADOR_SUBSCRIPTION_PRICE = 35.0;
+
+// Preço da conta primária/secundária de um produto digital, com a mesma regra usada
+// no front (client/src/pages/DigitalMedia.tsx: getProductPrice) — precisa bater
+// exatamente, senão o preço "verificado" no servidor diverge do que foi cobrado.
+function computeDigitalPrice(p: { price: string; pricePrimary: string | null; priceSecondary: string | null }, accountType?: string): number {
+  const basePrice = parseFloat(p.price || "0");
+  const primaryPrice = p.pricePrimary ? parseFloat(p.pricePrimary) : basePrice;
+  const secondaryPrice = p.priceSecondary ? parseFloat(p.priceSecondary) : 0;
+  if (accountType === "secundaria" && secondaryPrice > 0) return Math.max(0, secondaryPrice);
+  return Math.max(0, primaryPrice);
+}
 
 export function registerPaymentRoute(app: Express) {
   // Rota de busca automática de capas de jogos no Steam
@@ -93,20 +106,15 @@ export function registerPaymentRoute(app: Express) {
   // ─── Checkout: cria link de pagamento InfinitePay ────────────────────────────
   app.post("/api/infinitepay/checkout", async (req, res) => {
     try {
-      const { name, price, quantity = 1, redirectUrl, productType = "store", productId, sellerId, customer, coinsToUse = 0, couponCode, accountType } = req.body;
-      let productNameStr: string = name || "Produto";
-      if (accountType === "secundaria") {
-        if (!productNameStr.toLowerCase().includes("secundária") && !productNameStr.toLowerCase().includes("secundaria")) {
-          productNameStr += " (Conta Secundária)";
-        }
-      } else if (accountType === "primaria") {
-        if (!productNameStr.toLowerCase().includes("primária") && !productNameStr.toLowerCase().includes("primaria")) {
-          productNameStr += " (Conta Primária)";
-        }
-      }
+      const { name, quantity = 1, redirectUrl, productType = "store", productId, sellerId, customer, couponCode, accountType } = req.body;
+      // price/coinsToUse também chegam no body, mas são só o que o comprador VIU na tela —
+      // nunca são usados pra calcular o valor cobrado. O valor real é sempre recalculado
+      // abaixo a partir do banco (preço do produto + saldo real de ForteCoins do comprador).
+      // Sem isso, bastava editar a requisição no navegador pra comprar qualquer coisa por
+      // R$0,01 (ou de graça, informando um monte de ForteCoins que nem existiam no saldo).
 
-      if (!name || price === undefined) {
-        return res.status(400).json({ success: false, error: "Nome e preço são obrigatórios." });
+      if (!name) {
+        return res.status(400).json({ success: false, error: "Nome do produto é obrigatório." });
       }
 
       const apiKey = process.env.INFINITE_PAY_API_KEY;
@@ -135,6 +143,56 @@ export function registerPaymentRoute(app: Express) {
         }
       }
 
+      const database = await db.getDb();
+      if (!database) {
+        return res.status(500).json({ success: false, error: "Banco de dados indisponível." });
+      }
+
+      // ── Preço verificado no servidor (nunca confia no `price` enviado pelo cliente) ──
+      let verifiedPrice: number | null = null;
+      let realProductName: string | null = null;
+      if (productType === "platinador") {
+        verifiedPrice = PLATINADOR_SUBSCRIPTION_PRICE;
+      } else if (productId) {
+        const pid = parseInt(String(productId));
+        if (!isNaN(pid)) {
+          if (productType === "store") {
+            const rows = await database.select().from(products).where(eq(products.id, pid)).limit(1);
+            if (rows[0]) { verifiedPrice = parseFloat(rows[0].price); realProductName = rows[0].name; }
+          } else if (productType === "used") {
+            const rows = await database.select().from(usedProducts).where(eq(usedProducts.id, pid)).limit(1);
+            if (rows[0]) { verifiedPrice = parseFloat(rows[0].price); realProductName = rows[0].name; }
+          } else if (productType === "digital") {
+            const rows = await database.select().from(digitalProducts).where(eq(digitalProducts.id, pid)).limit(1);
+            if (rows[0]) { verifiedPrice = computeDigitalPrice(rows[0], accountType); realProductName = rows[0].name; }
+          }
+        }
+      }
+
+      if (verifiedPrice === null) {
+        console.warn(`[Checkout] Preço não pôde ser verificado — productType=${productType}, productId=${productId}`);
+        return res.status(400).json({ success: false, error: "Não foi possível confirmar o preço deste produto. Atualize a página e tente novamente." });
+      }
+
+      let productNameStr: string = realProductName || name || "Produto";
+      if (accountType === "secundaria") {
+        if (!productNameStr.toLowerCase().includes("secundária") && !productNameStr.toLowerCase().includes("secundaria")) {
+          productNameStr += " (Conta Secundária)";
+        }
+      } else if (accountType === "primaria") {
+        if (!productNameStr.toLowerCase().includes("primária") && !productNameStr.toLowerCase().includes("primaria")) {
+          productNameStr += " (Conta Primária)";
+        }
+      }
+
+      // ── ForteCoins verificadas no servidor (nunca confia no `coinsToUse` do cliente) ──
+      let verifiedCoinsToUse = 0;
+      if (buyerId > 0 && Number(req.body.coinsToUse) > 0) {
+        const buyerRows = await database.select().from(users).where(eq(users.id, buyerId)).limit(1);
+        const realBalance = buyerRows[0]?.forteCoins || 0;
+        verifiedCoinsToUse = Math.min(Math.floor(Number(req.body.coinsToUse)) || 0, realBalance);
+      }
+
       // Valida o cupom se fornecido
       let couponDiscount = 0;
       let validCouponCode: string | null = null;
@@ -143,9 +201,9 @@ export function registerPaymentRoute(app: Express) {
         if (coupon) {
           const isExpired = coupon.expiresAt && new Date(coupon.expiresAt).getTime() < Date.now();
           const isExceeded = coupon.maxUses !== null && (coupon.usedCount || 0) >= coupon.maxUses;
-          
+
           if (!isExpired && !isExceeded) {
-            couponDiscount = parseFloat(price) * (parseFloat(coupon.discountPercentage) / 100);
+            couponDiscount = verifiedPrice * (parseFloat(coupon.discountPercentage) / 100);
             validCouponCode = coupon.code;
           } else {
             console.warn(`[Checkout] Cupom ${couponCode} está expirado ou esgotado.`);
@@ -156,14 +214,12 @@ export function registerPaymentRoute(app: Express) {
       }
 
       // Calcula o desconto: 10 ForteCoins = R$ 1,00
-      const coinsDiscount = Number(coinsToUse) * 0.10;
-      const originalPrice = parseFloat(price);
+      const coinsDiscount = verifiedCoinsToUse * 0.10;
+      const originalPrice = verifiedPrice;
       const finalPrice = Math.max(0, originalPrice - couponDiscount - coinsDiscount);
 
       // Se o desconto cobrir 100% do preço do jogo, finaliza diretamente sem InfinitePay
       if (finalPrice <= 0) {
-        const database = await db.getDb();
-        if (database) {
           let commissionPct = "6.00";
           try {
             const settings = await db.getPlatformSettings();
@@ -185,7 +241,7 @@ export function registerPaymentRoute(app: Express) {
             sellerAmount: "0.00",
             status: "pago",
             paymentId: `ForteCoins-100%-${Date.now()}`,
-            coinsUsed: Number(coinsToUse),
+            coinsUsed: verifiedCoinsToUse,
             productName: productNameStr,
             accountType: accountType || null,
             firebaseProductId: productId ? String(productId) : null,
@@ -200,15 +256,15 @@ export function registerPaymentRoute(app: Express) {
           }
 
           await database.insert(orders).values(insertValues);
-          
+
           // Deduct coins used and reward 7 coins cashback in PostgreSQL
           if (buyerId > 0) {
             const userResult = await database.select().from(users).where(eq(users.id, buyerId)).limit(1);
             if (userResult.length > 0) {
               const usr = userResult[0];
-              const netCoins = Math.max(0, (usr.forteCoins || 0) - Number(coinsToUse) + 7);
+              const netCoins = Math.max(0, (usr.forteCoins || 0) - verifiedCoinsToUse + 7);
               await database.update(users).set({ forteCoins: netCoins }).where(eq(users.id, buyerId));
-              console.log(`[Checkout 100%] updated user ${buyerId} coins: from ${usr.forteCoins} to ${netCoins} (-${coinsToUse} + 7 cashback)`);
+              console.log(`[Checkout 100%] updated user ${buyerId} coins: from ${usr.forteCoins} to ${netCoins} (-${verifiedCoinsToUse} + 7 cashback)`);
             }
           }
 
@@ -223,9 +279,6 @@ export function registerPaymentRoute(app: Express) {
 
           console.log("[Checkout] Compra 100% paga com moedas/cupom registrada com sucesso.");
           return res.json({ success: true, url: null, paidWithCoins: true });
-        } else {
-          return res.status(500).json({ success: false, error: "Banco de dados indisponível." });
-        }
       }
 
       // Converte preço para centavos (inteiro)
@@ -234,7 +287,7 @@ export function registerPaymentRoute(app: Express) {
       // Constrói order_nsu compacto: buyerId_sellerId_productType_productId_coinsToUse_couponCode
       // Codifica o nome do produto em base64 para incluir no NSU sem quebrar o split por "_"
       const productNameB64 = Buffer.from(productNameStr).toString("base64");
-      const orderNsu = `${buyerId}_${mysqlSellerId || "null"}_${productType}_${productId || "null"}_${coinsToUse}_${validCouponCode || "nocoupon"}_${productNameB64}`;
+      const orderNsu = `${buyerId}_${mysqlSellerId || "null"}_${productType}_${productId || "null"}_${verifiedCoinsToUse}_${validCouponCode || "nocoupon"}_${productNameB64}`;
 
       const host = req.get("host") || "";
       const protocol = host.includes("localhost") || host.includes("127.0.0.1") ? "http" : "https";
@@ -364,6 +417,26 @@ export function registerPaymentRoute(app: Express) {
 
       // Registra o pedido no banco com status "pago"
       const database = await db.getDb();
+
+      // Idempotência: o InfinitePay pode reenviar o mesmo webhook mais de uma vez (é a
+      // forma deles garantirem que o evento chegou). Sem checar isso, um reenvio cria um
+      // segundo pedido "pago" pra uma cobrança real única — e se o comprador confirmar o
+      // recebimento dos dois, o vendedor seria pago em dobro por uma venda só.
+      if (database && paymentId) {
+        const existingOrder = await database.select().from(orders).where(eq(orders.paymentId, String(paymentId))).limit(1);
+        if (existingOrder.length > 0) {
+          console.log(`[InfinitePay Webhook] Pagamento ${paymentId} já processado (pedido #${existingOrder[0].id}) — reenvio ignorado.`);
+          return res.status(200).json({ received: true, duplicate: true });
+        }
+        if ((productType as string) === "platinador") {
+          const existingSub = await database.select().from(platinadorSubscriptions).where(eq(platinadorSubscriptions.paymentId, String(paymentId))).limit(1);
+          if (existingSub.length > 0) {
+            console.log(`[InfinitePay Webhook] Assinatura do Platinador pra pagamento ${paymentId} já processada — reenvio ignorado.`);
+            return res.status(200).json({ received: true, duplicate: true });
+          }
+        }
+      }
+
       if (database && (productType as string) === "platinador") {
         // Assinatura Clube Platinador: não é um "pedido" de produto (a tabela orders só aceita
         // productType store/used/digital), então ativamos/renovamos a assinatura diretamente.
