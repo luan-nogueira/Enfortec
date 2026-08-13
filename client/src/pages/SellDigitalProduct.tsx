@@ -377,11 +377,31 @@ export default function SellDigitalProduct() {
                 </div>
               )}
 
-              {/* Download URL (for games) */}
+              {/* Login/Senha ou Código (for account-based games) */}
               {(formData.type as string) === "jogo" && (
                 <div>
                   <label className="block text-sm font-semibold text-slate-300 mb-2">
-                    URL de Download *
+                    Dados de Acesso da Conta (Login e Senha)
+                  </label>
+                  <Input
+                    type="text"
+                    name="keyOrCode"
+                    placeholder="Ex: login@email.com / senha123"
+                    value={formData.keyOrCode}
+                    onChange={handleInputChange}
+                    disabled={isLoading}
+                  />
+                  <p className="text-xs text-slate-600 mt-1">
+                    Login e senha (ou código de ativação) que serão enviados ao comprador após o pagamento
+                  </p>
+                </div>
+              )}
+
+              {/* Download URL (opcional, para jogos entregues por link direto) */}
+              {(formData.type as string) === "jogo" && (
+                <div>
+                  <label className="block text-sm font-semibold text-slate-300 mb-2">
+                    URL de Download (opcional)
                   </label>
                   <Input
                     type="url"
@@ -390,10 +410,9 @@ export default function SellDigitalProduct() {
                     value={formData.downloadUrl}
                     onChange={handleInputChange}
                     disabled={isLoading}
-                    required
                   />
                   <p className="text-xs text-slate-600 mt-1">
-                    Link para download do jogo (será enviado ao comprador após pagamento)
+                    Preencha só se o jogo também for entregue por link de download, além do login da conta
                   </p>
                 </div>
               )}

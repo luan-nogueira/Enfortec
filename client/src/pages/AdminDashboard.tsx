@@ -4966,9 +4966,9 @@ export default function AdminDashboard() {
 
       {/* Modal de Cadastro em Lote */}
       <Dialog open={showBatchModal} onOpenChange={setShowBatchModal}>
-        <DialogContent className="bg-slate-900 border-red-600/30 text-white max-w-4xl card-neon max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-slate-900 border-red-600/30 text-white w-[92vw] sm:w-full sm:max-w-4xl card-neon max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold flex items-center gap-2 text-neon">
+            <DialogTitle className="text-lg sm:text-xl font-bold flex items-center gap-2 text-neon">
               <Plus className="text-red-500" /> Cadastrar Jogos em Lote
             </DialogTitle>
             <DialogDescription className="text-slate-400 text-xs">
@@ -5002,8 +5002,8 @@ export default function AdminDashboard() {
             </div>
           ) : (
             <div className="space-y-6 py-4">
-              <div className="max-h-[50vh] overflow-y-auto border border-red-600/10 rounded-lg">
-                <table className="w-full text-left border-collapse">
+              <div className="max-h-[50vh] overflow-auto border border-red-600/10 rounded-lg">
+                <table className="w-full min-w-[640px] text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-950 text-slate-400 text-[10px] uppercase tracking-wider border-b border-red-600/20">
                       <th className="py-2.5 px-3 w-16">Capa</th>
@@ -5122,30 +5122,30 @@ export default function AdminDashboard() {
                 </div>
               )}
 
-              <DialogFooter className="flex items-center justify-between gap-4">
+              <DialogFooter className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => { setBatchGames([]); }}
                   disabled={isSavingBatch}
-                  className="border-slate-700 text-slate-300 hover:bg-slate-800"
+                  className="border-slate-700 text-slate-300 hover:bg-slate-800 w-full sm:w-auto"
                 >
                   Voltar
                 </Button>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <Button
                     type="button"
                     variant="ghost"
                     onClick={() => triggerBatchCoverSearch(batchGames)}
                     disabled={isProcessingBatchSearch || isSavingBatch}
-                    className="text-red-500 hover:bg-red-500/10 font-bold animate-pulse"
+                    className="text-red-500 hover:bg-red-500/10 font-bold animate-pulse w-full sm:w-auto"
                   >
                     {isProcessingBatchSearch ? "Buscando..." : "Refazer Busca de Capas"}
                   </Button>
                   <Button
                     onClick={handleSaveBatchGames}
                     disabled={isSavingBatch || batchGames.length === 0}
-                    className="bg-red-600 hover:bg-red-700 font-bold px-6 btn-neon"
+                    className="bg-red-600 hover:bg-red-700 font-bold px-6 btn-neon w-full sm:w-auto"
                   >
                     {isSavingBatch ? "Cadastrando..." : `Cadastrar ${batchGames.length} Jogos`}
                   </Button>
