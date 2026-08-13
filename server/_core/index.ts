@@ -251,6 +251,13 @@ async function runMigrations() {
     await sql.query(`ALTER TABLE "usedProducts" ADD COLUMN IF NOT EXISTS "estado" varchar(50)`);
     await sql.query(`ALTER TABLE "usedProducts" ADD COLUMN IF NOT EXISTS "cidade" varchar(100)`);
     await sql.query(`ALTER TABLE "usedProducts" ADD COLUMN IF NOT EXISTS "category" varchar(50) DEFAULT 'midia_fisica'`);
+
+    // "accountType" existe no schema do Drizzle (conta primária/secundária) e era criada
+    // só pela rota manual /api/migrate-db, nunca chamada em produção — sem essa coluna,
+    // qualquer "select() sem lista de colunas" em orders falhava (getOrdersByBuyerId,
+    // getOrdersBySellerId, getAllOrdersWithDetails e o próprio confirmOrderAndReview, que
+    // é o que libera o saldo do vendedor do escrow).
+    await sql.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "accountType" varchar(20)`);
     console.log("[Database] Migrações de inicialização concluídas com sucesso.");
   } catch (migErr: any) {
     console.warn("[Database] Aviso: Falha na migração automática de inicialização:", migErr.message);

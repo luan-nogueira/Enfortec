@@ -291,7 +291,13 @@ export function registerPaymentRoute(app: Express) {
 
       const host = req.get("host") || "";
       const protocol = host.includes("localhost") || host.includes("127.0.0.1") ? "http" : "https";
-      const webhookUrl = `${protocol}://${host}/api/infinitepay/webhook`;
+      // O webhook não tem como saber sozinho que a chamada realmente veio do InfinitePay
+      // (não há assinatura enviada por eles) — por isso embutimos um segredo só nosso na
+      // própria URL, que viaja só de servidor pra servidor e nunca é exposto ao navegador
+      // do comprador. Sem isso, qualquer um podia chamar o webhook direto e fabricar um
+      // pedido "pago" sem pagar nada.
+      const webhookSecret = process.env.INFINITE_PAY_WEBHOOK_SECRET;
+      const webhookUrl = `${protocol}://${host}/api/infinitepay/webhook${webhookSecret ? `?secret=${encodeURIComponent(webhookSecret)}` : ""}`;
 
       const payload: any = {
         handle,
@@ -343,6 +349,25 @@ export function registerPaymentRoute(app: Express) {
   // ─── Webhook: recebe notificações de pagamento confirmado ────────────────────
   app.post("/api/infinitepay/webhook", async (req, res) => {
     try {
+      // Só aceita a chamada se trouxer o segredo que nós mesmos geramos e embutimos na
+      // webhook_url na hora de criar o link de pagamento (ver acima). Isso é o que garante
+      // que só o InfinitePay (ou quem tiver essa URL exata) consegue confirmar um pagamento
+      // — sem essa checagem, qualquer requisição direta pra essa rota fabricava um pedido
+      // "pago" de graça, sem passar por nenhum pagamento real.
+      //
+      // Enquanto INFINITE_PAY_WEBHOOK_SECRET não estiver configurado no ambiente (variável
+      // nova, precisa ser adicionada nas configurações do projeto na Vercel), o webhook
+      // continua processando normalmente — sem isso, subir este código sem a variável já
+      // configurada derrubaria a confirmação de TODO pagamento real. Assim que a variável
+      // for definida, a checagem passa a valer sozinha, sem precisar mexer em mais nada.
+      const expectedSecret = process.env.INFINITE_PAY_WEBHOOK_SECRET;
+      if (!expectedSecret) {
+        console.warn("[InfinitePay Webhook] INFINITE_PAY_WEBHOOK_SECRET não configurado — processando sem verificação de origem. Configure essa variável no ambiente para fechar essa brecha.");
+      } else if (req.query.secret !== expectedSecret) {
+        console.warn("[InfinitePay Webhook] Tentativa de chamada com segredo ausente ou incorreto — ignorada.");
+        return res.status(401).json({ received: false, error: "Não autorizado." });
+      }
+
       const event = req.body;
       console.log("[InfinitePay Webhook] Evento recebido:", JSON.stringify(event));
 
