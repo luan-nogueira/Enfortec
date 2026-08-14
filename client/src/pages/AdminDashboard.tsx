@@ -2808,7 +2808,7 @@ export default function AdminDashboard() {
         </header>
 
         {/* Page Content Body */}
-        <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8 pb-28 lg:pb-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 py-6 sm:py-8 px-3 sm:px-6 lg:px-8 pb-36 lg:pb-16 max-w-7xl w-full mx-auto">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
 
             {/* ========================= CENTRAL DE NOTIFICAÇÕES ========================= */}
@@ -3495,7 +3495,7 @@ export default function AdminDashboard() {
                 <p className="text-slate-400 text-sm">Nenhum anúncio de mídia física cadastrado ainda.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-12">
                 {usedProductsListAdmin.map((p: any) => {
                   const isBoosted = Boolean(p.boostedUntil && new Date(p.boostedUntil).getTime() > Date.now());
                   return (

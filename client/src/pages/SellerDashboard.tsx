@@ -331,7 +331,7 @@ export default function SellerDashboard() {
       </div>
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-4 sm:py-8 pb-28 lg:pb-8">
+      <div className="container mx-auto px-4 py-4 sm:py-8 pb-36 lg:pb-16">
         {/* KPI Cards (Saldo Escrow vs Liberado & Reputação) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
           {/* Card 1: Saldo Liberado */}

@@ -535,7 +535,7 @@ export default function UsedMarketplace() {
       </div>
 
       {/* Products Grid */}
-      <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-12 pb-24 lg:pb-12">
+      <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-12 pb-36 lg:pb-16">
         {isLoading ? (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
             {Array.from({ length: 8 }).map((_, i) => (

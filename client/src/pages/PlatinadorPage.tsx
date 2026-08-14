@@ -229,7 +229,7 @@ export default function PlatinadorPage() {
         </div>
       </header>
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-8 space-y-12">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-8 space-y-12 pb-36 lg:pb-16">
         {/* HERO SECTION */}
         <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#2a060d] via-[#140508] to-[#0a0a0a] border border-[#dc143c]/40 p-5 sm:p-8 lg:p-12 shadow-2xl shadow-[#dc143c]/20">
           {/* Background Gaming Art & Trophy Glow */}

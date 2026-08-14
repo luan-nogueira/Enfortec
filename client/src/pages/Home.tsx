@@ -964,7 +964,7 @@ export default function Home() {
 
 
       {/* Footer */}
-      <footer className="bg-slate-950 border-t border-slate-800/60 py-12 mt-10 pb-28 lg:pb-12 relative overflow-hidden">
+      <footer className="bg-slate-950 border-t border-slate-800/60 py-12 mt-10 pb-36 lg:pb-16 relative overflow-hidden">
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-red-600/30 to-transparent" />
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-px bg-gradient-to-r from-transparent via-red-500/50 to-transparent blur-sm" />
         <div className="container mx-auto px-4 text-center">
