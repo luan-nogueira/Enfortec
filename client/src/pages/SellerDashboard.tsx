@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { db, storage } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, addDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useLocation } from "wouter";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
@@ -77,9 +77,11 @@ export default function SellerDashboard() {
   const { data: pgUser } = trpc.auth.me.useQuery(undefined, { enabled: isAuthenticated });
   const createProductMutation = trpc.usedProducts.create.useMutation();
   const boostProductMutation = trpc.usedProducts.boost.useMutation();
+  const deleteUsedProductMutation = trpc.usedProducts.delete.useMutation();
+  const deleteDigitalProductMutation = trpc.digitalProducts.delete.useMutation();
 
   const { data: trpcUsedProducts, isLoading: isUsedLoading, refetch: refetchUsedProducts } = trpc.usedProducts.getByUserId.useQuery(undefined, { enabled: isAuthenticated && !!user?.id });
-  const { data: trpcDigitalProducts, isLoading: isDigitalLoading } = trpc.digitalProducts.getByUserId.useQuery(undefined, { enabled: isAuthenticated && !!user?.id });
+  const { data: trpcDigitalProducts, isLoading: isDigitalLoading, refetch: refetchDigitalProducts } = trpc.digitalProducts.getByUserId.useQuery(undefined, { enabled: isAuthenticated && !!user?.id });
 
   useEffect(() => {
     if (trpcUsedProducts || trpcDigitalProducts) {
@@ -248,16 +250,22 @@ export default function SellerDashboard() {
     }
   };
 
-  const handleDeleteProduct = async (id: string) => {
+  const handleDeleteProduct = async (product: any) => {
     toast("Deletar este anúncio?", {
       action: {
         label: "Deletar",
         onClick: async () => {
           try {
-            await deleteDoc(doc(db, "used_products", id));
+            if (product._source === "digital") {
+              await deleteDigitalProductMutation.mutateAsync({ id: Number(product.id) });
+              refetchDigitalProducts();
+            } else {
+              await deleteUsedProductMutation.mutateAsync({ id: Number(product.id) });
+              refetchUsedProducts();
+            }
             toast.success("Anúncio deletado com sucesso!");
-          } catch (error) {
-            toast.error("Erro ao deletar anúncio.");
+          } catch (error: any) {
+            toast.error(error?.message || "Erro ao deletar anúncio.");
           }
         }
       }
@@ -536,7 +544,7 @@ export default function SellerDashboard() {
                           </span>
                         )}
                       </div>
-                      <Button variant="ghost" size="icon" className="text-slate-500 hover:text-red-500 -mt-2 -mr-2" onClick={() => handleDeleteProduct(product.id)}>
+                      <Button variant="ghost" size="icon" className="text-slate-500 hover:text-red-500 -mt-2 -mr-2" onClick={() => handleDeleteProduct(product)}>
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>

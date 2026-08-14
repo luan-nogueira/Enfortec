@@ -585,6 +585,26 @@ export const appRouter = router({
         if (!database) throw new Error("Database not available");
         return database.delete(digitalProducts).where(eq(digitalProducts.id, input));
       }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+
+        const [product] = await database.select().from(digitalProducts).where(eq(digitalProducts.id, input.id)).limit(1);
+        if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Anúncio não encontrado" });
+
+        const seller = await db.getSellerByUserId(ctx.user.id);
+        const isAdmin = ctx.user.role === 'admin';
+        const isOwner = seller && product.sellerId === seller.id;
+
+        if (!isAdmin && !isOwner) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Sem permissão para deletar este anúncio" });
+        }
+
+        await database.delete(digitalProducts).where(eq(digitalProducts.id, input.id));
+        return { success: true };
+      }),
   }),
 
   // Orders Router
