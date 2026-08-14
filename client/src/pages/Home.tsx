@@ -2,7 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocation } from "wouter";
-import { Zap, Gamepad2, Search, Shield, Package, LayoutGrid, Tag, Coins, LogOut, HelpCircle, Home as HomeIcon, Instagram, ChevronLeft, ChevronRight, ShieldCheck, Sparkles, PlusCircle, Swords, Compass, Trophy, Gauge, Crosshair, Flame, ShoppingCart, Star, Menu, ArrowRight } from "lucide-react";
+import { Zap, Gamepad2, Search, Shield, Package, LayoutGrid, Tag, Coins, LogOut, HelpCircle, Home as HomeIcon, Instagram, ChevronLeft, ChevronRight, ShieldCheck, Sparkles, PlusCircle, Swords, Compass, Trophy, Gauge, Crosshair, Flame, Star, Menu, ArrowRight } from "lucide-react";
 import { getLoginUrl } from "@/const";
 import UserProfileButton from "@/components/UserProfileButton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -283,18 +283,12 @@ export default function Home() {
                   <div className="space-y-2">
                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider px-2">📦 Físicos, Consoles & Acessórios</h4>
                     <div className="space-y-1">
-                      <a href="/usados" className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-slate-900 text-xs font-semibold text-slate-300 hover:text-white transition-colors">
-                        <ShoppingCart className="w-4 h-4 text-blue-400" /> Desapegos de Jogos Físicos & Consoles
-                      </a>
                       <a href="/usados" className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-900 text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors border border-blue-950/40">
                         <span className="flex items-center gap-2.5"><Package className="w-4 h-4 text-blue-400" /> Mídia Física / Consoles Diversos</span>
                         <span className="bg-blue-600/30 text-blue-400 text-[9px] px-1.5 py-0.5 rounded font-black">NOVO</span>
                       </a>
                       <a href="/loja" className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-slate-900 text-xs font-semibold text-slate-300 hover:text-white transition-colors">
                         <Package className="w-4 h-4 text-emerald-400" /> Loja Oficial Eforte
-                      </a>
-                      <a href="/usados/anunciar" className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-slate-900 text-xs font-semibold text-slate-300 hover:text-white transition-colors">
-                        <PlusCircle className="w-4 h-4 text-slate-400" /> Anunciar meu Item Físico
                       </a>
                     </div>
                   </div>
