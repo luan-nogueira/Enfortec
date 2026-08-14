@@ -45,6 +45,27 @@ function PlatinadorAdminTab() {
   const [editPlatform, setEditPlatform] = useState("PS4 / PS5");
   const [editStatus, setEditStatus] = useState<"ativo" | "encerrado" | "brevemente">("ativo");
 
+  // Modal genérico pra substituir os prompt() nativos do navegador (feios e fora do
+  // padrão visual) por um input com o mesmo tema do resto do painel.
+  const [promptModal, setPromptModal] = useState<{
+    title: string;
+    placeholder?: string;
+    confirmLabel?: string;
+    onConfirm: (value: string) => void;
+  } | null>(null);
+  const [promptValue, setPromptValue] = useState("");
+
+  const openPrompt = (config: { title: string; defaultValue?: string; placeholder?: string; confirmLabel?: string; onConfirm: (value: string) => void }) => {
+    setPromptValue(config.defaultValue || "");
+    setPromptModal({ title: config.title, placeholder: config.placeholder, confirmLabel: config.confirmLabel, onConfirm: config.onConfirm });
+  };
+
+  const confirmPrompt = () => {
+    if (!promptModal) return;
+    promptModal.onConfirm(promptValue);
+    setPromptModal(null);
+  };
+
   const challengesQuery = trpc.platinador.listChallenges.useQuery();
   const submissionsQuery = trpc.platinador.adminListSubmissions.useQuery();
 
@@ -129,12 +150,18 @@ function PlatinadorAdminTab() {
   }, [submissionsQuery.data]);
 
   const handleEditSubmissionPsnId = (submissionId: number, currentPsnId: string) => {
-    const newPsnId = prompt("Novo PSN ID:", currentPsnId);
-    if (!newPsnId || !newPsnId.trim() || newPsnId.trim() === currentPsnId) return;
-    updateSubmissionMutation.mutate(
-      { submissionId, psnId: newPsnId.trim() },
-      { onSuccess: () => { submissionsQuery.refetch(); toast.success("PSN ID atualizado!"); } }
-    );
+    openPrompt({
+      title: "Novo PSN ID",
+      defaultValue: currentPsnId,
+      confirmLabel: "Salvar",
+      onConfirm: (newPsnId) => {
+        if (!newPsnId.trim() || newPsnId.trim() === currentPsnId) return;
+        updateSubmissionMutation.mutate(
+          { submissionId, psnId: newPsnId.trim() },
+          { onSuccess: () => { submissionsQuery.refetch(); toast.success("PSN ID atualizado!"); } }
+        );
+      },
+    });
   };
 
   const handleDeleteSubmission = (sub: any) => {
@@ -152,13 +179,19 @@ function PlatinadorAdminTab() {
   };
 
   const handleRenamePlayer = (player: { psnId: string; submissionIds: number[] }) => {
-    const newPsnId = prompt("Novo PSN ID:", player.psnId);
-    if (!newPsnId || !newPsnId.trim() || newPsnId.trim() === player.psnId) return;
-    Promise.all(
-      player.submissionIds.map(id => updateSubmissionMutation.mutateAsync({ submissionId: id, psnId: newPsnId.trim() }))
-    ).then(() => {
-      submissionsQuery.refetch();
-      toast.success("PSN ID atualizado no ranking!");
+    openPrompt({
+      title: "Novo PSN ID",
+      defaultValue: player.psnId,
+      confirmLabel: "Salvar",
+      onConfirm: (newPsnId) => {
+        if (!newPsnId.trim() || newPsnId.trim() === player.psnId) return;
+        Promise.all(
+          player.submissionIds.map(id => updateSubmissionMutation.mutateAsync({ submissionId: id, psnId: newPsnId.trim() }))
+        ).then(() => {
+          submissionsQuery.refetch();
+          toast.success("PSN ID atualizado no ranking!");
+        });
+      },
     });
   };
 
@@ -448,7 +481,17 @@ function PlatinadorAdminTab() {
                           <Button size="sm" onClick={() => approveMutation.mutate({ submissionId: sub.id, coinsToAward: rewardCoins })} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold">
                             Aprovar (+{rewardCoins} Coins)
                           </Button>
-                          <Button size="sm" variant="destructive" onClick={() => { const reason = prompt("Motivo da rejeição:") || "Foto ilegível"; rejectMutation.mutate({ submissionId: sub.id, adminNotes: reason }); }} className="text-xs font-bold">
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => openPrompt({
+                              title: "Motivo da Rejeição",
+                              placeholder: "Ex: Foto ilegível",
+                              confirmLabel: "Rejeitar",
+                              onConfirm: (reason) => rejectMutation.mutate({ submissionId: sub.id, adminNotes: reason.trim() || "Foto ilegível" }),
+                            })}
+                            className="text-xs font-bold"
+                          >
                             Rejeitar
                           </Button>
                         </div>
@@ -568,6 +611,31 @@ function PlatinadorAdminTab() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Modal genérico de input (substitui os prompt() nativos do navegador) */}
+      <Dialog open={!!promptModal} onOpenChange={(open) => { if (!open) setPromptModal(null); }}>
+        <DialogContent className="bg-slate-900 border-red-600/30 text-white sm:max-w-sm card-neon">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-neon">{promptModal?.title}</DialogTitle>
+          </DialogHeader>
+          <Input
+            autoFocus
+            value={promptValue}
+            onChange={(e) => setPromptValue(e.target.value)}
+            placeholder={promptModal?.placeholder}
+            onKeyDown={(e) => { if (e.key === "Enter") confirmPrompt(); }}
+            className="bg-slate-950 border-red-600/20 text-white"
+          />
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" onClick={() => setPromptModal(null)} className="text-slate-400 hover:text-white">
+              Cancelar
+            </Button>
+            <Button onClick={confirmPrompt} className="bg-red-600 hover:bg-red-700 font-bold btn-neon">
+              {promptModal?.confirmLabel || "OK"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

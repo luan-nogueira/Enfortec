@@ -3,9 +3,35 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { Upload } from "lucide-react";
+import { Upload, Loader2 } from "lucide-react";
+import { storage } from "@/lib/firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+
+/**
+ * Foto de celular costuma vir com 3-10MB de resolução total; redimensiona pro tamanho
+ * que realmente aparece na tela (capa de mídia física) antes de enviar, pra não travar
+ * o cadastro com o limite de tamanho nem inflar o carregamento da loja pros compradores.
+ */
+async function compressImage(file: File, maxDimension = 1600, quality = 0.82): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  let { width, height } = bitmap;
+  if (width > maxDimension || height > maxDimension) {
+    const scale = maxDimension / Math.max(width, height);
+    width = Math.round(width * scale);
+    height = Math.round(height * scale);
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Não foi possível processar a imagem");
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Falha ao comprimir imagem"))), "image/jpeg", quality);
+  });
+}
 
 const BRAZIL_STATES = [
   { uf: "AC", name: "Acre" },
@@ -53,6 +79,8 @@ export default function AddUsedProduct() {
     bairro: "",
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const cepRequestIdRef = useRef(0);
 
   const { data: seller } = trpc.sellers.getByUserId.useQuery(undefined, {
     enabled: isAuthenticated,
@@ -87,38 +115,57 @@ export default function AddUsedProduct() {
     }));
   };
 
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
+    const fileList = Array.from(files);
+    e.target.value = "";
 
-    Array.from(files).forEach((file) => {
-      if (file.size > 3 * 1024 * 1024) {
-        toast.error(`A imagem ${file.name} ultrapassa 3MB.`);
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
+    setUploadingImages(true);
+    let uploadedCount = 0;
+    try {
+      for (const file of fileList) {
+        if (file.size > 20 * 1024 * 1024) {
+          toast.error(`A imagem ${file.name} é grande demais (máx. 20MB).`);
+          continue;
+        }
+        try {
+          const compressed = await compressImage(file);
+          const imageRef = ref(storage, `used_products/${Date.now()}_${file.name.replace(/\.[^.]+$/, "")}.jpg`);
+          const uploadResult = await uploadBytes(imageRef, compressed);
+          const downloadUrl = await getDownloadURL(uploadResult.ref);
           setFormData((prev) => ({
             ...prev,
-            images: [...prev.images, event.target!.result as string].slice(0, 5),
+            images: [...prev.images, downloadUrl].slice(0, 5),
           }));
+          uploadedCount++;
+        } catch (err) {
+          console.error("Erro ao enviar imagem:", err);
+          toast.error(`Erro ao enviar a imagem ${file.name}.`);
         }
-      };
-      reader.readAsDataURL(file);
-    });
-    toast.success("Foto(s) carregada(s) com sucesso!");
+      }
+      if (uploadedCount > 0) {
+        toast.success(`${uploadedCount} foto${uploadedCount > 1 ? "s" : ""} carregada${uploadedCount > 1 ? "s" : ""} com sucesso!`);
+      }
+    } finally {
+      setUploadingImages(false);
+    }
   };
 
   const fetchCep = async (cep: string) => {
     const cleanCep = cep.replace(/\D/g, "");
     if (cleanCep.length !== 8) return;
 
+    // Se a pessoa corrige um dígito digitado errado, uma busca antiga (do CEP errado)
+    // pode responder DEPOIS da busca nova e sobrescrever com a localização errada —
+    // por isso só aplica a resposta se essa ainda for a busca mais recente disparada.
+    const requestId = ++cepRequestIdRef.current;
+
     try {
       setIsLoading(true);
       const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
       const data = await response.json();
+      if (requestId !== cepRequestIdRef.current) return;
 
       if (!data.erro) {
         setFormData(prev => ({
@@ -132,9 +179,10 @@ export default function AddUsedProduct() {
         toast.error("CEP não encontrado");
       }
     } catch (error) {
+      if (requestId !== cepRequestIdRef.current) return;
       toast.error("Erro ao buscar CEP");
     } finally {
-      setIsLoading(false);
+      if (requestId === cepRequestIdRef.current) setIsLoading(false);
     }
   };
 
@@ -381,10 +429,16 @@ export default function AddUsedProduct() {
                 <div className="border-2 border-dashed border-slate-800 rounded-2xl p-6 text-center hover:border-red-500/50 transition bg-slate-950">
                   <Upload className="w-10 h-10 text-red-500 mx-auto mb-2" />
                   <p className="text-slate-300 text-sm mb-3 font-semibold">Tire uma foto clara do estojo, disco ou console</p>
-                  
+
                   <div className="flex flex-wrap gap-3 justify-center">
-                    <label className="cursor-pointer bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition-all flex items-center gap-2">
-                      📷 Tirar Foto com Celular / Escolher Imagem
+                    <label className={`cursor-pointer bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition-all flex items-center gap-2 ${uploadingImages ? "opacity-60 pointer-events-none" : ""}`}>
+                      {uploadingImages ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" /> Enviando foto(s)...
+                        </>
+                      ) : (
+                        "📷 Tirar Foto com Celular / Escolher Imagem"
+                      )}
                       <input
                         type="file"
                         multiple
@@ -392,11 +446,11 @@ export default function AddUsedProduct() {
                         capture="environment"
                         onChange={handleImageFileChange}
                         className="hidden"
-                        disabled={isLoading}
+                        disabled={isLoading || uploadingImages}
                       />
                     </label>
                   </div>
-                  <p className="text-[10px] text-slate-500 mt-2">Formatos ideais: capas verticais (proporção de mídia física)</p>
+                  <p className="text-[10px] text-slate-500 mt-2">A foto é redimensionada automaticamente — não precisa se preocupar com o tamanho do arquivo.</p>
                 </div>
 
                 {/* Preview Thumbnail Grid */}
