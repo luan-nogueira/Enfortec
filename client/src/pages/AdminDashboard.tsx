@@ -69,6 +69,25 @@ function PlatinadorAdminTab() {
   const challengesQuery = trpc.platinador.listChallenges.useQuery();
   const submissionsQuery = trpc.platinador.adminListSubmissions.useQuery();
 
+  // Link do Grupo VIP no WhatsApp — mesmo campo (platformSettings.vipWhatsappUrl) já
+  // editável em "Sistema > Link WhatsApp & ForteCoins", replicado aqui pra ficar junto
+  // do resto da gestão do Clube Platinador.
+  const platformSettingsQuery = trpc.settings.get.useQuery();
+  const [vipWhatsappUrlInput, setVipWhatsappUrlInput] = useState("");
+  useEffect(() => {
+    if (platformSettingsQuery.data?.vipWhatsappUrl !== undefined) {
+      setVipWhatsappUrlInput(platformSettingsQuery.data.vipWhatsappUrl || "");
+    }
+  }, [platformSettingsQuery.data?.vipWhatsappUrl]);
+
+  const updateWhatsappUrlMutation = trpc.settings.updateWhatsappUrl.useMutation({
+    onSuccess: () => {
+      toast.success("Link do Grupo VIP salvo com sucesso!");
+      platformSettingsQuery.refetch();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao salvar o link do grupo."),
+  });
+
   const createChallengeMutation = trpc.platinador.adminCreateChallenge.useMutation({
     onSuccess: () => {
       toast.success("Desafio de platina cadastrado com sucesso!");
@@ -261,6 +280,31 @@ function PlatinadorAdminTab() {
 
   return (
     <div className="space-y-8">
+      {/* Link do Grupo VIP no WhatsApp */}
+      <Card className="bg-[#121212] border-emerald-600/30 p-6 shadow-xl">
+        <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
+          <MessageCircle className="text-emerald-500 w-5 h-5" /> Link do Grupo VIP no WhatsApp
+        </h3>
+        <p className="text-xs text-slate-400 mb-4">
+          É o link que aparece pro assinante clicar em "Acessar Grupo VIP no WhatsApp" na página do Clube Platinador.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Input
+            value={vipWhatsappUrlInput}
+            onChange={(e) => setVipWhatsappUrlInput(e.target.value)}
+            placeholder="https://chat.whatsapp.com/..."
+            className="bg-slate-950 border-emerald-600/20 text-white flex-1"
+          />
+          <Button
+            onClick={() => updateWhatsappUrlMutation.mutate({ vipWhatsappUrl: vipWhatsappUrlInput.trim() })}
+            disabled={updateWhatsappUrlMutation.isPending}
+            className="bg-emerald-600 hover:bg-emerald-700 font-bold text-white shrink-0"
+          >
+            {updateWhatsappUrlMutation.isPending ? "Salvando..." : "Salvar Link"}
+          </Button>
+        </div>
+      </Card>
+
       {/* Form Criar Novo Desafio */}
       <Card className="bg-[#121212] border-red-600/30 p-6 shadow-xl">
         <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">

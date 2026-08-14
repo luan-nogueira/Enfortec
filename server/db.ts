@@ -517,7 +517,7 @@ export async function getPlatformSettings() {
   if (result.length === 0) {
     // Initialize singleton row if not exists
     await db.insert(platformSettings).values({ id: 1, commissionPercentage: "6" }).onConflictDoNothing();
-    return { id: 1, commissionPercentage: "6" };
+    return { id: 1, commissionPercentage: "6", vipWhatsappUrl: null };
   }
   return result[0];
 }

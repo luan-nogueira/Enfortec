@@ -80,6 +80,7 @@ export default function AddUsedProduct() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
+  const [isFetchingCep, setIsFetchingCep] = useState(false);
   const cepRequestIdRef = useRef(0);
 
   const { data: seller } = trpc.sellers.getByUserId.useQuery(undefined, {
@@ -162,7 +163,10 @@ export default function AddUsedProduct() {
     const requestId = ++cepRequestIdRef.current;
 
     try {
-      setIsLoading(true);
+      // Estado dedicado só pra essa busca — usar o isLoading geral do formulário aqui
+      // desabilitava TODOS os campos (inclusive o próprio CEP) durante a requisição,
+      // então digitar rápido logo após completar o CEP "comia" as teclas seguintes.
+      setIsFetchingCep(true);
       const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
       const data = await response.json();
       if (requestId !== cepRequestIdRef.current) return;
@@ -182,7 +186,7 @@ export default function AddUsedProduct() {
       if (requestId !== cepRequestIdRef.current) return;
       toast.error("Erro ao buscar CEP");
     } finally {
-      if (requestId === cepRequestIdRef.current) setIsLoading(false);
+      if (requestId === cepRequestIdRef.current) setIsFetchingCep(false);
     }
   };
 
