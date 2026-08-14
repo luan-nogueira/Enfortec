@@ -344,13 +344,17 @@ export const appRouter = router({
         const database = await getDb();
         if (!database) throw new Error("Database not available");
 
-        const seller = await db.getSellerByUserId(ctx.user.id);
-        if (!seller) throw new TRPCError({ code: "FORBIDDEN", message: "User is not a seller" });
-
         const productResult = await database.select().from(usedProducts).where(eq(usedProducts.id, input.id)).limit(1);
         const product = productResult[0];
         if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Anúncio não encontrado" });
-        if (product.sellerId !== seller.id) throw new TRPCError({ code: "FORBIDDEN", message: "Este anúncio não pertence a você" });
+
+        // Contas admin gerenciam o estoque compartilhado da loja (ver getUsedProductsForAccount) —
+        // podem turbinar qualquer anúncio dela, não só o vinculado à própria linha de vendedor.
+        if (ctx.user.role !== "admin") {
+          const seller = await db.getSellerByUserId(ctx.user.id);
+          if (!seller) throw new TRPCError({ code: "FORBIDDEN", message: "User is not a seller" });
+          if (product.sellerId !== seller.id) throw new TRPCError({ code: "FORBIDDEN", message: "Este anúncio não pertence a você" });
+        }
 
         const BOOST_COST = 10;
         if ((ctx.user.forteCoins || 0) < BOOST_COST) {

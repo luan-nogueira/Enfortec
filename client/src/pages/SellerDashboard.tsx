@@ -78,7 +78,7 @@ export default function SellerDashboard() {
   const createProductMutation = trpc.usedProducts.create.useMutation();
   const boostProductMutation = trpc.usedProducts.boost.useMutation();
 
-  const { data: trpcUsedProducts, isLoading: isUsedLoading } = trpc.usedProducts.getByUserId.useQuery(undefined, { enabled: isAuthenticated && !!user?.id });
+  const { data: trpcUsedProducts, isLoading: isUsedLoading, refetch: refetchUsedProducts } = trpc.usedProducts.getByUserId.useQuery(undefined, { enabled: isAuthenticated && !!user?.id });
   const { data: trpcDigitalProducts, isLoading: isDigitalLoading } = trpc.digitalProducts.getByUserId.useQuery(undefined, { enabled: isAuthenticated && !!user?.id });
 
   useEffect(() => {
@@ -289,6 +289,7 @@ export default function SellerDashboard() {
             // O saldo e a titularidade do anúncio são validados e debitados no servidor (Postgres),
             // que é a fonte de verdade real usada no checkout — não faz sentido debitar no Firestore aqui.
             await boostProductMutation.mutateAsync({ id: Number(product.id) });
+            await refetchUsedProducts();
             toast.success("Anúncio turbinado com sucesso! ⭐");
           } catch (error: any) {
             console.error("Erro ao turbinar:", error);
