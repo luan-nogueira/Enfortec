@@ -415,17 +415,32 @@ export default function JogueComEconomia() {
                 <p>• Suporte total via WhatsApp e Chat da loja.</p>
               </div>
 
-              {/* WhatsApp direct support button */}
-              <button
-                type="button"
-                onClick={() => {
-                  const msg = encodeURIComponent(`Olá! Tenho uma dúvida antes de finalizar a compra do jogo "${selectedProduct.name}". Podem me ajudar?`);
-                  window.open(`https://wa.me/554384253691?text=${msg}`, "_blank");
-                }}
-                className="w-full py-2 bg-green-950/40 border border-green-800/40 hover:bg-green-900/50 text-green-400 font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-colors"
-              >
-                💬 Dúvidas sobre ativação? Fale no WhatsApp
-              </button>
+              {/* WhatsApp direct support buttons */}
+              <div className="space-y-1.5">
+                <p className="text-[11px] text-slate-400 text-center">💬 Dúvidas sobre ativação? Fale no WhatsApp</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const msg = encodeURIComponent(`Olá André! Tenho uma dúvida antes de finalizar a compra do jogo "${selectedProduct.name}". Podem me ajudar?`);
+                      window.open(`https://wa.me/554384253691?text=${msg}`, "_blank");
+                    }}
+                    className="w-full py-2 bg-green-950/40 border border-green-800/40 hover:bg-green-900/50 text-green-400 font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-colors"
+                  >
+                    Fale com André
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const msg = encodeURIComponent(`Olá Sandro! Tenho uma dúvida antes de finalizar a compra do jogo "${selectedProduct.name}". Podem me ajudar?`);
+                      window.open(`https://wa.me/557187650840?text=${msg}`, "_blank");
+                    }}
+                    className="w-full py-2 bg-green-950/40 border border-green-800/40 hover:bg-green-900/50 text-green-400 font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-colors"
+                  >
+                    Fale com Sandro
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div className="flex gap-2 justify-end pt-2 border-t border-slate-800">
