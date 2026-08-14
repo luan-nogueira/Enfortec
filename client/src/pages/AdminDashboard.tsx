@@ -2748,9 +2748,9 @@ export default function AdminDashboard() {
                   </span>
                 )}
               </button>
-              <Button onClick={() => setShowCreateModal(true)} className="bg-red-600 hover:bg-red-700 font-bold btn-neon flex items-center gap-1.5 h-9 text-xs sm:h-10 sm:text-sm">
+              <Button onClick={() => setShowCreateModal(true)} className="bg-red-600 hover:bg-red-700 font-bold btn-neon flex items-center gap-1.5 h-9 px-2.5 sm:px-4 text-xs sm:h-10 sm:text-sm shrink-0">
                 <Plus className="w-4 h-4" />
-                Criar Novo Acesso
+                <span className="hidden sm:inline">Criar Novo Acesso</span>
               </Button>
             </div>
           </div>
@@ -5001,8 +5001,144 @@ export default function AdminDashboard() {
               </DialogFooter>
             </div>
           ) : (
-            <div className="space-y-6 py-4">
-              <div className="max-h-[50vh] overflow-auto border border-red-600/10 rounded-lg">
+            <div className="space-y-3 py-4 min-w-0">
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Jogos marcados <strong className="text-slate-400">"Não encontrada"</strong> não existem no catálogo da Steam (comum em exclusivos de PlayStation). Clique em <strong className="text-amber-400">🔍</strong> pra abrir o Google Imagens já buscando o jogo — clique com o botão direito na foto desejada, escolha "Copiar link da imagem" e cole no campinho abaixo da capa. Ou use <strong className="text-blue-400">📸</strong> pra enviar uma foto do seu computador.
+              </p>
+
+              {/* Mobile: cards empilhados, sem precisar rolar de lado dentro do modal */}
+              <div className="sm:hidden space-y-3 max-h-[55vh] overflow-y-auto pr-1">
+                {batchGames.map((game, idx) => (
+                  <div key={game.id} className="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2.5">
+                    <div className="flex gap-3">
+                      <div className="shrink-0">
+                        <div className="h-16 w-16 rounded bg-slate-900 overflow-hidden border border-red-600/10 flex items-center justify-center relative">
+                          {game.imageUrl ? (
+                            <img src={game.imageUrl} alt="Capa" className="w-full h-full object-cover" />
+                          ) : game.status === "searching" ? (
+                            <span className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <span className="text-[8px] text-slate-600 text-center font-bold px-1">Não encontrada</span>
+                          )}
+                        </div>
+                        {!game.imageUrl && game.status !== "searching" && (
+                          <input
+                            type="text"
+                            placeholder="Colar link"
+                            className="mt-1 w-16 bg-slate-900 border border-slate-800 rounded text-[8px] text-white px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-red-500/50"
+                            onKeyDown={(e) => {
+                              if (e.key !== "Enter") return;
+                              const url = (e.target as HTMLInputElement).value.trim();
+                              if (!url) return;
+                              const updated = [...batchGames];
+                              updated[idx].imageUrl = url;
+                              updated[idx].status = "found";
+                              setBatchGames(updated);
+                            }}
+                            onBlur={(e) => {
+                              const url = e.target.value.trim();
+                              if (!url) return;
+                              const updated = [...batchGames];
+                              updated[idx].imageUrl = url;
+                              updated[idx].status = "found";
+                              setBatchGames(updated);
+                            }}
+                          />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0 space-y-1.5">
+                        <Input
+                          value={game.name}
+                          onChange={(e) => {
+                            const updated = [...batchGames];
+                            updated[idx].name = e.target.value;
+                            setBatchGames(updated);
+                          }}
+                          placeholder="Nome do jogo"
+                          className="bg-slate-900 border-slate-800 h-8 text-xs text-white"
+                        />
+                        <div className="flex items-center gap-1.5">
+                          <label className="cursor-pointer hover:bg-slate-800 p-1.5 rounded text-blue-400 hover:text-blue-300" title="Upload local de foto">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleBatchImageUpload(game.id, file);
+                              }}
+                              className="hidden"
+                            />
+                            📸
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const q = encodeURIComponent(`${game.name} capa jogo ps4 ps5`);
+                              window.open(`https://www.google.com/search?tbm=isch&q=${q}`, "_blank");
+                            }}
+                            className="hover:bg-slate-800 p-1.5 rounded text-amber-400 hover:text-amber-300"
+                            title="Buscar capa no Google Imagens"
+                          >
+                            🔍
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setBatchGames(batchGames.filter((_, i) => i !== idx))}
+                            className="hover:bg-slate-800 p-1.5 rounded text-red-500 hover:text-red-400 ml-auto"
+                            title="Remover linha"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="text-[9px] text-slate-500 uppercase font-bold block mb-0.5">Preço R$</label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={game.price}
+                          onChange={(e) => {
+                            const updated = [...batchGames];
+                            updated[idx].price = Number(e.target.value);
+                            setBatchGames(updated);
+                          }}
+                          className="bg-slate-900 border-slate-800 h-8 text-xs text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] text-slate-500 uppercase font-bold block mb-0.5">Plataforma</label>
+                        <Input
+                          value={game.platform}
+                          onChange={(e) => {
+                            const updated = [...batchGames];
+                            updated[idx].platform = e.target.value;
+                            setBatchGames(updated);
+                          }}
+                          className="bg-slate-900 border-slate-800 h-8 text-xs text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] text-slate-500 uppercase font-bold block mb-0.5">Estoque</label>
+                        <Input
+                          type="number"
+                          value={game.stock}
+                          onChange={(e) => {
+                            const updated = [...batchGames];
+                            updated[idx].stock = Number(e.target.value);
+                            setBatchGames(updated);
+                          }}
+                          className="bg-slate-900 border-slate-800 h-8 text-xs text-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop/tablet: tabela normal */}
+              <div className="hidden sm:block max-h-[50vh] overflow-auto border border-red-600/10 rounded-lg min-w-0">
                 <table className="w-full min-w-[640px] text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-950 text-slate-400 text-[10px] uppercase tracking-wider border-b border-red-600/20">
@@ -5026,9 +5162,33 @@ export default function AdminDashboard() {
                                 <span className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
                               </div>
                             ) : (
-                              <span className="text-[9px] text-slate-600 text-center font-bold">Sem capa</span>
+                              <span className="text-[9px] text-slate-600 text-center font-bold px-1">Não encontrada</span>
                             )}
                           </div>
+                          {!game.imageUrl && game.status !== "searching" && (
+                            <input
+                              type="text"
+                              placeholder="Colar link da imagem"
+                              className="mt-1 w-20 bg-slate-950 border border-slate-800 rounded text-[9px] text-white px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-red-500/50"
+                              onKeyDown={(e) => {
+                                if (e.key !== "Enter") return;
+                                const url = (e.target as HTMLInputElement).value.trim();
+                                if (!url) return;
+                                const updated = [...batchGames];
+                                updated[idx].imageUrl = url;
+                                updated[idx].status = "found";
+                                setBatchGames(updated);
+                              }}
+                              onBlur={(e) => {
+                                const url = e.target.value.trim();
+                                if (!url) return;
+                                const updated = [...batchGames];
+                                updated[idx].imageUrl = url;
+                                updated[idx].status = "found";
+                                setBatchGames(updated);
+                              }}
+                            />
+                          )}
                         </td>
                         <td className="py-3 px-3">
                           <Input
@@ -5091,6 +5251,17 @@ export default function AdminDashboard() {
                               />
                               📸
                             </label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const q = encodeURIComponent(`${game.name} capa jogo ps4 ps5`);
+                                window.open(`https://www.google.com/search?tbm=isch&q=${q}`, "_blank");
+                              }}
+                              className="hover:bg-slate-800 p-1.5 rounded text-amber-400 hover:text-amber-300"
+                              title="Buscar capa no Google Imagens (clique com botão direito na imagem escolhida e 'Copiar link da imagem', depois cole no campo abaixo da capa)"
+                            >
+                              🔍
+                            </button>
                             <button
                               type="button"
                               onClick={() => {
