@@ -14,11 +14,23 @@ import "./index.css";
 // um chunk que não existe mais, o Vite dispara esse evento em vez de travar silenciosamente
 // — recarrega a página uma vez para pegar a versão atual. Guarda em sessionStorage pra não
 // entrar em loop caso o recarregamento não resolva (problema de rede, por exemplo).
-window.addEventListener("vite:preloadError", () => {
+function reloadOnceAfterStaleChunk() {
   const key = "forte_reloaded_after_preload_error";
   if (sessionStorage.getItem(key)) return;
   sessionStorage.setItem(key, "1");
   window.location.reload();
+}
+
+window.addEventListener("vite:preloadError", reloadOnceAfterStaleChunk);
+
+// Em alguns navegadores/rotas, um chunk lazy (React.lazy/import()) que não existe mais
+// depois de um deploy novo rejeita a promise direto como "Failed to fetch dynamically
+// imported module", sem passar pelo evento vite:preloadError acima — cobre esse caso.
+window.addEventListener("unhandledrejection", (event) => {
+  const msg = String(event.reason?.message || event.reason || "");
+  if (/Failed to fetch dynamically imported module|error loading dynamically imported module/i.test(msg)) {
+    reloadOnceAfterStaleChunk();
+  }
 });
 
 const queryClient = new QueryClient();
