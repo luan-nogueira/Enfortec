@@ -13,7 +13,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { getLoginUrl } from "@/const";
-import { Package, Star, AlertCircle, MessageCircle } from "lucide-react";
+import { Package, Star, AlertCircle, MessageCircle, Clock, Zap } from "lucide-react";
+import { getStoreStatus } from "@/lib/storeHours";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -95,7 +96,7 @@ export default function MyPurchases() {
   return (
     <div className="min-h-screen bg-slate-950 p-4 sm:p-6 pt-24 pb-28 lg:pb-6">
       <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold text-white flex items-center gap-3">
             <Package className="w-8 h-8 text-red-500" />
             Minhas Compras
@@ -104,6 +105,24 @@ export default function MyPurchases() {
             Voltar
           </Button>
         </div>
+
+        {/* Banner de Horário de Atendimento da Loja */}
+        {(() => {
+          const storeStatus = getStoreStatus();
+          if (storeStatus.isOpen) return null;
+          return (
+            <div className="mb-6 p-4 bg-amber-950/30 border border-amber-500/30 rounded-2xl flex items-start gap-3 shadow-lg">
+              <Clock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5 animate-pulse" />
+              <div>
+                <h4 className="text-sm font-black text-amber-400 uppercase tracking-wider">Aviso de Horário de Atendimento</h4>
+                <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                  A loja encerrou o atendimento de hoje (<strong>Horário de Funcionamento: Segunda a Sábado até 22:00 / Domingos até 16:00</strong>).
+                  As mídias digitais compradas fora do horário serão entregues {storeStatus.nextOpeningText} assim que a loja abrir!
+                </p>
+              </div>
+            </div>
+          );
+        })()}
 
         {isLoading ? (
           <div className="text-center text-slate-400 py-12">Carregando suas compras...</div>

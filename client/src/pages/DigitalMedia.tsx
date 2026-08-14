@@ -704,6 +704,13 @@ export default function DigitalMedia() {
                     </div>
                   </div>
                   <div className="p-2 sm:p-3 flex flex-col flex-1">
+                    {product.sellerId ? (
+                      <div className="mb-1">
+                        <span className="text-[8px] sm:text-[9px] font-black bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-sm">
+                          🤝 Vendedor Parceiro
+                        </span>
+                      </div>
+                    ) : null}
                     <h3 className="text-[11px] sm:text-sm font-bold text-white line-clamp-2 mb-1.5 sm:mb-2 group-hover:text-red-400 transition-colors flex-1">
                       {product.name}
                     </h3>

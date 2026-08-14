@@ -392,6 +392,34 @@ export const appRouter = router({
         await database.delete(usedProducts).where(eq(usedProducts.id, input.id));
         return { success: true };
       }),
+    moveToDigital: protectedProcedure
+      .input(z.object({ usedProductId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+
+        const usedRows = await database.select().from(usedProducts).where(eq(usedProducts.id, input.usedProductId)).limit(1);
+        if (!usedRows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Anúncio não encontrado" });
+
+        const used = usedRows[0];
+        const image = used.images && used.images.length > 0 ? used.images[0] : null;
+
+        await database.insert(digitalProducts).values({
+          sellerId: used.sellerId,
+          name: used.name,
+          description: used.description || "",
+          price: used.price,
+          pricePrimary: used.price,
+          type: "jogo",
+          platform: "PS4/PS5",
+          imageUrl: image,
+          isActive: true,
+        });
+
+        await database.delete(usedProducts).where(eq(usedProducts.id, input.usedProductId));
+        return { success: true };
+      }),
   }),
 
   // Digital Products Router

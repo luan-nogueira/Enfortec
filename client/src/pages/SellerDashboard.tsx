@@ -492,121 +492,26 @@ export default function SellerDashboard() {
         {activeTab === "produtos" && (
           <div>
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-6">
-              <h2 className="text-2xl font-bold text-white">Meus Produtos Anunciados</h2>
+              <div>
+                <h2 className="text-2xl font-bold text-white">Minhas Contas e Produtos Anunciados</h2>
+                <p className="text-xs text-slate-400">Cadastre e gerencie suas contas EforteGames anunciadas na plataforma</p>
+              </div>
               <div className="flex flex-col sm:flex-row gap-2">
-                <Button onClick={() => navigate("/digital/vender")} className="bg-purple-600 hover:bg-purple-700 btn-neon">
-                  <Plus className="w-4 h-4 mr-2" /> Vender Conta / Mídia Digital
-                </Button>
-                <Button onClick={() => setShowAddForm(!showAddForm)} className="bg-red-600 hover:bg-red-700 btn-neon">
-                  {showAddForm ? "Cancelar" : <><Plus className="w-4 h-4 mr-2" /> Novo Produto Físico</>}
+                <Button onClick={() => navigate("/digital/vender")} className="bg-red-600 hover:bg-red-700 btn-neon text-white font-bold">
+                  <Plus className="w-4 h-4 mr-2" /> Cadastrar Conta Enfortegames
                 </Button>
               </div>
             </div>
 
-            {showAddForm && (
-              <Card className="p-6 card-neon mb-8">
-                <h3 className="text-lg font-bold text-white mb-1">Anunciar Produto Físico</h3>
-                <p className="text-xs text-slate-500 mb-4">
-                  Este formulário é apenas para mídia física, consoles e acessórios. Para vender contas ou mídia digital,
-                  use o botão "Vender Conta / Mídia Digital" acima.
-                </p>
-                <form onSubmit={handleAddProduct} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="md:col-span-2">
-                    <Label className="text-slate-300">Nome do Produto</Label>
-                    <Input required value={name} onChange={e => setName(e.target.value)} className="bg-slate-900 border-red-600/30 text-white" />
-                  </div>
-                  <div className="md:col-span-2">
-                    <Label className="text-slate-300">Descrição</Label>
-                    <Input required value={description} onChange={e => setDescription(e.target.value)} className="bg-slate-900 border-red-600/30 text-white" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-slate-300">Preço PS4 (R$)</Label>
-                      <Input type="number" step="0.01" value={pricePS4} onChange={e => setPricePS4(e.target.value)} className="bg-slate-900 border-red-600/30 text-white" placeholder="0.00" />
-                    </div>
-                    <div>
-                      <Label className="text-slate-300">Preço PS5 (R$)</Label>
-                      <Input type="number" step="0.01" value={pricePS5} onChange={e => setPricePS5(e.target.value)} className="bg-slate-900 border-red-600/30 text-white" placeholder="0.00" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div>
-                        <Label className="text-slate-300">CEP *</Label>
-                        <Input
-                          value={cep}
-                          onChange={handleCepChange}
-                          placeholder="00000-000"
-                          disabled={loading}
-                          required
-                          className="bg-slate-900 border-slate-700"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-slate-300">Estado (UF) *</Label>
-                        <select
-                          value={estado}
-                          onChange={(e) => setEstado(e.target.value)}
-                          className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-red-500"
-                          disabled={loading}
-                          required
-                        >
-                          <option value="">Selecione...</option>
-                          {BRAZIL_STATES.map(st => (
-                            <option key={st.uf} value={st.uf}>{st.name} ({st.uf})</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <Label className="text-slate-300">Cidade *</Label>
-                        <Input
-                          value={cidade}
-                          onChange={(e) => setCidade(e.target.value)}
-                          placeholder="Ex: Londrina"
-                          disabled={loading}
-                          required
-                          className="bg-slate-900 border-slate-700"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-slate-300">Bairro *</Label>
-                        <Input
-                          value={bairro}
-                          onChange={(e) => setBairro(e.target.value)}
-                          placeholder="Ex: Centro"
-                          disabled={loading}
-                          required
-                          className="bg-slate-900 border-slate-700"
-                        />
-                      </div>
-                    </div>
-                  <div>
-                    <Label className="text-slate-300">Foto do Produto</Label>
-                    <Input 
-                      id="sellerImageUpload"
-                      required 
-                      type="file" 
-                      accept="image/*"
-                      onChange={e => {
-                        if (e.target.files && e.target.files[0]) {
-                          setImageFile(e.target.files[0]);
-                        }
-                      }} 
-                      className="bg-slate-900 border-red-600/30 file:text-red-500 file:bg-slate-950 file:border-0 file:mr-4 file:py-2 file:px-4 file:rounded-md cursor-pointer text-slate-300" 
-                    />
-                  </div>
-                  <div className="flex items-end md:col-span-2">
-                    <Button type="submit" disabled={loading} className="w-full bg-red-600 hover:bg-red-700 py-6 text-lg font-bold">
-                      {loading ? "Salvando e Enviando Imagem..." : "Salvar Anúncio"}
-                    </Button>
-                  </div>
-                </form>
-              </Card>
-            )}
-
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {usedProducts.length === 0 && !showAddForm && (
-                <div className="col-span-full py-8 text-center text-slate-500">
-                  Você ainda não tem nenhum produto anunciado.
+              {usedProducts.length === 0 && (
+                <div className="col-span-full py-12 text-center bg-slate-900/40 rounded-2xl border border-slate-800">
+                  <Flame className="w-12 h-12 text-red-500/40 mx-auto mb-3" />
+                  <h3 className="text-base font-bold text-slate-300 mb-1">Nenhuma conta anunciada ainda</h3>
+                  <p className="text-xs text-slate-500 mb-4">Cadastre sua conta EforteGames para começar a revender!</p>
+                  <Button onClick={() => navigate("/digital/vender")} className="bg-red-600 hover:bg-red-700 btn-neon text-xs">
+                    <Plus className="w-4 h-4 mr-1.5" /> Cadastrar Conta Agora
+                  </Button>
                 </div>
               )}
               {usedProducts.map((product) => (
