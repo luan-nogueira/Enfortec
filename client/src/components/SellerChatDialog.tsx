@@ -123,10 +123,10 @@ export default function SellerChatDialog({
           participants: [user.id, resolvedSellerId],
         },
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error("[SellerChat] Erro ao enviar mensagem:", err);
       setMessage(msg);
-      toast.error("Erro ao enviar mensagem. Tente novamente.");
+      toast.error(err?.message || "Erro ao enviar mensagem. Tente novamente.");
     } finally {
       setSending(false);
     }

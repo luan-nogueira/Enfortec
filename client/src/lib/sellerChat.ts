@@ -6,6 +6,7 @@ import {
   serverTimestamp,
   setDoc,
 } from "firebase/firestore";
+import { containsLink, LINK_BLOCKED_MESSAGE } from "@/lib/textFilters";
 
 /**
  * Conversas 1:1 entre comprador e vendedor.
@@ -66,6 +67,13 @@ export async function sendSellerChatMessage(params: {
   thread: Omit<SellerChatThread, "id">;
 }) {
   const { threadId, text, senderId, senderName, senderRole, thread } = params;
+
+  // Admin/suporte pode precisar mandar links (comprovantes, páginas de pagamento);
+  // comprador e vendedor não — evita que combinem a venda fora da plataforma.
+  if (senderRole !== "admin" && containsLink(text)) {
+    throw new Error(LINK_BLOCKED_MESSAGE);
+  }
+
   const threadRef = doc(db, SELLER_CHATS, threadId);
 
   await setDoc(

@@ -110,10 +110,10 @@ export default function SellerChatsPanel({ role, emptyMessage }: SellerChatsPane
           participants: selected.participants || [selected.buyerId, selected.sellerId],
         },
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error("[SellerChatsPanel] Erro ao responder:", err);
       setReply(text);
-      toast.error("Erro ao enviar a resposta. Tente novamente.");
+      toast.error(err?.message || "Erro ao enviar a resposta. Tente novamente.");
     } finally {
       setSending(false);
     }

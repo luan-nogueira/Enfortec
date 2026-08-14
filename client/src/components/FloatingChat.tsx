@@ -16,6 +16,8 @@ import {
   getDocs
 } from "firebase/firestore";
 import { MessageCircle, X, Send, Bot, ShieldCheck, Zap, Trophy, ShoppingBag, Sparkles } from "lucide-react";
+import { toast } from "sonner";
+import { containsLink, LINK_BLOCKED_MESSAGE } from "@/lib/textFilters";
 
 // Catalog is now fetched dynamically from Firestore
 
@@ -287,6 +289,11 @@ export default function FloatingChat() {
 
   const sendMessage = async (msg: string) => {
     if (!msg.trim() || thinking) return;
+
+    if (containsLink(msg)) {
+      toast.error(LINK_BLOCKED_MESSAGE);
+      return;
+    }
 
     const uid = isAuthenticated && user?.id ? user.id : "guest";
     const uname = isAuthenticated && user?.name ? user.name : "Visitante";
