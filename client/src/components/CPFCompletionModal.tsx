@@ -36,7 +36,7 @@ function isValidCPF(cpf: string) {
 }
 
 export default function CPFCompletionModal() {
-  const { isAuthenticated, user, loading } = useAuth();
+  const { isAuthenticated, user, loading, isAdmin } = useAuth();
   const [cpf, setCpf] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -46,13 +46,14 @@ export default function CPFCompletionModal() {
   const updateProfileMutation = trpc.auth.updateProfile.useMutation();
 
   useEffect(() => {
-    // Show modal if user is logged in, loaded, but has no CPF registered
-    if (!loading && isAuthenticated && user && !user.cpf && !completedLocally) {
+    // Contas admin (gestor) têm acesso total ao site e não precisam de CPF —
+    // essa exigência é só pra garantir segurança das transações de clientes.
+    if (!loading && isAuthenticated && user && !user.cpf && !completedLocally && !isAdmin) {
       setIsOpen(true);
     } else {
       setIsOpen(false);
     }
-  }, [isAuthenticated, user, loading, completedLocally]);
+  }, [isAuthenticated, user, loading, completedLocally, isAdmin]);
 
   const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/\D/g, "");

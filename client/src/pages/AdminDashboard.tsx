@@ -578,7 +578,10 @@ export default function AdminDashboard() {
   const [, navigate] = useLocation();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("visao-geral");
+  const [activeTab, setActiveTab] = useState(() => {
+    const tabFromUrl = new URLSearchParams(window.location.search).get("tab");
+    return tabFromUrl || "visao-geral";
+  });
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Helpers to calculate sales stats
@@ -1852,9 +1855,11 @@ export default function AdminDashboard() {
   }, [notificationFeed]);
 
   // Pop-up em tempo real: dispara um toast quando surge uma notificação pendente
-  // nova (venda, mensagem de cliente, resgate, indicação) enquanto o gestor está
-  // com o painel aberto. Na primeira carga só registra o que já existe, sem
-  // alertar — senão toda pendência antiga viraria um pop-up ao abrir o painel.
+  // nova (venda, resgate, indicação) enquanto o gestor está com o painel aberto.
+  // Mensagens de chat ficam por conta do GlobalChatNotifier (App.tsx), que já
+  // avisa em qualquer página do site — evita balão duplicado aqui dentro do /admin.
+  // Na primeira carga só registra o que já existe, sem alertar — senão toda
+  // pendência antiga viraria um pop-up ao abrir o painel.
   const seenNotifIdsRef = useRef<Set<string> | null>(null);
   useEffect(() => {
     const pendingIds = notificationFeed.filter(n => n.status === "pendente").map(n => n.id as string);
@@ -1864,7 +1869,7 @@ export default function AdminDashboard() {
       return;
     }
 
-    const newOnes = notificationFeed.filter(n => n.status === "pendente" && !seenNotifIdsRef.current!.has(n.id));
+    const newOnes = notificationFeed.filter(n => n.status === "pendente" && n.category !== "mensagem" && !seenNotifIdsRef.current!.has(n.id));
     newOnes.forEach(n => {
       toast(n.title, {
         description: n.subtitle,

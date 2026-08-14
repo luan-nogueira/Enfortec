@@ -6,6 +6,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import FloatingChat from "./components/FloatingChat";
+import GlobalChatNotifier from "./components/GlobalChatNotifier";
 import SocialProofToast from "./components/SocialProofToast";
 import MobileBottomNav from "./components/MobileBottomNav";
 import CPFCompletionModal from "./components/CPFCompletionModal";
@@ -124,6 +125,7 @@ function App() {
           <Toaster />
           <Router />
           <FloatingChat />
+          <GlobalChatNotifier />
           <SocialProofToast />
           <MobileBottomNav />
           <CPFCompletionModal />
