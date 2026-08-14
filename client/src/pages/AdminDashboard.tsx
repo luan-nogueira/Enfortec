@@ -1219,7 +1219,11 @@ export default function AdminDashboard() {
   // Jogos
   const adminDigitalProductsQuery = trpc.digitalProducts.adminList.useQuery(undefined, { enabled: !!(isAuthenticated && isAdmin) });
   const gamesList = adminDigitalProductsQuery.data || [];
-  
+
+  // Mutation dedicada pro cadastro em lote — sem os callbacks de sucesso/erro da mutation
+  // de "Adicionar Jogo" (que fecham o modal errado e disparariam um toast por jogo).
+  const batchCreateGameMutation = trpc.digitalProducts.adminCreate.useMutation();
+
   const adminCreateGameMutation = trpc.digitalProducts.adminCreate.useMutation({
     onSuccess: () => {
       toast.success("Produto/Jogo cadastrado com sucesso!");
@@ -1557,33 +1561,47 @@ export default function AdminDashboard() {
     setIsSavingBatch(true);
     setBatchSaveProgress(0);
 
+    // Cadastra no Postgres (mesmo banco que alimenta o catálogo real do site e a lista
+    // "Gerenciar Jogos") — antes isso ia pro Firestore, uma base que nada mais lê hoje,
+    // então os jogos "cadastrados com sucesso" nunca apareciam em lugar nenhum.
     let count = 0;
-    try {
-      for (const game of batchGames) {
-        await addDoc(collection(db, "digital_products"), {
+    const failed: string[] = [];
+    for (const game of batchGames) {
+      try {
+        await batchCreateGameMutation.mutateAsync({
           name: game.name.trim(),
-          price: Number(game.price),
-          platform: game.platform.trim(),
-          imageUrl: game.imageUrl.trim(),
-          stock: Number(game.stock),
-          isActive: true,
+          price: Number(game.price) || 33.30,
+          pricePrimary: null,
+          priceSecondary: null,
           type: "jogo",
-          description: "Jogo Mídia Digital.",
-          createdAt: new Date().toISOString()
+          platform: game.platform?.trim() || "PS4/PS5",
+          imageUrl: game.imageUrl?.trim() || undefined,
+          coverFit: "cover",
+          stock: Number(game.stock) || 999,
+          isActive: true,
+          isPreVenda: false,
         });
         count++;
-        setBatchSaveProgress(Math.round((count / batchGames.length) * 100));
+      } catch (err: any) {
+        console.error(`Erro ao cadastrar "${game.name}":`, err);
+        failed.push(game.name);
       }
+      setBatchSaveProgress(Math.round(((count + failed.length) / batchGames.length) * 100));
+    }
+
+    adminDigitalProductsQuery.refetch();
+    setIsSavingBatch(false);
+    setBatchSaveProgress(0);
+
+    if (failed.length === 0) {
       toast.success(`${count} jogos cadastrados com sucesso!`);
       setShowBatchModal(false);
       setBatchRawText("");
       setBatchGames([]);
-    } catch (error) {
-      console.error("Erro ao cadastrar lote:", error);
-      toast.error(`Erro ao salvar lote de jogos. Cadastrados: ${count} de ${batchGames.length}.`);
-    } finally {
-      setIsSavingBatch(false);
-      setBatchSaveProgress(0);
+    } else {
+      toast.error(`Cadastrados: ${count} de ${batchGames.length}. Falharam: ${failed.join(", ")}`);
+      // Mantém só os que falharam na lista pra tentar de novo, sem perder o que já deu certo.
+      setBatchGames(batchGames.filter((g) => failed.includes(g.name)));
     }
   };
 
