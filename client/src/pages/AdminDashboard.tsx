@@ -1465,8 +1465,32 @@ export default function AdminDashboard() {
       }
     });
 
-    setBatchGames(parsedGames);
-    triggerBatchCoverSearch(parsedGames);
+    // Marca jogos que já existem no catálogo (comparação por nome normalizado, ignorando
+    // acentos/plataforma/maiúsculas) pra não duplicar o mesmo jogo cadastrado sem querer.
+    const normalizeGameName = (n: string) => {
+      const noAccents = (n || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+      return noAccents
+        .replace(/\b(ps4\/ps5|ps5|ps4|xbox|pc)\b/g, "")
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+    };
+
+    const existingNames = new Set(gamesList.map((g: any) => normalizeGameName(g.name)));
+    const seenInBatch = new Set<string>();
+    const gamesWithDuplicateFlag = parsedGames.map((g) => {
+      const norm = normalizeGameName(g.name);
+      const isDuplicate = existingNames.has(norm) || seenInBatch.has(norm);
+      seenInBatch.add(norm);
+      return { ...g, isDuplicate };
+    });
+
+    const duplicateCount = gamesWithDuplicateFlag.filter((g) => g.isDuplicate).length;
+    if (duplicateCount > 0) {
+      toast.warning(`${duplicateCount} jogo${duplicateCount > 1 ? "s" : ""} já ${duplicateCount > 1 ? "existem" : "existe"} no catálogo (marcado${duplicateCount > 1 ? "s" : ""} em amarelo). Remova se não quiser duplicar.`);
+    }
+
+    setBatchGames(gamesWithDuplicateFlag);
+    triggerBatchCoverSearch(gamesWithDuplicateFlag);
   };
 
   const triggerBatchCoverSearch = async (games: any[]) => {
@@ -3189,14 +3213,14 @@ export default function AdminDashboard() {
           </TabsContent>
 
           <TabsContent value="jogos">
-            <div className="flex justify-between items-center mb-8 border-l-4 border-red-600 pl-4">
-              <h2 className="text-xl font-bold text-white uppercase tracking-widest text-sm italic">Catálogo de Jogos</h2>
-              <div className="flex gap-2">
-                <Button onClick={() => { setBatchGames([]); setBatchRawText(""); setShowBatchModal(true); }} className="bg-slate-900 border border-red-600/30 hover:border-red-600/60 text-red-500 font-bold flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-8 border-l-4 border-red-600 pl-4">
+              <h2 className="text-lg sm:text-xl font-bold text-white uppercase tracking-widest sm:text-sm italic">Catálogo de Jogos</h2>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button onClick={() => { setBatchGames([]); setBatchRawText(""); setShowBatchModal(true); }} className="bg-slate-900 border border-red-600/30 hover:border-red-600/60 text-red-500 font-bold flex items-center justify-center gap-2 w-full sm:w-auto text-xs sm:text-sm">
                   📦 Cadastrar em Lote
                 </Button>
-                <Button onClick={() => { resetGameForm(); setShowGameModal(true); }} className="bg-red-600 hover:bg-red-700 font-bold btn-neon flex items-center gap-2">
-                  <Plus className="w-5 h-5" /> Adicionar Jogo
+                <Button onClick={() => { resetGameForm(); setShowGameModal(true); }} className="bg-red-600 hover:bg-red-700 font-bold btn-neon flex items-center justify-center gap-2 w-full sm:w-auto text-xs sm:text-sm">
+                  <Plus className="w-4 h-4 sm:w-5 sm:h-5" /> Adicionar Jogo
                 </Button>
               </div>
             </div>
@@ -3292,6 +3316,37 @@ export default function AdminDashboard() {
                         {game.showInEconomia !== false ? `⚡ Exibindo (${game.economiaLicenseType === "primaria" ? "Primária" : game.economiaLicenseType === "ambas" ? "Ambas" : "Secundária"})` : "Off"}
                       </button>
                     </div>
+
+                    {(game.keyOrCode || game.downloadUrl) && (
+                      <details className="mt-2 pt-2 border-t border-slate-800">
+                        <summary className="cursor-pointer text-[10px] text-amber-400 font-black uppercase tracking-wider select-none">
+                          🔑 Ver Dados de Acesso da Conta
+                        </summary>
+                        <div className="mt-1.5 space-y-1.5">
+                          {game.keyOrCode && (
+                            <div>
+                              <p className="text-[9px] text-slate-500 font-bold uppercase mb-0.5">Login / Senha / Código</p>
+                              <p className="text-[10px] text-slate-200 font-mono break-all select-all bg-slate-950 border border-slate-800 rounded p-1.5">
+                                {game.keyOrCode}
+                              </p>
+                            </div>
+                          )}
+                          {game.downloadUrl && (
+                            <div>
+                              <p className="text-[9px] text-slate-500 font-bold uppercase mb-0.5">URL de Download</p>
+                              <a
+                                href={game.downloadUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[10px] text-blue-400 hover:text-blue-300 underline break-all block bg-slate-950 border border-slate-800 rounded p-1.5"
+                              >
+                                {game.downloadUrl}
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </details>
+                    )}
                   </div>
                 </Card>
               ))}
@@ -5055,8 +5110,11 @@ export default function AdminDashboard() {
                             setBatchGames(updated);
                           }}
                           placeholder="Nome do jogo"
-                          className="bg-slate-900 border-slate-800 h-8 text-xs text-white"
+                          className={`h-8 text-xs text-white ${game.isDuplicate ? "bg-amber-950/30 border-amber-500/50" : "bg-slate-900 border-slate-800"}`}
                         />
+                        {game.isDuplicate && (
+                          <p className="text-[9px] text-amber-400 font-bold">⚠️ Já existe no catálogo</p>
+                        )}
                         <div className="flex items-center gap-1.5">
                           <label className="cursor-pointer hover:bg-slate-800 p-1.5 rounded text-blue-400 hover:text-blue-300" title="Upload local de foto">
                             <input
@@ -5198,8 +5256,11 @@ export default function AdminDashboard() {
                               updated[idx].name = e.target.value;
                               setBatchGames(updated);
                             }}
-                            className="bg-slate-950 border-slate-800 h-8 text-xs text-white"
+                            className={`h-8 text-xs text-white ${game.isDuplicate ? "bg-amber-950/30 border-amber-500/50" : "bg-slate-950 border-slate-800"}`}
                           />
+                          {game.isDuplicate && (
+                            <p className="text-[9px] text-amber-400 font-bold mt-0.5">⚠️ Já existe no catálogo</p>
+                          )}
                         </td>
                         <td className="py-3 px-3">
                           <Input

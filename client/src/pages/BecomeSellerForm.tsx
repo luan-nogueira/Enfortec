@@ -128,7 +128,7 @@ export default function BecomeSellerForm() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-slate-200 py-6 sm:py-12">
+    <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-slate-200 py-6 sm:py-12 pb-28 sm:pb-16">
       <div className="container mx-auto px-4">
         <div className="max-w-2xl mx-auto">
           {/* Header */}

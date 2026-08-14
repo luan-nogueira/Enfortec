@@ -174,6 +174,12 @@ export default function SellerDashboard() {
       toast.warning("Por favor, preencha o Bairro.");
       return;
     }
+    const parsedPricePS4 = pricePS4 ? parseFloat(pricePS4) : 0;
+    const parsedPricePS5 = pricePS5 ? parseFloat(pricePS5) : 0;
+    if (!(parsedPricePS4 > 0) && !(parsedPricePS5 > 0)) {
+      toast.warning("Preencha o preço (PS4 e/ou PS5) — sem isso o anúncio não é publicado.");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -182,38 +188,41 @@ export default function SellerDashboard() {
       const uploadResult = await uploadBytes(imageRef, imageFile);
       const downloadUrl = await getDownloadURL(uploadResult.ref);
 
-      // 2. Salvar Documento
-      await addDoc(collection(db, "used_products"), {
+      // 2. Salvar no Postgres primeiro — é a fonte real usada pela Loja de Usados pública
+      // e pelo "Meus Produtos". Se isso falhar, o anúncio NÃO deve ser dado como publicado
+      // (antes o Firestore era salvo primeiro e "sucesso" aparecia mesmo se o Postgres
+      // falhasse depois em silêncio, e o anúncio nunca aparecia pra ninguém).
+      await createProductMutation.mutateAsync({
         name,
         description,
-        pricePS4: pricePS4 ? parseFloat(pricePS4) : null,
-        pricePS5: pricePS5 ? parseFloat(pricePS5) : null,
-        imageUrl: downloadUrl,
-        sellerId: user?.id,
-        sellerName: user?.name || user?.email,
-        status: "Ativo",
+        price: parsedPricePS4 > 0 ? parsedPricePS4 : parsedPricePS5,
+        condition: "como_novo",
+        images: [downloadUrl],
         cep,
         estado,
         cidade,
-        bairro,
-        createdAt: new Date().toISOString()
+        bairro
       });
 
-      // 3. Salvar no Postgres (tRPC)
+      // 3. Salvar também no Firestore (mantido por compatibilidade com telas que ainda lêem de lá)
       try {
-        await createProductMutation.mutateAsync({
+        await addDoc(collection(db, "used_products"), {
           name,
           description,
-          price: pricePS4 ? parseFloat(pricePS4) : (pricePS5 ? parseFloat(pricePS5) : 0),
-          condition: "como_novo",
-          images: [downloadUrl],
+          pricePS4: pricePS4 ? parseFloat(pricePS4) : null,
+          pricePS5: pricePS5 ? parseFloat(pricePS5) : null,
+          imageUrl: downloadUrl,
+          sellerId: user?.id,
+          sellerName: user?.name || user?.email,
+          status: "Ativo",
           cep,
           estado,
           cidade,
-          bairro
+          bairro,
+          createdAt: new Date().toISOString()
         });
-      } catch (pgErr) {
-        console.warn("[SellerDashboard] Falha ao sincronizar com banco Postgres:", pgErr);
+      } catch (fsErr) {
+        console.warn("[SellerDashboard] Falha ao sincronizar com Firestore (não crítico):", fsErr);
       }
 
       setName("");
@@ -322,7 +331,7 @@ export default function SellerDashboard() {
       </div>
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-4 sm:py-8">
+      <div className="container mx-auto px-4 py-4 sm:py-8 pb-28 lg:pb-8">
         {/* KPI Cards (Saldo Escrow vs Liberado & Reputação) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
           {/* Card 1: Saldo Liberado */}
