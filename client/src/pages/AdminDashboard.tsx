@@ -1338,6 +1338,7 @@ export default function AdminDashboard() {
   // Jogos
   const adminDigitalProductsQuery = trpc.digitalProducts.adminList.useQuery(undefined, { enabled: !!(isAuthenticated && isAdmin) });
   const gamesList = adminDigitalProductsQuery.data || [];
+  const [gameSearchQuery, setGameSearchQuery] = useState("");
 
   // Usuários reais (Postgres) com atividade de verdade — a lista de "users" do Firestore
   // (usada em Gerenciar Acessos) nunca recebe lastSignedIn, então "Usuários Online" na
@@ -3607,9 +3608,32 @@ export default function AdminDashboard() {
                 </Button>
               </div>
             </div>
-            
+
+            <div className="relative mb-6 max-w-sm">
+              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <Input
+                value={gameSearchQuery}
+                onChange={(e) => setGameSearchQuery(e.target.value)}
+                placeholder="Pesquisar jogo pelo nome..."
+                className="bg-slate-950 border-red-600/20 text-white pl-9"
+              />
+            </div>
+
+            {(() => {
+              const filteredGamesList = gameSearchQuery.trim()
+                ? gamesList.filter((g: any) => g.name?.toLowerCase().includes(gameSearchQuery.trim().toLowerCase()))
+                : gamesList;
+              if (filteredGamesList.length === 0) {
+                return (
+                  <div className="text-center py-16 bg-slate-900 border border-slate-800 rounded-2xl">
+                    <Gamepad2 className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                    <p className="text-slate-400 text-sm">Nenhum jogo encontrado para "{gameSearchQuery}".</p>
+                  </div>
+                );
+              }
+              return (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {gamesList.map((game) => (
+              {filteredGamesList.map((game: any) => (
                 <Card key={game.id} className={`bg-slate-900/40 backdrop-blur-md border-red-600/10 p-4 hover:border-red-600/40 hover:shadow-[0_8px_30px_rgb(0,0,0,0.5)] transition-all duration-500 card-neon relative overflow-hidden group ${!game.isActive ? 'opacity-50' : ''}`}>
                   <div className="aspect-[16/9] w-full rounded-md overflow-hidden mb-4 bg-slate-800 flex items-center justify-center relative">
                     {game.imageUrl ? (
@@ -3741,6 +3765,8 @@ export default function AdminDashboard() {
                 </Card>
               ))}
             </div>
+              );
+            })()}
           </TabsContent>
 
           <TabsContent value="loja">
