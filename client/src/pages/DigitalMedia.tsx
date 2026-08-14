@@ -764,7 +764,7 @@ export default function DigitalMedia() {
                           <SellerChatDialog
                             productId={product.id}
                             productName={product.name}
-                            sellerId={product.sellerId || undefined}
+                            sellerId={product.sellerOpenId || undefined}
                             sellerName={product.sellerName || undefined}
                             buttonLabel="Vendedor"
                             buttonClassName="w-full bg-slate-900 border border-green-600/40 hover:border-green-500 text-green-400 font-bold text-[10px] sm:text-xs h-8 sm:h-9 rounded-lg sm:rounded-xl flex items-center justify-center gap-1"

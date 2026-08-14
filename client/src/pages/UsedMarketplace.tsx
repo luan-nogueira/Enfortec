@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import UserProfileButton from "@/components/UserProfileButton";
 import SellerChatDialog from "@/components/SellerChatDialog";
+import SellerReviewsDialog from "@/components/SellerReviewsDialog";
 import { Search, Star, ShoppingCart, ArrowLeft, Flame, User, Check, Package, Coins, MapPin, Shield, Trash2, MessageCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
@@ -612,10 +613,7 @@ export default function UsedMarketplace() {
                     <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-red-600/10 flex items-center justify-center border border-red-600/20">
                       <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-500" />
                     </div>
-                    <div className="flex flex-col">
-                      <span className="text-[8px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Vendido por:</span>
-                      <span className="text-[10px] sm:text-xs font-black text-white line-clamp-1">{product.sellerName || "Usuário Verificado"}</span>
-                    </div>
+                    <SellerReviewsDialog sellerId={product.sellerId || undefined} sellerName={product.sellerName} />
                   </div>
 
                   <div className="mt-auto space-y-3 sm:space-y-4">
@@ -669,7 +667,7 @@ export default function UsedMarketplace() {
                             <SellerChatDialog
                               productId={product.id}
                               productName={product.name}
-                              sellerId={product.sellerId || undefined}
+                              sellerId={product.sellerOpenId || undefined}
                               sellerName={product.sellerName || "Vendedor"}
                               buttonLabel="Vendedor"
                             />

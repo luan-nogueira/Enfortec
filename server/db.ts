@@ -170,7 +170,22 @@ export async function getActiveSellers() {
 export async function getApprovedUsedProducts() {
   const db = getDb();
   if (!db) return [];
-  return db.select().from(usedProducts).where(eq(usedProducts.status, 'aprovado')).orderBy(desc(usedProducts.createdAt));
+  // Junta com sellers/users pra expor o nome real do vendedor (em vez do genérico
+  // "Usuário Verificado") e o openId (uid do Firebase) — sem ele, o chat "Falar com
+  // Vendedor" gravava o id interno da linha de sellers, que não bate com o uid usado
+  // pelo painel do vendedor pra filtrar as conversas, e a mensagem nunca chegava.
+  const rows = await db
+    .select({
+      product: usedProducts,
+      sellerName: users.name,
+      sellerOpenId: users.openId,
+    })
+    .from(usedProducts)
+    .leftJoin(sellers, eq(usedProducts.sellerId, sellers.id))
+    .leftJoin(users, eq(sellers.userId, users.id))
+    .where(eq(usedProducts.status, 'aprovado'))
+    .orderBy(desc(usedProducts.createdAt));
+  return rows.map((r) => ({ ...r.product, sellerName: r.sellerName, sellerOpenId: r.sellerOpenId }));
 }
 
 export async function getUsedProductsBySellerId(sellerId: number) {
@@ -221,11 +236,18 @@ export async function getAllUsedProductsWithSeller() {
 export async function getActiveDigitalProducts() {
   const db = getDb();
   if (!db) return [];
-  return db
-    .select()
+  const rows = await db
+    .select({
+      product: digitalProducts,
+      sellerName: users.name,
+      sellerOpenId: users.openId,
+    })
     .from(digitalProducts)
+    .leftJoin(sellers, eq(digitalProducts.sellerId, sellers.id))
+    .leftJoin(users, eq(sellers.userId, users.id))
     .where(and(eq(digitalProducts.isActive, true), eq(digitalProducts.status, "aprovado")))
     .orderBy(desc(digitalProducts.createdAt));
+  return rows.map((r) => ({ ...r.product, sellerName: r.sellerName, sellerOpenId: r.sellerOpenId }));
 }
 
 export async function getAllDigitalProducts() {
@@ -478,7 +500,13 @@ export async function deleteCoupon(id: number) {
 export async function getReviewsBySellerId(sellerId: number) {
   const db = getDb();
   if (!db) return [];
-  return db.select().from(reviews).where(eq(reviews.sellerId, sellerId)).orderBy(desc(reviews.createdAt));
+  const rows = await db
+    .select({ review: reviews, buyerName: users.name })
+    .from(reviews)
+    .leftJoin(users, eq(reviews.buyerId, users.id))
+    .where(eq(reviews.sellerId, sellerId))
+    .orderBy(desc(reviews.createdAt));
+  return rows.map((r) => ({ ...r.review, buyerName: r.buyerName }));
 }
 
 // Platform Settings queries
