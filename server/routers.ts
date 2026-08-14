@@ -264,7 +264,7 @@ export const appRouter = router({
   // Used Products Router
   usedProducts: router({
     list: publicProcedure.query(() => db.getApprovedUsedProducts()),
-    getByUserId: protectedProcedure.query(({ ctx }) => db.getUsedProductsBySellerId(ctx.user.id)),
+    getByUserId: protectedProcedure.query(({ ctx }) => db.getUsedProductsForAccount(ctx.user.id, ctx.user.role === "admin")),
     adminList: protectedProcedure.query(async ({ ctx }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
       return db.getAllUsedProductsWithSeller();
@@ -425,7 +425,7 @@ export const appRouter = router({
   // Digital Products Router
   digitalProducts: router({
     list: publicProcedure.query(() => db.getActiveDigitalProducts()),
-    getByUserId: protectedProcedure.query(({ ctx }) => db.getDigitalProductsBySellerId(ctx.user.id)),
+    getByUserId: protectedProcedure.query(({ ctx }) => db.getDigitalProductsForAccount(ctx.user.id, ctx.user.role === "admin")),
     create: protectedProcedure
       .input(z.object({
         name: z.string().min(3),
@@ -466,12 +466,28 @@ export const appRouter = router({
           downloadUrl: input.downloadUrl,
           platform: input.platform || null,
           imageUrl: input.imageUrl || null,
+          // Cadastro de conta pela comunidade sempre entra pendente: só fica visível na loja
+          // pública depois que um gestor aprova na aba "Aprovar Contas" do painel admin.
+          status: "pendente",
         });
         return result;
       }),
+    adminSetStatus: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        status: z.enum(["aprovado", "rejeitado"]),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+
+        await database.update(digitalProducts).set({ status: input.status }).where(eq(digitalProducts.id, input.id));
+        return { success: true };
+      }),
     adminList: protectedProcedure.query(async ({ ctx }) => {
       if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
-      return db.getAllDigitalProducts();
+      return db.getAllDigitalProductsWithSeller();
     }),
     adminCreate: protectedProcedure
       .input(z.object({
@@ -512,6 +528,7 @@ export const appRouter = router({
           isPreVenda: input.isPreVenda,
           showInEconomia: input.showInEconomia,
           economiaLicenseType: input.economiaLicenseType,
+          status: "aprovado",
         });
       }),
     adminUpdate: protectedProcedure

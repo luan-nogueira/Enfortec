@@ -121,6 +121,10 @@ export const digitalProducts = pgTable("digitalProducts", {
   isPreVenda: boolean("isPreVenda").default(false),
   showInEconomia: boolean("showInEconomia").default(false),
   economiaLicenseType: varchar("economiaLicenseType", { length: 50 }),
+  // "pendente" | "aprovado" | "rejeitado" — contas cadastradas por vendedores da comunidade
+  // (SellDigitalProduct) entram como "pendente" e só ficam públicas após aprovação do gestor;
+  // cadastros feitos pelo próprio admin (adminCreate) já entram "aprovado".
+  status: varchar("status", { length: 20 }).default("aprovado").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => new Date()),
 });

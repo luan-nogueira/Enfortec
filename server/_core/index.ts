@@ -71,6 +71,10 @@ app.get("/api/migrate-db", async (req, res) => {
     
     await sql.query(`ALTER TABLE "digitalProducts" ADD COLUMN IF NOT EXISTS "pricePrimary" numeric(10, 2)`);
     await sql.query(`ALTER TABLE "digitalProducts" ADD COLUMN IF NOT EXISTS "priceSecondary" numeric(10, 2)`);
+    // Default 'aprovado' preserva a visibilidade de tudo que já estava publicado; o mutation
+    // digitalProducts.create (cadastro de conta pelo vendedor da comunidade) sobrescreve para
+    // 'pendente' explicitamente, exigindo aprovação do gestor antes de aparecer na loja pública.
+    await sql.query(`ALTER TABLE "digitalProducts" ADD COLUMN IF NOT EXISTS "status" varchar(20) DEFAULT 'aprovado' NOT NULL`);
 
     await sql.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "cpf" varchar(18)`);
     await sql.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "psnId" varchar(100)`);

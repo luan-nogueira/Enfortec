@@ -27,8 +27,22 @@ export default function SellDigitalProduct() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [confirmedDeactivation, setConfirmedDeactivation] = useState(false);
 
   const createProductMutation = trpc.digitalProducts.create.useMutation();
+
+  const handleWhatsAppProof = (contact: "Andre" | "Sandro") => {
+    const numbers = { Andre: "554384253691", Sandro: "557187650840" };
+    const contactName = contact === "Andre" ? "André" : "Sandro";
+    const accountLabel = formData.name.trim() || "minha conta";
+    const credentials = formData.keyOrCode.trim();
+    const msg = encodeURIComponent(
+      `Olá ${contactName}! Já desvinculei a conta "${accountLabel}" do meu console e vou anunciar aqui na Enfortegames.` +
+      (credentials ? `\n\nLogin/Senha: ${credentials}` : "") +
+      `\n\nVou enviar em seguida o vídeo comprovando a desativação.`
+    );
+    window.open(`https://wa.me/${numbers[contact]}?text=${msg}`, "_blank");
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -75,6 +89,11 @@ export default function SellDigitalProduct() {
       return;
     }
 
+    if ((formData.type as string) === "jogo" && !confirmedDeactivation) {
+      toast.error("Confirme que já desvinculou a conta do seu console e enviou o comprovante pra equipe antes de publicar.");
+      return;
+    }
+
     const isLicenseType = formData.type === "jogo" || formData.type === "assinatura";
 
     if (isLicenseType) {
@@ -113,8 +132,12 @@ export default function SellDigitalProduct() {
         downloadUrl: formData.downloadUrl.trim() || undefined,
         imageUrl: formData.imageUrl.trim() || undefined,
       });
-      toast.success("Anúncio publicado com sucesso!");
-      navigate("/digital");
+      toast.success(
+        (formData.type as string) === "jogo"
+          ? "Conta enviada! Ela fica pendente até nossa equipe confirmar o comprovante e aprovar a publicação."
+          : "Anúncio publicado com sucesso!"
+      );
+      navigate("/vendedor");
     } catch (error) {
       toast.error("Erro ao adicionar produto. Tente novamente.");
       console.error(error);
@@ -440,6 +463,51 @@ export default function SellDigitalProduct() {
                 </div>
               )}
 
+              {/* Aviso: Desvincular do Console antes de Anunciar */}
+              {(formData.type as string) === "jogo" && (
+                <div className="bg-amber-950/30 border border-amber-600/40 rounded-2xl p-4 sm:p-5 space-y-3">
+                  <p className="text-sm font-black text-amber-400 uppercase tracking-wide flex items-center gap-2">
+                    ⚠️ Antes de Anunciar: Desvincule a Conta do Seu Console
+                  </p>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Pra vender com segurança, remova essa conta do seu PS4/PS5 como conta principal <strong>antes</strong> de
+                    publicar o anúncio: vá em <strong>Configurações → Gerenciamento de Conta → Ativar como PS4/PS5 Principal</strong> e
+                    desative. Isso evita que o comprador tenha problemas para ativar a conta como dele.
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    Depois de desvincular, grave um vídeo curto mostrando a tela de desativação e mande pra nossa equipe no
+                    WhatsApp junto com o login e senha da conta — assim liberamos seu anúncio mais rápido.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => handleWhatsAppProof("Andre")}
+                      className="w-full py-2 bg-green-950/40 border border-green-800/40 hover:bg-green-900/50 text-green-400 font-bold text-xs rounded-lg flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      💬 Comprovar com André
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleWhatsAppProof("Sandro")}
+                      className="w-full py-2 bg-green-950/40 border border-green-800/40 hover:bg-green-900/50 text-green-400 font-bold text-xs rounded-lg flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      💬 Comprovar com Sandro
+                    </button>
+                  </div>
+                  <label className="flex items-start gap-2 pt-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={confirmedDeactivation}
+                      onChange={(e) => setConfirmedDeactivation(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 accent-amber-500 rounded shrink-0"
+                    />
+                    <span className="text-xs text-slate-300">
+                      Confirmo que já desvinculei essa conta do meu console e enviei o comprovante (vídeo) pra equipe via WhatsApp.
+                    </span>
+                  </label>
+                </div>
+              )}
+
               {/* Commission Info */}
               <div className="bg-purple-50 border border-purple-200 p-4 rounded-lg">
                 <p className="text-sm font-semibold text-purple-900 mb-2">Comissão da Plataforma</p>
@@ -470,7 +538,7 @@ export default function SellDigitalProduct() {
                 <Button
                   type="submit"
                   className="flex-1 bg-purple-600 hover:bg-purple-700"
-                  disabled={isLoading}
+                  disabled={isLoading || ((formData.type as string) === "jogo" && !confirmedDeactivation)}
                 >
                   {isLoading ? "Adicionando..." : "Publicar Produto"}
                 </Button>

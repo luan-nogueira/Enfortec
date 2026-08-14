@@ -179,6 +179,30 @@ export async function getUsedProductsBySellerId(sellerId: number) {
   return db.select().from(usedProducts).where(eq(usedProducts.sellerId, sellerId)).orderBy(desc(usedProducts.createdAt));
 }
 
+/**
+ * Anúncios físicos visíveis no painel "Meus Produtos" de uma conta.
+ * Contas admin (Luan/André/Sandro) enxergam o estoque compartilhado da loja —
+ * todos os anúncios cadastrados por QUALQUER conta admin, não só a própria —
+ * já que os três gerenciam o mesmo negócio, não vendedores independentes.
+ */
+export async function getUsedProductsForAccount(userId: number, isAdminAccount: boolean) {
+  const db = getDb();
+  if (!db) return [];
+  if (isAdminAccount) {
+    const rows = await db
+      .select({ product: usedProducts })
+      .from(usedProducts)
+      .innerJoin(sellers, eq(usedProducts.sellerId, sellers.id))
+      .innerJoin(users, eq(sellers.userId, users.id))
+      .where(eq(users.role, "admin"))
+      .orderBy(desc(usedProducts.createdAt));
+    return rows.map((r) => r.product);
+  }
+  const seller = await getSellerByUserId(userId);
+  if (!seller) return [];
+  return getUsedProductsBySellerId(seller.id);
+}
+
 export async function getAllUsedProductsWithSeller() {
   const db = getDb();
   if (!db) return [];
@@ -197,7 +221,11 @@ export async function getAllUsedProductsWithSeller() {
 export async function getActiveDigitalProducts() {
   const db = getDb();
   if (!db) return [];
-  return db.select().from(digitalProducts).where(eq(digitalProducts.isActive, true)).orderBy(desc(digitalProducts.createdAt));
+  return db
+    .select()
+    .from(digitalProducts)
+    .where(and(eq(digitalProducts.isActive, true), eq(digitalProducts.status, "aprovado")))
+    .orderBy(desc(digitalProducts.createdAt));
 }
 
 export async function getAllDigitalProducts() {
@@ -206,10 +234,46 @@ export async function getAllDigitalProducts() {
   return db.select().from(digitalProducts).orderBy(desc(digitalProducts.createdAt));
 }
 
+export async function getAllDigitalProductsWithSeller() {
+  const db = getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({
+      product: digitalProducts,
+      sellerStoreName: sellers.storeName,
+      sellerEmail: users.email,
+      sellerName: users.name,
+    })
+    .from(digitalProducts)
+    .leftJoin(sellers, eq(digitalProducts.sellerId, sellers.id))
+    .leftJoin(users, eq(sellers.userId, users.id))
+    .orderBy(desc(digitalProducts.createdAt));
+  return rows.map((r) => ({ ...r.product, sellerStoreName: r.sellerStoreName, sellerEmail: r.sellerEmail, sellerName: r.sellerName }));
+}
+
 export async function getDigitalProductsBySellerId(sellerId: number) {
   const db = getDb();
   if (!db) return [];
   return db.select().from(digitalProducts).where(eq(digitalProducts.sellerId, sellerId)).orderBy(desc(digitalProducts.createdAt));
+}
+
+/** Mesma lógica de getUsedProductsForAccount, para contas digitais. */
+export async function getDigitalProductsForAccount(userId: number, isAdminAccount: boolean) {
+  const db = getDb();
+  if (!db) return [];
+  if (isAdminAccount) {
+    const rows = await db
+      .select({ product: digitalProducts })
+      .from(digitalProducts)
+      .innerJoin(sellers, eq(digitalProducts.sellerId, sellers.id))
+      .innerJoin(users, eq(sellers.userId, users.id))
+      .where(eq(users.role, "admin"))
+      .orderBy(desc(digitalProducts.createdAt));
+    return rows.map((r) => r.product);
+  }
+  const seller = await getSellerByUserId(userId);
+  if (!seller) return [];
+  return getDigitalProductsBySellerId(seller.id);
 }
 
 // Orders queries

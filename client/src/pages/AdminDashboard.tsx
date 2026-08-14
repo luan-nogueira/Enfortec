@@ -1279,6 +1279,16 @@ export default function AdminDashboard() {
     }
   });
 
+  const adminSetDigitalStatusMutation = trpc.digitalProducts.adminSetStatus.useMutation({
+    onSuccess: (_data, variables) => {
+      toast.success(variables.status === "aprovado" ? "Conta aprovada e publicada na loja!" : "Conta rejeitada.");
+      adminDigitalProductsQuery.refetch();
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Erro ao atualizar status da conta.");
+    }
+  });
+
   const [showGameModal, setShowGameModal] = useState(false);
   const [gameName, setGameName] = useState("");
   const [gamePrice, setGamePrice] = useState(0);
@@ -1907,6 +1917,13 @@ export default function AdminDashboard() {
       badge: allChats.some(c => c.unreadByAdmin),
       section: "Atendimento",
     },
+    {
+      value: "aprovar_contas",
+      label: "✅ Aprovar Contas",
+      icon: Gamepad2,
+      badge: gamesList.some((g: any) => g.status === "pendente"),
+      section: "Catálogo",
+    },
     { value: "jogos", label: "Gerenciar Jogos", icon: Gamepad2, section: "Catálogo" },
     { value: "loja", label: "Loja (Produtos Físicos)", icon: Store, section: "Catálogo" },
     { value: "midia_fisica", label: "Mídia Física / Usados", icon: Package, section: "Catálogo" },
@@ -1926,7 +1943,7 @@ export default function AdminDashboard() {
     { value: "cupons", label: "Cupons", icon: Percent, section: "Marketing" },
     { value: "manutencao", label: "Bloqueio do Site", icon: ShieldAlert, section: "Sistema" },
     { value: "config_fortecoins", label: "📲 Link WhatsApp & ForteCoins", icon: Settings, section: "Sistema" },
-  ], [allRedemptions, allReferrals, allChats, pendingNotifCount, sales]);
+  ], [allRedemptions, allReferrals, allChats, pendingNotifCount, sales, gamesList]);
 
   // Delivery Orders State (modal de "Entregar Dados de Acesso" da aba Compras Pendentes)
   const [showDeliverModal, setShowDeliverModal] = useState(false);
@@ -3352,6 +3369,11 @@ export default function AdminDashboard() {
                             return;
                           }
                           try {
+                            // Postgres é o saldo real usado no checkout (desconto em compras) —
+                            // sem isso, o valor só mudava aqui na tela, nunca no que o usuário
+                            // conseguia efetivamente gastar.
+                            const delta = newCoins - (u.forteCoins ?? 0);
+                            await adminCreditCoinsMutation.mutateAsync({ openId: u.id, amount: delta });
                             await updateDoc(doc(db, "users", u.id), {
                               forteCoins: newCoins
                             });
@@ -3395,6 +3417,70 @@ export default function AdminDashboard() {
                 </Card>
               ))}
             </div>
+          </TabsContent>
+
+          <TabsContent value="aprovar_contas" className="space-y-6 pb-16">
+            <div className="border-l-4 border-red-600 pl-4">
+              <h2 className="text-lg sm:text-xl font-bold text-white uppercase tracking-widest sm:text-sm italic">Aprovar Contas Enfortegames</h2>
+              <p className="text-slate-400 text-xs mt-1">
+                Contas cadastradas por vendedores da comunidade ficam pendentes aqui até você confirmar o comprovante
+                de desvinculação do console (vídeo enviado no WhatsApp) e aprovar a publicação.
+              </p>
+            </div>
+
+            {(() => {
+              const pendingGames = gamesList.filter((g: any) => g.status === "pendente");
+              if (pendingGames.length === 0) {
+                return (
+                  <div className="text-center py-16 bg-slate-900 border border-slate-800 rounded-2xl">
+                    <CheckCircle2 className="w-12 h-12 text-green-500/40 mx-auto mb-3" />
+                    <h4 className="text-base font-bold text-white">Nenhuma Conta Pendente</h4>
+                    <p className="text-slate-400 text-xs mt-1">Todos os cadastros de conta foram revisados.</p>
+                  </div>
+                );
+              }
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {pendingGames.map((game: any) => (
+                    <Card key={game.id} className="p-5 card-neon border-amber-500/30 space-y-3">
+                      <div className="flex justify-between items-start gap-2">
+                        <div>
+                          <h3 className="text-base font-bold text-white">{game.name}</h3>
+                          <p className="text-xs text-slate-400">{game.platform || "—"} • R$ {Number(game.price || 0).toFixed(2)}</p>
+                        </div>
+                        <span className="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full font-bold uppercase shrink-0">Pendente</span>
+                      </div>
+                      <p className="text-xs text-slate-400 line-clamp-2">{game.description}</p>
+                      <div className="bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs space-y-1">
+                        <p className="text-slate-400">Vendedor: <span className="text-white font-bold">{game.sellerName || game.sellerStoreName || "—"}</span></p>
+                        <p className="text-slate-400">Email: <span className="text-white">{game.sellerEmail || "—"}</span></p>
+                        {game.keyOrCode && (
+                          <p className="text-slate-400">Login/Senha: <span className="text-white font-mono select-all">{game.keyOrCode}</span></p>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <Button
+                          size="sm"
+                          disabled={adminSetDigitalStatusMutation.isPending}
+                          onClick={() => adminSetDigitalStatusMutation.mutate({ id: game.id, status: "rejeitado" })}
+                          className="bg-slate-800 hover:bg-red-950 border border-red-600/30 text-red-400 font-bold text-xs"
+                        >
+                          Rejeitar
+                        </Button>
+                        <Button
+                          size="sm"
+                          disabled={adminSetDigitalStatusMutation.isPending}
+                          onClick={() => adminSetDigitalStatusMutation.mutate({ id: game.id, status: "aprovado" })}
+                          className="bg-green-600 hover:bg-green-700 text-white font-bold text-xs"
+                        >
+                          Aprovar
+                        </Button>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              );
+            })()}
           </TabsContent>
 
           <TabsContent value="jogos">
