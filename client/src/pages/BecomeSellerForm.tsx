@@ -144,9 +144,9 @@ export default function BecomeSellerForm() {
             <div>
               <h1 className="text-lg sm:text-3xl font-black text-neon flex items-center gap-2">
                 <Flame className="w-5 h-5 sm:w-8 sm:h-8 text-red-500 shrink-0" />
-                Parcerias & Revenda
+                Parcerias & Revenda de Contas
               </h1>
-              <p className="text-slate-400 text-xs sm:text-sm">Trabalhe conosco ou revenda seus itens para a nossa loja</p>
+              <p className="text-slate-400 text-xs sm:text-sm">Trabalhe conosco ou revenda sua conta EforteGames para a nossa loja</p>
             </div>
           </div>
 

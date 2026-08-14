@@ -13,6 +13,27 @@ export const appRouter = router({
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
+    // O painel admin mostrava "Usuários Online" a partir da lista de usuários do Firestore,
+    // que nunca recebe o campo lastSignedIn (só é atualizado no Postgres a cada requisição
+    // autenticada) — o contador dava sempre 0 e só aparecia "1" por causa de um floor
+    // artificial no front. Essa rota traz os usuários reais do Postgres, com a atividade
+    // de verdade.
+    adminListUsers: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores" });
+      const database = await getDb();
+      if (!database) return [];
+      return database
+        .select({
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          role: users.role,
+          lastSignedIn: users.lastSignedIn,
+          createdAt: users.createdAt,
+        })
+        .from(users)
+        .orderBy(desc(users.lastSignedIn));
+    }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });

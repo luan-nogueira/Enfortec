@@ -45,34 +45,39 @@ export default function PromotionsPage() {
     <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-white">
       {/* Header */}
       <div className="bg-gradient-to-r from-red-950/20 via-slate-950 to-slate-950 border-b border-red-600/20">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-6">
+          <div className="flex items-center justify-between gap-2 sm:gap-4">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => navigate("/")}
-                className="text-white hover:text-red-300 px-2"
+                className="text-white hover:text-red-300 px-1.5 sm:px-2 shrink-0 h-8 sm:h-9"
               >
-                <ArrowLeft className="w-5 h-5 mr-2" />
-                <span>Voltar</span>
+                <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
+                <span className="text-xs sm:text-sm">Voltar</span>
               </Button>
-              <div className="flex items-center gap-2">
-                <Flame className="w-6 h-6 text-red-500 animate-pulse" />
-                <h1 className="text-xl sm:text-3xl font-black text-neon tracking-tight uppercase">Promoções Imperdíveis</h1>
+              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                <Flame className="w-4 h-4 sm:w-6 sm:h-6 text-red-500 animate-pulse shrink-0" />
+                <h1 className="text-xs sm:text-2xl md:text-3xl font-black text-neon tracking-tight uppercase truncate">
+                  Promoções Imperdíveis
+                </h1>
               </div>
             </div>
             {isAuthenticated && (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
                 <Button 
                   variant="ghost" 
-                  className="text-slate-300 hover:text-white hover:bg-slate-900/40 flex items-center gap-1.5 px-3"
+                  size="sm"
+                  className="text-slate-300 hover:text-white hover:bg-slate-900/40 flex items-center gap-1 px-2 sm:px-3 h-8 sm:h-9"
                   onClick={() => navigate("/fortecoins")}
                 >
-                  <Coins className="w-4 h-4 text-red-500" />
-                  <span className="text-sm font-bold">{user?.forteCoins ?? 0} FC</span>
+                  <Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-500 shrink-0" />
+                  <span className="text-xs sm:text-sm font-bold whitespace-nowrap">{user?.forteCoins ?? 0} FC</span>
                 </Button>
-                <UserProfileButton />
+                <div className="shrink-0">
+                  <UserProfileButton />
+                </div>
               </div>
             )}
           </div>

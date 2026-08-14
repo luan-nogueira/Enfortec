@@ -1220,6 +1220,15 @@ export default function AdminDashboard() {
   const adminDigitalProductsQuery = trpc.digitalProducts.adminList.useQuery(undefined, { enabled: !!(isAuthenticated && isAdmin) });
   const gamesList = adminDigitalProductsQuery.data || [];
 
+  // Usuários reais (Postgres) com atividade de verdade — a lista de "users" do Firestore
+  // (usada em Gerenciar Acessos) nunca recebe lastSignedIn, então "Usuários Online" na
+  // Visão Geral sempre dava 0 ali. Atualiza a cada 30s pra ficar razoavelmente ao vivo.
+  const adminUsersQuery = trpc.auth.adminListUsers.useQuery(undefined, {
+    enabled: !!(isAuthenticated && isAdmin),
+    refetchInterval: 30000,
+  });
+  const realUsers = adminUsersQuery.data || [];
+
   // Mutation dedicada pro cadastro em lote — sem os callbacks de sucesso/erro da mutation
   // de "Adicionar Jogo" (que fecham o modal errado e disparariam um toast por jogo).
   const batchCreateGameMutation = trpc.digitalProducts.adminCreate.useMutation();
@@ -2799,7 +2808,7 @@ export default function AdminDashboard() {
         </header>
 
         {/* Page Content Body */}
-        <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8 pb-28 lg:pb-8 max-w-7xl w-full mx-auto">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
 
             {/* ========================= CENTRAL DE NOTIFICAÇÕES ========================= */}
@@ -2989,7 +2998,7 @@ export default function AdminDashboard() {
               {/* KPIs Row */}
               {(() => {
                 const stats = getSalesStats();
-                const activeCount = users.filter((u: any) => {
+                const activeCount = realUsers.filter((u: any) => {
                   if (!u.lastSignedIn) return false;
                   const lastActive = new Date(u.lastSignedIn).getTime();
                   return (Date.now() - lastActive) < 15 * 60 * 1000;
@@ -3061,7 +3070,7 @@ export default function AdminDashboard() {
                               <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-ping" />
                               Usuários Online (15m)
                             </p>
-                            <p className="text-2xl font-black text-green-500">{Math.max(1, activeCount)}</p>
+                            <p className="text-2xl font-black text-green-500">{activeCount}</p>
                           </div>
                           <UserCheck className="w-8 h-8 text-green-500" />
                         </div>
