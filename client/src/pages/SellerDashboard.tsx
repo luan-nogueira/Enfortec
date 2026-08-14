@@ -380,7 +380,7 @@ export default function SellerDashboard() {
               <ShoppingCart className="w-6 h-6 text-blue-400" />
             </div>
             <p className="text-[10px] text-slate-500 mt-2">
-              Valor acumulado: R$ {usedProducts.reduce((acc, p) => acc + (p.pricePS4 || p.pricePS5 || p.price || 0), 0).toFixed(2)}
+              Valor acumulado: R$ {usedProducts.reduce((acc, p) => acc + Number(p.pricePS4 || p.pricePS5 || p.price || 0), 0).toFixed(2)}
             </p>
           </Card>
 

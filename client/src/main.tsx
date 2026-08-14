@@ -9,6 +9,18 @@ import { getLoginUrl } from "./const";
 import { auth } from "@/lib/firebase";
 import "./index.css";
 
+// Depois de um novo deploy, uma aba que já estava aberta ainda referencia os nomes de
+// arquivo (hash) da versão antiga. Ao navegar pra uma rota que carrega sob demanda (lazy)
+// um chunk que não existe mais, o Vite dispara esse evento em vez de travar silenciosamente
+// — recarrega a página uma vez para pegar a versão atual. Guarda em sessionStorage pra não
+// entrar em loop caso o recarregamento não resolva (problema de rede, por exemplo).
+window.addEventListener("vite:preloadError", () => {
+  const key = "forte_reloaded_after_preload_error";
+  if (sessionStorage.getItem(key)) return;
+  sessionStorage.setItem(key, "1");
+  window.location.reload();
+});
+
 const queryClient = new QueryClient();
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
