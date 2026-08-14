@@ -571,7 +571,7 @@ export default function SellerDashboard() {
                       >
                         <Flame className="w-3.5 h-3.5 mr-1.5" />
                         {Boolean(product.boostedUntil && new Date(product.boostedUntil).getTime() > Date.now())
-                          ? 'Anúncio Turbinado'
+                          ? `Turbinado até ${new Date(product.boostedUntil).toLocaleDateString('pt-BR')}`
                           : 'Turbinar Anúncio (10 FC)'}
                       </Button>
                       )}
