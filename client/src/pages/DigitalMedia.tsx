@@ -174,7 +174,10 @@ export default function DigitalMedia() {
       setAppliedCoupon(null);
       setCouponError(null);
       setAcceptedTerms(false);
-      setAccountType("primaria");
+      // Só troca o default pra "secundária" quando o produto realmente só tem conta
+      // secundária cadastrada — produtos sem esse split (a maioria do catálogo, preço
+      // único) continuam mandando "primaria" pro servidor, que é o que eles esperam.
+      setAccountType(hasSecondaryPrice(selectedProduct) && !hasPrimaryPrice(selectedProduct) ? "secundaria" : "primaria");
     }
   }, [selectedProduct, user]);
 
@@ -437,6 +440,15 @@ export default function DigitalMedia() {
     const sec = prod.priceSecondary ?? prod.price_secondary;
     if (sec === undefined || sec === null || sec === "" || sec === 0 || sec === "0" || sec === "0.00") return false;
     return parseFloat(sec) > 0;
+  };
+
+  // Distingue "produto sem preço primária cadastrado" (só tem conta secundária) de
+  // "produto normal", pra não oferecer/cobrar uma conta primária que não existe.
+  const hasPrimaryPrice = (prod: any) => {
+    if (!prod) return false;
+    const prim = prod.pricePrimary ?? prod.price_primary;
+    if (prim === undefined || prim === null || prim === "" || prim === 0 || prim === "0" || prim === "0.00") return false;
+    return parseFloat(prim) > 0;
   };
 
   const getProductPrice = (prod: any, accType: "primaria" | "secundaria") => {
@@ -717,7 +729,7 @@ export default function DigitalMedia() {
                     <div className="flex flex-col mb-2 sm:mb-3">
                       {parseFloat(product.price) === 0 ? (
                         <span className="text-base sm:text-xl font-black text-red-500">Consultar</span>
-                      ) : hasSecondaryPrice(product) ? (
+                      ) : hasSecondaryPrice(product) && hasPrimaryPrice(product) ? (
                         <div className="space-y-0.5 bg-slate-950/60 p-1.5 rounded-lg border border-slate-800">
                           <div className="flex justify-between items-center text-[10px] sm:text-xs">
                             <span className="text-slate-400 font-bold">👤 Primária:</span>
@@ -727,6 +739,13 @@ export default function DigitalMedia() {
                             <span className="text-slate-400 font-bold">👥 Secundária:</span>
                             <span className="font-bold text-slate-300">R$ {getProductPrice(product, "secundaria").toFixed(2).replace('.', ',')}</span>
                           </div>
+                        </div>
+                      ) : hasSecondaryPrice(product) && !hasPrimaryPrice(product) ? (
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-[10px] sm:text-xs text-slate-400 font-bold">👥 Secundária:</span>
+                          <span className="text-base sm:text-xl font-black text-red-500">
+                            R$ {getProductPrice(product, "secundaria").toFixed(2).replace('.', ',')}
+                          </span>
                         </div>
                       ) : product.type === "jogo" || product.type === "assinatura" || product.category === "Assinaturas" ? (
                         <div className="flex items-baseline gap-1">
@@ -812,7 +831,7 @@ export default function DigitalMedia() {
             </div>
 
             {/* Seletor de Licença: Conta Primária vs Conta Secundária */}
-            {hasSecondaryPrice(selectedProduct) && (
+            {hasSecondaryPrice(selectedProduct) && hasPrimaryPrice(selectedProduct) && (
               <div className="bg-slate-950 border border-red-600/30 rounded-xl p-3.5 space-y-2 animate-in fade-in duration-200">
                 <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
                   Escolha o Tipo de Licença / Conta *
@@ -856,6 +875,15 @@ export default function DigitalMedia() {
                     </div>
                   </button>
                 </div>
+              </div>
+            )}
+
+            {hasSecondaryPrice(selectedProduct) && !hasPrimaryPrice(selectedProduct) && (
+              <div className="bg-slate-950 border border-red-600/30 rounded-xl p-3.5 space-y-1">
+                <div className="font-bold text-xs flex items-center justify-between text-white">
+                  <span>👥 Conta Secundária {selectedProduct.stockSecondary !== undefined && `(${selectedProduct.stockSecondary} un)`}</span>
+                </div>
+                <p className="text-[9px] text-slate-400 leading-tight">Este jogo só está disponível em conta secundária (compartilhada) — jogue na conta enviada com internet.</p>
               </div>
             )}
 

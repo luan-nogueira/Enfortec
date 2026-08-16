@@ -2121,15 +2121,23 @@ export default function AdminDashboard() {
       toast.warning("Nome e plataforma são obrigatórios.");
       return;
     }
+    const pricePrimaryVal = gamePricePrimary !== "" ? Number(gamePricePrimary) : null;
+    const priceSecondaryVal = gamePriceSecondary !== "" ? Number(gamePriceSecondary) : null;
+    if (pricePrimaryVal === null && priceSecondaryVal === null) {
+      toast.warning("Informe ao menos um preço: Primária ou Secundária.");
+      return;
+    }
     setAddingGame(true);
 
-    const pricePrimaryVal = gamePricePrimary !== "" ? Number(gamePricePrimary) : Number(gamePrice);
-    const priceSecondaryVal = gamePriceSecondary !== "" ? Number(gamePriceSecondary) : null;
+    // Jogo só com conta secundária (sem primária): a coluna "price" (base, obrigatória
+    // no banco) usa o preço secundário, e "Conta Primária" some do site — não faz mais
+    // sentido oferecer/cobrar por uma conta primária que não existe.
+    const basePriceVal = pricePrimaryVal ?? priceSecondaryVal!;
     const itemType = (gameCategory === "Assinaturas" || gameCategory === "assinatura") ? "assinatura" : "jogo";
 
     const payload = {
       name: gameName.trim(),
-      price: pricePrimaryVal,
+      price: basePriceVal,
       pricePrimary: pricePrimaryVal,
       priceSecondary: priceSecondaryVal,
       platform: gamePlatform.trim(),
@@ -2173,7 +2181,7 @@ export default function AdminDashboard() {
     setEditingGameId(game.id);
     setGameName(game.name || "");
     setGamePrice(game.price || 0);
-    setGamePricePrimary(game.pricePrimary ?? game.price_primary ?? game.price ?? "");
+    setGamePricePrimary(game.pricePrimary ?? game.price_primary ?? "");
     setGamePriceSecondary(game.priceSecondary ?? game.price_secondary ?? "");
     setGamePlatform(game.platform || "");
     setGameCategory(game.category || "");
@@ -4957,7 +4965,7 @@ export default function AdminDashboard() {
             <div className="grid grid-cols-2 gap-3 bg-slate-950/60 p-3 rounded-lg border border-red-600/20">
               <div className="space-y-1.5">
                 <Label className="text-xs text-slate-300 font-bold uppercase flex items-center gap-1">
-                  <span>👤 Preço Primária (R$) *</span>
+                  <span>👤 Preço Primária (R$)</span>
                 </Label>
                 <Input
                   type="number"
@@ -4967,10 +4975,9 @@ export default function AdminDashboard() {
                     setGamePricePrimary(e.target.value);
                     setGamePrice(Number(e.target.value));
                   }}
-                  placeholder="Ex: 150.00"
+                  placeholder="Deixe em branco se não tiver conta primária"
                   className="bg-slate-950 border-red-600/30 text-white font-bold"
                   min={0}
-                  required
                 />
               </div>
 

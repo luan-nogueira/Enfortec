@@ -12,9 +12,17 @@ const PLATINADOR_SUBSCRIPTION_PRICE = 35.0;
 // exatamente, senão o preço "verificado" no servidor diverge do que foi cobrado.
 function computeDigitalPrice(p: { price: string; pricePrimary: string | null; priceSecondary: string | null }, accountType?: string): number {
   const basePrice = parseFloat(p.price || "0");
-  const primaryPrice = p.pricePrimary ? parseFloat(p.pricePrimary) : basePrice;
   const secondaryPrice = p.priceSecondary ? parseFloat(p.priceSecondary) : 0;
-  if (accountType === "secundaria" && secondaryPrice > 0) return Math.max(0, secondaryPrice);
+  if (accountType === "secundaria") {
+    if (secondaryPrice <= 0) throw new Error("Conta secundária não disponível para este produto.");
+    return Math.max(0, secondaryPrice);
+  }
+  // Produto sem preço primária cadastrado (só tem conta secundária): não deixa cobrar
+  // como se a conta primária existisse, mesmo que "price" (base) tenha algum valor.
+  if (accountType === "primaria" && !p.pricePrimary) {
+    throw new Error("Conta primária não disponível para este produto.");
+  }
+  const primaryPrice = p.pricePrimary ? parseFloat(p.pricePrimary) : basePrice;
   return Math.max(0, primaryPrice);
 }
 
