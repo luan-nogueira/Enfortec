@@ -720,7 +720,11 @@ export default function Home() {
               return visibleListings.length > 0 ? visibleListings.map((listing: any) => {
               const secVal = listing.priceSecondary ?? listing.price_secondary;
               const hasSec = secVal !== undefined && secVal !== null && secVal !== "" && parseFloat(secVal) > 0;
-              const primaryPrice = listing.pricePrimary ? parseFloat(listing.pricePrimary) : (listing.price_primary ? parseFloat(listing.price_primary) : parseFloat(listing.price || 0));
+              const primVal = listing.pricePrimary ?? listing.price_primary;
+              const hasPrim = primVal !== undefined && primVal !== null && primVal !== "" && parseFloat(primVal) > 0;
+              // Sem pricePrimary cadastrado, "price" é só o preço base (igual ao da secundária
+              // quando o jogo só tem conta secundária) — não é um preço de Primária de verdade.
+              const primaryPrice = hasPrim ? parseFloat(primVal) : parseFloat(listing.price || 0);
               const secondaryPrice = hasSec ? parseFloat(secVal) : 0;
 
               const isAssinatura = listing.type === 'assinatura';
@@ -783,7 +787,7 @@ export default function Home() {
                             )}
                           </span>
                         </div>
-                      ) : hasSec ? (
+                      ) : hasSec && hasPrim ? (
                         <div className="bg-slate-950/70 p-2 rounded-lg border border-slate-800 space-y-1">
                           <div className="flex justify-between items-center text-[10px] sm:text-xs">
                             <span className="text-slate-400 font-bold">👤 Primária:</span>
@@ -793,6 +797,13 @@ export default function Home() {
                             <span className="text-slate-400 font-bold">👥 Secundária:</span>
                             <span className="font-bold text-slate-300">R$ {secondaryPrice.toFixed(2).replace('.', ',')}</span>
                           </div>
+                        </div>
+                      ) : hasSec && !hasPrim ? (
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-xs text-slate-400 font-bold">👥 Secundária:</span>
+                          <span className="text-base sm:text-2xl font-black text-white">
+                            <span className="text-[10px] sm:text-sm text-slate-500 font-normal">R$</span> {secondaryPrice.toFixed(2).replace('.', ',')}
+                          </span>
                         </div>
                       ) : (
                         <div className="flex items-baseline gap-1">
