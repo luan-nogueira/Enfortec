@@ -202,7 +202,10 @@ export default function Home() {
 
   // As buscas de usedProducts e digitalProducts agora são feitas via TRPC.
 
-  // Últimos anúncios: digitais + físicos usados
+  // Últimos anúncios: digitais + físicos usados. Sem slice aqui de propósito — cada aba
+  // (Primária/Secundária/Físico/etc.) precisa pescar os 24 mais recentes DENTRO da própria
+  // categoria, senão uma leva de cadastros digitais lota as 24 vagas e as outras abas ficam
+  // vazias mesmo tendo estoque de sobra fora dessa janela.
   const allListings = [
     ...digitalProducts.map((p: any) => ({ ...p, _type: 'digital' })),
     ...usedProducts.map((p: any) => ({ ...p, _type: 'used' }))
@@ -215,7 +218,7 @@ export default function Home() {
       return isNaN(parsed) ? 0 : parsed;
     };
     return getMs(b.createdAt) - getMs(a.createdAt);
-  }).slice(0, 24);
+  });
 
   const categories = [
     { name: "Assinaturas", icon: Sparkles, color: "from-amber-500 to-yellow-600" },
@@ -713,7 +716,7 @@ export default function Home() {
                 }
                 // "todos" — todos os digitais (não físicos)
                 return listing._type === 'digital';
-              });
+              }).slice(0, 24);
               return visibleListings.length > 0 ? visibleListings.map((listing: any) => {
               const secVal = listing.priceSecondary ?? listing.price_secondary;
               const hasSec = secVal !== undefined && secVal !== null && secVal !== "" && parseFloat(secVal) > 0;
