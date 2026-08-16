@@ -847,7 +847,7 @@ export default function DigitalMedia() {
                     }`}
                   >
                     <div className="font-bold text-xs flex items-center justify-between">
-                      <span>👤 Primária {selectedProduct.stockPrimary !== undefined && `(${selectedProduct.stockPrimary} un)`}</span>
+                      <span>👤 Primária</span>
                       {accountType === "primaria" && <span className="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded font-black">OK</span>}
                     </div>
                     <p className="text-[9px] text-slate-400 mt-1 leading-tight">Jogue no seu perfil pessoal com conquistas</p>
@@ -866,7 +866,7 @@ export default function DigitalMedia() {
                     }`}
                   >
                     <div className="font-bold text-xs flex items-center justify-between">
-                      <span>👥 Secundária {selectedProduct.stockSecondary !== undefined && `(${selectedProduct.stockSecondary} un)`}</span>
+                      <span>👥 Secundária</span>
                       {accountType === "secundaria" && <span className="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded font-black">OK</span>}
                     </div>
                     <p className="text-[9px] text-slate-400 mt-1 leading-tight">Jogue na conta enviada com internet</p>
@@ -881,7 +881,7 @@ export default function DigitalMedia() {
             {hasSecondaryPrice(selectedProduct) && !hasPrimaryPrice(selectedProduct) && (
               <div className="bg-slate-950 border border-red-600/30 rounded-xl p-3.5 space-y-1">
                 <div className="font-bold text-xs flex items-center justify-between text-white">
-                  <span>👥 Conta Secundária {selectedProduct.stockSecondary !== undefined && `(${selectedProduct.stockSecondary} un)`}</span>
+                  <span>👥 Conta Secundária</span>
                 </div>
                 <p className="text-[9px] text-slate-400 leading-tight">Este jogo só está disponível em conta secundária (compartilhada) — jogue na conta enviada com internet.</p>
               </div>
