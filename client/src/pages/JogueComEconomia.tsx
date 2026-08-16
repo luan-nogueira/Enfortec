@@ -55,6 +55,14 @@ export default function JogueComEconomia() {
   };
 
   const handleOpenBuyModal = (product: any) => {
+    // Sem login, o pedido não fica vinculado a nenhuma conta e nunca aparece em
+    // "Minhas Compras" depois — melhor exigir login antes de abrir o checkout.
+    if (!isAuthenticated) {
+      toast.warning("Faça login antes de comprar, assim seu pedido aparece em \"Minhas Compras\".");
+      navigate("/login");
+      return;
+    }
+
     setSelectedProduct(product);
     const allowPrim = isPrimaryAvailable(product);
     const allowSec = isSecondaryAvailable(product);
