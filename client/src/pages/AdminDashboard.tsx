@@ -3582,7 +3582,7 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className="mt-2 pt-2 border-t border-slate-800 flex items-center justify-between">
-                      <span className="text-[10px] text-slate-400 font-bold">⚡ Economia:</span>
+                      <span className="text-[10px] text-slate-400 font-bold" title="Isso NÃO ativa/desativa o jogo — só controla se ele também aparece na página separada 'Jogue com Economia'.">⚡ Vitrine "Economia":</span>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -3609,7 +3609,7 @@ export default function AdminDashboard() {
                           
                           adminUpdateGameMutation.mutate(payload, {
                             onSuccess: () => {
-                              toast.success(!currentVal ? "Jogo ativado na página Jogue com Economia!" : "Jogo removido do Jogue com Economia.");
+                              toast.success(!currentVal ? "Movido para a vitrine 'Jogue com Economia' — some do catálogo normal." : "Voltou pro catálogo normal — saiu da vitrine 'Jogue com Economia'.");
                             }
                           });
                         }}
@@ -3619,7 +3619,7 @@ export default function AdminDashboard() {
                             : "bg-slate-900 text-slate-500 border border-slate-800 hover:bg-slate-800"
                         }`}
                       >
-                        {game.showInEconomia !== false ? `⚡ Exibindo (${game.economiaLicenseType === "primaria" ? "Primária" : game.economiaLicenseType === "ambas" ? "Ambas" : "Secundária"})` : "Off"}
+                        {game.showInEconomia !== false ? `⚡ Também na Economia (${game.economiaLicenseType === "primaria" ? "Primária" : game.economiaLicenseType === "ambas" ? "Ambas" : "Secundária"})` : "Fora da Economia"}
                       </button>
                     </div>
 
