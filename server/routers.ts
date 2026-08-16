@@ -668,6 +668,12 @@ export const appRouter = router({
         if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
         return db.updatePlatformSettings({ vipWhatsappUrl: input.vipWhatsappUrl });
       }),
+    updateCoinLimits: protectedProcedure
+      .input(z.object({ maxCoinsPerPurchase: z.number().min(0), maxCoinsPreVenda: z.number().min(0) }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+        return db.updatePlatformSettings({ maxCoinsPerPurchase: input.maxCoinsPerPurchase, maxCoinsPreVenda: input.maxCoinsPreVenda });
+      }),
   }),
 
   // Reviews Router

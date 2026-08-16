@@ -1644,6 +1644,28 @@ export default function AdminDashboard() {
   });
   const [savingFcConfig, setSavingFcConfig] = useState(false);
 
+  // Teto de ForteCoins por compra — é o valor que o SERVIDOR realmente aplica no checkout
+  // (server/_core/payment.ts), diferente do fcConfig acima que só fica salvo pra referência
+  // (Firestore) e não é lido pelo checkout de verdade.
+  const coinLimitsQuery = trpc.settings.get.useQuery();
+  const [maxCoinsInput, setMaxCoinsInput] = useState({ maxCoinsPerPurchase: 10, maxCoinsPreVenda: 50 });
+  useEffect(() => {
+    if (coinLimitsQuery.data?.maxCoinsPerPurchase !== undefined) {
+      setMaxCoinsInput({
+        maxCoinsPerPurchase: coinLimitsQuery.data.maxCoinsPerPurchase ?? 10,
+        maxCoinsPreVenda: coinLimitsQuery.data.maxCoinsPreVenda ?? 50,
+      });
+    }
+  }, [coinLimitsQuery.data?.maxCoinsPerPurchase, coinLimitsQuery.data?.maxCoinsPreVenda]);
+
+  const updateCoinLimitsMutation = trpc.settings.updateCoinLimits.useMutation({
+    onSuccess: () => {
+      toast.success("Teto de ForteCoins por compra salvo com sucesso!");
+      coinLimitsQuery.refetch();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao salvar o teto de ForteCoins."),
+  });
+
   // --- Configurações de WhatsApp e Grupos ---
   const [waConfig, setWaConfig] = useState({
     groupUrl: "https://chat.whatsapp.com/GczvlmlbhRk4rPak1pcaL3?s=cl&p=a&ilr=2",
@@ -4507,6 +4529,53 @@ export default function AdminDashboard() {
                     className="bg-slate-950 border-slate-800 text-white text-xs h-10 mt-1 font-mono"
                   />
                   <span className="text-[10px] text-slate-500 mt-1 block">Formato: 55 + DDD + Número (apenas dígitos)</span>
+                </div>
+              </div>
+            </Card>
+
+            {/* Card de Teto de ForteCoins por Compra — é o valor que o checkout de verdade usa */}
+            <Card className="bg-slate-900 border-amber-500/30 p-6 card-neon space-y-4 mb-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800 pb-4">
+                <div>
+                  <h4 className="font-black text-white text-base flex items-center gap-2">
+                    <Coins className="w-5 h-5 text-amber-500" /> Teto de ForteCoins por Compra
+                  </h4>
+                  <p className="text-slate-400 text-xs mt-0.5">
+                    Limite máximo de moedas que um cliente pode usar numa única compra, mesmo tendo saldo maior — evita que um saldo grande zere o preço do produto. É o valor que o checkout realmente aplica no servidor.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => updateCoinLimitsMutation.mutate(maxCoinsInput)}
+                  disabled={updateCoinLimitsMutation.isPending}
+                  className="bg-amber-600 hover:bg-amber-700 text-white font-bold h-9 px-4 text-xs flex items-center gap-1.5 shrink-0"
+                >
+                  <Check className="w-4 h-4" />
+                  {updateCoinLimitsMutation.isPending ? "Salvando..." : "Salvar Teto de FC"}
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                <div>
+                  <Label className="text-xs text-slate-300 font-bold">Compra Normal (FC)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={maxCoinsInput.maxCoinsPerPurchase}
+                    onChange={(e) => setMaxCoinsInput({ ...maxCoinsInput, maxCoinsPerPurchase: Number(e.target.value) })}
+                    className="bg-slate-950 border-slate-800 text-white text-xs h-10 mt-1 font-mono"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-1 block">10 FC = R$ 1,00 de desconto. Padrão: 10 FC (R$1,00).</span>
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-300 font-bold">Jogo em Pré-Venda / Lançamento (FC)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={maxCoinsInput.maxCoinsPreVenda}
+                    onChange={(e) => setMaxCoinsInput({ ...maxCoinsInput, maxCoinsPreVenda: Number(e.target.value) })}
+                    className="bg-slate-950 border-slate-800 text-white text-xs h-10 mt-1 font-mono"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-1 block">Teto maior pra jogos marcados como "Pré-Venda". Padrão: 50 FC (R$5,00).</span>
                 </div>
               </div>
             </Card>

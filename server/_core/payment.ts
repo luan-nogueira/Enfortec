@@ -197,9 +197,12 @@ export function registerPaymentRoute(app: Express) {
       // ── ForteCoins verificadas no servidor (nunca confia no `coinsToUse` do cliente) ──
       // Além do saldo real, existe um teto por compra — sem isso, um saldo grande de
       // ForteCoins (ex: 449, acumulado por indicação/bônus) cobria o preço inteiro e o
-      // produto saía de graça. 10 FC (R$1,00) por compra normal, 50 FC (R$5,00) em
-      // pré-venda/lançamento.
-      const MAX_COINS_PER_PURCHASE = verifiedIsPreVenda ? 50 : 10;
+      // produto saía de graça. Teto configurável em Admin > Config ForteCoins (10 FC / 50 FC
+      // em pré-venda por padrão).
+      const platformSettingsForCoins = await db.getPlatformSettings();
+      const MAX_COINS_PER_PURCHASE = verifiedIsPreVenda
+        ? (platformSettingsForCoins?.maxCoinsPreVenda ?? 50)
+        : (platformSettingsForCoins?.maxCoinsPerPurchase ?? 10);
       let verifiedCoinsToUse = 0;
       if (buyerId > 0 && Number(req.body.coinsToUse) > 0) {
         const buyerRows = await database.select().from(users).where(eq(users.id, buyerId)).limit(1);

@@ -89,11 +89,20 @@ app.get("/api/migrate-db", async (req, res) => {
     await sql.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "coinsUsed" integer DEFAULT 0 NOT NULL`);
     await sql.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "productName" varchar(255)`);
 
-    await sql.query(`CREATE TABLE IF NOT EXISTS "platformSettings" (
-      "id" serial PRIMARY KEY,
-      "commissionPercentage" varchar(10) NOT NULL DEFAULT '6.00'
+    // Nome real da tabela usada pelo Drizzle é "platform_settings" (snake_case, definido em
+    // drizzle/schema.ts) — a criação abaixo usava "platformSettings" (camelCase) por engano,
+    // o que criava uma tabela fantasma que ninguém lia; a tabela real já existe em produção
+    // (criada via drizzle-kit push) e é a que db.getPlatformSettings()/updatePlatformSettings()
+    // realmente usam.
+    await sql.query(`CREATE TABLE IF NOT EXISTS "platform_settings" (
+      "id" integer PRIMARY KEY,
+      "commissionPercentage" numeric(5, 2) DEFAULT '10'
     )`);
-    await sql.query(`INSERT INTO "platformSettings" (id, "commissionPercentage") VALUES (1, '6.00') ON CONFLICT (id) DO UPDATE SET "commissionPercentage" = '6.00'`);
+    await sql.query(`ALTER TABLE "platform_settings" ADD COLUMN IF NOT EXISTS "vipWhatsappUrl" varchar(500) DEFAULT 'https://chat.whatsapp.com/Gkx7ExampleVipLink'`);
+    await sql.query(`ALTER TABLE "platform_settings" ADD COLUMN IF NOT EXISTS "maxCoinsPerPurchase" integer DEFAULT 10`);
+    await sql.query(`ALTER TABLE "platform_settings" ADD COLUMN IF NOT EXISTS "maxCoinsPreVenda" integer DEFAULT 50`);
+    await sql.query(`ALTER TABLE "platform_settings" ADD COLUMN IF NOT EXISTS "updatedAt" timestamp DEFAULT now() NOT NULL`);
+    await sql.query(`INSERT INTO "platform_settings" (id, "commissionPercentage") VALUES (1, '6.00') ON CONFLICT (id) DO UPDATE SET "commissionPercentage" = '6.00'`);
 
     return res.json({ success: true, message: "Migração das tabelas e comissão de 6% concluída com sucesso na Vercel!" });
   } catch (err: any) {
@@ -262,6 +271,20 @@ async function runMigrations() {
     // getOrdersBySellerId, getAllOrdersWithDetails e o próprio confirmOrderAndReview, que
     // é o que libera o saldo do vendedor do escrow).
     await sql.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "accountType" varchar(20)`);
+
+    // Teto de ForteCoins por compra, configurável em Admin > Config ForteCoins (antes fixo
+    // no código — sem isso aqui, o valor configurado pelo gestor nunca chegava no banco em
+    // produção, já que essa é a única migração que roda de verdade no Vercel).
+    await sql.query(`CREATE TABLE IF NOT EXISTS "platform_settings" (
+      "id" integer PRIMARY KEY,
+      "commissionPercentage" numeric(5, 2) DEFAULT '10'
+    )`);
+    await sql.query(`ALTER TABLE "platform_settings" ADD COLUMN IF NOT EXISTS "vipWhatsappUrl" varchar(500)`);
+    await sql.query(`ALTER TABLE "platform_settings" ADD COLUMN IF NOT EXISTS "maxCoinsPerPurchase" integer DEFAULT 10`);
+    await sql.query(`ALTER TABLE "platform_settings" ADD COLUMN IF NOT EXISTS "maxCoinsPreVenda" integer DEFAULT 50`);
+    await sql.query(`ALTER TABLE "platform_settings" ADD COLUMN IF NOT EXISTS "updatedAt" timestamp DEFAULT now() NOT NULL`);
+    await sql.query(`INSERT INTO "platform_settings" (id) VALUES (1) ON CONFLICT (id) DO NOTHING`);
+
     console.log("[Database] Migrações de inicialização concluídas com sucesso.");
   } catch (migErr: any) {
     console.warn("[Database] Aviso: Falha na migração automática de inicialização:", migErr.message);

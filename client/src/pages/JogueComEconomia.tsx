@@ -13,6 +13,7 @@ import { trpc } from "@/lib/trpc";
 export default function JogueComEconomia() {
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
+  const { data: platformSettings } = trpc.settings.get.useQuery();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [selectedAccountType, setSelectedAccountType] = useState<"primaria" | "secundaria">("secundaria");
@@ -84,10 +85,12 @@ export default function JogueComEconomia() {
       let coinsUsed = 0;
 
       if (useCoins && user && user.forteCoins > 0) {
-        // 10 FC = R$1,00 (mesma taxa do resto do site) e teto de 10 FC por compra (50 em
-        // pré-venda) — precisa bater com o limite aplicado no servidor em payment.ts, senão
-        // a tela promete um desconto maior do que o checkout real vai aceitar.
-        const maxCoins = selectedProduct.isPreVenda ? 50 : 10;
+        // 10 FC = R$1,00 (mesma taxa do resto do site) e teto de FC por compra — precisa
+        // bater com o limite aplicado no servidor em payment.ts, senão a tela promete um
+        // desconto maior do que o checkout real vai aceitar.
+        const maxCoins = selectedProduct.isPreVenda
+          ? (platformSettings?.maxCoinsPreVenda ?? 50)
+          : (platformSettings?.maxCoinsPerPurchase ?? 10);
         coinsUsed = Math.min(user.forteCoins, Math.ceil(basePrice * 10), maxCoins);
         finalPrice = Math.max(0, basePrice - coinsUsed * 0.10);
       }
@@ -396,20 +399,33 @@ export default function JogueComEconomia() {
                 })()}
               </div>
 
-              {user && user.forteCoins > 0 && (
-                <div className="flex items-center justify-between p-3 bg-amber-950/20 border border-amber-800/40 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <Coins className="w-4 h-4 text-amber-400" />
-                    <span className="text-xs text-slate-200">Usar meus {user.forteCoins} ForteCoins como desconto</span>
+              {user && user.forteCoins > 0 && (() => {
+                const maxCoins = selectedProduct.isPreVenda
+                  ? (platformSettings?.maxCoinsPreVenda ?? 50)
+                  : (platformSettings?.maxCoinsPerPurchase ?? 10);
+                const basePriceForCoins = getItemPrice(selectedProduct, selectedAccountType);
+                const coinsThatWillApply = Math.min(user.forteCoins, Math.ceil(basePriceForCoins * 10), maxCoins);
+                return (
+                  <div className="p-3 bg-amber-950/20 border border-amber-800/40 rounded-lg space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Coins className="w-4 h-4 text-amber-400" />
+                        <span className="text-xs text-slate-200">Usar ForteCoins como desconto</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={useCoins}
+                        onChange={(e) => setUseCoins(e.target.checked)}
+                        className="w-4 h-4 accent-red-600 rounded cursor-pointer"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-400">
+                      Saldo disponível: <strong className="text-white">{user.forteCoins} FC</strong> · máximo por compra: <strong className="text-amber-400">{maxCoins} FC</strong>
+                      {useCoins && <> — desconto a aplicar: <strong className="text-amber-400">R$ {(coinsThatWillApply * 0.10).toFixed(2)}</strong> (usando {coinsThatWillApply} FC)</>}
+                    </p>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={useCoins}
-                    onChange={(e) => setUseCoins(e.target.checked)}
-                    className="w-4 h-4 accent-red-600 rounded cursor-pointer"
-                  />
-                </div>
-              )}
+                );
+              })()}
 
               <div className="p-3 bg-slate-950/50 rounded-lg text-[11px] text-slate-400 space-y-1">
                 <p className="flex items-center gap-1 text-slate-300 font-semibold">

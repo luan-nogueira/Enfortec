@@ -88,6 +88,7 @@ function getGameBadge(product: any) {
 export default function DigitalMedia() {
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
+  const { data: platformSettings } = trpc.settings.get.useQuery();
   const [searchTerm, setSearchTerm] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get("search") || "";
@@ -437,7 +438,9 @@ export default function DigitalMedia() {
 
   // Teto de ForteCoins por compra — precisa bater com o mesmo limite aplicado no servidor
   // (server/_core/payment.ts), senão a tela mostra um desconto que o checkout real não aplica.
-  const getMaxCoinsForProduct = (prod: any) => (prod?.isPreVenda ? 50 : 10);
+  // Configurável em Admin > Config ForteCoins; 10/50 são só o fallback antes de carregar.
+  const getMaxCoinsForProduct = (prod: any) =>
+    prod?.isPreVenda ? (platformSettings?.maxCoinsPreVenda ?? 50) : (platformSettings?.maxCoinsPerPurchase ?? 10);
 
   const hasSecondaryPrice = (prod: any) => {
     if (!prod) return false;

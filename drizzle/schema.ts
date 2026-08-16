@@ -208,6 +208,10 @@ export const platformSettings = pgTable("platform_settings", {
   id: integer("id").primaryKey(),
   commissionPercentage: numeric("commissionPercentage", { precision: 5, scale: 2 }).default("10"),
   vipWhatsappUrl: varchar("vipWhatsappUrl", { length: 500 }).default("https://chat.whatsapp.com/Gkx7ExampleVipLink"),
+  // Teto de ForteCoins aplicavel numa unica compra — o servidor (payment.ts) usa isso pra
+  // limitar o desconto, nunca confia em valor vindo do navegador.
+  maxCoinsPerPurchase: integer("maxCoinsPerPurchase").default(10),
+  maxCoinsPreVenda: integer("maxCoinsPreVenda").default(50),
   updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => new Date()),
 });
 

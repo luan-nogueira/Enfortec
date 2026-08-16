@@ -45,6 +45,7 @@ function getStoreProductImage(product: any): string | null {
 export default function Store() {
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
+  const { data: platformSettings } = trpc.settings.get.useQuery();
   const [searchTerm, setSearchTerm] = useState("");
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -153,8 +154,8 @@ export default function Store() {
     setIsProcessingCheckout(true);
     setCheckoutError(null);
 
-    // Teto de 10 FC por compra — precisa bater com o limite aplicado no servidor em payment.ts.
-    const coinsToUse = useCoins ? Math.min(user?.forteCoins || 0, Math.ceil(price * 10), 10) : 0;
+    // Teto de FC por compra — precisa bater com o limite aplicado no servidor em payment.ts.
+    const coinsToUse = useCoins ? Math.min(user?.forteCoins || 0, Math.ceil(price * 10), platformSettings?.maxCoinsPerPurchase ?? 10) : 0;
     let coinsDeducted = false;
 
     try {
@@ -277,7 +278,7 @@ export default function Store() {
   const price = Number(selectedProduct?.price || 0);
   const couponDiscount = appliedCoupon ? price * (discountPercentage / 100) : 0;
   const priceAfterCoupon = Math.max(0, price - couponDiscount);
-  const coinsToUseVal = useCoins ? Math.min(user?.forteCoins || 0, Math.ceil(priceAfterCoupon * 10), 10) : 0;
+  const coinsToUseVal = useCoins ? Math.min(user?.forteCoins || 0, Math.ceil(priceAfterCoupon * 10), platformSettings?.maxCoinsPerPurchase ?? 10) : 0;
   const coinDiscount = coinsToUseVal * 0.10;
   const finalPriceVal = Math.max(0, priceAfterCoupon - coinDiscount);
 

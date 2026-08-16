@@ -517,12 +517,12 @@ export async function getPlatformSettings() {
   if (result.length === 0) {
     // Initialize singleton row if not exists
     await db.insert(platformSettings).values({ id: 1, commissionPercentage: "6" }).onConflictDoNothing();
-    return { id: 1, commissionPercentage: "6", vipWhatsappUrl: null };
+    return { id: 1, commissionPercentage: "6", vipWhatsappUrl: null, maxCoinsPerPurchase: 10, maxCoinsPreVenda: 50 };
   }
   return result[0];
 }
 
-export async function updatePlatformSettings(data: { commissionPercentage?: string, vipWhatsappUrl?: string }) {
+export async function updatePlatformSettings(data: { commissionPercentage?: string, vipWhatsappUrl?: string, maxCoinsPerPurchase?: number, maxCoinsPreVenda?: number }) {
   const db = getDb();
   if (!db) return;
   await db.update(platformSettings).set(data).where(eq(platformSettings.id, 1));
