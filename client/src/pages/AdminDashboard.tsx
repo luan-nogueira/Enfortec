@@ -5011,17 +5011,28 @@ export default function AdminDashboard() {
 
             {/* Configuração para o "Jogue com Economia" */}
             <div className="bg-red-950/20 p-3 rounded-lg border border-red-500/30 space-y-2.5">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-3">
                 <Label className="text-xs text-white font-bold uppercase flex items-center gap-1.5 cursor-pointer">
-                  <span>⚡ Exibir em "Jogue com Economia" (/economia)</span>
+                  <span>⚠️ Tirar da loja principal e pôr SÓ na vitrine "Jogue com Economia"</span>
                 </Label>
                 <input
                   type="checkbox"
                   checked={gameShowInEconomia}
-                  onChange={(e) => setGameShowInEconomia(e.target.checked)}
+                  onChange={(e) => {
+                    const next = e.target.checked;
+                    if (next) {
+                      if (!window.confirm('Isso vai TIRAR este jogo do catálogo normal e do banner da Home — ele só vai aparecer na página separada /jogue-com-economia. NÃO marque isso só porque o jogo é "conta secundária/barata": jogos de conta secundária normais devem ficar desmarcados aqui. Confirma?')) {
+                        return;
+                      }
+                    }
+                    setGameShowInEconomia(next);
+                  }}
                   className="w-4 h-4 accent-red-600 rounded cursor-pointer"
                 />
               </div>
+              <p className="text-[9px] text-slate-400 leading-tight">
+                Deixe DESMARCADO para jogos normais, mesmo que só tenham conta secundária — eles aparecem certinho no catálogo principal (só com a opção Secundária). Marque isto apenas para os poucos jogos que devem existir EXCLUSIVAMENTE na vitrine promocional separada /jogue-com-economia.
+              </p>
               {gameShowInEconomia && (
                 <div className="space-y-1.5 pt-2 border-t border-red-500/20">
                   <Label className="text-[10px] text-slate-300 font-bold uppercase block">
