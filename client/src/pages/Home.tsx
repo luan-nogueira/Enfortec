@@ -156,7 +156,7 @@ export default function Home() {
   const FALLBACK_GAME_IMAGE = "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?q=80&w=1200";
 
   // Mix dynamic games from the database into the slides as requested by the user
-  const dbGameBanners = digitalProducts.map(game => {
+  const dbGameBanners = digitalProducts.filter(game => game.showInEconomia !== true).map(game => {
     let imageUrl = game.imageUrl;
     return {
       id: `game-banner-${game.id}`,

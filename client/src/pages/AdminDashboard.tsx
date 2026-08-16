@@ -1298,7 +1298,7 @@ export default function AdminDashboard() {
   const [gameStock, setGameStock] = useState(999);
   const [gameIsActive, setGameIsActive] = useState(true);
   const [gameIsPreVenda, setGameIsPreVenda] = useState(false);
-  const [gameShowInEconomia, setGameShowInEconomia] = useState(true);
+  const [gameShowInEconomia, setGameShowInEconomia] = useState(false);
   const [gameEconomiaLicenseType, setGameEconomiaLicenseType] = useState<"secundaria" | "primaria" | "ambas">("secundaria");
   const [gameCoverFit, setGameCoverFit] = useState<"cover" | "contain">("cover");
   const [addingGame, setAddingGame] = useState(false);
@@ -2164,7 +2164,7 @@ export default function AdminDashboard() {
     setGameStock(999);
     setGameIsActive(true);
     setGameIsPreVenda(false);
-    setGameShowInEconomia(true);
+    setGameShowInEconomia(false);
     setGameEconomiaLicenseType("secundaria");
     setEditingGameId(null);
   };
@@ -2182,7 +2182,7 @@ export default function AdminDashboard() {
     setGameStock(game.stock ?? 999);
     setGameIsActive(game.isActive ?? true);
     setGameIsPreVenda(game.isPreVenda ?? false);
-    setGameShowInEconomia(game.showInEconomia ?? true);
+    setGameShowInEconomia(game.showInEconomia ?? false);
     setGameEconomiaLicenseType(game.economiaLicenseType || "secundaria");
     setShowGameModal(true);
   };
