@@ -3587,31 +3587,43 @@ export default function AdminDashboard() {
                         onClick={(e) => {
                           e.stopPropagation();
                           const currentVal = game.showInEconomia !== false;
-                          
-                          // Reconstruímos o payload necessário para a mutation
-                          const payload = {
-                            name: game.name,
-                            price: Number(game.price),
-                            pricePrimary: game.pricePrimary != null ? Number(game.pricePrimary) : null,
-                            priceSecondary: game.priceSecondary != null ? Number(game.priceSecondary) : null,
-                            type: game.type as any,
-                            platform: game.platform ?? undefined,
-                            category: game.category ?? undefined,
-                            imageUrl: game.imageUrl ?? undefined,
-                            coverFit: game.coverFit ?? undefined,
-                            stock: game.stock ?? 1,
-                            isActive: game.isActive ?? true,
-                            isPreVenda: game.isPreVenda ?? false,
-                            economiaLicenseType: game.economiaLicenseType ?? undefined,
-                            showInEconomia: !currentVal,
-                            id: game.id,
+
+                          const applyToggle = () => {
+                            // Reconstruímos o payload necessário para a mutation
+                            const payload = {
+                              name: game.name,
+                              price: Number(game.price),
+                              pricePrimary: game.pricePrimary != null ? Number(game.pricePrimary) : null,
+                              priceSecondary: game.priceSecondary != null ? Number(game.priceSecondary) : null,
+                              type: game.type as any,
+                              platform: game.platform ?? undefined,
+                              category: game.category ?? undefined,
+                              imageUrl: game.imageUrl ?? undefined,
+                              coverFit: game.coverFit ?? undefined,
+                              stock: game.stock ?? 1,
+                              isActive: game.isActive ?? true,
+                              isPreVenda: game.isPreVenda ?? false,
+                              economiaLicenseType: game.economiaLicenseType ?? undefined,
+                              showInEconomia: !currentVal,
+                              id: game.id,
+                            };
+
+                            adminUpdateGameMutation.mutate(payload, {
+                              onSuccess: () => {
+                                toast.success(!currentVal ? "Movido para a vitrine 'Jogue com Economia' — some do catálogo normal." : "Voltou pro catálogo normal — saiu da vitrine 'Jogue com Economia'.");
+                              }
+                            });
                           };
-                          
-                          adminUpdateGameMutation.mutate(payload, {
-                            onSuccess: () => {
-                              toast.success(!currentVal ? "Movido para a vitrine 'Jogue com Economia' — some do catálogo normal." : "Voltou pro catálogo normal — saiu da vitrine 'Jogue com Economia'.");
-                            }
-                          });
+
+                          // Marcar "Economia" tira o jogo do catálogo normal e do banner da Home —
+                          // pede confirmação só nessa direção, já que é a que causa surpresa.
+                          if (!currentVal) {
+                            toast(`"${game.name}" vai sumir do catálogo normal e do banner, e só vai aparecer na página "Jogue com Economia". Confirma?`, {
+                              action: { label: "Confirmar", onClick: applyToggle },
+                            });
+                          } else {
+                            applyToggle();
+                          }
                         }}
                         className={`text-[9px] px-2 py-0.5 rounded font-black uppercase transition-all ${
                           game.showInEconomia !== false
