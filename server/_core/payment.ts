@@ -13,8 +13,16 @@ const PLATINADOR_SUBSCRIPTION_PRICE = 35.0;
 function computeDigitalPrice(p: { price: string; pricePrimary: string | null; priceSecondary: string | null }, accountType?: string): number {
   const basePrice = parseFloat(p.price || "0");
   const secondaryPrice = p.priceSecondary ? parseFloat(p.priceSecondary) : 0;
+  // Produto de preço único, sem o split Primária/Secundária cadastrado (a maioria do
+  // catálogo) — accountType não se aplica a ele, cobra sempre o preço base. Sem essa saída,
+  // o bloqueio de "primária indisponível" abaixo (pensado só pra quem tem Secundária mas
+  // não tem Primária) acabava barrando também esses produtos normais, já que o front manda
+  // accountType="primaria" por padrão pra qualquer jogo, split ou não.
+  const hasSplit = secondaryPrice > 0;
+  if (!hasSplit) {
+    return Math.max(0, p.pricePrimary ? parseFloat(p.pricePrimary) : basePrice);
+  }
   if (accountType === "secundaria") {
-    if (secondaryPrice <= 0) throw new Error("Conta secundária não disponível para este produto.");
     return Math.max(0, secondaryPrice);
   }
   // Produto sem preço primária cadastrado (só tem conta secundária): não deixa cobrar
