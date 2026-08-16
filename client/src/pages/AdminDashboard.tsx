@@ -3562,7 +3562,11 @@ export default function AdminDashboard() {
                       <div className="text-xs space-y-0.5 my-1 bg-slate-950/60 p-1.5 rounded border border-slate-800">
                         <div className="flex justify-between items-center">
                           <span className="text-slate-400 font-bold">👤 Primária:</span>
-                          <span className="text-green-400 font-bold">R$ {Number(game.pricePrimary || game.price || 0).toFixed(2).replace('.', ',')}</span>
+                          {game.pricePrimary ? (
+                            <span className="text-green-400 font-bold">R$ {Number(game.pricePrimary).toFixed(2).replace('.', ',')}</span>
+                          ) : (
+                            <span className="text-slate-500 italic">Sem conta primária</span>
+                          )}
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-slate-400 font-bold">👥 Secundária:</span>
