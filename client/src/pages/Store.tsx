@@ -153,7 +153,8 @@ export default function Store() {
     setIsProcessingCheckout(true);
     setCheckoutError(null);
 
-    const coinsToUse = useCoins ? Math.min(user?.forteCoins || 0, Math.ceil(price * 10)) : 0;
+    // Teto de 10 FC por compra — precisa bater com o limite aplicado no servidor em payment.ts.
+    const coinsToUse = useCoins ? Math.min(user?.forteCoins || 0, Math.ceil(price * 10), 10) : 0;
     let coinsDeducted = false;
 
     try {
@@ -276,7 +277,7 @@ export default function Store() {
   const price = Number(selectedProduct?.price || 0);
   const couponDiscount = appliedCoupon ? price * (discountPercentage / 100) : 0;
   const priceAfterCoupon = Math.max(0, price - couponDiscount);
-  const coinsToUseVal = useCoins ? Math.min(user?.forteCoins || 0, Math.ceil(priceAfterCoupon * 10)) : 0;
+  const coinsToUseVal = useCoins ? Math.min(user?.forteCoins || 0, Math.ceil(priceAfterCoupon * 10), 10) : 0;
   const coinDiscount = coinsToUseVal * 0.10;
   const finalPriceVal = Math.max(0, priceAfterCoupon - coinDiscount);
 

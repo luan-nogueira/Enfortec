@@ -159,6 +159,7 @@ export function registerPaymentRoute(app: Express) {
       // ── Preço verificado no servidor (nunca confia no `price` enviado pelo cliente) ──
       let verifiedPrice: number | null = null;
       let realProductName: string | null = null;
+      let verifiedIsPreVenda = false;
       if (productType === "platinador") {
         verifiedPrice = PLATINADOR_SUBSCRIPTION_PRICE;
       } else if (productId) {
@@ -172,7 +173,7 @@ export function registerPaymentRoute(app: Express) {
             if (rows[0]) { verifiedPrice = parseFloat(rows[0].price); realProductName = rows[0].name; }
           } else if (productType === "digital") {
             const rows = await database.select().from(digitalProducts).where(eq(digitalProducts.id, pid)).limit(1);
-            if (rows[0]) { verifiedPrice = computeDigitalPrice(rows[0], accountType); realProductName = rows[0].name; }
+            if (rows[0]) { verifiedPrice = computeDigitalPrice(rows[0], accountType); realProductName = rows[0].name; verifiedIsPreVenda = !!rows[0].isPreVenda; }
           }
         }
       }
@@ -194,11 +195,16 @@ export function registerPaymentRoute(app: Express) {
       }
 
       // ── ForteCoins verificadas no servidor (nunca confia no `coinsToUse` do cliente) ──
+      // Além do saldo real, existe um teto por compra — sem isso, um saldo grande de
+      // ForteCoins (ex: 449, acumulado por indicação/bônus) cobria o preço inteiro e o
+      // produto saía de graça. 10 FC (R$1,00) por compra normal, 50 FC (R$5,00) em
+      // pré-venda/lançamento.
+      const MAX_COINS_PER_PURCHASE = verifiedIsPreVenda ? 50 : 10;
       let verifiedCoinsToUse = 0;
       if (buyerId > 0 && Number(req.body.coinsToUse) > 0) {
         const buyerRows = await database.select().from(users).where(eq(users.id, buyerId)).limit(1);
         const realBalance = buyerRows[0]?.forteCoins || 0;
-        verifiedCoinsToUse = Math.min(Math.floor(Number(req.body.coinsToUse)) || 0, realBalance);
+        verifiedCoinsToUse = Math.min(Math.floor(Number(req.body.coinsToUse)) || 0, realBalance, MAX_COINS_PER_PURCHASE);
       }
 
       // Valida o cupom se fornecido

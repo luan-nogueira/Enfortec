@@ -84,8 +84,12 @@ export default function JogueComEconomia() {
       let coinsUsed = 0;
 
       if (useCoins && user && user.forteCoins > 0) {
-        coinsUsed = Math.min(user.forteCoins, Math.floor(basePrice));
-        finalPrice = Math.max(0, basePrice - coinsUsed);
+        // 10 FC = R$1,00 (mesma taxa do resto do site) e teto de 10 FC por compra (50 em
+        // pré-venda) — precisa bater com o limite aplicado no servidor em payment.ts, senão
+        // a tela promete um desconto maior do que o checkout real vai aceitar.
+        const maxCoins = selectedProduct.isPreVenda ? 50 : 10;
+        coinsUsed = Math.min(user.forteCoins, Math.ceil(basePrice * 10), maxCoins);
+        finalPrice = Math.max(0, basePrice - coinsUsed * 0.10);
       }
 
       const accountLabel = selectedAccountType === "primaria" ? "Conta Primária" : "Conta Secundária";

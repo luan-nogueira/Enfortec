@@ -221,7 +221,7 @@ export default function DigitalMedia() {
     setIsProcessingCheckout(true);
     setCheckoutError(null);
 
-    const coinsToUse = useCoins ? Math.min(user?.forteCoins || 0, Math.ceil(price * 10)) : 0;
+    const coinsToUse = useCoins ? Math.min(user?.forteCoins || 0, Math.ceil(price * 10), getMaxCoinsForProduct(selectedProduct)) : 0;
     let coinsDeducted = false;
 
     try {
@@ -435,6 +435,10 @@ export default function DigitalMedia() {
     return <Icon className="w-6 h-6" />;
   };
 
+  // Teto de ForteCoins por compra — precisa bater com o mesmo limite aplicado no servidor
+  // (server/_core/payment.ts), senão a tela mostra um desconto que o checkout real não aplica.
+  const getMaxCoinsForProduct = (prod: any) => (prod?.isPreVenda ? 50 : 10);
+
   const hasSecondaryPrice = (prod: any) => {
     if (!prod) return false;
     const sec = prod.priceSecondary ?? prod.price_secondary;
@@ -467,7 +471,7 @@ export default function DigitalMedia() {
   const price = selectedProduct ? getProductPrice(selectedProduct, accountType) : 0;
   const couponDiscount = appliedCoupon ? price * (discountPercentage / 100) : 0;
   const priceAfterCoupon = Math.max(0, price - couponDiscount);
-  const coinsToUseVal = useCoins ? Math.min(user?.forteCoins || 0, Math.ceil(priceAfterCoupon * 10)) : 0;
+  const coinsToUseVal = useCoins ? Math.min(user?.forteCoins || 0, Math.ceil(priceAfterCoupon * 10), getMaxCoinsForProduct(selectedProduct)) : 0;
   const coinDiscount = coinsToUseVal * 0.10;
   const finalPriceVal = Math.max(0, priceAfterCoupon - coinDiscount);
 
