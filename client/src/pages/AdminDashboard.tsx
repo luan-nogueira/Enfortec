@@ -1814,6 +1814,57 @@ export default function AdminDashboard() {
   // --- Feed Unificado de Notificações & Atividades ---
   const [notifFilter, setNotifFilter] = useState<string>("todas");
 
+  // "Apagar" aqui só tira da Central de Notificações (guardado no localStorage deste
+  // navegador) — não apaga o chat, pedido, resgate ou indicação de verdade, só limpa a
+  // lista. Evita apagar dado real sem querer.
+  const NOTIF_DISMISSED_KEY = "admin_notif_dismissed_ids";
+  const [dismissedNotifIds, setDismissedNotifIds] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem(NOTIF_DISMISSED_KEY);
+      return new Set(raw ? JSON.parse(raw) : []);
+    } catch {
+      return new Set();
+    }
+  });
+  const persistDismissedNotifIds = (ids: Set<string>) => {
+    setDismissedNotifIds(new Set(ids));
+    try {
+      localStorage.setItem(NOTIF_DISMISSED_KEY, JSON.stringify([...ids]));
+    } catch { /* localStorage indisponível — ignora */ }
+  };
+  const [notifSelectMode, setNotifSelectMode] = useState(false);
+  const [selectedNotifIds, setSelectedNotifIds] = useState<Set<string>>(new Set());
+  const toggleNotifSelected = (id: string) => {
+    setSelectedNotifIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+  const dismissOneNotif = (id: string) => {
+    persistDismissedNotifIds(new Set([...dismissedNotifIds, id]));
+  };
+  const dismissSelectedNotifs = () => {
+    if (selectedNotifIds.size === 0) return;
+    persistDismissedNotifIds(new Set([...dismissedNotifIds, ...selectedNotifIds]));
+    setSelectedNotifIds(new Set());
+    setNotifSelectMode(false);
+    toast.success("Notificações selecionadas removidas da lista.");
+  };
+  const dismissAllVisibleNotifs = (visibleIds: string[]) => {
+    toast(`Apagar ${visibleIds.length} notificaç${visibleIds.length === 1 ? "ão" : "ões"} da lista? Isso não apaga chats, pedidos ou resgates de verdade, só limpa aqui.`, {
+      action: {
+        label: "Apagar Tudo",
+        onClick: () => {
+          persistDismissedNotifIds(new Set([...dismissedNotifIds, ...visibleIds]));
+          setSelectedNotifIds(new Set());
+          setNotifSelectMode(false);
+          toast.success("Notificações apagadas da lista.");
+        },
+      },
+    });
+  };
+
   const notificationFeed = useMemo(() => {
     const feed: any[] = [];
 
@@ -1880,9 +1931,13 @@ export default function AdminDashboard() {
     return feed.sort((a, b) => b.timestamp - a.timestamp);
   }, [allRedemptions, allChats, allReferrals, sales]);
 
+  const visibleNotificationFeed = useMemo(() => {
+    return notificationFeed.filter(item => !dismissedNotifIds.has(item.id));
+  }, [notificationFeed, dismissedNotifIds]);
+
   const pendingNotifCount = useMemo(() => {
-    return notificationFeed.filter(item => item.status === "pendente").length;
-  }, [notificationFeed]);
+    return visibleNotificationFeed.filter(item => item.status === "pendente").length;
+  }, [visibleNotificationFeed]);
 
   // Pop-up em tempo real: dispara um toast quando surge uma notificação pendente
   // nova (venda, resgate, indicação) enquanto o gestor está com o painel aberto.
@@ -3028,10 +3083,35 @@ export default function AdminDashboard() {
                   </h3>
                   <p className="text-slate-400 text-sm mt-0.5">Visão unificada de toda a atividade do site em tempo real.</p>
                 </div>
+
+                {/* Ações de limpeza — só tiram da lista, não apagam chat/pedido/resgate de verdade */}
+                <div className="flex items-center gap-2 shrink-0">
+                  {notifSelectMode && (
+                    <Button
+                      size="sm"
+                      onClick={dismissSelectedNotifs}
+                      disabled={selectedNotifIds.size === 0}
+                      className="bg-red-600 hover:bg-red-700 text-white font-bold h-8 text-xs px-3 disabled:opacity-40"
+                    >
+                      Apagar Selecionadas ({selectedNotifIds.size})
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setNotifSelectMode(v => !v);
+                      setSelectedNotifIds(new Set());
+                    }}
+                    className="border-slate-700 text-slate-300 hover:bg-slate-800 h-8 text-xs px-3"
+                  >
+                    {notifSelectMode ? "Cancelar" : "Selecionar"}
+                  </Button>
+                </div>
               </div>
 
               {/* Filtros por Categoria */}
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 items-center">
                 {[
                   { key: "todas", label: "🔔 Todas", color: "bg-slate-700 text-slate-200" },
                   { key: "resgate", label: "🎁 Gift Cards", color: "bg-purple-900/60 text-purple-300 border border-purple-700/40" },
@@ -3052,7 +3132,7 @@ export default function AdminDashboard() {
                     {f.label}
                     {f.key !== "todas" && (
                       <span className="ml-1.5 opacity-70">
-                        ({notificationFeed.filter(n => f.key === "pendente" ? n.status === "pendente" : n.category === f.key).length})
+                        ({visibleNotificationFeed.filter(n => f.key === "pendente" ? n.status === "pendente" : n.category === f.key).length})
                       </span>
                     )}
                   </button>
@@ -3063,10 +3143,10 @@ export default function AdminDashboard() {
               <div className="space-y-3">
                 {(() => {
                   const filtered = notifFilter === "todas"
-                    ? notificationFeed
+                    ? visibleNotificationFeed
                     : notifFilter === "pendente"
-                      ? notificationFeed.filter(n => n.status === "pendente")
-                      : notificationFeed.filter(n => n.category === notifFilter);
+                      ? visibleNotificationFeed.filter(n => n.status === "pendente")
+                      : visibleNotificationFeed.filter(n => n.category === notifFilter);
 
                   if (filtered.length === 0) {
                     return (
@@ -3078,7 +3158,20 @@ export default function AdminDashboard() {
                     );
                   }
 
-                  return filtered.map((item: any) => {
+                  return (
+                    <>
+                      <div className="flex justify-between items-center pb-1">
+                        <span className="text-[11px] text-slate-500">{filtered.length} notificaç{filtered.length === 1 ? "ão" : "ões"} nesta lista</span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => dismissAllVisibleNotifs(filtered.map((f: any) => f.id))}
+                          className="text-red-400 hover:text-red-300 hover:bg-red-950/30 h-7 text-[11px] px-2"
+                        >
+                          🗑️ Apagar Tudo Daqui
+                        </Button>
+                      </div>
+                      {filtered.map((item: any) => {
                     const categoryColors: Record<string, string> = {
                       resgate: "border-l-purple-500 bg-purple-950/20",
                       mensagem: "border-l-blue-500 bg-blue-950/20",
@@ -3100,8 +3193,30 @@ export default function AdminDashboard() {
                         className={`relative flex items-start gap-4 p-4 rounded-xl border border-slate-800 border-l-4 transition-all hover:bg-slate-800/40 cursor-default ${categoryColors[item.category] || "bg-slate-900"}`}
                       >
                         {/* Dot Pendente */}
-                        {item.status === "pendente" && (
+                        {item.status === "pendente" && !notifSelectMode && (
                           <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+                        )}
+
+                        {/* Botão de apagar individual (fora do modo seleção) */}
+                        {!notifSelectMode && (
+                          <button
+                            type="button"
+                            onClick={() => dismissOneNotif(item.id)}
+                            title="Apagar da lista"
+                            className="absolute top-2.5 right-2.5 text-slate-600 hover:text-red-400 transition-colors text-xs w-5 h-5 flex items-center justify-center rounded hover:bg-slate-800"
+                          >
+                            ✕
+                          </button>
+                        )}
+
+                        {/* Checkbox de seleção */}
+                        {notifSelectMode && (
+                          <input
+                            type="checkbox"
+                            checked={selectedNotifIds.has(item.id)}
+                            onChange={() => toggleNotifSelected(item.id)}
+                            className="shrink-0 w-4 h-4 mt-2 accent-red-600 rounded cursor-pointer"
+                          />
                         )}
 
                         {/* Ícone Categoria */}
@@ -3168,17 +3283,19 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                     );
-                  });
+                  })}
+                    </>
+                  );
                 })()}
               </div>
 
               {/* Resumo de Estatísticas */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2 border-t border-slate-800">
                 {[
-                  { label: "Gift Cards", count: notificationFeed.filter(n => n.category === "resgate").length, pending: notificationFeed.filter(n => n.category === "resgate" && n.status === "pendente").length, color: "text-purple-400", icon: "🎁" },
-                  { label: "Mensagens", count: notificationFeed.filter(n => n.category === "mensagem").length, pending: notificationFeed.filter(n => n.category === "mensagem" && n.status === "pendente").length, color: "text-blue-400", icon: "💬" },
-                  { label: "Indicações", count: notificationFeed.filter(n => n.category === "indicacao").length, pending: notificationFeed.filter(n => n.category === "indicacao" && n.status === "pendente").length, color: "text-yellow-400", icon: "💰" },
-                  { label: "Pedidos", count: notificationFeed.filter(n => n.category === "pedido").length, pending: notificationFeed.filter(n => n.category === "pedido" && n.status === "pendente").length, color: "text-green-400", icon: "🛒" },
+                  { label: "Gift Cards", count: visibleNotificationFeed.filter(n => n.category === "resgate").length, pending: visibleNotificationFeed.filter(n => n.category === "resgate" && n.status === "pendente").length, color: "text-purple-400", icon: "🎁" },
+                  { label: "Mensagens", count: visibleNotificationFeed.filter(n => n.category === "mensagem").length, pending: visibleNotificationFeed.filter(n => n.category === "mensagem" && n.status === "pendente").length, color: "text-blue-400", icon: "💬" },
+                  { label: "Indicações", count: visibleNotificationFeed.filter(n => n.category === "indicacao").length, pending: visibleNotificationFeed.filter(n => n.category === "indicacao" && n.status === "pendente").length, color: "text-yellow-400", icon: "💰" },
+                  { label: "Pedidos", count: visibleNotificationFeed.filter(n => n.category === "pedido").length, pending: visibleNotificationFeed.filter(n => n.category === "pedido" && n.status === "pendente").length, color: "text-green-400", icon: "🛒" },
                 ].map(stat => (
                   <div key={stat.label} className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
                     <div className="text-2xl mb-1">{stat.icon}</div>
