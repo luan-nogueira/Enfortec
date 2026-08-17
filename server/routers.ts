@@ -676,6 +676,29 @@ export const appRouter = router({
       }),
   }),
 
+  // Central de Notificações do admin — "dispensar" aqui só esconde da lista (compartilhado
+  // entre gestores/dispositivos), nunca apaga o chat/pedido/resgate/indicação de verdade.
+  adminNotifications: router({
+    getDismissed: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+      return db.getDismissedNotificationIds();
+    }),
+    dismiss: protectedProcedure
+      .input(z.object({ ids: z.array(z.string()).min(1) }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+        await db.dismissNotifications(input.ids);
+        return { success: true };
+      }),
+    restore: protectedProcedure
+      .input(z.object({ ids: z.array(z.string()).min(1) }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+        await db.restoreNotifications(input.ids);
+        return { success: true };
+      }),
+  }),
+
   // Reviews Router
   reviews: router({
     getBySellerId: publicProcedure

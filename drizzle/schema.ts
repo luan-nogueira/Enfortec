@@ -203,6 +203,17 @@ export const messages = pgTable("messages", {
 export type Message = typeof messages.$inferSelect;
 export type InsertMessage = typeof messages.$inferInsert;
 
+// IDs de itens dispensados na Central de Notificações do admin (compartilhado entre
+// gestores/dispositivos — antes era só localStorage do navegador). O "id" é o id sintético
+// do item no feed (ex: "chat_abc123", "sale_45"), não uma FK pra nenhuma tabela real —
+// dispensar aqui nunca apaga o chat/pedido/resgate/indicação de verdade.
+export const adminDismissedNotifications = pgTable("admin_dismissed_notifications", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  dismissedAt: timestamp("dismissedAt").defaultNow().notNull(),
+});
+
+export type AdminDismissedNotification = typeof adminDismissedNotifications.$inferSelect;
+
 // Global Settings table - singleton row (id=1) for commission and platform configs
 export const platformSettings = pgTable("platform_settings", {
   id: integer("id").primaryKey(),

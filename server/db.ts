@@ -1,7 +1,7 @@
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
-import { InsertUser, InsertCoupon, users, sellers, products, usedProducts, digitalProducts, orders, reviews, coupons, platformSettings } from "../drizzle/schema";
+import { InsertUser, InsertCoupon, users, sellers, products, usedProducts, digitalProducts, orders, reviews, coupons, platformSettings, adminDismissedNotifications } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 /**
@@ -526,6 +526,27 @@ export async function updatePlatformSettings(data: { commissionPercentage?: stri
   const db = getDb();
   if (!db) return;
   await db.update(platformSettings).set(data).where(eq(platformSettings.id, 1));
+}
+
+// IDs dispensados na Central de Notificações do admin — nunca apaga o chat/pedido/
+// resgate/indicação de verdade, só a marcação de "não mostrar mais" na lista.
+export async function getDismissedNotificationIds(): Promise<string[]> {
+  const db = getDb();
+  if (!db) return [];
+  const rows = await db.select().from(adminDismissedNotifications);
+  return rows.map(r => r.id);
+}
+
+export async function dismissNotifications(ids: string[]) {
+  const db = getDb();
+  if (!db || ids.length === 0) return;
+  await db.insert(adminDismissedNotifications).values(ids.map(id => ({ id }))).onConflictDoNothing();
+}
+
+export async function restoreNotifications(ids: string[]) {
+  const db = getDb();
+  if (!db || ids.length === 0) return;
+  await db.delete(adminDismissedNotifications).where(inArray(adminDismissedNotifications.id, ids));
 }
 
 // Balance, Order Confirmation, and Reviews (Escrow System)

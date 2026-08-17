@@ -8,7 +8,7 @@ import { db, storage } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, onSnapshot, doc, updateDoc, setDoc, deleteDoc, query, orderBy, serverTimestamp, addDoc, getDoc } from "firebase/firestore";
 import { useLocation } from "wouter";
-import { Shield, User, UserCheck, UserPlus, ArrowLeft, Plus, X, Lock, Mail, Trash2, MessageCircle, Send, Coins, Gift, Check, Clock, LogOut, Gamepad2, Edit, Menu, BarChart3, Users, ShoppingBag, Tag, Image, Percent, Ban, Trophy, ExternalLink, Flame, Copy, Settings, Bell, Filter, CheckCircle2, ShieldAlert, Package, Store, Star, MapPin } from "lucide-react";
+import { Shield, User, UserCheck, UserPlus, ArrowLeft, Plus, X, Lock, Mail, Trash2, MessageCircle, Send, Coins, Gift, Check, Clock, LogOut, Gamepad2, Edit, Menu, BarChart3, Users, ShoppingBag, Tag, Image, Percent, Ban, Trophy, ExternalLink, Flame, Copy, Settings, Bell, Filter, CheckCircle2, ShieldAlert, Package, Store, Star, MapPin, Search } from "lucide-react";
 import { useState, useEffect, useRef, useMemo } from "react";
 import {
   Dialog,
@@ -1813,25 +1813,24 @@ export default function AdminDashboard() {
 
   // --- Feed Unificado de Notificações & Atividades ---
   const [notifFilter, setNotifFilter] = useState<string>("todas");
+  const [notifSearch, setNotifSearch] = useState("");
 
-  // "Apagar" aqui só tira da Central de Notificações (guardado no localStorage deste
-  // navegador) — não apaga o chat, pedido, resgate ou indicação de verdade, só limpa a
-  // lista. Evita apagar dado real sem querer.
-  const NOTIF_DISMISSED_KEY = "admin_notif_dismissed_ids";
-  const [dismissedNotifIds, setDismissedNotifIds] = useState<Set<string>>(() => {
-    try {
-      const raw = localStorage.getItem(NOTIF_DISMISSED_KEY);
-      return new Set(raw ? JSON.parse(raw) : []);
-    } catch {
-      return new Set();
-    }
+  // "Apagar" aqui só tira da Central de Notificações — guardado no servidor (compartilhado
+  // entre gestores/dispositivos, não é mais só o localStorage de um navegador) — nunca apaga
+  // o chat, pedido, resgate ou indicação de verdade, só a marcação de "não mostrar mais".
+  const dismissedNotifQuery = trpc.adminNotifications.getDismissed.useQuery(undefined, {
+    enabled: !!(isAuthenticated && isAdmin),
   });
-  const persistDismissedNotifIds = (ids: Set<string>) => {
-    setDismissedNotifIds(new Set(ids));
-    try {
-      localStorage.setItem(NOTIF_DISMISSED_KEY, JSON.stringify([...ids]));
-    } catch { /* localStorage indisponível — ignora */ }
-  };
+  const [dismissedNotifIds, setDismissedNotifIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (dismissedNotifQuery.data) {
+      setDismissedNotifIds(new Set(dismissedNotifQuery.data));
+    }
+  }, [dismissedNotifQuery.data]);
+
+  const dismissMutation = trpc.adminNotifications.dismiss.useMutation();
+  const restoreMutation = trpc.adminNotifications.restore.useMutation();
+
   const [notifSelectMode, setNotifSelectMode] = useState(false);
   const [selectedNotifIds, setSelectedNotifIds] = useState<Set<string>>(new Set());
   const toggleNotifSelected = (id: string) => {
@@ -1841,28 +1840,69 @@ export default function AdminDashboard() {
       return next;
     });
   };
-  const dismissOneNotif = (id: string) => {
-    persistDismissedNotifIds(new Set([...dismissedNotifIds, id]));
-  };
-  const dismissSelectedNotifs = () => {
-    if (selectedNotifIds.size === 0) return;
-    persistDismissedNotifIds(new Set([...dismissedNotifIds, ...selectedNotifIds]));
+
+  // Aplica a dispensa na hora (otimista) e sincroniza com o servidor em segundo plano.
+  // "Desfazer" no toast por alguns segundos reverte dos dois lados antes de virar definitivo.
+  const applyDismiss = (ids: string[], successMsg: string) => {
+    if (ids.length === 0) return;
+    setDismissedNotifIds(prev => new Set([...prev, ...ids]));
+    dismissMutation.mutate({ ids }, { onError: () => dismissedNotifQuery.refetch() });
     setSelectedNotifIds(new Set());
     setNotifSelectMode(false);
-    toast.success("Notificações selecionadas removidas da lista.");
+    toast.success(successMsg, {
+      duration: 5000,
+      action: {
+        label: "Desfazer",
+        onClick: () => {
+          setDismissedNotifIds(prev => {
+            const next = new Set(prev);
+            ids.forEach(id => next.delete(id));
+            return next;
+          });
+          restoreMutation.mutate({ ids }, { onError: () => dismissedNotifQuery.refetch() });
+        },
+      },
+    });
   };
+
+  const dismissOneNotif = (id: string) => applyDismiss([id], "Notificação removida da lista.");
+  const dismissSelectedNotifs = () => applyDismiss([...selectedNotifIds], `${selectedNotifIds.size} notificaç${selectedNotifIds.size === 1 ? "ão removida" : "ões removidas"} da lista.`);
   const dismissAllVisibleNotifs = (visibleIds: string[]) => {
     toast(`Apagar ${visibleIds.length} notificaç${visibleIds.length === 1 ? "ão" : "ões"} da lista? Isso não apaga chats, pedidos ou resgates de verdade, só limpa aqui.`, {
       action: {
         label: "Apagar Tudo",
-        onClick: () => {
-          persistDismissedNotifIds(new Set([...dismissedNotifIds, ...visibleIds]));
-          setSelectedNotifIds(new Set());
-          setNotifSelectMode(false);
-          toast.success("Notificações apagadas da lista.");
-        },
+        onClick: () => applyDismiss(visibleIds, "Notificações apagadas da lista."),
       },
     });
+  };
+
+  // Aviso sonoro/desktop pra notificação pendente nova — preferência fica só no
+  // localStorage deste navegador mesmo (é sobre este aparelho, não dado compartilhado).
+  const [notifSoundEnabled, setNotifSoundEnabled] = useState(() => {
+    try { return localStorage.getItem("admin_notif_sound_enabled") === "1"; } catch { return false; }
+  });
+  const toggleNotifSound = async () => {
+    const next = !notifSoundEnabled;
+    if (next && typeof Notification !== "undefined" && Notification.permission === "default") {
+      await Notification.requestPermission();
+    }
+    setNotifSoundEnabled(next);
+    try { localStorage.setItem("admin_notif_sound_enabled", next ? "1" : "0"); } catch { /* ignora */ }
+  };
+  const playNotifBeep = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.35);
+    } catch { /* navegador sem suporte a Web Audio — ignora */ }
   };
 
   const notificationFeed = useMemo(() => {
@@ -1966,8 +2006,19 @@ export default function AdminDashboard() {
       });
     });
 
+    if (newOnes.length > 0 && notifSoundEnabled) {
+      playNotifBeep();
+      if (typeof Notification !== "undefined" && Notification.permission === "granted" && document.hidden) {
+        try {
+          new Notification(newOnes.length === 1 ? newOnes[0].title : `${newOnes.length} novas notificações`, {
+            body: newOnes.length === 1 ? newOnes[0].subtitle : newOnes.map(n => n.title).join(" • "),
+          });
+        } catch { /* navegador sem suporte — ignora */ }
+      }
+    }
+
     seenNotifIdsRef.current = new Set(pendingIds);
-  }, [notificationFeed]);
+  }, [notificationFeed, notifSoundEnabled]);
 
   const menuItems = useMemo(() => [
     { value: "visao-geral", label: "Visão Geral", icon: BarChart3 },
@@ -3086,6 +3137,15 @@ export default function AdminDashboard() {
 
                 {/* Ações de limpeza — só tiram da lista, não apagam chat/pedido/resgate de verdade */}
                 <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={toggleNotifSound}
+                    title={notifSoundEnabled ? "Avisos sonoros ativados — clique pra desativar" : "Ativar som/aviso do navegador pra notificação nova"}
+                    className={`h-8 text-xs px-3 ${notifSoundEnabled ? "border-red-600/50 text-red-400 bg-red-950/20" : "border-slate-700 text-slate-400 hover:bg-slate-800"}`}
+                  >
+                    {notifSoundEnabled ? "🔔 Som Ativo" : "🔕 Som Desativado"}
+                  </Button>
                   {notifSelectMode && (
                     <Button
                       size="sm"
@@ -3108,6 +3168,17 @@ export default function AdminDashboard() {
                     {notifSelectMode ? "Cancelar" : "Selecionar"}
                   </Button>
                 </div>
+              </div>
+
+              {/* Busca */}
+              <div className="relative max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <Input
+                  value={notifSearch}
+                  onChange={(e) => setNotifSearch(e.target.value)}
+                  placeholder="Buscar por nome, cliente, jogo..."
+                  className="bg-slate-950 border-slate-800 text-white text-sm h-9 pl-9"
+                />
               </div>
 
               {/* Filtros por Categoria */}
@@ -3142,17 +3213,22 @@ export default function AdminDashboard() {
               {/* Feed de Notificações */}
               <div className="space-y-3">
                 {(() => {
-                  const filtered = notifFilter === "todas"
+                  const byCategory = notifFilter === "todas"
                     ? visibleNotificationFeed
                     : notifFilter === "pendente"
                       ? visibleNotificationFeed.filter(n => n.status === "pendente")
                       : visibleNotificationFeed.filter(n => n.category === notifFilter);
 
+                  const searchTerm = notifSearch.trim().toLowerCase();
+                  const filtered = searchTerm
+                    ? byCategory.filter(n => n.title?.toLowerCase().includes(searchTerm) || n.subtitle?.toLowerCase().includes(searchTerm))
+                    : byCategory;
+
                   if (filtered.length === 0) {
                     return (
                       <div className="text-center py-16 text-slate-500">
                         <Bell className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                        <p className="font-bold">Nenhuma atividade nesta categoria</p>
+                        <p className="font-bold">{searchTerm ? "Nenhum resultado pra essa busca" : "Nenhuma atividade nesta categoria"}</p>
                         <p className="text-xs mt-1">Tudo tranquilo por aqui!</p>
                       </div>
                     );

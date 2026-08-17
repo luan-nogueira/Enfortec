@@ -104,6 +104,11 @@ app.get("/api/migrate-db", async (req, res) => {
     await sql.query(`ALTER TABLE "platform_settings" ADD COLUMN IF NOT EXISTS "updatedAt" timestamp DEFAULT now() NOT NULL`);
     await sql.query(`INSERT INTO "platform_settings" (id, "commissionPercentage") VALUES (1, '6.00') ON CONFLICT (id) DO UPDATE SET "commissionPercentage" = '6.00'`);
 
+    await sql.query(`CREATE TABLE IF NOT EXISTS "admin_dismissed_notifications" (
+      "id" varchar(255) PRIMARY KEY,
+      "dismissedAt" timestamp DEFAULT now() NOT NULL
+    )`);
+
     return res.json({ success: true, message: "Migração das tabelas e comissão de 6% concluída com sucesso na Vercel!" });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
@@ -284,6 +289,13 @@ async function runMigrations() {
     await sql.query(`ALTER TABLE "platform_settings" ADD COLUMN IF NOT EXISTS "maxCoinsPreVenda" integer DEFAULT 50`);
     await sql.query(`ALTER TABLE "platform_settings" ADD COLUMN IF NOT EXISTS "updatedAt" timestamp DEFAULT now() NOT NULL`);
     await sql.query(`INSERT INTO "platform_settings" (id) VALUES (1) ON CONFLICT (id) DO NOTHING`);
+
+    // IDs dispensados na Central de Notificações do admin — compartilhado entre gestores,
+    // não apaga nenhum chat/pedido/resgate/indicação de verdade.
+    await sql.query(`CREATE TABLE IF NOT EXISTS "admin_dismissed_notifications" (
+      "id" varchar(255) PRIMARY KEY,
+      "dismissedAt" timestamp DEFAULT now() NOT NULL
+    )`);
 
     console.log("[Database] Migrações de inicialização concluídas com sucesso.");
   } catch (migErr: any) {
