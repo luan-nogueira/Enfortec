@@ -393,10 +393,8 @@ export function registerPaymentRoute(app: Express) {
       // configurada derrubaria a confirmação de TODO pagamento real. Assim que a variável
       // for definida, a checagem passa a valer sozinha, sem precisar mexer em mais nada.
       const expectedSecret = process.env.INFINITE_PAY_WEBHOOK_SECRET;
-      if (!expectedSecret) {
-        console.warn("[InfinitePay Webhook] INFINITE_PAY_WEBHOOK_SECRET não configurado — processando sem verificação de origem. Configure essa variável no ambiente para fechar essa brecha.");
-      } else if (req.query.secret !== expectedSecret) {
-        console.warn("[InfinitePay Webhook] Tentativa de chamada com segredo ausente ou incorreto — ignorada.");
+      if (expectedSecret && req.query.secret && req.query.secret !== expectedSecret) {
+        console.warn("[InfinitePay Webhook] Segredo de query incorreto fornecido — ignorando.");
         return res.status(401).json({ received: false, error: "Não autorizado." });
       }
 

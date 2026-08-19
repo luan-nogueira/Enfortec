@@ -1,0 +1,3 @@
+{
+  "query": "INSERT INTO orders (\"buyerId\", \"productType\", \"productName\", \"quantity\", \"totalPrice\", \"status\", \"buyerPhone\", \"createdAt\") SELECT id, 'digital', 'A QUIET PLACE', 1, '59.00', 'pago', '5571987650840', NOW() FROM users WHERE email = 'sandrinhooperfectt@gmail.com' LIMIT 1;"
+}
