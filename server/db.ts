@@ -388,6 +388,28 @@ export async function getAllOrdersWithDetails() {
   const db = getDb();
   if (!db) return [];
 
+  // Recupera automaticamente a compra do A QUIET PLACE do china gameplay se ainda não constar
+  try {
+    const existing = await db.select().from(orders).where(eq(orders.productName, "A QUIET PLACE")).limit(1);
+    if (existing.length === 0) {
+      const userRow = await db.select().from(users).where(eq(users.email, "sandrinhooperfectt@gmail.com")).limit(1);
+      if (userRow.length > 0) {
+        await db.insert(orders).values({
+          buyerId: userRow[0].id,
+          productType: "digital",
+          productName: "A QUIET PLACE",
+          quantity: 1,
+          totalPrice: "59.00",
+          status: "pago",
+          buyerPhone: "5571987650840",
+          createdAt: new Date(),
+        });
+      }
+    }
+  } catch (e) {
+    console.error("[getAllOrdersWithDetails] Error in auto-recovery:", e);
+  }
+
   const results = await db
     .select({
       order: orders,
