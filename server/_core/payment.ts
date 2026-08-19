@@ -123,6 +123,7 @@ export function registerPaymentRoute(app: Express) {
   app.post("/api/infinitepay/checkout", async (req, res) => {
     try {
       const { name, quantity = 1, redirectUrl, productType = "store", productId, sellerId, customer, couponCode, accountType } = req.body;
+      const customerPhone: string = customer?.phone_number || "";
       // price/coinsToUse também chegam no body, mas são só o que o comprador VIU na tela —
       // nunca são usados pra calcular o valor cobrado. O valor real é sempre recalculado
       // abaixo a partir do banco (preço do produto + saldo real de ForteCoins do comprador).
@@ -280,6 +281,10 @@ export function registerPaymentRoute(app: Express) {
             insertValues.digitalProductId = parseInt(productId) || null;
           }
 
+          if (customerPhone) {
+            insertValues.buyerPhone = customerPhone;
+          }
+
           await database.insert(orders).values(insertValues);
 
           // Deduct coins used and reward 7 coins cashback in PostgreSQL
@@ -311,8 +316,10 @@ export function registerPaymentRoute(app: Express) {
 
       // Constrói order_nsu compacto: buyerId_sellerId_productType_productId_coinsToUse_couponCode
       // Codifica o nome do produto em base64 para incluir no NSU sem quebrar o split por "_"
-      const productNameB64 = Buffer.from(productNameStr).toString("base64");
-      const orderNsu = `${buyerId}_${mysqlSellerId || "null"}_${productType}_${productId || "null"}_${verifiedCoinsToUse}_${validCouponCode || "nocoupon"}_${productNameB64}`;
+      const productNameBase64 = Buffer.from(productNameStr).toString("base64");
+      // parts: buyerId_sellerId_productType_productId_coinsUsed_coupon_productName_phone
+      const phoneBase64 = customerPhone ? Buffer.from(customerPhone).toString("base64") : "nophone";
+      const orderNsu = `${buyerId}_${mysqlSellerId}_${productType}_${productId || "null"}_${verifiedCoinsToUse}_${validCouponCode || "nocoupon"}_${productNameBase64}_${phoneBase64}`;
 
       const host = req.get("host") || "";
       const protocol = host.includes("localhost") || host.includes("127.0.0.1") ? "http" : "https";
@@ -461,6 +468,14 @@ export function registerPaymentRoute(app: Express) {
             productNameFromNsu = Buffer.from(parts[6], "base64").toString("utf-8");
           } catch { /* mantém o nome padrão */ }
         }
+        // parts[7] = phone
+        let phoneFromNsu: string | null = null;
+        if (parts.length >= 8) {
+          try {
+            const decoded = Buffer.from(parts[7], "base64").toString("utf-8");
+            phoneFromNsu = decoded !== "nophone" ? decoded : null;
+          } catch { /* ignora */ }
+        }
       }
 
       console.log(`[InfinitePay Webhook] Pagamento confirmado — ID: ${paymentId}, Valor: R$${totalPrice}, Produto: ${productName}, Buyer: ${buyerId}, Seller: ${sellerId}, Tipo: ${productType}, Moedas usadas: ${coinsUsedValue}, Cupom: ${couponCodeValue}`);
@@ -558,6 +573,10 @@ export function registerPaymentRoute(app: Express) {
           insertValues.usedProductId = parseInt(productIdString) || null;
         } else if (productType === "digital" && productIdString) {
           insertValues.digitalProductId = parseInt(productIdString) || null;
+        }
+
+        if (phoneFromNsu) {
+          insertValues.buyerPhone = phoneFromNsu;
         }
 
         await database.insert(orders).values(insertValues);

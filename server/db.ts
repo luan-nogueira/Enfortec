@@ -225,11 +225,21 @@ export async function getAllUsedProductsWithSeller() {
     .select({
       product: usedProducts,
       sellerStoreName: sellers.storeName,
+      sellerEmail: users.email,
+      sellerName: users.name,
+      directUserEmail: sql<string | null>`(SELECT email FROM users WHERE id = ${usedProducts.sellerId} LIMIT 1)`,
+      directUserName: sql<string | null>`(SELECT name FROM users WHERE id = ${usedProducts.sellerId} LIMIT 1)`,
     })
     .from(usedProducts)
     .leftJoin(sellers, eq(usedProducts.sellerId, sellers.id))
+    .leftJoin(users, eq(sellers.userId, users.id))
     .orderBy(desc(usedProducts.createdAt));
-  return rows.map(r => ({ ...r.product, sellerStoreName: r.sellerStoreName }));
+  return rows.map(r => ({
+    ...r.product,
+    sellerStoreName: r.sellerStoreName || undefined,
+    sellerEmail: r.sellerEmail || r.directUserEmail || undefined,
+    sellerName: r.sellerName || r.directUserName || undefined,
+  }));
 }
 
 // Digital Products queries
@@ -265,12 +275,19 @@ export async function getAllDigitalProductsWithSeller() {
       sellerStoreName: sellers.storeName,
       sellerEmail: users.email,
       sellerName: users.name,
+      directUserEmail: sql<string | null>`(SELECT email FROM users WHERE id = ${digitalProducts.sellerId} LIMIT 1)`,
+      directUserName: sql<string | null>`(SELECT name FROM users WHERE id = ${digitalProducts.sellerId} LIMIT 1)`,
     })
     .from(digitalProducts)
     .leftJoin(sellers, eq(digitalProducts.sellerId, sellers.id))
     .leftJoin(users, eq(sellers.userId, users.id))
     .orderBy(desc(digitalProducts.createdAt));
-  return rows.map((r) => ({ ...r.product, sellerStoreName: r.sellerStoreName, sellerEmail: r.sellerEmail, sellerName: r.sellerName }));
+  return rows.map((r) => ({
+    ...r.product,
+    sellerStoreName: r.sellerStoreName || undefined,
+    sellerEmail: r.sellerEmail || r.directUserEmail || undefined,
+    sellerName: r.sellerName || r.directUserName || undefined,
+  }));
 }
 
 export async function getDigitalProductsBySellerId(sellerId: number) {
@@ -399,6 +416,7 @@ export async function getAllOrdersWithDetails() {
       ...r.order,
       buyerName: r.buyer?.name || "Sem Nome",
       buyerEmail: r.buyer?.email || "Sem E-mail",
+      buyerPhone: r.order.buyerPhone || null,
       productName,
     };
   });

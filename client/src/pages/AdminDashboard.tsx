@@ -1757,6 +1757,41 @@ export default function AdminDashboard() {
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [adminReplyText, setAdminReplyText] = useState("");
   const [sendingReply, setSendingReply] = useState(false);
+  const [chatSearch, setChatSearch] = useState("");
+  const [chatFilter, setChatFilter] = useState<"todas" | "nao_lidas">("todas");
+
+  const handleDeleteChat = (chatId: string, userName: string) => {
+    toast(`Excluir permanentemente a conversa com "${userName}"? Isso libera espaço no banco de dados (Firestore).`, {
+      action: {
+        label: "Excluir",
+        onClick: async () => {
+          try {
+            await deleteDoc(doc(db, "chats", chatId));
+            toast.success("Conversa excluída do banco de dados!");
+            if (selectedChatUser?.id === chatId) {
+              setSelectedChatUser(null);
+            }
+          } catch (err: any) {
+            console.error("Erro ao excluir conversa:", err);
+            toast.error("Erro ao excluir conversa.");
+          }
+        },
+      },
+    });
+  };
+
+  const filteredChats = useMemo(() => {
+    return allChats.filter((chat) => {
+      if (chatFilter === "nao_lidas" && !chat.unreadByAdmin) return false;
+      if (!chatSearch.trim()) return true;
+      const term = chatSearch.toLowerCase().trim();
+      const name = (chat.userName || "").toLowerCase();
+      const email = (chat.userEmail || "").toLowerCase();
+      const msg = (chat.lastMessage || "").toLowerCase();
+      const topic = (chat.topic || "").toLowerCase();
+      return name.includes(term) || email.includes(term) || msg.includes(term) || topic.includes(term);
+    });
+  }, [allChats, chatFilter, chatSearch]);
 
   useEffect(() => {
     if (!isAuthenticated || (!isAdmin && !isCollaborator)) return;
@@ -3064,6 +3099,14 @@ export default function AdminDashboard() {
                           <p className="text-slate-500 font-bold uppercase text-[10px]">Comprador</p>
                           <p className="text-white font-semibold">{order.buyerName || "Cliente"}</p>
                           <p className="text-slate-400 text-[11px]">{order.buyerEmail}</p>
+                          {order.buyerPhone && (
+                            <p className="text-green-400 text-[11px] font-bold flex items-center gap-1 mt-0.5">
+                              <MessageCircle className="w-3 h-3" /> {order.buyerPhone}
+                            </p>
+                          )}
+                          {!order.buyerPhone && (
+                            <p className="text-slate-600 text-[10px] italic mt-0.5">WhatsApp não informado</p>
+                          )}
                         </div>
                         <div>
                           <p className="text-slate-500 font-bold uppercase text-[10px]">Status do Pagamento</p>
@@ -3101,16 +3144,45 @@ export default function AdminDashboard() {
                           <Check className="w-3.5 h-3.5" />
                           Marcar Concluído / Entregue
                         </Button>
+                        {/* Botão WhatsApp — abre direto no número do comprador */}
                         <Button
                           onClick={() => {
-                            const text = encodeURIComponent(`Olá ${order.buyerName || 'Cliente'}! Sobre o seu pedido #${order.id} (${order.productName}) na EforteGames:`);
-                            window.open(`https://wa.me/?text=${text}`, "_blank");
+                            const rawPhone = order.buyerPhone || "";
+                            // Normaliza: remove tudo que não é dígito e garante código do país
+                            const digits = rawPhone.replace(/\D/g, "");
+                            const phone = digits.startsWith("55") ? digits : digits ? `55${digits}` : "";
+                            const text = encodeURIComponent(
+                              `Olá ${order.buyerName || "Cliente"}! Sobre o seu pedido #${order.id} (${order.productName}) na EforteGames:`
+                            );
+                            if (phone) {
+                              window.open(`https://wa.me/${phone}?text=${text}`, "_blank");
+                            } else {
+                              window.open(`https://wa.me/?text=${text}`, "_blank");
+                            }
                           }}
                           variant="outline"
-                          className="bg-green-950/30 hover:bg-green-900/50 text-green-400 border-green-500/40 font-bold text-xs h-9 px-3 flex items-center gap-1.5"
+                          title={order.buyerPhone ? `WhatsApp: ${order.buyerPhone}` : "Número não cadastrado — abrirá sem destinatário"}
+                          className={`font-bold text-xs h-9 px-3 flex items-center gap-1.5 ${
+                            order.buyerPhone
+                              ? "bg-green-950/30 hover:bg-green-900/50 text-green-400 border-green-500/40"
+                              : "bg-slate-900 text-slate-500 border-slate-700 cursor-not-allowed"
+                          }`}
                         >
                           <MessageCircle className="w-3.5 h-3.5" />
-                          WhatsApp
+                          WhatsApp{!order.buyerPhone && " ⚠️"}
+                        </Button>
+                        {/* Botão Chat pelo Site — abre a aba de chats filtrando pelo comprador */}
+                        <Button
+                          onClick={() => {
+                            // Muda para a aba de chats e tenta filtrar pelo nome do comprador
+                            const el = document.querySelector('[data-value="chats"]') as HTMLElement | null;
+                            if (el) el.click();
+                          }}
+                          variant="outline"
+                          className="bg-blue-950/30 hover:bg-blue-900/50 text-blue-400 border-blue-500/40 font-bold text-xs h-9 px-3 flex items-center gap-1.5"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                          Chat pelo Site
                         </Button>
                       </div>
                     </Card>
@@ -3727,8 +3799,15 @@ export default function AdminDashboard() {
             </div>
 
             {(() => {
-              const filteredGamesList = gameSearchQuery.trim()
-                ? gamesList.filter((g: any) => g.name?.toLowerCase().includes(gameSearchQuery.trim().toLowerCase()))
+              const queryStr = gameSearchQuery.trim().toLowerCase();
+              const filteredGamesList = queryStr
+                ? gamesList.filter((g: any) =>
+                    g.name?.toLowerCase().includes(queryStr) ||
+                    g.sellerName?.toLowerCase().includes(queryStr) ||
+                    g.sellerEmail?.toLowerCase().includes(queryStr) ||
+                    g.sellerStoreName?.toLowerCase().includes(queryStr) ||
+                    String(g.sellerId || "").includes(queryStr)
+                  )
                 : gamesList;
               if (filteredGamesList.length === 0) {
                 return (
@@ -3755,12 +3834,29 @@ export default function AdminDashboard() {
                   </div>
                   <div>
                     <div className="flex justify-between items-start gap-2 mb-2">
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <h3 className="font-bold text-white text-sm line-clamp-2" title={game.name}>{game.name}</h3>
                         {game.sellerId && (
-                          <span className="inline-block mt-1 text-[9px] font-black bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full">
-                            🤝 Vendedor Parceiro (ID: #{game.sellerId})
-                          </span>
+                          <div className="mt-1 bg-amber-950/40 border border-amber-500/30 p-2 rounded-lg text-xs space-y-0.5">
+                            <div className="flex items-center justify-between gap-1 flex-wrap">
+                              <span className="font-black text-amber-400 flex items-center gap-1 text-[10px]">
+                                🤝 Anunciado por: <strong className="text-white font-bold">{game.sellerName || game.sellerStoreName || `Vendedor #${game.sellerId}`}</strong>
+                              </span>
+                              <span className="text-[9px] font-mono text-amber-300 font-bold bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/30">
+                                ID #{game.sellerId}
+                              </span>
+                            </div>
+                            {game.sellerEmail && (
+                              <p className="text-[10px] text-slate-300 font-mono truncate" title={game.sellerEmail}>
+                                ✉️ {game.sellerEmail}
+                              </p>
+                            )}
+                            {game.sellerStoreName && game.sellerStoreName !== game.sellerName && (
+                              <p className="text-[10px] text-slate-400 truncate">
+                                🏪 Loja: {game.sellerStoreName}
+                              </p>
+                            )}
+                          </div>
                         )}
                       </div>
                       <div className="flex items-center gap-1 shrink-0 bg-slate-950/80 rounded border border-slate-800 p-0.5">
@@ -4395,43 +4491,92 @@ export default function AdminDashboard() {
 
           {/* Aba Negociações & Mensagens dos Clientes */}
           <TabsContent value="negociacoes" className="space-y-6">
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
               <div>
                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
                   <MessageCircle className="w-6 h-6 text-red-500" /> Negociações & Mensagens dos Clientes
+                  <span className="text-xs bg-slate-800 text-slate-400 font-normal px-2.5 py-0.5 rounded-full border border-slate-700">
+                    {allChats.length} conversa{allChats.length !== 1 ? "s" : ""}
+                  </span>
                 </h3>
                 <p className="text-slate-400 text-sm">
-                  Acompanhe em tempo real as conversas dos clientes, resgates de prêmios e negociações de mídias físicas.
+                  Acompanhe em tempo real as conversas dos clientes e exclua o histórico antigo para economizar armazenamento no banco.
                 </p>
               </div>
             </div>
 
+            {/* Barra de Filtro e Busca de Conversas */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Input
+                  value={chatSearch}
+                  onChange={(e) => setChatSearch(e.target.value)}
+                  placeholder="Buscar conversa por nome do cliente, e-mail ou mensagem..."
+                  className="bg-slate-950 border-slate-800 text-white text-xs pl-9 h-9 rounded-lg"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setChatFilter("todas")}
+                  className={`h-9 text-xs px-3 font-bold ${chatFilter === "todas" ? "bg-red-600 text-white border-red-500" : "bg-slate-950 text-slate-400 border-slate-800"}`}
+                >
+                  Todas ({allChats.length})
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setChatFilter("nao_lidas")}
+                  className={`h-9 text-xs px-3 font-bold ${chatFilter === "nao_lidas" ? "bg-red-600 text-white border-red-500" : "bg-slate-950 text-slate-400 border-slate-800"}`}
+                >
+                  Não Lidas ({allChats.filter(c => c.unreadByAdmin).length})
+                </Button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {allChats.length === 0 ? (
+              {filteredChats.length === 0 ? (
                 <div className="col-span-full py-16 text-center text-slate-500 italic bg-slate-900/40 rounded-xl border border-slate-800">
                   <MessageCircle className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                  <h4 className="font-bold text-slate-400">Nenhuma conversa registrada ainda</h4>
-                  <p className="text-xs text-slate-600 mt-1">As conversas e solicitações dos clientes aparecerão aqui.</p>
+                  <h4 className="font-bold text-slate-400">
+                    {chatSearch ? "Nenhuma conversa encontrada na busca" : "Nenhuma conversa registrada ainda"}
+                  </h4>
+                  <p className="text-xs text-slate-600 mt-1">
+                    {chatSearch ? "Tente buscar por outro termo ou nome de cliente." : "As conversas e solicitações dos clientes aparecerão aqui."}
+                  </p>
                 </div>
               ) : (
-                allChats.map((chat) => (
+                filteredChats.map((chat) => (
                   <Card key={chat.id} className="bg-slate-900 border-slate-800 p-5 flex flex-col justify-between card-neon hover:border-red-500/40 transition-all">
                     <div>
                       <div className="flex items-start justify-between gap-2 mb-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-red-400 font-bold text-sm uppercase">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-red-400 font-bold text-sm uppercase shrink-0">
                             {chat.userName?.charAt(0) || "U"}
                           </div>
-                          <div>
-                            <h4 className="font-bold text-white text-sm">{chat.userName || "Usuário"}</h4>
-                            <p className="text-[11px] text-slate-400">{chat.userEmail || chat.id}</p>
+                          <div className="min-w-0">
+                            <h4 className="font-bold text-white text-sm truncate">{chat.userName || "Usuário"}</h4>
+                            <p className="text-[11px] text-slate-400 truncate">{chat.userEmail || chat.id}</p>
                           </div>
                         </div>
-                        {chat.unreadByAdmin && (
-                          <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-red-600 text-white animate-pulse">
-                            Novo
-                          </span>
-                        )}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {chat.unreadByAdmin && (
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-red-600 text-white animate-pulse">
+                              Novo
+                            </span>
+                          )}
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            onClick={() => handleDeleteChat(chat.id, chat.userName || "Usuário")}
+                            title="Excluir conversa (libera espaço no banco de dados)"
+                            className="h-7 w-7 bg-red-950/20 hover:bg-red-900/50 text-red-400 border-red-500/30 hover:border-red-500/60 rounded-md"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
                       </div>
 
                       <div className="bg-slate-950/80 p-3 rounded-lg border border-slate-800 text-xs text-slate-300 font-mono line-clamp-3 mb-4">
@@ -6029,13 +6174,24 @@ export default function AdminDashboard() {
       {selectedChatUser && (
         <Dialog open={!!selectedChatUser} onOpenChange={() => setSelectedChatUser(null)}>
           <DialogContent className="bg-slate-900 border-red-600/30 text-white max-w-lg card-neon">
-            <DialogHeader>
-              <DialogTitle className="text-lg font-bold flex items-center gap-2 text-neon">
-                <MessageCircle className="text-red-500" /> Mensagens com {selectedChatUser.name}
-              </DialogTitle>
-              <DialogDescription className="text-slate-400 text-xs">
-                {selectedChatUser.topic ? `Assunto: ${selectedChatUser.topic}` : selectedChatUser.email || selectedChatUser.id}
-              </DialogDescription>
+            <DialogHeader className="flex flex-row items-start justify-between pr-6">
+              <div>
+                <DialogTitle className="text-lg font-bold flex items-center gap-2 text-neon">
+                  <MessageCircle className="text-red-500" /> Mensagens com {selectedChatUser.name}
+                </DialogTitle>
+                <DialogDescription className="text-slate-400 text-xs">
+                  {selectedChatUser.topic ? `Assunto: ${selectedChatUser.topic}` : selectedChatUser.email || selectedChatUser.id}
+                </DialogDescription>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleDeleteChat(selectedChatUser.id, selectedChatUser.name)}
+                title="Excluir permanentemente do banco"
+                className="bg-red-950/30 hover:bg-red-900/50 text-red-400 border-red-500/40 font-bold text-xs h-8 px-2.5 flex items-center gap-1.5 shrink-0"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Excluir
+              </Button>
             </DialogHeader>
 
             <div className="space-y-4 my-2">

@@ -409,7 +409,7 @@ export default function Home() {
                     <img
                       src={banner.imageUrl}
                       alt={banner.title}
-                      className="w-full h-full object-cover brightness-[0.35] group-hover/carousel:scale-[1.01] transition-transform duration-700"
+                      className="w-full h-full object-cover brightness-[0.75] group-hover/carousel:scale-[1.01] transition-transform duration-700"
                       onError={(e) => {
                         e.currentTarget.src = FALLBACK_GAME_IMAGE;
                         e.currentTarget.onerror = null;
@@ -420,15 +420,15 @@ export default function Home() {
                   )}
 
                   {/* Content Overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent flex flex-col justify-end p-6 sm:p-10 text-left">
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent flex flex-col justify-end p-6 sm:p-10 text-left">
                     <div className="max-w-2xl space-y-2 sm:space-y-3">
                       {/* Countdown Timer if available */}
                       {banner.expiresAt && <BannerCountdown expiresAt={banner.expiresAt} />}
                       
-                      <h2 className="text-lg sm:text-2xl md:text-4xl font-black text-white leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                      <h2 className="text-lg sm:text-2xl md:text-4xl font-black text-white leading-tight tracking-tight drop-shadow-[0_2px_8px_rgba(0,0,0,1)] [text-shadow:0_2px_12px_rgba(0,0,0,0.9)]">
                         {banner.title}
                       </h2>
-                      <p className="text-[10px] sm:text-xs md:text-sm text-slate-300 line-clamp-2 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] max-w-xl">
+                      <p className="text-[10px] sm:text-xs md:text-sm text-slate-200 line-clamp-2 drop-shadow-[0_1px_4px_rgba(0,0,0,1)] max-w-xl">
                         {banner.description || banner.title}
                       </p>
                       
@@ -496,7 +496,7 @@ export default function Home() {
                   <img
                     src={sidebarTopBanner.imageUrl}
                     alt={sidebarTopBanner.title}
-                    className="absolute inset-0 w-full h-full object-cover brightness-[0.4] group-hover/sidebar:scale-[1.02] transition-transform duration-500"
+                    className="absolute inset-0 w-full h-full object-cover brightness-[0.75] group-hover/sidebar:scale-[1.02] transition-transform duration-500"
                     onError={(e) => {
                       e.currentTarget.src = FALLBACK_GAME_IMAGE;
                       e.currentTarget.onerror = null;
@@ -505,12 +505,12 @@ export default function Home() {
                 ) : (
                   <div className="absolute inset-0 bg-gradient-to-br from-red-950 to-slate-900" />
                 )}
-                <div className="relative z-10 space-y-0.5 sm:space-y-1 text-left">
+                <div className="relative z-10 space-y-0.5 sm:space-y-1 text-left [text-shadow:0_1px_6px_rgba(0,0,0,0.9)]">
                   {sidebarTopBanner.expiresAt && <BannerCountdown expiresAt={sidebarTopBanner.expiresAt} />}
-                  <h3 className="text-xs sm:text-sm lg:text-base font-black text-white leading-tight drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.8)]">
+                  <h3 className="text-xs sm:text-sm lg:text-base font-black text-white leading-tight drop-shadow-[0_2px_6px_rgba(0,0,0,1)]">
                     {sidebarTopBanner.title}
                   </h3>
-                  <p className="text-[9px] sm:text-[10px] lg:text-xs text-slate-300 line-clamp-2 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] max-w-md">
+                  <p className="text-[9px] sm:text-[10px] lg:text-xs text-slate-200 line-clamp-2 drop-shadow-[0_1px_4px_rgba(0,0,0,1)] max-w-md">
                     {sidebarTopBanner.description || sidebarTopBanner.title}
                   </p>
                 </div>
@@ -525,7 +525,7 @@ export default function Home() {
                   <img
                     src={sidebarBottomBanner.imageUrl}
                     alt={sidebarBottomBanner.title}
-                    className="absolute inset-0 w-full h-full object-cover brightness-[0.4] group-hover/sidebar:scale-[1.02] transition-transform duration-500"
+                    className="absolute inset-0 w-full h-full object-cover brightness-[0.75] group-hover/sidebar:scale-[1.02] transition-transform duration-500"
                     onError={(e) => {
                       e.currentTarget.src = FALLBACK_GAME_IMAGE;
                       e.currentTarget.onerror = null;
@@ -534,12 +534,12 @@ export default function Home() {
                 ) : (
                   <div className="absolute inset-0 bg-gradient-to-br from-red-950 to-slate-900" />
                 )}
-                <div className="relative z-10 space-y-0.5 sm:space-y-1 text-left">
+                <div className="relative z-10 space-y-0.5 sm:space-y-1 text-left [text-shadow:0_1px_6px_rgba(0,0,0,0.9)]">
                   {sidebarBottomBanner.expiresAt && <BannerCountdown expiresAt={sidebarBottomBanner.expiresAt} />}
-                  <h3 className="text-xs sm:text-sm lg:text-base font-black text-white leading-tight drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.8)]">
+                  <h3 className="text-xs sm:text-sm lg:text-base font-black text-white leading-tight drop-shadow-[0_2px_6px_rgba(0,0,0,1)]">
                     {sidebarBottomBanner.title}
                   </h3>
-                  <p className="text-[9px] sm:text-[10px] lg:text-xs text-slate-300 line-clamp-2 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] max-w-md">
+                  <p className="text-[9px] sm:text-[10px] lg:text-xs text-slate-200 line-clamp-2 drop-shadow-[0_1px_4px_rgba(0,0,0,1)] max-w-md">
                     {sidebarBottomBanner.description || sidebarBottomBanner.title}
                   </p>
                 </div>
@@ -554,7 +554,7 @@ export default function Home() {
                   <img
                     src={sidebarPlatinadorBanner.imageUrl}
                     alt={sidebarPlatinadorBanner.title}
-                    className="absolute inset-0 w-full h-full object-cover brightness-[0.4] group-hover/sidebar:scale-[1.02] transition-transform duration-500"
+                    className="absolute inset-0 w-full h-full object-cover brightness-[0.75] group-hover/sidebar:scale-[1.02] transition-transform duration-500"
                     onError={(e) => {
                       e.currentTarget.src = FALLBACK_GAME_IMAGE;
                       e.currentTarget.onerror = null;
@@ -563,12 +563,12 @@ export default function Home() {
                 ) : (
                   <div className="absolute inset-0 bg-gradient-to-br from-amber-950 to-slate-900" />
                 )}
-                <div className="relative z-10 space-y-0.5 sm:space-y-1 text-left">
+                <div className="relative z-10 space-y-0.5 sm:space-y-1 text-left [text-shadow:0_1px_6px_rgba(0,0,0,0.9)]">
                   {sidebarPlatinadorBanner.expiresAt && <BannerCountdown expiresAt={sidebarPlatinadorBanner.expiresAt} />}
-                  <h3 className="text-xs sm:text-sm lg:text-base font-black text-amber-400 leading-tight drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.8)]">
+                  <h3 className="text-xs sm:text-sm lg:text-base font-black text-amber-400 leading-tight drop-shadow-[0_2px_6px_rgba(0,0,0,1)]">
                     {sidebarPlatinadorBanner.title}
                   </h3>
-                  <p className="text-[9px] sm:text-[10px] lg:text-xs text-slate-300 line-clamp-2 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] max-w-md">
+                  <p className="text-[9px] sm:text-[10px] lg:text-xs text-slate-200 line-clamp-2 drop-shadow-[0_1px_4px_rgba(0,0,0,1)] max-w-md">
                     {sidebarPlatinadorBanner.description || sidebarPlatinadorBanner.title}
                   </p>
                 </div>

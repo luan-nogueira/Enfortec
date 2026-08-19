@@ -405,166 +405,244 @@ export default function PlatinadorPage() {
                 Platine um destes jogos na sua conta PSN e envie a comprovação para receber suas ForteCoins
               </p>
             </div>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {challengesQuery.isLoading ? (
-              <div className="col-span-full py-12 text-center text-gray-400">Carregando desafios...</div>
-            ) : (
-              challengesQuery.data?.map((challenge: any) => (
-                <Card
-                  key={challenge.id}
-                  className="bg-[#121212] border-gray-800 hover:border-[#dc143c]/50 transition-all overflow-hidden flex flex-col group"
-                >
-                  <div className="relative h-48 overflow-hidden bg-black">
-                    <img
-                      src={challenge.imageUrl || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=800"}
-                      alt={challenge.gameTitle}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-80"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-transparent to-transparent" />
-                    <Badge className="absolute top-3 left-3 bg-black/70 backdrop-blur-md text-white border-white/20 text-xs">
-                      {challenge.platform}
-                    </Badge>
-                    <Badge className="absolute top-3 right-3 bg-amber-500 text-black font-extrabold text-xs flex items-center gap-1 shadow-md">
-                      <Coins className="w-3.5 h-3.5 fill-black" /> +{challenge.rewardCoins} Coins
-                    </Badge>
-                  </div>
-
-                  <CardHeader className="pt-4 pb-2">
-                    <CardTitle className="text-lg font-bold text-white group-hover:text-[#dc143c] transition-colors">
-                      {challenge.gameTitle}
-                    </CardTitle>
-                    <CardDescription className="text-gray-400 text-xs line-clamp-2">
-                      {challenge.description}
-                    </CardDescription>
-                    {(() => {
-                      const completers = completersByChallenge.get(challenge.id) || [];
-                      if (completers.length === 0) return null;
-                      return (
-                        <div className="pt-2 mt-1 border-t border-gray-800/60">
-                          <p className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1.5 mb-1">
-                            <Users className="w-3.5 h-3.5" /> {completers.length} platinador{completers.length !== 1 ? "es" : ""} já conquistou{completers.length !== 1 ? "aram" : ""} essa
-                          </p>
-                          <div className="flex flex-wrap gap-1">
-                            {completers.slice(0, 6).map((c, i) => (
-                              <span key={i} className="text-[10px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded-full font-medium">
-                                {c.psnId}
-                              </span>
-                            ))}
-                            {completers.length > 6 && (
-                              <span className="text-[10px] text-gray-500 px-1.5 py-0.5">+{completers.length - 6}</span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </CardHeader>
-
-                  <CardFooter className="mt-auto pt-4 border-t border-gray-800/60">
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button
-                          onClick={() => {
-                            setSelectedChallenge(challenge);
-                            setPsnInput(userPsnId);
-                          }}
-                          className="w-full bg-[#dc143c] hover:bg-[#b01030] text-white font-bold text-xs py-5 rounded-xl shadow-lg shadow-[#dc143c]/20"
-                        >
-                          <Trophy className="w-4 h-4 mr-2" /> Comprovar Platina
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="bg-[#141414] border-[#dc143c]/30 text-white max-w-md">
-                        <DialogHeader>
-                          <DialogTitle className="text-lg font-bold flex items-center gap-2">
-                            <Trophy className="w-5 h-5 text-amber-400" /> Comprovação de Platina
-                          </DialogTitle>
-                          <DialogDescription className="text-gray-400 text-xs">
-                            Enviar platina para: <strong className="text-white">{challenge.gameTitle}</strong> (+{challenge.rewardCoins} Coins)
-                          </DialogDescription>
-                        </DialogHeader>
-
-                        <form onSubmit={handleSubmitProof} className="space-y-4 py-2">
-                          <div>
-                            <label className="text-xs font-semibold text-gray-300 block mb-1">
-                              Sua PSN Online ID
-                            </label>
-                            <Input
-                              value={psnInput}
-                              onChange={(e) => setPsnInput(e.target.value)}
-                              placeholder="Ex: SeuNomePSN_BR"
-                              required
-                              className="bg-[#0a0a0a] border-gray-800 text-white text-sm"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="text-xs font-semibold text-gray-300 block mb-1">
-                              Comprovação de Platina (Imagem ou URL)
-                            </label>
-
-                            {/* Upload de imagem */}
-                            <div className="mb-2">
-                              <input
-                                ref={proofFileRef}
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={handleProofImageUpload}
-                              />
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                disabled={isUploadingProof}
-                                onClick={() => proofFileRef.current?.click()}
-                                className="w-full border border-dashed border-gray-700 hover:border-[#dc143c]/50 bg-[#0a0a0a] hover:bg-[#dc143c]/5 text-gray-400 hover:text-white text-xs h-10 flex items-center justify-center gap-2 rounded-lg transition-all"
-                              >
-                                {isUploadingProof ? (
-                                  <><span className="animate-spin">⏳</span> Enviando imagem...</>
-                                ) : (
-                                  <><Upload className="w-4 h-4" /> Fazer Upload da Imagem (recomendado)</>
-                                )}
-                              </Button>
-                            </div>
-
-                            {/* Preview se imagem carregada */}
-                            {proofUrl && proofUrl.startsWith("http") && (
-                              <div className="mb-2 rounded-lg overflow-hidden border border-gray-800 max-h-32">
-                                <img src={proofUrl} alt="Preview" className="w-full h-32 object-cover" />
-                              </div>
-                            )}
-
-                            {/* Campo URL manual */}
-                            <label className="text-[10px] text-gray-500 block mb-1">Ou cole o link/URL da foto:</label>
-                            <Input
-                              value={proofUrl}
-                              onChange={(e) => setProofUrl(e.target.value)}
-                              placeholder="Ex: https://imgur.com/sua-foto-platina.jpg"
-                              required
-                              className="bg-[#0a0a0a] border-gray-800 text-white text-sm"
-                            />
-                            <p className="text-[11px] text-gray-500 mt-1">
-                              Envie o print onde apareça seu troféu de platina e sua PSN ID.
-                            </p>
-                          </div>
-
-                          <DialogFooter className="pt-2">
-                            <Button
-                              type="submit"
-                              disabled={isSubmitting}
-                              className="w-full bg-[#dc143c] hover:bg-[#b01030] text-white font-bold"
-                            >
-                              {isSubmitting ? "Enviando..." : "Enviar para Aprovação"}
-                            </Button>
-                          </DialogFooter>
-                        </form>
-                      </DialogContent>
-                    </Dialog>
-                  </CardFooter>
-                </Card>
-              ))
+            {!isSubscribed && (
+              <div className="hidden sm:flex items-center gap-2 bg-[#dc143c]/10 border border-[#dc143c]/30 text-[#ff4d6d] text-xs font-bold px-3 py-1.5 rounded-full">
+                <ShieldCheck className="w-4 h-4" /> Exclusivo para Assinantes
+              </div>
             )}
           </div>
+
+          {/* PAYWALL: mostra para não-assinantes */}
+          {!isSubscribed ? (
+            <div className="relative">
+              {/* Cards borrados em background */}
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 select-none pointer-events-none blur-sm opacity-40">
+                {challengesQuery.isLoading ? (
+                  [1, 2, 3].map((i) => (
+                    <div key={i} className="bg-[#121212] border border-gray-800 rounded-2xl overflow-hidden h-72 animate-pulse" />
+                  ))
+                ) : (
+                  (challengesQuery.data || []).slice(0, 6).map((challenge: any) => (
+                    <Card key={challenge.id} className="bg-[#121212] border-gray-800 overflow-hidden flex flex-col">
+                      <div className="relative h-48 overflow-hidden bg-black">
+                        <img
+                          src={challenge.imageUrl || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=800"}
+                          alt={challenge.gameTitle}
+                          className="w-full h-full object-cover opacity-80"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-transparent to-transparent" />
+                        <Badge className="absolute top-3 left-3 bg-black/70 text-white border-white/20 text-xs">
+                          {challenge.platform}
+                        </Badge>
+                        <Badge className="absolute top-3 right-3 bg-amber-500 text-black font-extrabold text-xs flex items-center gap-1">
+                          <Coins className="w-3.5 h-3.5 fill-black" /> +{challenge.rewardCoins} Coins
+                        </Badge>
+                      </div>
+                      <CardHeader className="pt-4 pb-2">
+                        <CardTitle className="text-lg font-bold text-white">{challenge.gameTitle}</CardTitle>
+                        <CardDescription className="text-gray-400 text-xs line-clamp-2">{challenge.description}</CardDescription>
+                      </CardHeader>
+                      <CardFooter className="mt-auto pt-4 border-t border-gray-800/60">
+                        <Button className="w-full bg-[#dc143c] text-white font-bold text-xs py-5 rounded-xl">
+                          <Trophy className="w-4 h-4 mr-2" /> Comprovar Platina
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  ))
+                )}
+              </div>
+
+              {/* Overlay de bloqueio */}
+              <div className="absolute inset-0 flex items-center justify-center z-10">
+                <div className="bg-[#0a0a0a]/95 border border-[#dc143c]/50 rounded-3xl p-8 sm:p-12 text-center max-w-md mx-4 shadow-2xl shadow-[#dc143c]/20 backdrop-blur-sm">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#dc143c]/20 to-[#dc143c]/5 border border-[#dc143c]/30 flex items-center justify-center mx-auto mb-5">
+                    <ShieldCheck className="w-8 h-8 text-[#dc143c]" />
+                  </div>
+                  <h3 className="text-xl sm:text-2xl font-black text-white mb-2">
+                    Conteúdo Exclusivo para Membros
+                  </h3>
+                  <p className="text-gray-400 text-sm leading-relaxed mb-6">
+                    Os desafios de platina são exclusivos para assinantes do <strong className="text-white">Clube Platinador</strong>. Assine agora por <span className="text-amber-400 font-black">R$ 35/mês</span> e comece a ganhar ForteCoins!
+                  </p>
+                  <div className="space-y-3">
+                    <Button
+                      onClick={handleSubscribe}
+                      disabled={isSubscribing}
+                      className="w-full bg-gradient-to-r from-[#dc143c] via-[#ff2a55] to-[#dc143c] hover:from-[#b01030] hover:to-[#dc143c] text-white font-extrabold py-6 rounded-2xl shadow-xl shadow-[#dc143c]/40 transition-all hover:scale-105 border border-[#ff4d6d]/30"
+                    >
+                      <Trophy className="w-5 h-5 mr-2 text-amber-400 shrink-0" />
+                      {isSubscribing ? "Processando..." : "Assinar e Desbloquear — R$ 35/mês"}
+                    </Button>
+                    {!user && (
+                      <p className="text-xs text-gray-500">
+                        <button onClick={() => (window.location.href = getLoginUrl())} className="text-[#dc143c] hover:underline font-bold">Faça login</button> para assinar
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Conteúdo real — apenas para assinantes */
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {challengesQuery.isLoading ? (
+                <div className="col-span-full py-12 text-center text-gray-400">Carregando desafios...</div>
+              ) : (
+                challengesQuery.data?.map((challenge: any) => (
+                  <Card
+                    key={challenge.id}
+                    className="bg-[#121212] border-gray-800 hover:border-[#dc143c]/50 transition-all overflow-hidden flex flex-col group"
+                  >
+                    <div className="relative h-48 overflow-hidden bg-black">
+                      <img
+                        src={challenge.imageUrl || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=800"}
+                        alt={challenge.gameTitle}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-80"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-transparent to-transparent" />
+                      <Badge className="absolute top-3 left-3 bg-black/70 backdrop-blur-md text-white border-white/20 text-xs">
+                        {challenge.platform}
+                      </Badge>
+                      <Badge className="absolute top-3 right-3 bg-amber-500 text-black font-extrabold text-xs flex items-center gap-1 shadow-md">
+                        <Coins className="w-3.5 h-3.5 fill-black" /> +{challenge.rewardCoins} Coins
+                      </Badge>
+                    </div>
+
+                    <CardHeader className="pt-4 pb-2">
+                      <CardTitle className="text-lg font-bold text-white group-hover:text-[#dc143c] transition-colors">
+                        {challenge.gameTitle}
+                      </CardTitle>
+                      <CardDescription className="text-gray-400 text-xs line-clamp-2">
+                        {challenge.description}
+                      </CardDescription>
+                      {(() => {
+                        const completers = completersByChallenge.get(challenge.id) || [];
+                        if (completers.length === 0) return null;
+                        return (
+                          <div className="pt-2 mt-1 border-t border-gray-800/60">
+                            <p className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1.5 mb-1">
+                              <Users className="w-3.5 h-3.5" /> {completers.length} platinador{completers.length !== 1 ? "es" : ""} já conquistou{completers.length !== 1 ? "aram" : ""} essa
+                            </p>
+                            <div className="flex flex-wrap gap-1">
+                              {completers.slice(0, 6).map((c, i) => (
+                                <span key={i} className="text-[10px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded-full font-medium">
+                                  {c.psnId}
+                                </span>
+                              ))}
+                              {completers.length > 6 && (
+                                <span className="text-[10px] text-gray-500 px-1.5 py-0.5">+{completers.length - 6}</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </CardHeader>
+
+                    <CardFooter className="mt-auto pt-4 border-t border-gray-800/60">
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button
+                            onClick={() => {
+                              setSelectedChallenge(challenge);
+                              setPsnInput(userPsnId);
+                            }}
+                            className="w-full bg-[#dc143c] hover:bg-[#b01030] text-white font-bold text-xs py-5 rounded-xl shadow-lg shadow-[#dc143c]/20"
+                          >
+                            <Trophy className="w-4 h-4 mr-2" /> Comprovar Platina
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="bg-[#141414] border-[#dc143c]/30 text-white max-w-md">
+                          <DialogHeader>
+                            <DialogTitle className="text-lg font-bold flex items-center gap-2">
+                              <Trophy className="w-5 h-5 text-amber-400" /> Comprovação de Platina
+                            </DialogTitle>
+                            <DialogDescription className="text-gray-400 text-xs">
+                              Enviar platina para: <strong className="text-white">{challenge.gameTitle}</strong> (+{challenge.rewardCoins} Coins)
+                            </DialogDescription>
+                          </DialogHeader>
+
+                          <form onSubmit={handleSubmitProof} className="space-y-4 py-2">
+                            <div>
+                              <label className="text-xs font-semibold text-gray-300 block mb-1">
+                                Sua PSN Online ID
+                              </label>
+                              <Input
+                                value={psnInput}
+                                onChange={(e) => setPsnInput(e.target.value)}
+                                placeholder="Ex: SeuNomePSN_BR"
+                                required
+                                className="bg-[#0a0a0a] border-gray-800 text-white text-sm"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-xs font-semibold text-gray-300 block mb-1">
+                                Comprovação de Platina (Imagem ou URL)
+                              </label>
+
+                              {/* Upload de imagem */}
+                              <div className="mb-2">
+                                <input
+                                  ref={proofFileRef}
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={handleProofImageUpload}
+                                />
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  disabled={isUploadingProof}
+                                  onClick={() => proofFileRef.current?.click()}
+                                  className="w-full border border-dashed border-gray-700 hover:border-[#dc143c]/50 bg-[#0a0a0a] hover:bg-[#dc143c]/5 text-gray-400 hover:text-white text-xs h-10 flex items-center justify-center gap-2 rounded-lg transition-all"
+                                >
+                                  {isUploadingProof ? (
+                                    <><span className="animate-spin">⏳</span> Enviando imagem...</>
+                                  ) : (
+                                    <><Upload className="w-4 h-4" /> Fazer Upload da Imagem (recomendado)</>
+                                  )}
+                                </Button>
+                              </div>
+
+                              {/* Preview se imagem carregada */}
+                              {proofUrl && proofUrl.startsWith("http") && (
+                                <div className="mb-2 rounded-lg overflow-hidden border border-gray-800 max-h-32">
+                                  <img src={proofUrl} alt="Preview" className="w-full h-32 object-cover" />
+                                </div>
+                              )}
+
+                              {/* Campo URL manual */}
+                              <label className="text-[10px] text-gray-500 block mb-1">Ou cole o link/URL da foto:</label>
+                              <Input
+                                value={proofUrl}
+                                onChange={(e) => setProofUrl(e.target.value)}
+                                placeholder="Ex: https://imgur.com/sua-foto-platina.jpg"
+                                required
+                                className="bg-[#0a0a0a] border-gray-800 text-white text-sm"
+                              />
+                              <p className="text-[11px] text-gray-500 mt-1">
+                                Envie o print onde apareça seu troféu de platina e sua PSN ID.
+                              </p>
+                            </div>
+
+                            <DialogFooter className="pt-2">
+                              <Button
+                                type="submit"
+                                disabled={isSubmitting}
+                                className="w-full bg-[#dc143c] hover:bg-[#b01030] text-white font-bold"
+                              >
+                                {isSubmitting ? "Enviando..." : "Enviar para Aprovação"}
+                              </Button>
+                            </DialogFooter>
+                          </form>
+                        </DialogContent>
+                      </Dialog>
+                    </CardFooter>
+                  </Card>
+                ))
+              )}
+            </div>
+          )}
         </section>
 
         {/* RANKING DE PLATINADORES */}

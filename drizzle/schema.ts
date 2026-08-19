@@ -153,6 +153,7 @@ export const orders = pgTable("orders", {
   accountType: varchar("accountType", { length: 20 }),
   deliveryDetails: text("deliveryDetails"),
   coinsUsed: integer("coinsUsed").default(0).notNull(),
+  buyerPhone: varchar("buyerPhone", { length: 30 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => new Date()),
 });

@@ -3,7 +3,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, orderBy, query, where } from "firebase/firestore";
+import { collection, onSnapshot, orderBy, query, where, doc, deleteDoc } from "firebase/firestore";
 import {
   SELLER_CHATS,
   STORE_SELLER_NAME,
@@ -14,7 +14,7 @@ import {
   type SellerChatRole,
   type SellerChatThread,
 } from "@/lib/sellerChat";
-import { MessageCircle, Send, ArrowLeft, User as UserIcon } from "lucide-react";
+import { MessageCircle, Send, ArrowLeft, User as UserIcon, Trash2, Search } from "lucide-react";
 import { toast } from "sonner";
 
 interface SellerChatsPanelProps {
@@ -30,7 +30,28 @@ export default function SellerChatsPanel({ role, emptyMessage }: SellerChatsPane
   const [messages, setMessages] = useState<SellerChatMessage[]>([]);
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const handleDeleteThread = (threadId: string, name: string) => {
+    toast(`Excluir permanentemente a conversa com "${name}"? Isso libera espaço no banco de dados.`, {
+      action: {
+        label: "Excluir",
+        onClick: async () => {
+          try {
+            await deleteDoc(doc(db, SELLER_CHATS, threadId));
+            toast.success("Conversa excluída do banco!");
+            if (selectedId === threadId) {
+              setSelectedId(null);
+            }
+          } catch (err: any) {
+            console.error("[SellerChatsPanel] Erro ao excluir conversa:", err);
+            toast.error("Erro ao excluir conversa.");
+          }
+        },
+      },
+    });
+  };
 
   useEffect(() => {
     if (role !== "admin" && !user?.id) return;
@@ -141,64 +162,142 @@ export default function SellerChatsPanel({ role, emptyMessage }: SellerChatsPane
           selected ? "hidden md:block" : ""
         }`}
       >
-        {threads.map((thread) => {
-          const unread = Boolean((thread as any)[unreadKey]);
-          return (
-            <button
-              key={thread.id}
-              onClick={() => setSelectedId(thread.id)}
-              className={`w-full text-left p-3 rounded-xl border transition ${
-                selectedId === thread.id
-                  ? "bg-slate-800 border-green-600/50"
-                  : "bg-slate-900/60 border-slate-800 hover:border-green-600/30"
-              }`}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-black text-white truncate">
-                  {counterpartName(thread)}
-                </span>
-                {unread && (
-                  <span className="shrink-0 text-[8px] font-black uppercase tracking-wider bg-green-600 text-white px-1.5 py-0.5 rounded-full">
-                    Nova
+  const filteredThreads = useMemo(() => {
+    if (!searchTerm.trim()) return threads;
+    const term = searchTerm.toLowerCase().trim();
+    return threads.filter(
+      (t) =>
+        (t.buyerName || "").toLowerCase().includes(term) ||
+        (t.sellerName || "").toLowerCase().includes(term) ||
+        (t.productName || "").toLowerCase().includes(term) ||
+        (t.lastMessage || "").toLowerCase().includes(term)
+    );
+  }, [threads, searchTerm]);
+
+  if (threads.length === 0) {
+    return (
+      <div className="p-8 text-center bg-slate-900/40 rounded-xl border border-dashed border-slate-700">
+        <MessageCircle className="w-10 h-10 text-slate-700 mx-auto mb-3" />
+        <p className="text-slate-500 text-sm">
+          {emptyMessage || "Nenhuma conversa por aqui ainda."}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-[minmax(0,320px)_1fr] gap-4">
+      {/* Lista de conversas */}
+      <div
+        className={`space-y-2 max-h-[28rem] overflow-y-auto pr-1 ${
+          selected ? "hidden md:block" : ""
+        }`}
+      >
+        <div className="relative mb-2">
+          <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+          <Input
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Filtrar conversas..."
+            className="bg-slate-900 border-slate-800 text-white text-xs pl-8 h-8 rounded-lg"
+          />
+        </div>
+
+        {filteredThreads.length === 0 ? (
+          <p className="text-xs text-slate-500 text-center py-6 italic">Nenhuma conversa encontrada.</p>
+        ) : (
+          filteredThreads.map((thread) => {
+            const unread = Boolean((thread as any)[unreadKey]);
+            return (
+              <div
+                key={thread.id}
+                className={`relative group w-full text-left p-3 rounded-xl border transition ${
+                  selectedId === thread.id
+                    ? "bg-slate-800 border-green-600/50"
+                    : "bg-slate-900/60 border-slate-800 hover:border-green-600/30"
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => setSelectedId(thread.id)}
+                  className="w-full text-left pr-6"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-black text-white truncate">
+                      {counterpartName(thread)}
+                    </span>
+                    {unread && (
+                      <span className="shrink-0 text-[8px] font-black uppercase tracking-wider bg-green-600 text-white px-1.5 py-0.5 rounded-full">
+                        Nova
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider truncate">
+                    {thread.productName}
+                  </p>
+                  <p className="text-[11px] text-slate-400 truncate mt-1">
+                    {thread.lastSenderRole === "buyer" ? "" : "Você: "}
+                    {thread.lastMessage}
+                  </p>
+                  <span className="text-[9px] text-slate-600 font-mono">
+                    {sellerChatTimeLabel(thread.updatedAt)}
                   </span>
+                </button>
+
+                {role === "admin" && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteThread(thread.id, counterpartName(thread));
+                    }}
+                    title="Excluir conversa (libera espaço no banco)"
+                    className="absolute top-2 right-2 h-6 w-6 text-slate-500 hover:text-red-400 hover:bg-red-950/30 rounded-md"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
                 )}
               </div>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider truncate">
-                {thread.productName}
-              </p>
-              <p className="text-[11px] text-slate-400 truncate mt-1">
-                {thread.lastSenderRole === "buyer" ? "" : "Você: "}
-                {thread.lastMessage}
-              </p>
-              <span className="text-[9px] text-slate-600 font-mono">
-                {sellerChatTimeLabel(thread.updatedAt)}
-              </span>
-            </button>
-          );
-        })}
+            );
+          })
+        )}
       </div>
 
       {/* Conversa */}
       {selected ? (
         <div className="flex flex-col bg-slate-950/60 border border-slate-800 rounded-xl overflow-hidden">
-          <div className="p-3 bg-slate-900 border-b border-slate-800 flex items-center gap-2">
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              onClick={() => setSelectedId(null)}
-              className="md:hidden h-7 w-7 text-slate-400"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <UserIcon className="w-4 h-4 text-green-500 shrink-0" />
-            <div className="min-w-0">
-              <p className="text-xs font-black text-white truncate">{counterpartName(selected)}</p>
-              <p className="text-[10px] text-slate-500 truncate">
-                {selected.productName}
-                {role !== "buyer" && selected.buyerEmail ? ` • ${selected.buyerEmail}` : ""}
-              </p>
+          <div className="p-3 bg-slate-900 border-b border-slate-800 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                onClick={() => setSelectedId(null)}
+                className="md:hidden h-7 w-7 text-slate-400"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+              <UserIcon className="w-4 h-4 text-green-500 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs font-black text-white truncate">{counterpartName(selected)}</p>
+                <p className="text-[10px] text-slate-500 truncate">
+                  {selected.productName}
+                  {role !== "buyer" && selected.buyerEmail ? ` • ${selected.buyerEmail}` : ""}
+                </p>
+              </div>
             </div>
+
+            {role === "admin" && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleDeleteThread(selected.id, counterpartName(selected))}
+                className="bg-red-950/30 hover:bg-red-900/50 text-red-400 border-red-500/40 font-bold text-xs h-7 px-2.5 flex items-center gap-1.5 shrink-0"
+              >
+                <Trash2 className="w-3 h-3" /> Excluir Chat
+              </Button>
+            )}
           </div>
 
           <div ref={scrollRef} className="h-72 overflow-y-auto p-3.5 space-y-3">
