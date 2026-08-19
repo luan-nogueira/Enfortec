@@ -1166,6 +1166,16 @@ export default function AdminDashboard() {
     }
   });
 
+  const simulateTestOrderMutation = trpc.orders.simulateTestOrder.useMutation({
+    onSuccess: () => {
+      refetchSales();
+      toast.success("Compra de teste gerada com sucesso!");
+    },
+    onError: (err: any) => {
+      toast.error("Erro ao simular compra: " + (err.message || "Erro desconhecido"));
+    }
+  });
+
   const handleUpdateSaleStatus = (orderId: number, status: "pendente" | "pago" | "enviado" | "entregue" | "cancelado") => {
     if (confirm(`Tem certeza que deseja mudar o status deste pedido para '${status}'?`)) {
       updateOrderStatusMutation.mutate({ orderId, status });
@@ -3047,15 +3057,25 @@ export default function AdminDashboard() {
                     Pedidos de Mídia Digital e vendas. Atendimento: Segunda a Sábado até 22:00 / Domingo até 16:00.
                   </p>
                 </div>
-                {(() => {
-                  const storeStatus = getStoreStatus();
-                  return (
-                    <div className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-2 ${storeStatus.isOpen ? "bg-emerald-950/40 text-emerald-400 border-emerald-500/40" : "bg-amber-950/40 text-amber-400 border-amber-500/40"}`}>
-                      <Clock className="w-4 h-4 animate-pulse" />
-                      {storeStatus.isOpen ? "🟢 Loja Aberta (Entregas Ativas)" : "⏰ Loja Fechada (Atendimento até 22h / Dom 16h)"}
-                    </div>
-                  );
-                })()}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button
+                    size="sm"
+                    onClick={() => simulateTestOrderMutation.mutate()}
+                    disabled={simulateTestOrderMutation.isPending}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-lg flex items-center gap-1.5"
+                  >
+                    🧪 Simular Compra de Teste
+                  </Button>
+                  {(() => {
+                    const storeStatus = getStoreStatus();
+                    return (
+                      <div className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-2 ${storeStatus.isOpen ? "bg-emerald-950/40 text-emerald-400 border-emerald-500/40" : "bg-amber-950/40 text-amber-400 border-amber-500/40"}`}>
+                        <Clock className="w-4 h-4 animate-pulse" />
+                        {storeStatus.isOpen ? "🟢 Loja Aberta (Entregas Ativas)" : "⏰ Loja Fechada (Atendimento até 22h / Dom 16h)"}
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
 
               <div className="space-y-4">

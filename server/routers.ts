@@ -651,6 +651,26 @@ export const appRouter = router({
         if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
         return db.deleteOrder(input);
       }),
+    simulateTestOrder: protectedProcedure
+      .mutation(async ({ ctx }) => {
+        if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+
+        return database.insert(orders).values({
+          buyerId: ctx.user.id,
+          productType: "digital",
+          productName: "EA SPORTS FC 25 (Teste de Compra)",
+          quantity: 1,
+          totalPrice: "199.90",
+          commissionPercentage: "10.00",
+          platformCommission: "19.99",
+          sellerAmount: "179.91",
+          status: "pago",
+          buyerPhone: "5571987650840",
+          createdAt: new Date(),
+        });
+      }),
   }),
 
   // Settings Router - for admin only
