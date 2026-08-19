@@ -127,6 +127,7 @@ export default function DigitalMedia() {
 
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [accountType, setAccountType] = useState<"primaria" | "secundaria">("primaria");
+  const [selectedConsole, setSelectedConsole] = useState<"PS4" | "PS5">("PS5");
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -175,6 +176,8 @@ export default function DigitalMedia() {
       setAppliedCoupon(null);
       setCouponError(null);
       setAcceptedTerms(false);
+      const plat = getGamePlatform(selectedProduct);
+      setSelectedConsole(plat === "PS4" ? "PS4" : "PS5");
       // Só troca o default pra "secundária" quando o produto realmente só tem conta
       // secundária cadastrada — produtos sem esse split (a maioria do catálogo, preço
       // único) continuam mandando "primaria" pro servidor, que é o que eles esperam.
@@ -261,6 +264,17 @@ export default function DigitalMedia() {
         ? customerPhone 
         : `+55${customerPhone.replace(/\D/g, "")}`;
 
+      const isConsoleSelectable = (
+        selectedProduct.type === "assinatura" ||
+        selectedProduct.category === "Assinaturas" ||
+        selectedProduct.name?.toLowerCase().includes("ps plus") ||
+        getGamePlatform(selectedProduct) === "PS4/PS5"
+      );
+
+      const finalProductName = isConsoleSelectable 
+        ? `${selectedProduct.name} (${selectedConsole})`
+        : selectedProduct.name;
+
       const response = await fetch("/api/infinitepay/checkout", {
         method: "POST",
         headers: {
@@ -268,7 +282,8 @@ export default function DigitalMedia() {
           ...(token ? { Authorization: `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
-          name: selectedProduct.name,
+          name: finalProductName,
+          consoleType: isConsoleSelectable ? selectedConsole : undefined,
           price: price,
           accountType: (selectedProduct.type === "jogo" || selectedProduct.type === "assinatura" || selectedProduct.priceSecondary || selectedProduct.price_secondary) ? accountType : undefined,
           redirectUrl: `${window.location.origin}/minhas-compras`,
@@ -339,7 +354,14 @@ export default function DigitalMedia() {
 
       // Só vai para WhatsApp se for erro de rede (servidor offline)
       if (error instanceof TypeError && error.message.includes("fetch")) {
-        const msg = encodeURIComponent(`Olá! Tenho interesse no jogo "${selectedProduct.name}" - R$ ${price.toFixed(2).replace('.', ',')}. Como faço para comprar?`);
+        const isConsoleSelectable = (
+          selectedProduct.type === "assinatura" ||
+          selectedProduct.category === "Assinaturas" ||
+          selectedProduct.name?.toLowerCase().includes("ps plus") ||
+          getGamePlatform(selectedProduct) === "PS4/PS5"
+        );
+        const prodTitle = isConsoleSelectable ? `${selectedProduct.name} (${selectedConsole})` : selectedProduct.name;
+        const msg = encodeURIComponent(`Olá! Tenho interesse no produto "${prodTitle}" - R$ ${price.toFixed(2).replace('.', ',')}. Como faço para comprar?`);
         window.open(`https://wa.me/554384253691?text=${msg}`, '_blank');
         setSelectedProduct(null);
       } else {
@@ -844,6 +866,55 @@ export default function DigitalMedia() {
                 </div>
               </div>
             </div>
+
+            {/* Seletor de Console: PS4 vs PS5 */}
+            {(selectedProduct?.type === "assinatura" || 
+              selectedProduct?.category === "Assinaturas" || 
+              selectedProduct?.name?.toLowerCase().includes("ps plus") ||
+              getGamePlatform(selectedProduct) === "PS4/PS5") && (
+              <div className="bg-slate-950 border border-red-600/30 rounded-xl p-3.5 space-y-2 animate-in fade-in duration-200">
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                  Escolha o seu Console *
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedConsole("PS4")}
+                    className={`p-2.5 rounded-lg border text-left transition-all ${
+                      selectedConsole === "PS4"
+                        ? "bg-red-600/20 border-red-500 text-white shadow-[0_0_15px_rgba(220,38,38,0.3)]"
+                        : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="font-bold text-xs flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">🎮 PS4</span>
+                      {selectedConsole === "PS4" && (
+                        <span className="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded font-black">OK</span>
+                      )}
+                    </div>
+                    <p className="text-[9px] text-slate-400 mt-1 leading-tight">PlayStation 4</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedConsole("PS5")}
+                    className={`p-2.5 rounded-lg border text-left transition-all ${
+                      selectedConsole === "PS5"
+                        ? "bg-red-600/20 border-red-500 text-white shadow-[0_0_15px_rgba(220,38,38,0.3)]"
+                        : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="font-bold text-xs flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">⚡ PS5</span>
+                      {selectedConsole === "PS5" && (
+                        <span className="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded font-black">OK</span>
+                      )}
+                    </div>
+                    <p className="text-[9px] text-slate-400 mt-1 leading-tight">PlayStation 5</p>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Seletor de Licença: Conta Primária vs Conta Secundária */}
             {hasSecondaryPrice(selectedProduct) && hasPrimaryPrice(selectedProduct) && (

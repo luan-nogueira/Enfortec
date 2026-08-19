@@ -335,13 +335,17 @@ export async function getOrdersByBuyerId(buyerId: number) {
     .orderBy(desc(orders.createdAt));
 
   return results.map(r => {
-    let productName = r.order.productName || "Produto";
-    if (r.order.productType === "store" && r.product) {
-      productName = r.product.name;
-    } else if (r.order.productType === "used" && r.usedProduct) {
-      productName = r.usedProduct.name;
-    } else if (r.order.productType === "digital" && r.digitalProduct) {
-      productName = r.digitalProduct.name;
+    let productName = r.order.productName;
+    if (!productName || productName.trim() === "" || productName === "Produto") {
+      if (r.order.productType === "store" && r.product) {
+        productName = r.product.name;
+      } else if (r.order.productType === "used" && r.usedProduct) {
+        productName = r.usedProduct.name;
+      } else if (r.order.productType === "digital" && r.digitalProduct) {
+        productName = r.digitalProduct.name;
+      } else {
+        productName = "Produto";
+      }
     }
     return {
       ...r.order,
@@ -369,13 +373,17 @@ export async function getOrdersBySellerId(sellerId: number) {
     .orderBy(desc(orders.createdAt));
 
   return results.map(r => {
-    let productName = r.order.productName || "Produto";
-    if (r.order.productType === "store" && r.product) {
-      productName = r.product.name;
-    } else if (r.order.productType === "used" && r.usedProduct) {
-      productName = r.usedProduct.name;
-    } else if (r.order.productType === "digital" && r.digitalProduct) {
-      productName = r.digitalProduct.name;
+    let productName = r.order.productName;
+    if (!productName || productName.trim() === "" || productName === "Produto") {
+      if (r.order.productType === "store" && r.product) {
+        productName = r.product.name;
+      } else if (r.order.productType === "used" && r.usedProduct) {
+        productName = r.usedProduct.name;
+      } else if (r.order.productType === "digital" && r.digitalProduct) {
+        productName = r.digitalProduct.name;
+      } else {
+        productName = "Produto";
+      }
     }
     return {
       ...r.order,
@@ -432,13 +440,17 @@ export async function getAllOrdersWithDetails() {
     .orderBy(desc(orders.createdAt));
 
   return results.map(r => {
-    let productName = r.order.productName || "Produto";
-    if (r.order.productType === "store" && r.product) {
-      productName = r.product.name;
-    } else if (r.order.productType === "used" && r.usedProduct) {
-      productName = r.usedProduct.name;
-    } else if (r.order.productType === "digital" && r.digitalProduct) {
-      productName = r.digitalProduct.name;
+    let productName = r.order.productName;
+    if (!productName || productName.trim() === "" || productName === "Produto") {
+      if (r.order.productType === "store" && r.product) {
+        productName = r.product.name;
+      } else if (r.order.productType === "used" && r.usedProduct) {
+        productName = r.usedProduct.name;
+      } else if (r.order.productType === "digital" && r.digitalProduct) {
+        productName = r.digitalProduct.name;
+      } else {
+        productName = "Produto";
+      }
     }
     return {
       ...r.order,

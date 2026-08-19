@@ -3100,6 +3100,16 @@ export default function AdminDashboard() {
                             <span className="bg-red-500/20 text-red-400 border border-red-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
                               {order.productType === "digital" ? "🎮 Mídia Digital" : order.productType === "used" ? "📦 Usado / Desapego" : "🛒 Loja"}
                             </span>
+                            {order.productName?.includes("(PS4)") && (
+                              <span className="bg-purple-500/20 text-purple-400 border border-purple-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                🎮 PS4
+                              </span>
+                            )}
+                            {order.productName?.includes("(PS5)") && (
+                              <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                ⚡ PS5
+                              </span>
+                            )}
                             {order.accountType && (
                               <span className="bg-blue-500/20 text-blue-400 border border-blue-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full">
                                 {order.accountType === "primaria" ? "👤 Conta Primária" : "👥 Conta Secundária"}

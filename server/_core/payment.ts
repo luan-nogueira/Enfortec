@@ -122,7 +122,7 @@ export function registerPaymentRoute(app: Express) {
   // ─── Checkout: cria link de pagamento InfinitePay ────────────────────────────
   app.post("/api/infinitepay/checkout", async (req, res) => {
     try {
-      const { name, quantity = 1, redirectUrl, productType = "store", productId, sellerId, customer, couponCode, accountType } = req.body;
+      const { name, quantity = 1, redirectUrl, productType = "store", productId, sellerId, customer, couponCode, accountType, consoleType } = req.body;
       const customerPhone: string = customer?.phone_number || "";
       // price/coinsToUse também chegam no body, mas são só o que o comprador VIU na tela —
       // nunca são usados pra calcular o valor cobrado. O valor real é sempre recalculado
@@ -193,6 +193,11 @@ export function registerPaymentRoute(app: Express) {
       }
 
       let productNameStr: string = realProductName || name || "Produto";
+      if (consoleType && (consoleType === "PS4" || consoleType === "PS5")) {
+        if (!productNameStr.toUpperCase().includes(`(${consoleType})`) && !productNameStr.toUpperCase().includes(`- ${consoleType}`)) {
+          productNameStr += ` (${consoleType})`;
+        }
+      }
       if (accountType === "secundaria") {
         if (!productNameStr.toLowerCase().includes("secundária") && !productNameStr.toLowerCase().includes("secundaria")) {
           productNameStr += " (Conta Secundária)";
