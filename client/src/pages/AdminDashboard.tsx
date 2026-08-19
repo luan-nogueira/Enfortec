@@ -3191,14 +3191,11 @@ export default function AdminDashboard() {
                           <MessageCircle className="w-3.5 h-3.5" />
                           WhatsApp{!order.buyerPhone && " ⚠️"}
                         </Button>
-                        {/* Botão Chat pelo Site — abre a aba de chats filtrando pelo comprador */}
+                        {/* Botão Chat pelo Site — abre a aba Negociações & Mensagens na hora */}
                         <Button
-                          onClick={() => {
-                            // Muda para a aba de chats e tenta filtrar pelo nome do comprador
-                            const el = document.querySelector('[data-value="chats"]') as HTMLElement | null;
-                            if (el) el.click();
-                          }}
+                          onClick={() => setActiveTab("mensagens")}
                           variant="outline"
+                          title="Abrir a central de conversas e mensagens do site"
                           className="bg-blue-950/30 hover:bg-blue-900/50 text-blue-400 border-blue-500/40 font-bold text-xs h-9 px-3 flex items-center gap-1.5"
                         >
                           <MessageCircle className="w-3.5 h-3.5" />
