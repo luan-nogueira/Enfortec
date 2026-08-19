@@ -143,25 +143,6 @@ export default function SellerChatsPanel({ role, emptyMessage }: SellerChatsPane
   const counterpartName = (thread: SellerChatThread) =>
     role === "buyer" ? thread.sellerName || "Vendedor" : thread.buyerName || "Comprador";
 
-  if (threads.length === 0) {
-    return (
-      <div className="p-8 text-center bg-slate-900/40 rounded-xl border border-dashed border-slate-700">
-        <MessageCircle className="w-10 h-10 text-slate-700 mx-auto mb-3" />
-        <p className="text-slate-500 text-sm">
-          {emptyMessage || "Nenhuma conversa por aqui ainda."}
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-[minmax(0,320px)_1fr] gap-4">
-      {/* Lista de conversas */}
-      <div
-        className={`space-y-2 max-h-[28rem] overflow-y-auto pr-1 ${
-          selected ? "hidden md:block" : ""
-        }`}
-      >
   const filteredThreads = useMemo(() => {
     if (!searchTerm.trim()) return threads;
     const term = searchTerm.toLowerCase().trim();
