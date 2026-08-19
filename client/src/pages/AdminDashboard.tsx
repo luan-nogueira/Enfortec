@@ -3204,6 +3204,17 @@ export default function AdminDashboard() {
                           <MessageCircle className="w-3.5 h-3.5" />
                           Chat pelo Site
                         </Button>
+                        {/* Botão Excluir Pedido (útil para apagar testes) */}
+                        <Button
+                          onClick={() => handleDeleteSale(order.id)}
+                          disabled={deleteOrderMutation.isPending}
+                          variant="outline"
+                          title="Excluir pedido (útil para apagar simulações e testes)"
+                          className="bg-red-950/30 hover:bg-red-900/50 text-red-400 border-red-500/40 font-bold text-xs h-9 px-3 flex items-center gap-1.5 ml-auto"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Excluir
+                        </Button>
                       </div>
                     </Card>
                   ));
