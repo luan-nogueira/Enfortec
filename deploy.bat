@@ -1,5 +1,5 @@
 @echo off
 cd /d C:\Users\Luanm\.gemini\Enfortec
 git add .
-git commit -m "refactor: remove legacy A QUIET PLACE hack from db.ts and add accountType/quantity to webhook orderNsu"
+git commit -m "fix: encode coupon code in base64 in orderNsu to prevent _ in coupon from corrupting NSU parse"
 git push

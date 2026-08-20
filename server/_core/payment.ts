@@ -341,14 +341,14 @@ export function registerPaymentRoute(app: Express) {
       // Converte preço para centavos (inteiro)
       const priceInCents = Math.round(finalPrice * 100);
 
-      // Constrói order_nsu compacto: buyerId_sellerId_productType_productId_coinsToUse_couponCode
-      // Codifica o nome do produto em base64 para incluir no NSU sem quebrar o split por "_"
       const productNameBase64 = Buffer.from(productNameStr).toString("base64");
       // parts: buyerId_sellerId_productType_productId_coinsUsed_coupon_productName_phone_accountType_quantity
+      // coupon is also base64-encoded to prevent '_' in coupon code from breaking the split
       const phoneBase64 = customerPhone ? Buffer.from(customerPhone).toString("base64") : "nophone";
+      const couponBase64 = validCouponCode ? Buffer.from(validCouponCode).toString("base64") : "nocoupon";
       const accTypeVal = accountType || "noacc";
       const qtyVal = Number(quantity) || 1;
-      const orderNsu = `${buyerId}_${mysqlSellerId}_${productType}_${productId || "null"}_${verifiedCoinsToUse}_${validCouponCode || "nocoupon"}_${productNameBase64}_${phoneBase64}_${accTypeVal}_${qtyVal}`;
+      const orderNsu = `${buyerId}_${mysqlSellerId}_${productType}_${productId || "null"}_${verifiedCoinsToUse}_${couponBase64}_${productNameBase64}_${phoneBase64}_${accTypeVal}_${qtyVal}`;
 
       const host = req.get("host") || "";
       const protocol = host.includes("localhost") || host.includes("127.0.0.1") ? "http" : "https";
@@ -491,7 +491,12 @@ export function registerPaymentRoute(app: Express) {
           coinsUsedValue = parseInt(parts[4]) || 0;
         }
         if (parts.length >= 6) {
-          couponCodeValue = parts[5] === "nocoupon" ? null : parts[5];
+          try {
+            const decodedCoupon = Buffer.from(parts[5], "base64").toString("utf-8");
+            couponCodeValue = decodedCoupon === "nocoupon" ? null : decodedCoupon;
+          } catch {
+            couponCodeValue = parts[5] === "nocoupon" ? null : parts[5]; // fallback for legacy NSUs
+          }
         }
         if (parts.length >= 7) {
           try {
