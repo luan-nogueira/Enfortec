@@ -230,7 +230,14 @@ export function registerPaymentRoute(app: Express) {
       if (couponCode) {
         const coupon = await db.getCouponByCode(couponCode.toUpperCase().trim());
         if (coupon) {
-          const isExpired = coupon.expiresAt && new Date(coupon.expiresAt).getTime() < Date.now();
+          let isExpired = false;
+          if (coupon.expiresAt) {
+            const expiryDate = new Date(coupon.expiresAt);
+            if (expiryDate.getUTCHours() === 0 && expiryDate.getUTCMinutes() === 0 && expiryDate.getUTCSeconds() === 0) {
+              expiryDate.setUTCHours(23, 59, 59, 999);
+            }
+            isExpired = expiryDate.getTime() < Date.now();
+          }
           const isExceeded = coupon.maxUses !== null && (coupon.usedCount || 0) >= coupon.maxUses;
 
           if (!isExpired && !isExceeded) {
@@ -451,6 +458,7 @@ export function registerPaymentRoute(app: Express) {
       let coinsUsedValue = 0;
       let couponCodeValue: string | null = null;
       let productNameFromNsu: string = event?.items?.[0]?.name || event?.items?.[0]?.description || event?.description || "Produto Eforte Games";
+      let phoneFromNsu: string | null = null;
 
       if (orderNsu && typeof orderNsu === "string") {
         const parts = orderNsu.split("_");
@@ -472,7 +480,6 @@ export function registerPaymentRoute(app: Express) {
           } catch { /* mantém o nome padrão */ }
         }
         // parts[7] = phone
-        let phoneFromNsu: string | null = null;
         if (parts.length >= 8) {
           try {
             const decoded = Buffer.from(parts[7], "base64").toString("utf-8");

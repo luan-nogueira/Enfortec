@@ -787,8 +787,14 @@ export const appRouter = router({
         if (!coupon) throw new Error("Cupom inválido ou inativo");
         
         // Expiration check
-        if (coupon.expiresAt && new Date(coupon.expiresAt).getTime() < Date.now()) {
-          throw new Error("Cupom expirado");
+        if (coupon.expiresAt) {
+          const expiryDate = new Date(coupon.expiresAt);
+          if (expiryDate.getUTCHours() === 0 && expiryDate.getUTCMinutes() === 0 && expiryDate.getUTCSeconds() === 0) {
+            expiryDate.setUTCHours(23, 59, 59, 999);
+          }
+          if (expiryDate.getTime() < Date.now()) {
+            throw new Error("Cupom expirado");
+          }
         }
         
         // Max uses check

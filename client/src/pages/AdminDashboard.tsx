@@ -984,7 +984,7 @@ export default function AdminDashboard() {
         code: couponCodeForm.toUpperCase().trim(),
         discountPercentage: couponDiscountForm,
         maxUses: couponMaxUsesForm ? parseInt(couponMaxUsesForm) : null,
-        expiresAt: couponExpiresForm ? new Date(couponExpiresForm).toISOString() : null,
+        expiresAt: couponExpiresForm ? new Date(`${couponExpiresForm}T23:59:59`).toISOString() : null,
       });
       toast.success("Cupom criado com sucesso!");
       refetchCoupons();
