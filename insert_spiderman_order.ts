@@ -3,16 +3,16 @@ config({ path: ".env.local" });
 import { neon } from "@neondatabase/serverless";
 
 async function main() {
-  const connectionString = process.env.DATABASE_URL || "postgresql://neondb_owner:npg_0jJNSsBH7dFc@ep-wispy-sunset-ac5sonfy-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require";
-  const sql = neon(connectionString);
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL não configurado nas variáveis de ambiente.");
+  }
+  const sql = neon(process.env.DATABASE_URL);
 
   console.log("Inserindo o pedido de Spider-Man Remastered PS5 no banco de dados...");
 
-  // 1. Busca id do comprador
   const users = await sql`SELECT id FROM users WHERE email = 'rainbowflix000@gmail.com' LIMIT 1`;
   const buyerId = users.length > 0 ? users[0].id : 1;
 
-  // 2. Busca id do produto em digitalProducts ou products
   const digitalProds = await sql`SELECT id FROM "digitalProducts" WHERE name ILIKE '%Spider%' LIMIT 1`;
   let digitalProductId = digitalProds.length > 0 ? digitalProds[0].id : null;
 
@@ -22,7 +22,6 @@ async function main() {
     if (storeProds.length > 0) storeProductId = storeProds[0].id;
   }
 
-  // 3. Insere o pedido com comissão padrão
   const result = await sql`
     INSERT INTO orders (
       "buyerId",

@@ -319,6 +319,21 @@ export function registerPaymentRoute(app: Express) {
             }
           }
 
+          // Decrement stock for the purchased product
+          if (productType === "digital" && insertValues.digitalProductId) {
+            const prod = await database.select().from(digitalProducts).where(eq(digitalProducts.id, insertValues.digitalProductId)).limit(1);
+            if (prod.length > 0) {
+              const newStock = Math.max(0, (prod[0].stock || 1) - 1);
+              await database.update(digitalProducts).set({ stock: newStock, isActive: newStock > 0 }).where(eq(digitalProducts.id, insertValues.digitalProductId));
+            }
+          } else if (productType === "store" && insertValues.productId) {
+            const prod = await database.select().from(products).where(eq(products.id, insertValues.productId)).limit(1);
+            if (prod.length > 0) {
+              const newStock = Math.max(0, (prod[0].stock || 1) - 1);
+              await database.update(products).set({ stock: newStock, isActive: newStock > 0 }).where(eq(products.id, insertValues.productId));
+            }
+          }
+
           console.log("[Checkout] Compra 100% paga com moedas/cupom registrada com sucesso.");
           return res.json({ success: true, url: null, paidWithCoins: true });
       }
@@ -405,8 +420,8 @@ export function registerPaymentRoute(app: Express) {
       // configurada derrubaria a confirmação de TODO pagamento real. Assim que a variável
       // for definida, a checagem passa a valer sozinha, sem precisar mexer em mais nada.
       const expectedSecret = process.env.INFINITE_PAY_WEBHOOK_SECRET;
-      if (expectedSecret && req.query.secret && req.query.secret !== expectedSecret) {
-        console.warn("[InfinitePay Webhook] Segredo de query incorreto fornecido — ignorando.");
+      if (expectedSecret && req.query.secret !== expectedSecret) {
+        console.warn("[InfinitePay Webhook] Segredo de query incorreto ou ausente fornecido — ignorando.");
         return res.status(401).json({ received: false, error: "Não autorizado." });
       }
 
@@ -480,7 +495,7 @@ export function registerPaymentRoute(app: Express) {
           } catch { /* mantém o nome padrão */ }
         }
         // parts[7] = phone
-        if (parts.length >= 8) {
+        if (parts.length >= 8 && parts[7] !== "nophone") {
           try {
             const decoded = Buffer.from(parts[7], "base64").toString("utf-8");
             phoneFromNsu = decoded !== "nophone" ? decoded : null;
@@ -609,6 +624,23 @@ export function registerPaymentRoute(app: Express) {
             const cp = couponResult[0];
             await database.update(coupons).set({ usedCount: (cp.usedCount || 0) + 1 }).where(eq(coupons.id, cp.id));
             console.log(`[Webhook] incremented coupon ${couponCodeValue} usage count to ${(cp.usedCount || 0) + 1}`);
+          }
+        }
+
+        // Decrement stock for the purchased product
+        if (productType === "digital" && insertValues.digitalProductId) {
+          const prod = await database.select().from(digitalProducts).where(eq(digitalProducts.id, insertValues.digitalProductId)).limit(1);
+          if (prod.length > 0) {
+            const newStock = Math.max(0, (prod[0].stock || 1) - 1);
+            await database.update(digitalProducts).set({ stock: newStock, isActive: newStock > 0 }).where(eq(digitalProducts.id, insertValues.digitalProductId));
+            console.log(`[Webhook] decremented digital product ${insertValues.digitalProductId} stock to ${newStock}`);
+          }
+        } else if (productType === "store" && insertValues.productId) {
+          const prod = await database.select().from(products).where(eq(products.id, insertValues.productId)).limit(1);
+          if (prod.length > 0) {
+            const newStock = Math.max(0, (prod[0].stock || 1) - 1);
+            await database.update(products).set({ stock: newStock, isActive: newStock > 0 }).where(eq(products.id, insertValues.productId));
+            console.log(`[Webhook] decremented store product ${insertValues.productId} stock to ${newStock}`);
           }
         }
 

@@ -3,10 +3,10 @@ config({ path: ".env.local" });
 import { neon } from "@neondatabase/serverless";
 
 async function main() {
-  const connectionString = process.env.DATABASE_URL || "postgresql://neondb_owner:npg_0jJNSsBH7dFc@ep-wispy-sunset-ac5sonfy-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require";
-  const sql = neon(connectionString);
-
-  console.log("Inserindo o pedido de Spider-Man Remastered PS5 no banco de dados...");
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL não configurado.");
+  }
+  const sql = neon(process.env.DATABASE_URL);
 
   const users = await sql`SELECT id FROM users WHERE email = 'rainbowflix000@gmail.com' LIMIT 1`;
   const buyerId = users.length > 0 ? users[0].id : 1;
@@ -55,7 +55,7 @@ async function main() {
     RETURNING id, "productName", "totalPrice", status, "buyerPhone";
   `;
 
-  console.log("✅ Pedido inserido com sucesso no banco de dados!");
+  console.log("✅ Pedido inserido com sucesso!");
   console.log(JSON.stringify(result, null, 2));
 }
 

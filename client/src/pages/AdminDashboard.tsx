@@ -966,12 +966,24 @@ export default function AdminDashboard() {
     setEditingPromoId(null);
   };
 
+  const formatLocalDatetimeInput = (dateInput: any) => {
+    if (!dateInput) return "";
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return "";
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const hours = String(d.getHours()).padStart(2, "0");
+    const minutes = String(d.getMinutes()).padStart(2, "0");
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
   const openEditPromo = (promo: any) => {
     setEditingPromoId(promo.id);
     setPromoTitle(promo.title || "");
     setPromoImage(promo.imageUrl || "");
     setPromoLink(promo.link || "");
-    setPromoCountdown(promo.expiresAt ? new Date(promo.expiresAt).toISOString().substring(0, 16) : "");
+    setPromoCountdown(formatLocalDatetimeInput(promo.expiresAt));
     setPromoPosition(promo.position || "main");
     setPromoIsActive(promo.isActive ?? true);
     setShowPromoModal(true);

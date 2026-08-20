@@ -1,3 +1,12 @@
 node_modules
-.env*.local
 .env*
+.env*.local
+*.local
+insert_*.cjs
+insert_*.js
+insert_*.ts
+query_*.cjs
+query_*.json
+check_*.ts
+payload.json
+

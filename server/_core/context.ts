@@ -21,17 +21,6 @@ export async function verifyFirebaseToken(token: string) {
     return payload;
   } catch (error) {
     console.error("[FirebaseAuth] Token verification failed:", error);
-    // Fallback: decode without verification (for development/edge cases)
-    try {
-      const parts = token.split('.');
-      if (parts.length === 3) {
-        const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
-        console.log("[FirebaseAuth] Using unverified token payload (fallback):", payload.sub);
-        return payload;
-      }
-    } catch (e) {
-      console.error("[FirebaseAuth] Failed to decode token fallback:", e);
-    }
     return null;
   }
 }
