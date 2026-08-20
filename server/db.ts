@@ -396,34 +396,6 @@ export async function getAllOrdersWithDetails() {
   const db = getDb();
   if (!db) return [];
 
-  // Recupera automaticamente a compra do A QUIET PLACE do china gameplay se ainda não constar
-  try {
-    const existing = await db.select().from(orders).where(like(orders.productName, "%QUIET PLACE%")).limit(1);
-    if (existing.length === 0) {
-      const userRow = await db.select().from(users).where(like(users.email, "%sandrinho%")).limit(1);
-      const firstUser = await db.select().from(users).limit(1);
-      const fallbackId = firstUser.length > 0 ? firstUser[0].id : 1;
-      const buyerIdToUse = userRow.length > 0 ? userRow[0].id : fallbackId;
-
-      await db.insert(orders).values({
-        buyerId: buyerIdToUse,
-        productType: "digital",
-        productName: "A QUIET PLACE",
-        quantity: 1,
-        totalPrice: "59.00",
-        commissionPercentage: "10.00",
-        platformCommission: "5.90",
-        sellerAmount: "53.10",
-        status: "pago",
-        buyerPhone: "5571987650840",
-        createdAt: new Date(),
-      });
-      console.log("[getAllOrdersWithDetails] Pedido A QUIET PLACE recuperado com sucesso!");
-    }
-  } catch (e) {
-    console.error("[getAllOrdersWithDetails] Erro ao auto-recuperar:", e);
-  }
-
   const results = await db
     .select({
       order: orders,

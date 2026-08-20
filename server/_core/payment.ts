@@ -344,9 +344,11 @@ export function registerPaymentRoute(app: Express) {
       // Constrói order_nsu compacto: buyerId_sellerId_productType_productId_coinsToUse_couponCode
       // Codifica o nome do produto em base64 para incluir no NSU sem quebrar o split por "_"
       const productNameBase64 = Buffer.from(productNameStr).toString("base64");
-      // parts: buyerId_sellerId_productType_productId_coinsUsed_coupon_productName_phone
+      // parts: buyerId_sellerId_productType_productId_coinsUsed_coupon_productName_phone_accountType_quantity
       const phoneBase64 = customerPhone ? Buffer.from(customerPhone).toString("base64") : "nophone";
-      const orderNsu = `${buyerId}_${mysqlSellerId}_${productType}_${productId || "null"}_${verifiedCoinsToUse}_${validCouponCode || "nocoupon"}_${productNameBase64}_${phoneBase64}`;
+      const accTypeVal = accountType || "noacc";
+      const qtyVal = Number(quantity) || 1;
+      const orderNsu = `${buyerId}_${mysqlSellerId}_${productType}_${productId || "null"}_${verifiedCoinsToUse}_${validCouponCode || "nocoupon"}_${productNameBase64}_${phoneBase64}_${accTypeVal}_${qtyVal}`;
 
       const host = req.get("host") || "";
       const protocol = host.includes("localhost") || host.includes("127.0.0.1") ? "http" : "https";
@@ -474,6 +476,8 @@ export function registerPaymentRoute(app: Express) {
       let couponCodeValue: string | null = null;
       let productNameFromNsu: string = event?.items?.[0]?.name || event?.items?.[0]?.description || event?.description || "Produto Eforte Games";
       let phoneFromNsu: string | null = null;
+      let accountTypeFromNsu: string | null = null;
+      let quantityFromNsu = 1;
 
       if (orderNsu && typeof orderNsu === "string") {
         const parts = orderNsu.split("_");
@@ -500,6 +504,12 @@ export function registerPaymentRoute(app: Express) {
             const decoded = Buffer.from(parts[7], "base64").toString("utf-8");
             phoneFromNsu = decoded !== "nophone" ? decoded : null;
           } catch { /* ignora */ }
+        }
+        if (parts.length >= 9 && parts[8] !== "noacc") {
+          accountTypeFromNsu = parts[8];
+        }
+        if (parts.length >= 10) {
+          quantityFromNsu = parseInt(parts[9]) || 1;
         }
       }
 
@@ -580,7 +590,7 @@ export function registerPaymentRoute(app: Express) {
           buyerId: buyerId,
           sellerId: sellerId,
           productType: productType,
-          quantity: 1,
+          quantity: quantityFromNsu,
           totalPrice: totalPrice,
           commissionPercentage: commissionPct,
           platformCommission: platformCommission,
@@ -589,6 +599,7 @@ export function registerPaymentRoute(app: Express) {
           paymentId: paymentId ? String(paymentId) : null,
           coinsUsed: coinsUsedValue,
           productName: productNameFromNsu,
+          accountType: accountTypeFromNsu || null,
           firebaseProductId: productIdString || null,
         };
 
