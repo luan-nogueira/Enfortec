@@ -18,6 +18,7 @@ import {
 import { auth, db } from "@/lib/firebase";
 import { collection, onSnapshot, doc, getDoc, updateDoc } from "firebase/firestore";
 import { trpc } from "@/lib/trpc";
+import { isValidWhatsApp } from "@/lib/utils";
 
 // Mapeamento de gêneros → palavras-chave nos nomes dos jogos
 const GENRE_MAP: Record<string, string[]> = {
@@ -74,6 +75,28 @@ function getGamePlatform(product: any): string {
     return "PS4";
   }
   return "PS4/PS5";
+}
+
+function isConsoleSelectableProduct(product: any): boolean {
+  if (!product) return false;
+  if (
+    product.type === "assinatura" ||
+    product.category === "Assinaturas" ||
+    product.name?.toLowerCase().includes("ps plus")
+  ) {
+    return true;
+  }
+  const plat = getGamePlatform(product);
+  const platUpper = (product.platform || "").toUpperCase();
+  return (
+    plat === "PS4/PS5" ||
+    plat === "PS4 / PS5" ||
+    platUpper.includes("PS4/PS5") ||
+    platUpper.includes("PS4 / PS5") ||
+    (platUpper.includes("PS4") && platUpper.includes("PS5")) ||
+    platUpper.includes("DUAL") ||
+    (!platUpper.includes("PS4") && !platUpper.includes("PS5"))
+  );
 }
 
 function getGameBadge(product: any) {
@@ -230,6 +253,11 @@ export default function DigitalMedia() {
       return;
     }
 
+    if (!isValidWhatsApp(customerPhone)) {
+      setCheckoutError("Por favor, informe um número de WhatsApp válido com DDD (ex: 11 99999-8888).");
+      return;
+    }
+
     setIsProcessingCheckout(true);
     setCheckoutError(null);
 
@@ -264,12 +292,7 @@ export default function DigitalMedia() {
         ? customerPhone 
         : `+55${customerPhone.replace(/\D/g, "")}`;
 
-      const isConsoleSelectable = (
-        selectedProduct.type === "assinatura" ||
-        selectedProduct.category === "Assinaturas" ||
-        selectedProduct.name?.toLowerCase().includes("ps plus") ||
-        getGamePlatform(selectedProduct) === "PS4/PS5"
-      );
+      const isConsoleSelectable = isConsoleSelectableProduct(selectedProduct);
 
       const finalProductName = isConsoleSelectable 
         ? `${selectedProduct.name} (${selectedConsole})`
@@ -283,7 +306,7 @@ export default function DigitalMedia() {
         },
         body: JSON.stringify({
           name: finalProductName,
-          consoleType: isConsoleSelectable ? selectedConsole : undefined,
+          consoleType: isConsoleSelectable ? selectedConsole : (getGamePlatform(selectedProduct) === "PS4" ? "PS4" : getGamePlatform(selectedProduct) === "PS5" ? "PS5" : selectedConsole),
           price: price,
           accountType: (selectedProduct.type === "jogo" || selectedProduct.type === "assinatura" || selectedProduct.priceSecondary || selectedProduct.price_secondary) ? accountType : undefined,
           redirectUrl: `${window.location.origin}/minhas-compras`,
@@ -868,10 +891,7 @@ export default function DigitalMedia() {
             </div>
 
             {/* Seletor de Console: PS4 vs PS5 */}
-            {(selectedProduct?.type === "assinatura" || 
-              selectedProduct?.category === "Assinaturas" || 
-              selectedProduct?.name?.toLowerCase().includes("ps plus") ||
-              getGamePlatform(selectedProduct) === "PS4/PS5") && (
+            {isConsoleSelectableProduct(selectedProduct) && (
               <div className="bg-slate-950 border border-red-600/30 rounded-xl p-3.5 space-y-2 animate-in fade-in duration-200">
                 <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
                   Escolha o seu Console *

@@ -11,6 +11,7 @@ import { auth, db } from "@/lib/firebase";
 import { collection, onSnapshot, query, orderBy, doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { isValidWhatsApp } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -222,6 +223,11 @@ export default function UsedMarketplace() {
 
     if (!customerName.trim() || !customerEmail.trim() || !customerPhone.trim()) {
       setCheckoutError("Por favor, preencha todos os dados de contato (Nome, E-mail e WhatsApp).");
+      return;
+    }
+
+    if (!isValidWhatsApp(customerPhone)) {
+      setCheckoutError("Por favor, informe um número de WhatsApp válido com DDD (ex: 11 99999-8888).");
       return;
     }
 

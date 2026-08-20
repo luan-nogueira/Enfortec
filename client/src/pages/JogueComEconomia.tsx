@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { auth } from "@/lib/firebase";
 import { trpc } from "@/lib/trpc";
+import { isValidWhatsApp } from "@/lib/utils";
 
 export default function JogueComEconomia() {
   const { user, isAuthenticated } = useAuth();
@@ -17,8 +18,13 @@ export default function JogueComEconomia() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [selectedAccountType, setSelectedAccountType] = useState<"primaria" | "secundaria">("secundaria");
+  const [selectedConsole, setSelectedConsole] = useState<"PS4" | "PS5">("PS5");
+  const [customerName, setCustomerName] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
   const [useCoins, setUseCoins] = useState(false);
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   // Antes lia de uma coleção legada do Firestore, desincronizada do catálogo real
   // (o toggle "Exibir em Jogue com Economia" do admin já mexe é no Postgres).
@@ -64,6 +70,12 @@ export default function JogueComEconomia() {
     }
 
     setSelectedProduct(product);
+    setCustomerName(user?.name || "");
+    setCustomerEmail(user?.email || "");
+    setCustomerPhone(localStorage.getItem("customerPhone") || "");
+    setSelectedConsole("PS5");
+    setCheckoutError(null);
+
     const allowPrim = isPrimaryAvailable(product);
     const allowSec = isSecondaryAvailable(product);
     if (!allowPrim && allowSec) {
@@ -86,22 +98,38 @@ export default function JogueComEconomia() {
 
   const handleCheckout = async () => {
     if (!selectedProduct) return;
+
+    if (!customerName.trim() || !customerEmail.trim() || !customerPhone.trim()) {
+      setCheckoutError("Por favor, preencha todos os dados de contato (Nome, E-mail e WhatsApp).");
+      toast.error("Por favor, preencha todos os dados de contato (Nome, E-mail e WhatsApp).");
+      return;
+    }
+
+    if (!isValidWhatsApp(customerPhone)) {
+      setCheckoutError("Por favor, informe um número de WhatsApp válido com DDD (ex: 11 99999-8888).");
+      toast.error("Por favor, informe um número de WhatsApp válido com DDD.");
+      return;
+    }
+
     setIsProcessingCheckout(true);
+    setCheckoutError(null);
     try {
       const basePrice = getItemPrice(selectedProduct, selectedAccountType);
       let finalPrice = basePrice;
       let coinsUsed = 0;
 
       if (useCoins && user && user.forteCoins > 0) {
-        // 10 FC = R$1,00 (mesma taxa do resto do site) e teto de FC por compra — precisa
-        // bater com o limite aplicado no servidor em payment.ts, senão a tela promete um
-        // desconto maior do que o checkout real vai aceitar.
         const maxCoins = selectedProduct.isPreVenda
           ? (platformSettings?.maxCoinsPreVenda ?? 50)
           : (platformSettings?.maxCoinsPerPurchase ?? 10);
         coinsUsed = Math.min(user.forteCoins, Math.ceil(basePrice * 10), maxCoins);
         finalPrice = Math.max(0, basePrice - coinsUsed * 0.10);
       }
+
+      const formattedPhone = customerPhone.startsWith("+") 
+        ? customerPhone 
+        : `+55${customerPhone.replace(/\D/g, "")}`;
+      localStorage.setItem("customerPhone", customerPhone);
 
       const accountLabel = selectedAccountType === "primaria" ? "Conta Primária" : "Conta Secundária";
 
@@ -113,13 +141,19 @@ export default function JogueComEconomia() {
           ...(token ? { Authorization: `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
-          name: `${selectedProduct.name} - ${accountLabel}`,
+          name: `${selectedProduct.name} (${selectedConsole}) - ${accountLabel}`,
+          consoleType: selectedConsole,
           price: finalPrice,
           quantity: 1,
           productType: "digital",
           productId: selectedProduct.id,
           accountType: selectedAccountType,
           coinsToUse: coinsUsed,
+          customer: {
+            name: customerName,
+            email: customerEmail,
+            phone_number: formattedPhone
+          }
         }),
       });
 
@@ -350,6 +384,45 @@ export default function JogueComEconomia() {
                 </div>
               </div>
 
+              {/* Seletor de Console: PS4 vs PS5 */}
+              <div className="bg-slate-950 border border-slate-800 p-3 rounded-lg space-y-2">
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                  Escolha o seu Console *
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedConsole("PS4")}
+                    className={`p-2.5 rounded-lg border text-left transition-all ${
+                      selectedConsole === "PS4"
+                        ? "bg-red-600/20 border-red-500 text-white shadow-md font-bold"
+                        : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="text-xs font-bold flex justify-between items-center">
+                      <span>🎮 PS4</span>
+                      {selectedConsole === "PS4" && <span className="text-[8px] bg-red-600 text-white px-1 rounded">OK</span>}
+                    </div>
+                    <p className="text-[9px] text-slate-400 mt-1 leading-tight">PlayStation 4</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedConsole("PS5")}
+                    className={`p-2.5 rounded-lg border text-left transition-all ${
+                      selectedConsole === "PS5"
+                        ? "bg-red-600/20 border-red-500 text-white shadow-md font-bold"
+                        : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="text-xs font-bold flex justify-between items-center">
+                      <span>⚡ PS5</span>
+                      {selectedConsole === "PS5" && <span className="text-[8px] bg-red-600 text-white px-1 rounded">OK</span>}
+                    </div>
+                    <p className="text-[9px] text-slate-400 mt-1 leading-tight">PlayStation 5</p>
+                  </button>
+                </div>
+              </div>
+
               {/* Seletor de Conta Primária vs Secundária */}
               <div className="bg-slate-950 border border-slate-800 p-3 rounded-lg space-y-2">
                 <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
@@ -406,6 +479,50 @@ export default function JogueComEconomia() {
                   );
                 })()}
               </div>
+
+              {/* Dados do Comprador */}
+              <div className="bg-slate-950 border border-slate-800 p-3 rounded-lg space-y-3">
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                  Dados para Entrega (WhatsApp/Contato) *
+                </label>
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">Nome Completo</label>
+                    <Input
+                      placeholder="Ex: João da Silva"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      className="bg-slate-900 border-slate-800 text-xs h-9"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">E-mail</label>
+                    <Input
+                      type="email"
+                      placeholder="Ex: joao@email.com"
+                      value={customerEmail}
+                      onChange={(e) => setCustomerEmail(e.target.value)}
+                      className="bg-slate-900 border-slate-800 text-xs h-9"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">WhatsApp / Telefone (com DDD) *</label>
+                    <Input
+                      type="tel"
+                      placeholder="Ex: 11999998888"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      className="bg-slate-900 border-slate-800 text-xs h-9"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {checkoutError && (
+                <p className="text-red-400 text-xs font-semibold bg-red-950/40 p-2.5 rounded border border-red-800/40">
+                  ❌ {checkoutError}
+                </p>
+              )}
 
               {user && user.forteCoins > 0 && (() => {
                 const maxCoins = selectedProduct.isPreVenda

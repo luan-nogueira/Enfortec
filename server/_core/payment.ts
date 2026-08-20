@@ -193,9 +193,21 @@ export function registerPaymentRoute(app: Express) {
       }
 
       let productNameStr: string = realProductName || name || "Produto";
-      if (consoleType && (consoleType === "PS4" || consoleType === "PS5")) {
-        if (!productNameStr.toUpperCase().includes(`(${consoleType})`) && !productNameStr.toUpperCase().includes(`- ${consoleType}`)) {
-          productNameStr += ` (${consoleType})`;
+
+      // Detecta consoleType (PS4 ou PS5) se enviado explicitamente ou se embutido no nome do produto
+      let resolvedConsoleType = consoleType;
+      if (!resolvedConsoleType && name && typeof name === "string") {
+        const upperName = name.toUpperCase();
+        if (upperName.includes("(PS5)") || upperName.includes("- PS5") || upperName.includes(" PS5")) {
+          resolvedConsoleType = "PS5";
+        } else if (upperName.includes("(PS4)") || upperName.includes("- PS4") || upperName.includes(" PS4")) {
+          resolvedConsoleType = "PS4";
+        }
+      }
+
+      if (resolvedConsoleType && (resolvedConsoleType === "PS4" || resolvedConsoleType === "PS5")) {
+        if (!productNameStr.toUpperCase().includes(`(${resolvedConsoleType})`) && !productNameStr.toUpperCase().includes(`- ${resolvedConsoleType}`)) {
+          productNameStr += ` (${resolvedConsoleType})`;
         }
       }
       if (accountType === "secundaria") {
@@ -367,7 +379,7 @@ export function registerPaymentRoute(app: Express) {
         webhook_url: webhookUrl,
         items: [
           {
-            description: name,
+            description: productNameStr,
             price: priceInCents,
             quantity: Number(quantity),
           },
