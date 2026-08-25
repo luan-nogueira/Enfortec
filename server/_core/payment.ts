@@ -403,8 +403,12 @@ export function registerPaymentRoute(app: Express) {
   app.post("/api/mercadopago/checkout", handleCheckout);
   app.post("/api/infinitepay/checkout", handleCheckout); // Mantido como alias de compatibilidade
 
+  // Trava de concorrência em memória (Mutex) para evitar inserção duplicada por webhooks simultâneos do Mercado Pago
+  const activeProcessingPaymentIds = new Set<string>();
+
   // ─── Webhook Mercado Pago: recebe notificações de pagamento confirmado ───────
   const handleWebhook = async (req: any, res: any) => {
+    let paymentIdToUnlock: string | null = null;
     try {
       const expectedSecret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
       if (expectedSecret && req.query.secret !== expectedSecret) {
@@ -429,6 +433,14 @@ export function registerPaymentRoute(app: Express) {
       if (!paymentId || (topic && topic !== "payment" && topic !== "merchant_order" && event?.action !== "payment.created" && event?.action !== "payment.updated")) {
         return res.status(200).json({ received: true, ignored: true });
       }
+
+      const strPaymentId = String(paymentId);
+      if (activeProcessingPaymentIds.has(strPaymentId)) {
+        console.log(`[Mercado Pago Webhook] Pagamento #${strPaymentId} já está sendo processado em paralelo por outra requisição. Reenvio ignorado.`);
+        return res.status(200).json({ received: true, inProgress: true });
+      }
+      activeProcessingPaymentIds.add(strPaymentId);
+      paymentIdToUnlock = strPaymentId;
 
       const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
       if (!accessToken) {
@@ -618,6 +630,10 @@ export function registerPaymentRoute(app: Express) {
     } catch (error: any) {
       console.error("[Mercado Pago Webhook] Erro ao processar evento:", error.message);
       return res.status(200).json({ received: true, error: error.message });
+    } finally {
+      if (paymentIdToUnlock) {
+        activeProcessingPaymentIds.delete(paymentIdToUnlock);
+      }
     }
   };
 

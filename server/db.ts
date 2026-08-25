@@ -352,6 +352,26 @@ export async function getDigitalProductsForAccount(userId: number, isAdminAccoun
   return getDigitalProductsBySellerId(seller.id);
 }
 
+function deduplicateOrders<T extends { id: number; paymentId?: string | null }>(items: T[]): T[] {
+  const seenPaymentIds = new Set<string>();
+  const seenIds = new Set<number>();
+  const deduped: T[] = [];
+
+  for (const item of items) {
+    if (seenIds.has(item.id)) continue;
+    seenIds.add(item.id);
+
+    if (item.paymentId && item.paymentId.trim() !== "") {
+      if (seenPaymentIds.has(item.paymentId)) {
+        continue;
+      }
+      seenPaymentIds.add(item.paymentId);
+    }
+    deduped.push(item);
+  }
+  return deduped;
+}
+
 // Orders queries
 export async function getOrdersByBuyerId(buyerId: number) {
   const db = getDb();
@@ -371,7 +391,7 @@ export async function getOrdersByBuyerId(buyerId: number) {
     .where(eq(orders.buyerId, buyerId))
     .orderBy(desc(orders.createdAt));
 
-  return results.map(r => {
+  const mapped = results.map(r => {
     let productName = r.order.productName;
     if (!productName || productName.trim() === "" || productName === "Produto") {
       if (r.order.productType === "store" && r.product) {
@@ -389,6 +409,8 @@ export async function getOrdersByBuyerId(buyerId: number) {
       productName,
     };
   });
+
+  return deduplicateOrders(mapped);
 }
 
 export async function getOrdersBySellerId(sellerId: number) {
@@ -409,7 +431,7 @@ export async function getOrdersBySellerId(sellerId: number) {
     .where(eq(orders.sellerId, sellerId))
     .orderBy(desc(orders.createdAt));
 
-  return results.map(r => {
+  const mapped = results.map(r => {
     let productName = r.order.productName;
     if (!productName || productName.trim() === "" || productName === "Produto") {
       if (r.order.productType === "store" && r.product) {
@@ -427,6 +449,8 @@ export async function getOrdersBySellerId(sellerId: number) {
       productName,
     };
   });
+
+  return deduplicateOrders(mapped);
 }
 
 export async function getAllOrdersWithDetails() {
@@ -448,7 +472,7 @@ export async function getAllOrdersWithDetails() {
     .leftJoin(digitalProducts, eq(orders.digitalProductId, digitalProducts.id))
     .orderBy(desc(orders.createdAt));
 
-  return results.map(r => {
+  const mapped = results.map(r => {
     let productName = r.order.productName;
     if (!productName || productName.trim() === "" || productName === "Produto") {
       if (r.order.productType === "store" && r.product) {
@@ -469,6 +493,8 @@ export async function getAllOrdersWithDetails() {
       productName,
     };
   });
+
+  return deduplicateOrders(mapped);
 }
 
 export async function deliverOrder(orderId: number, deliveryDetails: string) {

@@ -173,49 +173,24 @@ export default function FloatingChat() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Msg[]>([]);
   const [thinking, setThinking] = useState(false);
-  const [showChips, setShowChips] = useState(false);
   const [showWaSelector, setShowWaSelector] = useState(false);
-  const welcomeStarted = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [catalog, setCatalog] = useState<{name: string; price: number}[]>([]);
-  const [mobileViewport, setMobileViewport] = useState<{ height: number; offsetTop: number } | null>(null);
   const [isPageScrolling, setIsPageScrolling] = useState(false);
 
-  // O botão flutuante fica fixo no canto inferior direito em toda página, então em
-  // telas de conteúdo longo (guias, grades de produto) ele acaba tampando texto/preço
-  // por baixo. Encolher/apagar ele enquanto a página está sendo rolada evita isso sem
-  // precisar reservar espaço em cada página individualmente.
+  // Reduz opacidade do botão flutuante enquanto a página é rolada
   useEffect(() => {
     if (isOpen) return;
     let timeout: ReturnType<typeof setTimeout>;
     const onScroll = () => {
       setIsPageScrolling(true);
       clearTimeout(timeout);
-      timeout = setTimeout(() => setIsPageScrolling(false), 500);
+      timeout = setTimeout(() => setIsPageScrolling(false), 400);
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       window.removeEventListener("scroll", onScroll);
       clearTimeout(timeout);
-    };
-  }, [isOpen]);
-
-  // No mobile, elementos fixos acompanham o layout viewport (tela toda) e não o
-  // visual viewport (área acima do teclado), deixando um vão entre o input e o teclado.
-  // Aqui sincronizamos a altura/posição do painel com o visualViewport em tempo real.
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!isOpen || !vv || window.innerWidth >= 640) {
-      setMobileViewport(null);
-      return;
-    }
-    const update = () => setMobileViewport({ height: vv.height, offsetTop: vv.offsetTop });
-    update();
-    vv.addEventListener("resize", update);
-    vv.addEventListener("scroll", update);
-    return () => {
-      vv.removeEventListener("resize", update);
-      vv.removeEventListener("scroll", update);
     };
   }, [isOpen]);
 
@@ -235,57 +210,59 @@ export default function FloatingChat() {
     fetchCatalog();
   }, []);
 
+  const DEFAULT_WELCOME: Msg[] = [
+    {
+      id: "welcome-0",
+      text: "Olá! 👋 Bem-vindo à **Eforte Games**!",
+      senderId: "ai-support",
+      senderName: "Assistente Eforte",
+      timestamp: new Date(),
+    },
+    {
+      id: "welcome-1",
+      text: "🎮 Precisa de ajuda com algum jogo, conta ou pedido? Escolha uma das opções rápidas abaixo ou digite o nome do jogo!",
+      senderId: "ai-support",
+      senderName: "Assistente Eforte",
+      timestamp: new Date(),
+    },
+  ];
+
+  // Carrega histórico do usuário se autenticado, ou inicializa com boas-vindas
   useEffect(() => {
-    if (!isOpen || !isAuthenticated || !user?.id) return;
-    const q = query(collection(db, "chats", user.id, "messages"), orderBy("timestamp", "asc"));
-    const unsub = onSnapshot(q, snap => {
-      setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() } as Msg)));
-    });
-    return () => unsub();
+    if (!isOpen) return;
+
+    if (isAuthenticated && user?.id) {
+      try {
+        const q = query(collection(db, "chats", user.id, "messages"), orderBy("timestamp", "asc"));
+        const unsub = onSnapshot(
+          q,
+          snap => {
+            if (!snap.empty) {
+              setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() } as Msg)));
+            } else {
+              setMessages(DEFAULT_WELCOME);
+            }
+          },
+          err => {
+            console.warn("[FloatingChat] Firestore listener fallback:", err.message);
+            setMessages(prev => (prev.length > 0 ? prev : DEFAULT_WELCOME));
+          }
+        );
+        return () => unsub();
+      } catch (err) {
+        console.error("[FloatingChat] Erro ao conectar chat:", err);
+        setMessages(DEFAULT_WELCOME);
+      }
+    } else {
+      setMessages(prev => (prev.length > 0 ? prev : DEFAULT_WELCOME));
+    }
   }, [isOpen, isAuthenticated, user?.id]);
 
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
   }, [messages, thinking]);
-
-  useEffect(() => {
-    if (!isOpen || welcomeStarted.current) return;
-    const delayCheck = setTimeout(() => {
-      if (welcomeStarted.current) return;
-      welcomeStarted.current = true;
-      setShowChips(false);
-
-      const timeouts: ReturnType<typeof setTimeout>[] = [];
-
-      WELCOME_FLOW.forEach((step, idx) => {
-        const tTyping = setTimeout(() => setThinking(true), step.delay - 400 < 0 ? 0 : step.delay - 400);
-        const tMsg = setTimeout(() => {
-          setThinking(false);
-          setMessages(prev => {
-            if (prev.length > 0 && !prev[0]?.id?.startsWith("welcome-")) return prev;
-            return [
-              ...prev,
-              {
-                id: `welcome-${idx}`,
-                text: step.text,
-                senderId: "ai-support",
-                senderName: "Assistente Eforte",
-                timestamp: new Date(),
-              },
-            ];
-          });
-          if (idx === WELCOME_FLOW.length - 1) {
-            setShowChips(true);
-          }
-        }, step.delay);
-        timeouts.push(tTyping, tMsg);
-      });
-
-      return () => timeouts.forEach(clearTimeout);
-    }, isAuthenticated ? 600 : 100);
-
-    return () => clearTimeout(delayCheck);
-  }, [isOpen, isAuthenticated]);
 
   const sendMessage = async (msg: string) => {
     if (!msg.trim() || thinking) return;
@@ -298,14 +275,12 @@ export default function FloatingChat() {
     const uid = isAuthenticated && user?.id ? user.id : "guest";
     const uname = isAuthenticated && user?.name ? user.name : "Visitante";
 
-    if (!isAuthenticated || !user?.id) {
-      setMessages(prev => [...prev, {
-        id: `u-${Date.now()}`, text: msg, senderId: uid, senderName: uname, timestamp: new Date()
-      }]);
-    }
+    setMessages(prev => [...prev, {
+      id: `u-${Date.now()}`, text: msg, senderId: uid, senderName: uname, timestamp: new Date()
+    }]);
 
     setThinking(true);
-    await new Promise(r => setTimeout(r, 450));
+    await new Promise(r => setTimeout(r, 400));
     const answer = aiAnswer(msg, catalog);
     setThinking(false);
 
@@ -324,10 +299,9 @@ export default function FloatingChat() {
         });
         await setDoc(chatRef, { lastMessage: answer, updatedAt: serverTimestamp(), unreadByAdmin: false }, { merge: true });
       } catch {
-        setMessages(prev => [...prev,
-          { id: `u-${Date.now()}`, text: msg, senderId: user.id, senderName: user.name, timestamp: new Date() },
-          { id: `ai-${Date.now()}`, text: answer, senderId: "ai-support", senderName: "Assistente Eforte", timestamp: new Date() }
-        ]);
+        setMessages(prev => [...prev, {
+          id: `ai-${Date.now()}`, text: answer, senderId: "ai-support", senderName: "Assistente Eforte", timestamp: new Date()
+        }]);
       }
     } else {
       setMessages(prev => [...prev, {
@@ -352,17 +326,12 @@ export default function FloatingChat() {
 
   return (
     <>
-      {isOpen && (
-        <div 
-          onClick={() => setIsOpen(false)}
-          className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-[90] transition-all duration-300 cursor-pointer animate-in fade-in"
-        />
-      )}
-
-      <div className={`fixed ${isOpen ? "inset-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2" : "bottom-20 right-4 sm:bottom-6 sm:right-6"} ${isOpen ? "z-[10000]" : "z-30"}`}>
-        {!isOpen && (
+      {/* Botão Flutuante (quando fechado) */}
+      {!isOpen && (
+        <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-[9990]">
           <Button
             onClick={() => setIsOpen(true)}
+            aria-label="Abrir chat de atendimento"
             className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 shadow-[0_8px_25px_rgba(220,38,38,0.5)] flex items-center justify-center p-0 transition-all duration-300 hover:scale-110 active:scale-95 group relative border border-red-400/30 ${
               isPageScrolling ? "opacity-40 scale-75" : "opacity-100 scale-100"
             }`}
@@ -370,12 +339,20 @@ export default function FloatingChat() {
             <MessageCircle className="w-6 h-6 text-white group-hover:rotate-12 transition-transform" />
             <div className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-400 border-2 border-slate-950 rounded-full animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
           </Button>
-        )}
+        </div>
+      )}
 
-        {isOpen && (
-          <Card
-            style={mobileViewport ? { height: `${mobileViewport.height}px`, marginTop: `${mobileViewport.offsetTop}px` } : undefined}
-            className="w-full h-full sm:w-[600px] sm:max-w-none sm:h-[650px] flex flex-col gap-0 py-0 bg-slate-900 border-red-600/40 shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden sm:rounded-2xl animate-in zoom-in-95 duration-200 rounded-none border-0 sm:border">
+      {/* Backdrop e Modal de Chat */}
+      {isOpen && (
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center sm:p-4">
+          {/* Backdrop escuro clicável para fechar */}
+          <div
+            onClick={() => setIsOpen(false)}
+            className="fixed inset-0 bg-slate-950/80 backdrop-blur-md cursor-pointer animate-in fade-in duration-200"
+          />
+
+          {/* Janela do Chat */}
+          <Card className="relative w-full h-[100dvh] sm:h-[650px] sm:max-h-[90vh] sm:w-[540px] flex flex-col gap-0 py-0 bg-slate-900 border-0 sm:border sm:border-red-600/40 shadow-[0_20px_60px_rgba(0,0,0,0.9)] overflow-hidden sm:rounded-2xl z-10 animate-in zoom-in-95 duration-200">
             {/* Header */}
             <div className="p-3.5 bg-gradient-to-r from-red-700 via-red-600 to-red-700 flex justify-between items-center shrink-0 border-b border-red-500/30 shadow-md">
               <div className="flex items-center gap-2.5">
@@ -389,33 +366,39 @@ export default function FloatingChat() {
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => setShowWaSelector(v => !v)}
-                  className="w-8 h-8 rounded-lg bg-green-600/80 hover:bg-green-600 flex items-center justify-center text-white transition-colors shadow"
-                  title="Atendimento no WhatsApp"
+                  className="px-2.5 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 flex items-center gap-1.5 text-white transition-colors shadow text-xs font-bold"
+                  title="Falar no WhatsApp"
                 >
-                  <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                  <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
                     <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.42 9.864-9.864.002-2.637-1.03-5.118-2.905-6.993C16.257 1.874 13.78 1.84 11.14 1.84 5.704 1.84 1.28 6.261 1.277 11.705c-.001 1.714.453 3.39 1.317 4.873L1.576 22.25l5.071-1.328z"/>
                   </svg>
+                  <span className="hidden sm:inline">WhatsApp</span>
                 </button>
-                <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="text-white/80 hover:text-white hover:bg-white/10 h-8 w-8 rounded-lg">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsOpen(false)}
+                  className="text-white/80 hover:text-white hover:bg-white/10 h-8 w-8 rounded-lg"
+                >
                   <X className="w-5 h-5" />
                 </Button>
               </div>
 
-              {/* Modal de Seleção de Atendente */}
+              {/* Modal Popover de Seleção de Atendente WhatsApp */}
               {showWaSelector && (
-                <div className="absolute top-14 right-3 z-50 bg-slate-900 border border-green-500/30 rounded-2xl shadow-2xl p-4 w-64 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="absolute top-14 right-3 z-50 bg-slate-900 border border-green-500/40 rounded-2xl shadow-2xl p-4 w-72 animate-in fade-in slide-in-from-top-2 duration-200">
                   <p className="text-[10px] text-green-400 font-black uppercase tracking-wider mb-3 flex items-center gap-1.5">
                     <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.42 9.864-9.864.002-2.637-1.03-5.118-2.905-6.993C16.257 1.874 13.78 1.84 11.14 1.84 5.704 1.84 1.28 6.261 1.277 11.705c-.001 1.714.453 3.39 1.317 4.873L1.576 22.25l5.071-1.328z"/></svg>
-                    Com quem deseja falar?
+                    Com qual atendente deseja falar?
                   </p>
                   <div className="space-y-2">
                     {WA_ATTENDANTS.map(att => (
                       <a
                         key={att.name}
-                        href={`https://wa.me/${att.number}`}
+                        href={`https://wa.me/${att.number}?text=${encodeURIComponent("Olá! Vim pelo chat do site da Eforte Games e gostaria de atendimento.")}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={() => setShowWaSelector(false)}
@@ -434,26 +417,27 @@ export default function FloatingChat() {
                   </div>
                   <button
                     onClick={() => setShowWaSelector(false)}
-                    className="mt-3 w-full text-[10px] text-slate-500 hover:text-slate-300 font-bold transition-colors"
+                    className="mt-3 w-full text-[11px] text-slate-500 hover:text-slate-300 font-bold transition-colors text-center"
                   >
-                    Cancelar
+                    Fechar
                   </button>
                 </div>
               )}
             </div>
 
             {/* Quick Topic Chips Bar */}
-            <div className="px-2.5 py-1.5 bg-slate-950 border-b border-slate-800 flex gap-1.5 overflow-x-auto scrollbar-none shrink-0">
+            <div className="px-3 py-2 bg-slate-950 border-b border-slate-800 flex gap-2 overflow-x-auto scrollbar-none shrink-0">
               {[
                 { label: "⚡ Economia", query: "Jogue com Economia" },
                 { label: "🏆 Platinador", query: "Clube do Platinador" },
                 { label: "💼 Revender", query: "Vender minha conta" },
                 { label: "📦 Entregas", query: "como recebo meu jogo" },
+                { label: "💳 Pagamentos", query: "quais formas de pagamento" },
               ].map(topic => (
                 <button
                   key={topic.query}
                   onClick={() => handleSelectSuggestion(topic.query)}
-                  className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-slate-900 border border-slate-800 hover:border-red-500/40 text-slate-300 hover:text-white whitespace-nowrap transition-all shrink-0"
+                  className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-900 border border-slate-800 hover:border-red-500/40 text-slate-300 hover:text-white whitespace-nowrap transition-all shrink-0 active:scale-95"
                 >
                   {topic.label}
                 </button>
@@ -461,13 +445,13 @@ export default function FloatingChat() {
             </div>
 
             {/* Messages Area */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto p-3.5 space-y-3 bg-slate-950/60">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto p-3.5 space-y-3 bg-slate-950/80">
               {messages.map(msg => (
                 <div key={msg.id} className={`flex ${msg.senderId === currentUserId ? "justify-end" : "justify-start"}`}>
                   <div className={`max-w-[88%] p-3 rounded-2xl text-xs font-medium ${
                     msg.senderId === currentUserId
                       ? "bg-red-600 text-white rounded-br-none shadow-md"
-                      : "bg-slate-900 text-slate-200 rounded-bl-none border border-slate-800"
+                      : "bg-slate-900 text-slate-200 rounded-bl-none border border-slate-800 shadow"
                   }`}>
                     {msg.senderId === "ai-support" && (
                       <span className="block text-[8px] text-red-400 font-black uppercase tracking-wider mb-1">Eforte Bot 🤖</span>
@@ -480,10 +464,10 @@ export default function FloatingChat() {
                 </div>
               ))}
 
-              {/* Dynamic Action Chips */}
-              {showChips && messages.length === WELCOME_FLOW.length && (
-                <div className="flex flex-col gap-1.5 pl-1 pr-2 mt-1">
-                  <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Como posso ajudar?</span>
+              {/* Action Suggestions Chips (quando conversa curta) */}
+              {messages.length <= 2 && (
+                <div className="flex flex-col gap-1.5 pl-1 pr-2 mt-2">
+                  <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Atalhos Frequentes:</span>
                   {[
                     { emoji: "⚡", label: "Ver Jogos Secundários (Jogue com Economia)", query: "Jogue com Economia" },
                     { emoji: "🏆", label: "Assinar Clube do Platinador VIP", query: "Clube do Platinador" },
@@ -493,7 +477,7 @@ export default function FloatingChat() {
                     <button
                       key={chip.query}
                       type="button"
-                      onClick={() => { setShowChips(false); handleSelectSuggestion(chip.query); }}
+                      onClick={() => handleSelectSuggestion(chip.query)}
                       className="text-left text-xs bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white px-3 py-2 rounded-xl border border-slate-800 hover:border-red-500/40 transition-all font-semibold cursor-pointer active:scale-95 shadow-sm"
                     >
                       {chip.emoji} {chip.label}
@@ -515,35 +499,35 @@ export default function FloatingChat() {
               )}
             </div>
 
-            {/* Direct WhatsApp Callout Banner */}
-            <div className="px-3 py-2 bg-slate-950 border-t border-slate-800 flex justify-center shrink-0">
+            {/* Direct WhatsApp Banner */}
+            <div className="px-3 py-2 bg-slate-950 border-t border-slate-800/80 flex justify-center shrink-0">
               <button
                 onClick={() => setShowWaSelector(v => !v)}
-                className="flex items-center justify-center gap-2 w-full bg-green-600/90 hover:bg-green-600 text-white font-black text-[10px] uppercase tracking-wider py-2 rounded-lg shadow transition-colors"
+                className="flex items-center justify-center gap-2 w-full bg-green-600/90 hover:bg-green-600 text-white font-black text-[10px] sm:text-xs uppercase tracking-wider py-2 rounded-xl shadow transition-colors active:scale-95"
               >
                 <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
                   <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.42 9.864-9.864.002-2.637-1.03-5.118-2.905-6.993C16.257 1.874 13.78 1.84 11.14 1.84 5.704 1.84 1.28 6.261 1.277 11.705c-.001 1.714.453 3.39 1.317 4.873L1.576 22.25l5.071-1.328z"/>
                 </svg>
-                Atendimento Direto no WhatsApp
+                Falar com Atendente Humano no WhatsApp
               </button>
             </div>
 
             {/* Input Form */}
-            <form onSubmit={handleSend} className="p-2.5 bg-slate-950 border-t border-slate-800 flex gap-2 shrink-0">
+            <form onSubmit={handleSend} className="p-2.5 bg-slate-950 border-t border-slate-800 flex gap-2 shrink-0 pb-[calc(10px+env(safe-area-inset-bottom,0px))]">
               <Input
                 value={message}
                 onChange={e => setMessage(e.target.value)}
-                placeholder="Pergunte sobre jogos, preços..."
-                className="bg-slate-900 border-slate-800 text-white text-xs focus-visible:ring-red-600 h-9 rounded-xl"
+                placeholder="Pergunte sobre jogos, contas, preços..."
+                className="bg-slate-900 border-slate-800 text-white text-xs focus-visible:ring-red-600 h-10 rounded-xl"
                 disabled={thinking}
               />
-              <Button type="submit" size="icon" className="bg-red-600 hover:bg-red-700 h-9 w-9 shrink-0 rounded-xl" disabled={thinking}>
-                <Send className="w-3.5 h-3.5" />
+              <Button type="submit" size="icon" className="bg-red-600 hover:bg-red-700 h-10 w-10 shrink-0 rounded-xl" disabled={thinking || !message.trim()}>
+                <Send className="w-4 h-4" />
               </Button>
             </form>
           </Card>
-        )}
-      </div>
+        </div>
+      )}
     </>
   );
 }
