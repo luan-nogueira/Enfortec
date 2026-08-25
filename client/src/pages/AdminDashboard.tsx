@@ -4269,6 +4269,27 @@ export default function AdminDashboard() {
                           <td className="py-3.5 px-4">
                             <div className="font-bold text-white">{sale.buyerName}</div>
                             <div className="text-xs text-slate-500">{sale.buyerEmail}</div>
+                            {sale.buyerPhone ? (
+                              <a
+                                href={(() => {
+                                  const digits = String(sale.buyerPhone).replace(/\D/g, "");
+                                  const phone = digits.startsWith("55") ? digits : digits ? `55${digits}` : "";
+                                  const text = encodeURIComponent(`Olá ${sale.buyerName || ""}! Falo da Eforte Games sobre o seu pedido #${sale.id} (${sale.productName || ""}).`);
+                                  return `https://wa.me/${phone}?text=${text}`;
+                                })()}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-[11px] text-green-400 hover:text-green-300 font-semibold mt-1 transition-colors bg-green-950/40 hover:bg-green-900/50 border border-green-500/30 px-2 py-0.5 rounded-md"
+                                title="Conversar com o cliente no WhatsApp"
+                              >
+                                <svg className="w-3 h-3 fill-current text-green-500 shrink-0" viewBox="0 0 24 24">
+                                  <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.42 9.864-9.864.002-2.637-1.03-5.118-2.905-6.993C16.257 1.874 13.78 1.84 11.14 1.84 5.704 1.84 1.28 6.261 1.277 11.705c-.001 1.714.453 3.39 1.317 4.873L1.576 22.25l5.071-1.328z"/>
+                                </svg>
+                                <span>{sale.buyerPhone}</span>
+                              </a>
+                            ) : (
+                              <span className="text-[10px] text-slate-600 italic block mt-0.5">WhatsApp não informado</span>
+                            )}
                           </td>
                           <td className="py-3.5 px-4 font-semibold text-slate-200">{sale.productName}</td>
                           <td className="py-3.5 px-4">
@@ -5687,6 +5708,42 @@ export default function AdminDashboard() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleDeliverGame} className="space-y-4 my-2">
+            {/* Resumo do Comprador e WhatsApp */}
+            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1.5 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400 font-bold uppercase text-[10px]">Comprador:</span>
+                <span className="text-white font-bold">{selectedDeliverOrder?.buyerName || "Sem Nome"}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400 font-bold uppercase text-[10px]">E-mail:</span>
+                <span className="text-slate-300 font-mono text-[11px]">{selectedDeliverOrder?.buyerEmail || "Sem E-mail"}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400 font-bold uppercase text-[10px]">WhatsApp:</span>
+                {selectedDeliverOrder?.buyerPhone ? (
+                  <a
+                    href={(() => {
+                      const digits = String(selectedDeliverOrder.buyerPhone).replace(/\D/g, "");
+                      const phone = digits.startsWith("55") ? digits : digits ? `55${digits}` : "";
+                      const text = encodeURIComponent(`Olá ${selectedDeliverOrder.buyerName || ""}! Falo da Eforte Games sobre o seu pedido #${selectedDeliverOrder.id} (${selectedDeliverOrder.productName || ""}).`);
+                      return `https://wa.me/${phone}?text=${text}`;
+                    })()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-green-400 hover:text-green-300 font-bold bg-green-950/40 border border-green-500/30 px-2 py-0.5 rounded transition-colors text-[11px]"
+                    title="Conversar no WhatsApp"
+                  >
+                    <svg className="w-3 h-3 fill-current text-green-500 shrink-0" viewBox="0 0 24 24">
+                      <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.42 9.864-9.864.002-2.637-1.03-5.118-2.905-6.993C16.257 1.874 13.78 1.84 11.14 1.84 5.704 1.84 1.28 6.261 1.277 11.705c-.001 1.714.453 3.39 1.317 4.873L1.576 22.25l5.071-1.328z"/>
+                    </svg>
+                    <span>{selectedDeliverOrder.buyerPhone}</span>
+                  </a>
+                ) : (
+                  <span className="text-slate-500 italic text-[11px]">Não informado</span>
+                )}
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label className="text-xs text-slate-300 font-bold uppercase">Chave de Ativação / Dados da Conta</Label>
               <textarea
