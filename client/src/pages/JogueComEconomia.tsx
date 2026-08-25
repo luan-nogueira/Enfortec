@@ -134,7 +134,7 @@ export default function JogueComEconomia() {
       const accountLabel = selectedAccountType === "primaria" ? "Conta Primária" : "Conta Secundária";
 
       const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
-      const res = await fetch("/api/infinitepay/checkout", {
+      const res = await fetch("/api/mercadopago/checkout", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

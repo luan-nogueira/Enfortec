@@ -55,8 +55,8 @@ function aiAnswer(q: string, catalog: any[]): string {
   if (/preciso de ajuda|ajuda com algum jogo|qual jogo deseja ajuda/.test(nq))
     return "Com certeza! Estou aqui para ajudar. 🎮\n\nSe você deseja ajuda com um jogo específico, digite o nome dele e eu vejo se temos disponível no nosso catálogo!\n\n[👉 Chamar no WhatsApp](" + WA_BASE + ")";
 
-  if (/pagamento|pix|cartao|boleto|pagar|pago|infinitepay/.test(nq))
-    return "Aceitamos **Pix**, **Cartão de Crédito** e **Boleto** via InfinitePay. 💳\n\nVocê também pode usar suas **ForteCoins** como desconto! (10 FC = R$ 1,00 de desconto)";
+  if (/pagamento|pix|cartao|boleto|pagar|pago|mercadopago|mercado pago|infinitepay/.test(nq))
+    return "Aceitamos **Pix**, **Cartão de Crédito**, **Boleto** e **Saldo Mercado Pago** via Mercado Pago. 💳\n\nVocê também pode usar suas **ForteCoins** como desconto! (10 FC = R$ 1,00 de desconto)";
 
   if (/fortecoin|moeda|coins|desconto/.test(nq))
     return "As **ForteCoins** são nossa moeda virtual! 🪙\n\nA cada compra você acumula pontos e pode usar como desconto em qualquer produto.\n\n**10 ForteCoins = R$ 1,00 de desconto**";

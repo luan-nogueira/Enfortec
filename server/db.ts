@@ -1,7 +1,7 @@
-import { eq, and, desc, sql, inArray, like } from "drizzle-orm";
+import { eq, and, desc, sql, inArray, like, lt } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
-import { InsertUser, InsertCoupon, users, sellers, products, usedProducts, digitalProducts, orders, reviews, coupons, platformSettings, adminDismissedNotifications } from "../drizzle/schema";
+import { InsertUser, InsertCoupon, users, sellers, products, usedProducts, digitalProducts, orders, reviews, coupons, platformSettings, adminDismissedNotifications, messages, platinumSubmissions } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 /**
@@ -52,18 +52,55 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     }
 
     if (existingUser) {
-      const updateData: any = {
-        openId: user.openId,
-        lastSignedIn: user.lastSignedIn || new Date(),
-        role: isAdmin ? 'admin' : existingUser.role
-      };
-      if (user.name) updateData.name = user.name;
-      if (user.email) updateData.email = user.email;
-      if (user.cpf) updateData.cpf = user.cpf;
-      if (user.forteCoins !== undefined) updateData.forteCoins = user.forteCoins;
-      if (user.loginMethod) updateData.loginMethod = user.loginMethod;
+      // Otimização para economizar armazenamento no Neon (evita dead tuples desnecessários):
+      // Só atualiza lastSignedIn se o último registro for de mais de 12 horas atrás
+      const now = new Date();
+      const lastSigned = existingUser.lastSignedIn ? new Date(existingUser.lastSignedIn).getTime() : 0;
+      const twelveHoursAgo = now.getTime() - 12 * 60 * 60 * 1000;
+      const shouldUpdateLastSigned = lastSigned < twelveHoursAgo;
 
-      await db.update(users).set(updateData).where(eq(users.id, existingUser.id));
+      const updateData: any = {};
+      let hasChanges = false;
+
+      if (user.openId !== existingUser.openId) {
+        updateData.openId = user.openId;
+        hasChanges = true;
+      }
+      if (shouldUpdateLastSigned) {
+        updateData.lastSignedIn = user.lastSignedIn || now;
+        hasChanges = true;
+      }
+      if (isAdmin && existingUser.role !== 'admin') {
+        updateData.role = 'admin';
+        hasChanges = true;
+      } else if (user.role && user.role !== existingUser.role) {
+        updateData.role = user.role;
+        hasChanges = true;
+      }
+      if (user.name && user.name !== existingUser.name) {
+        updateData.name = user.name;
+        hasChanges = true;
+      }
+      if (user.email && user.email !== existingUser.email) {
+        updateData.email = user.email;
+        hasChanges = true;
+      }
+      if (user.cpf && user.cpf !== existingUser.cpf) {
+        updateData.cpf = user.cpf;
+        hasChanges = true;
+      }
+      if (user.forteCoins !== undefined && user.forteCoins !== existingUser.forteCoins) {
+        updateData.forteCoins = user.forteCoins;
+        hasChanges = true;
+      }
+      if (user.loginMethod && user.loginMethod !== existingUser.loginMethod) {
+        updateData.loginMethod = user.loginMethod;
+        hasChanges = true;
+      }
+
+      if (hasChanges) {
+        await db.update(users).set(updateData).where(eq(users.id, existingUser.id));
+      }
     } else {
       const insertData: any = {
         openId: user.openId,
@@ -708,5 +745,85 @@ export async function getRecentReviews() {
       productName: productName,
     };
   });
+}
+
+/**
+ * Rotina de limpeza periódica de dados temporários e logs antigos
+ * Mantém o banco de dados leve e sempre dentro do plano gratuito (< 500 MB).
+ */
+export async function runDatabaseCleanup() {
+  const db = getDb();
+  if (!db) return { success: false, error: "Database not available" };
+
+  try {
+    const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    // 1. Apaga mensagens de chat antigas (> 60 dias)
+    await db.delete(messages).where(lt(messages.createdAt, sixtyDaysAgo));
+
+    // 2. Apaga notificações dispensadas antigas (> 30 dias)
+    await db.delete(adminDismissedNotifications).where(lt(adminDismissedNotifications.dismissedAt, thirtyDaysAgo));
+
+    // 3. Apaga submissões de platina rejeitadas antigas (> 60 dias)
+    await db.delete(platinumSubmissions).where(
+      and(
+        eq(platinumSubmissions.status, "rejeitado"),
+        lt(platinumSubmissions.submittedAt, sixtyDaysAgo)
+      )
+    );
+
+    console.log("[Database Cleanup] Rotina de limpeza executada com sucesso.");
+    return { success: true, timestamp: new Date().toISOString() };
+  } catch (err: any) {
+    console.error("[Database Cleanup] Erro ao executar limpeza:", err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Consulta estatísticas detalhadas de uso de armazenamento do PostgreSQL (Neon)
+ */
+export async function getDatabaseStorageStats() {
+  const db = getDb();
+  if (!db) return null;
+
+  try {
+    const rawSql = sql`
+      SELECT
+        pg_database_name.datname AS database_name,
+        pg_size_pretty(pg_database_size(pg_database_name.datname)) AS total_size,
+        pg_database_size(pg_database_name.datname) AS total_bytes
+      FROM (SELECT current_database() AS datname) AS pg_database_name;
+    `;
+    const dbSizeResult: any = await db.execute(rawSql);
+
+    const tablesSql = sql`
+      SELECT
+        relname AS table_name,
+        pg_size_pretty(pg_total_relation_size(relid)) AS total_size,
+        pg_total_relation_size(relid) AS total_bytes
+      FROM pg_catalog.pg_statio_user_tables
+      ORDER BY pg_total_relation_size(relid) DESC;
+    `;
+    const tablesResult: any = await db.execute(tablesSql);
+
+    const totalBytes = Number(dbSizeResult?.rows?.[0]?.total_bytes || 0);
+    const totalMb = (totalBytes / (1024 * 1024)).toFixed(2);
+    const freeTierLimitMb = 500; // Plano gratuito Neon 500 MB
+    const usagePercentage = ((Number(totalMb) / freeTierLimitMb) * 100).toFixed(2);
+
+    return {
+      databaseName: dbSizeResult?.rows?.[0]?.database_name || "neondb",
+      totalSize: dbSizeResult?.rows?.[0]?.total_size || "0 MB",
+      totalMb: Number(totalMb),
+      freeTierLimitMb,
+      usagePercentage: `${usagePercentage}%`,
+      tables: tablesResult?.rows || []
+    };
+  } catch (error: any) {
+    console.warn("[Database Stats] Erro ao buscar métricas de armazenamento:", error.message);
+    return null;
+  }
 }
 

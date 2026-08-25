@@ -240,7 +240,7 @@ export default function UsedMarketplace() {
         ? customerPhone 
         : `+55${customerPhone.replace(/\D/g, "")}`;
 
-      const response = await fetch("/api/infinitepay/checkout", {
+      const response = await fetch("/api/mercadopago/checkout", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

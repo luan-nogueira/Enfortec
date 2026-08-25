@@ -133,7 +133,7 @@ export default function PlatinadorPage() {
     setIsSubscribing(true);
     try {
       const idToken = user.firebaseUser ? await user.firebaseUser.getIdToken() : "";
-      const res = await fetch("/api/infinitepay/checkout", {
+      const res = await fetch("/api/mercadopago/checkout", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

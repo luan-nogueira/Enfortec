@@ -200,7 +200,7 @@ export default function Store() {
         ? customerPhone 
         : `+55${customerPhone.replace(/\D/g, "")}`;
 
-      const response = await fetch("/api/infinitepay/checkout", {
+      const response = await fetch("/api/mercadopago/checkout", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -387,7 +387,7 @@ export default function Store() {
                   Pagamento Seguro
                 </p>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Pague com Pix ou Cartão via InfinitePay. Você pode marcar o campo para usar suas <strong>ForteCoins</strong> e obter desconto imediato (cada 10 moedas = R$ 1,00 de desconto).
+                  Pague com Pix, Cartão ou Boleto via Mercado Pago. Você pode marcar o campo para usar suas <strong>ForteCoins</strong> e obter desconto imediato (cada 10 moedas = R$ 1,00 de desconto).
                 </p>
               </div>
 

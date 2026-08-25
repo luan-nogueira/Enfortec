@@ -298,7 +298,7 @@ export default function DigitalMedia() {
         ? `${selectedProduct.name} (${selectedConsole})`
         : selectedProduct.name;
 
-      const response = await fetch("/api/infinitepay/checkout", {
+      const response = await fetch("/api/mercadopago/checkout", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

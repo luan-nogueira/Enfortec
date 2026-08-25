@@ -34,6 +34,16 @@ export const appRouter = router({
         .from(users)
         .orderBy(desc(users.lastSignedIn));
     }),
+    adminGetDatabaseStats: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores" });
+      const stats = await db.getDatabaseStorageStats();
+      return stats;
+    }),
+    adminRunDatabaseCleanup: protectedProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores" });
+      const result = await db.runDatabaseCleanup();
+      return result;
+    }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
