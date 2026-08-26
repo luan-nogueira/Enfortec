@@ -490,6 +490,7 @@ export async function getAllOrdersWithDetails() {
       buyerName: r.buyer?.name || "Sem Nome",
       buyerEmail: r.buyer?.email || "Sem E-mail",
       buyerPhone: r.order.buyerPhone || null,
+      buyerOpenId: r.buyer?.openId || null,
       productName,
     };
   });

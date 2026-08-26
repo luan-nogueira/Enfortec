@@ -152,13 +152,32 @@ export function registerPaymentRoute(app: Express) {
         if (!isNaN(pid)) {
           if (productType === "store") {
             const rows = await database.select().from(products).where(eq(products.id, pid)).limit(1);
-            if (rows[0]) { verifiedPrice = parseFloat(rows[0].price); realProductName = rows[0].name; }
+            if (rows[0]) {
+              if (rows[0].isActive === false || (rows[0].stock !== undefined && rows[0].stock <= 0)) {
+                return res.status(400).json({ success: false, error: "Este produto está esgotado no momento." });
+              }
+              verifiedPrice = parseFloat(rows[0].price);
+              realProductName = rows[0].name;
+            }
           } else if (productType === "used") {
             const rows = await database.select().from(usedProducts).where(eq(usedProducts.id, pid)).limit(1);
-            if (rows[0]) { verifiedPrice = parseFloat(rows[0].price); realProductName = rows[0].name; }
+            if (rows[0]) {
+              if (rows[0].status === "vendido") {
+                return res.status(400).json({ success: false, error: "Este produto usado já foi vendido." });
+              }
+              verifiedPrice = parseFloat(rows[0].price);
+              realProductName = rows[0].name;
+            }
           } else if (productType === "digital") {
             const rows = await database.select().from(digitalProducts).where(eq(digitalProducts.id, pid)).limit(1);
-            if (rows[0]) { verifiedPrice = computeDigitalPrice(rows[0], accountType); realProductName = rows[0].name; verifiedIsPreVenda = !!rows[0].isPreVenda; }
+            if (rows[0]) {
+              if (rows[0].isActive === false || (rows[0].stock !== undefined && rows[0].stock <= 0)) {
+                return res.status(400).json({ success: false, error: "Este jogo está esgotado no momento." });
+              }
+              verifiedPrice = computeDigitalPrice(rows[0], accountType);
+              realProductName = rows[0].name;
+              verifiedIsPreVenda = !!rows[0].isPreVenda;
+            }
           }
         }
       }

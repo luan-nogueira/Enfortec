@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -168,6 +169,7 @@ const WA_ATTENDANTS = [
 ];
 
 export default function FloatingChat() {
+  const [location] = useLocation();
   const { user, isAuthenticated } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState("");
@@ -180,7 +182,7 @@ export default function FloatingChat() {
 
   // Reduz opacidade do botão flutuante enquanto a página é rolada
   useEffect(() => {
-    if (isOpen) return;
+    if (location.startsWith("/admin") || isOpen) return;
     let timeout: ReturnType<typeof setTimeout>;
     const onScroll = () => {
       setIsPageScrolling(true);
@@ -297,7 +299,7 @@ export default function FloatingChat() {
         await addDoc(collection(db, "chats", user.id, "messages"), {
           text: answer, senderId: "ai-support", senderName: "Assistente Eforte", timestamp: serverTimestamp()
         });
-        await setDoc(chatRef, { lastMessage: answer, updatedAt: serverTimestamp(), unreadByAdmin: false }, { merge: true });
+        await setDoc(chatRef, { lastMessage: answer, updatedAt: serverTimestamp(), unreadByAdmin: true }, { merge: true });
       } catch {
         setMessages(prev => [...prev, {
           id: `ai-${Date.now()}`, text: answer, senderId: "ai-support", senderName: "Assistente Eforte", timestamp: new Date()
@@ -323,6 +325,8 @@ export default function FloatingChat() {
   };
 
   const currentUserId = isAuthenticated && user?.id ? user.id : "guest";
+
+  if (location.startsWith("/admin")) return null;
 
   return (
     <>

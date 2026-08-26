@@ -730,12 +730,13 @@ export default function Home() {
               const isAssinatura = listing.type === 'assinatura';
               const isDigital = listing._type === 'digital' && !isAssinatura;
               const isFisico = listing._type === 'used';
+              const isOutOfStock = isDigital && listing.stock !== undefined && listing.stock !== null && Number(listing.stock) <= 0;
 
               return (
                 <div 
                   key={`${listing._type}-${listing.id}`}
-                  className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-red-500/40 transition-all hover:-translate-y-1.5 hover:shadow-[0_8px_30px_rgba(220,38,38,0.2)] flex flex-col h-full cursor-pointer min-w-[160px] sm:min-w-[220px] lg:min-w-0 w-[45vw] sm:w-[35vw] lg:w-auto snap-start shrink-0 group game-card-shine"
-                  onClick={() => navigate(isFisico ? '/usados' : `/digital?search=${encodeURIComponent(listing.name)}&buy=${listing.id}`)}
+                  className={`bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-red-500/40 transition-all hover:-translate-y-1.5 hover:shadow-[0_8px_30px_rgba(220,38,38,0.2)] flex flex-col h-full cursor-pointer min-w-[160px] sm:min-w-[220px] lg:min-w-0 w-[45vw] sm:w-[35vw] lg:w-auto snap-start shrink-0 group game-card-shine ${isOutOfStock ? 'opacity-70' : ''}`}
+                  onClick={() => !isOutOfStock && navigate(isFisico ? '/usados' : `/digital?search=${encodeURIComponent(listing.name)}&buy=${listing.id}`)}
                 >
                   <div className="h-28 sm:h-40 bg-slate-800 relative overflow-hidden">
                     {listing.imageUrl || (listing.images && listing.images.length > 0) ? (
@@ -760,6 +761,12 @@ export default function Home() {
                     }`}>
                       {isAssinatura ? '⭐ Assinatura VIP' : isFisico ? '📦 Mídia Física' : '🎮 Mídia Digital'}
                     </div>
+
+                    {isOutOfStock && (
+                      <div className="absolute top-1.5 right-1.5 z-10 bg-red-600/95 border border-red-500 text-white text-[7px] sm:text-[9px] font-black px-1.5 sm:px-2 py-0.5 rounded-full uppercase tracking-wider shadow-md">
+                        Esgotado
+                      </div>
+                    )}
 
                     {/* Verified & Cashback Badges */}
                     <div className="absolute bottom-1.5 right-1.5 flex flex-col items-end gap-1">
@@ -820,9 +827,15 @@ export default function Home() {
 
                       <Button
                         size="sm"
-                        className="w-full bg-red-600 hover:bg-red-700 text-white rounded-lg px-2.5 py-1.5 text-[10px] sm:text-xs font-bold btn-neon mt-2"
-                        onClick={(e) => {
+                        className={`w-full rounded-lg px-2.5 py-1.5 text-[10px] sm:text-xs font-bold mt-2 ${
+                          isOutOfStock
+                            ? "bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed"
+                            : "bg-red-600 hover:bg-red-700 text-white btn-neon"
+                        }`}
+                        disabled={isOutOfStock}
+                        onClick={(e: any) => {
                           e.stopPropagation();
+                          if (isOutOfStock) return;
                           if (isFisico) {
                             navigate('/usados');
                           } else {
@@ -830,7 +843,7 @@ export default function Home() {
                           }
                         }}
                       >
-                        {isFisico ? "Ver Anúncio" : primaryPrice === 0 ? "Contatar" : "Comprar / Escolher Conta"}
+                        {isOutOfStock ? "Esgotado" : isFisico ? "Ver Anúncio" : primaryPrice === 0 ? "Contatar" : "Comprar / Escolher Conta"}
                       </Button>
                     </div>
                   </div>

@@ -690,10 +690,27 @@ export default function AdminDashboard() {
   const [, navigate] = useLocation();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const normalizeAdminTab = (tab: string | null) => {
+    if (!tab) return "visao-geral";
+    if (tab === "mensagens" || tab === "chat" || tab === "chats") return "negociacoes";
+    return tab;
+  };
   const [activeTab, setActiveTab] = useState(() => {
     const tabFromUrl = new URLSearchParams(window.location.search).get("tab");
-    return tabFromUrl || "visao-geral";
+    return normalizeAdminTab(tabFromUrl);
   });
+
+  useEffect(() => {
+    const handleUrlTab = () => {
+      const tabFromUrl = new URLSearchParams(window.location.search).get("tab");
+      if (tabFromUrl) {
+        setActiveTab(normalizeAdminTab(tabFromUrl));
+      }
+    };
+    handleUrlTab();
+    window.addEventListener("popstate", handleUrlTab);
+    return () => window.removeEventListener("popstate", handleUrlTab);
+  }, []);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Helpers to calculate sales stats
@@ -1831,6 +1848,8 @@ export default function AdminDashboard() {
     const unsubMsg = onSnapshot(qMsg, (snapshot) => {
       setChatMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
+    // Marca conversa como lida pelo gestor
+    updateDoc(doc(db, "chats", selectedChatUser.id), { unreadByAdmin: false }).catch(() => {});
     return () => unsubMsg();
   }, [selectedChatUser]);
 
@@ -3021,7 +3040,7 @@ export default function AdminDashboard() {
 
               <h1 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2.5">
                 <Shield className="w-6 h-6 text-red-600 shrink-0" />
-                {menuItems.find(item => item.value === activeTab)?.label || "Painel do Gestor"}
+                {menuItems.find(item => item.value === activeTab)?.label || (activeTab === "mensagens" || activeTab === "negociacoes" ? "Negociações & Mensagens" : "Painel do Gestor")}
               </h1>
             </div>
             
@@ -3048,7 +3067,7 @@ export default function AdminDashboard() {
 
         {/* Page Content Body */}
         <main className="flex-1 py-6 sm:py-8 px-3 sm:px-6 lg:px-8 pb-36 lg:pb-16 max-w-7xl w-full mx-auto">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <Tabs value={activeTab === "mensagens" ? "negociacoes" : activeTab} onValueChange={(val) => setActiveTab(normalizeAdminTab(val))} className="w-full">
 
             {/* ========================= COMPRAS PENDENTES DE ENTREGA ========================= */}
             <TabsContent value="compras_pendentes" className="space-y-6 pb-16">
@@ -3213,11 +3232,27 @@ export default function AdminDashboard() {
                           <MessageCircle className="w-3.5 h-3.5" />
                           WhatsApp{!order.buyerPhone && " ⚠️"}
                         </Button>
-                        {/* Botão Chat pelo Site — abre a aba Negociações & Mensagens na hora */}
+                        {/* Botão Chat pelo Site — abre a conversa direta com o comprador */}
                         <Button
-                          onClick={() => setActiveTab("mensagens")}
+                          onClick={() => {
+                            setActiveTab("negociacoes");
+                            const buyerOpenId = order.buyerOpenId;
+                            const existingChat = allChats.find((c: any) =>
+                              (buyerOpenId && (c.id === buyerOpenId || c.userId === buyerOpenId)) ||
+                              (order.buyerEmail && c.userEmail && c.userEmail.toLowerCase() === order.buyerEmail.toLowerCase())
+                            );
+                            const targetId = buyerOpenId || existingChat?.id || existingChat?.userId || (order.buyerId ? String(order.buyerId) : "");
+                            if (targetId) {
+                              setSelectedChatUser({
+                                id: targetId,
+                                name: order.buyerName || existingChat?.userName || "Cliente",
+                                email: order.buyerEmail || existingChat?.userEmail || "",
+                                topic: `Pedido #${order.id} - ${order.productName || "Jogo"}`,
+                              });
+                            }
+                          }}
                           variant="outline"
-                          title="Abrir a central de conversas e mensagens do site"
+                          title="Abrir chat direto com este cliente"
                           className="bg-blue-950/30 hover:bg-blue-900/50 text-blue-400 border-blue-500/40 font-bold text-xs h-9 px-3 flex items-center gap-1.5"
                         >
                           <MessageCircle className="w-3.5 h-3.5" />
@@ -3870,7 +3905,7 @@ export default function AdminDashboard() {
               return (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredGamesList.map((game: any) => (
-                <Card key={game.id} className={`bg-slate-900/40 backdrop-blur-md border-red-600/10 p-4 hover:border-red-600/40 hover:shadow-[0_8px_30px_rgb(0,0,0,0.5)] transition-all duration-500 card-neon relative overflow-hidden group ${!game.isActive ? 'opacity-50' : ''}`}>
+                <Card key={game.id} className={`bg-slate-900/40 backdrop-blur-md border-red-600/10 p-4 hover:border-red-600/40 hover:shadow-[0_8px_30px_rgb(0,0,0,0.5)] transition-all duration-500 card-neon relative overflow-hidden group ${!game.isActive || Number(game.stock) <= 0 ? 'opacity-70 border-red-600/30' : ''}`}>
                   <div className="aspect-[16/9] w-full rounded-md overflow-hidden mb-4 bg-slate-800 flex items-center justify-center relative">
                     {game.imageUrl ? (
                       <img 
@@ -3938,11 +3973,17 @@ export default function AdminDashboard() {
                       <p className="text-xs text-slate-400 mb-1">Preço: <span className="text-green-400 font-bold">R$ {Number(game.pricePrimary || game.price || 0).toFixed(2).replace('.', ',')}</span></p>
                     )}
                     <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-800/50">
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border ${game.isActive ? "bg-green-500/10 text-green-500 border-green-500/20" : "bg-red-500/10 text-red-500 border-red-500/20"}`}>
-                        {game.isActive ? "Ativo" : "Inativo"}
-                      </span>
-                      <span className="text-[10px] text-slate-500 font-medium bg-slate-900 px-2 py-0.5 rounded">
-                        Estq: {game.stock}
+                      {Number(game.stock) <= 0 ? (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border bg-red-500/20 text-red-400 border-red-500/40 animate-pulse">
+                          Sem Estoque
+                        </span>
+                      ) : (
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border ${game.isActive ? "bg-green-500/10 text-green-500 border-green-500/20" : "bg-red-500/10 text-red-500 border-red-500/20"}`}>
+                          {game.isActive ? "Ativo" : "Inativo"}
+                        </span>
+                      )}
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded ${Number(game.stock) <= 0 ? 'bg-red-950/60 text-red-400 font-bold border border-red-800/50' : 'bg-slate-900 text-slate-500'}`}>
+                        Estq: {game.stock ?? 0}
                       </span>
                     </div>
 

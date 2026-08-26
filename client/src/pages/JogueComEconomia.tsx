@@ -69,6 +69,11 @@ export default function JogueComEconomia() {
       return;
     }
 
+    if (product.stock !== undefined && product.stock !== null && Number(product.stock) <= 0) {
+      toast.error("Este jogo está esgotado no momento.");
+      return;
+    }
+
     setSelectedProduct(product);
     setCustomerName(user?.name || "");
     setCustomerEmail(user?.email || "");
@@ -255,6 +260,7 @@ export default function JogueComEconomia() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {filteredProducts.map((product) => {
+              const isOutOfStock = product.stock !== undefined && product.stock !== null && Number(product.stock) <= 0;
               const licenseType = product.economiaLicenseType || "secundaria";
               const secPrice = Number(product.priceSecondary ?? product.price);
               const primPrice = Number(product.pricePrimary ?? product.price);
@@ -263,15 +269,21 @@ export default function JogueComEconomia() {
               return (
                 <div
                   key={product.id}
-                  className="group relative bg-slate-900/80 rounded-xl border border-slate-800 hover:border-red-500/50 transition-all duration-300 flex flex-col overflow-hidden shadow-lg hover:shadow-[0_0_20px_rgba(220,38,38,0.2)]"
+                  className={`group relative bg-slate-900/80 rounded-xl border border-slate-800 hover:border-red-500/50 transition-all duration-300 flex flex-col overflow-hidden shadow-lg hover:shadow-[0_0_20px_rgba(220,38,38,0.2)] ${isOutOfStock ? 'opacity-70' : ''}`}
                 >
                   {/* Badge */}
                   <div className="absolute top-2 left-2 z-10 flex flex-col gap-1">
-                    <span className={`text-white font-black text-[10px] uppercase px-2 py-0.5 rounded shadow ${
-                      licenseType === "primaria" ? "bg-blue-600" : licenseType === "ambas" ? "bg-purple-600" : "bg-red-600"
-                    }`}>
-                      {licenseType === "primaria" ? "Conta Primária" : licenseType === "ambas" ? "Primária ou Secundária" : "Conta Secundária"}
-                    </span>
+                    {isOutOfStock ? (
+                      <span className="bg-red-600/90 border border-red-500 text-white font-black text-[10px] uppercase px-2 py-0.5 rounded shadow">
+                        Esgotado
+                      </span>
+                    ) : (
+                      <span className={`text-white font-black text-[10px] uppercase px-2 py-0.5 rounded shadow ${
+                        licenseType === "primaria" ? "bg-blue-600" : licenseType === "ambas" ? "bg-purple-600" : "bg-red-600"
+                      }`}>
+                        {licenseType === "primaria" ? "Conta Primária" : licenseType === "ambas" ? "Primária ou Secundária" : "Conta Secundária"}
+                      </span>
+                    )}
                     <span className="bg-amber-500 text-slate-950 font-black text-[9px] px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">
                       🎁 +7 FC Cashback
                     </span>
@@ -341,10 +353,15 @@ export default function JogueComEconomia() {
                       )}
 
                       <Button
-                        onClick={() => handleOpenBuyModal(product)}
-                        className="w-full mt-3 bg-red-600 hover:bg-red-700 text-white font-bold text-xs py-2 rounded-lg transition-all shadow-md"
+                        onClick={() => !isOutOfStock && handleOpenBuyModal(product)}
+                        disabled={isOutOfStock}
+                        className={`w-full mt-3 font-bold text-xs py-2 rounded-lg transition-all shadow-md ${
+                          isOutOfStock 
+                            ? "bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed" 
+                            : "bg-red-600 hover:bg-red-700 text-white"
+                        }`}
                       >
-                        {licenseType === "primaria" ? "Comprar Primária" : licenseType === "ambas" ? "Comprar / Escolher Licença" : "Comprar Secundária"}
+                        {isOutOfStock ? "Indisponível" : licenseType === "primaria" ? "Comprar Primária" : licenseType === "ambas" ? "Comprar / Escolher Licença" : "Comprar Secundária"}
                       </Button>
                     </div>
                   </div>

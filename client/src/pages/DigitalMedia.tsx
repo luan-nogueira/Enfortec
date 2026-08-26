@@ -240,6 +240,11 @@ export default function DigitalMedia() {
       return;
     }
 
+    if (product.stock !== undefined && product.stock !== null && Number(product.stock) <= 0) {
+      toast.error("Este jogo está esgotado no momento.");
+      return;
+    }
+
     setSelectedProduct(product);
     setCheckoutError(null);
   };
@@ -733,8 +738,10 @@ export default function DigitalMedia() {
               </div>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-4">
-              {filteredProducts.map((product: any) => (
-                <div key={product.id} className="card-neon game-card-shine overflow-hidden group hover:scale-[1.03] transition-all duration-250 flex flex-col">
+              {filteredProducts.map((product: any) => {
+                const isOutOfStock = product.stock !== undefined && product.stock !== null && Number(product.stock) <= 0;
+                return (
+                <div key={product.id} className={`card-neon game-card-shine overflow-hidden group hover:scale-[1.03] transition-all duration-250 flex flex-col ${isOutOfStock ? 'opacity-70' : ''}`}>
                   <div className="relative overflow-hidden bg-slate-800 h-36 sm:h-52">
                     {product.imageUrl ? (
                       <img
@@ -755,7 +762,11 @@ export default function DigitalMedia() {
                       </div>
                     )}
                     {/* Game badge */}
-                    {(() => {
+                    {isOutOfStock ? (
+                      <div className="absolute top-1.5 right-1.5 z-10 bg-red-600/90 border border-red-500 text-white text-[7px] sm:text-[9px] font-black px-1.5 sm:px-2 py-0.5 rounded-full uppercase tracking-wider shadow-lg">
+                        Esgotado
+                      </div>
+                    ) : (() => {
                       const badge = getGameBadge(product);
                       return badge ? (
                         <div className={`absolute top-1.5 right-1.5 z-10 ${badge.color} text-white text-[7px] sm:text-[9px] font-black px-1.5 sm:px-2 py-0.5 rounded-full uppercase tracking-wider shadow-lg`}>
@@ -823,11 +834,17 @@ export default function DigitalMedia() {
                     <div className="flex flex-col gap-1.5">
                       <Button
                         size="sm"
-                        className="w-full bg-red-600 hover:bg-red-700 text-white font-bold btn-neon text-[10px] sm:text-xs h-8 sm:h-9"
-                        onClick={() => handleBuyClick(product)}
-                        disabled={isProcessingCheckout && selectedProduct?.id === product.id}
+                        className={`w-full font-bold text-[10px] sm:text-xs h-8 sm:h-9 ${
+                          isOutOfStock
+                            ? "bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed"
+                            : "bg-red-600 hover:bg-red-700 text-white btn-neon"
+                        }`}
+                        onClick={() => !isOutOfStock && handleBuyClick(product)}
+                        disabled={isOutOfStock || (isProcessingCheckout && selectedProduct?.id === product.id)}
                       >
-                        {parseFloat(product.price) === 0 ? (
+                        {isOutOfStock ? (
+                          "Indisponível"
+                        ) : parseFloat(product.price) === 0 ? (
                           "Consultar"
                         ) : (isProcessingCheckout && selectedProduct?.id === product.id) ? (
                           "..."
@@ -860,7 +877,8 @@ export default function DigitalMedia() {
                     </div>
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           </>
         )}

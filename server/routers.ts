@@ -222,7 +222,12 @@ export const appRouter = router({
           price: input.price.toString(),
           category: input.category,
         };
-        if (input.stock !== undefined) updateValues.stock = input.stock;
+        if (input.stock !== undefined) {
+          updateValues.stock = input.stock;
+          if (input.stock <= 0 && input.isActive === undefined) {
+            updateValues.isActive = false;
+          }
+        }
         if (input.images !== undefined) updateValues.images = input.images;
         if (input.isActive !== undefined) updateValues.isActive = input.isActive;
         return database.update(products).set(updateValues).where(eq(products.id, input.id));
@@ -538,7 +543,7 @@ export const appRouter = router({
           platform: input.platform,
           category: input.category,
           stock: input.stock !== undefined ? input.stock : 1,
-          isActive: input.isActive !== undefined ? input.isActive : true,
+          isActive: input.stock !== undefined && input.stock <= 0 ? false : (input.isActive !== undefined ? input.isActive : true),
           isPreVenda: input.isPreVenda,
           showInEconomia: input.showInEconomia,
           economiaLicenseType: input.economiaLicenseType,
@@ -581,7 +586,7 @@ export const appRouter = router({
           platform: input.platform,
           category: input.category,
           stock: input.stock !== undefined ? input.stock : 1,
-          isActive: input.isActive !== undefined ? input.isActive : true,
+          isActive: input.stock !== undefined && input.stock <= 0 && input.isActive === undefined ? false : (input.isActive !== undefined ? input.isActive : true),
           isPreVenda: input.isPreVenda,
           showInEconomia: input.showInEconomia,
           economiaLicenseType: input.economiaLicenseType,
