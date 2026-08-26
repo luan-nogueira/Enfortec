@@ -27,6 +27,13 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, 
 import SellerChatsPanel from "@/components/SellerChatsPanel";
 import { STORE_SELLER_NAME } from "@/lib/sellerChat";
 import { getStoreStatus } from "@/lib/storeHours";
+import {
+  notifyAdmin,
+  playNotificationChime,
+  requestNotificationPermission,
+  getNotificationPermission,
+  NotificationPermissionState,
+} from "@/lib/soundAndNotifications";
 
 function PlatinadorAdminTab() {
   const [gameTitle, setGameTitle] = useState("");
@@ -1952,33 +1959,46 @@ export default function AdminDashboard() {
     });
   };
 
-  // Aviso sonoro/desktop pra notificação pendente nova — preferência fica só no
-  // localStorage deste navegador mesmo (é sobre este aparelho, não dado compartilhado).
+  // Alertas sonoros e pop-ups nativos do Windows
+  const [permState, setPermState] = useState<NotificationPermissionState>(() => getNotificationPermission());
   const [notifSoundEnabled, setNotifSoundEnabled] = useState(() => {
-    try { return localStorage.getItem("admin_notif_sound_enabled") === "1"; } catch { return false; }
-  });
-  const toggleNotifSound = async () => {
-    const next = !notifSoundEnabled;
-    if (next && typeof Notification !== "undefined" && Notification.permission === "default") {
-      await Notification.requestPermission();
-    }
-    setNotifSoundEnabled(next);
-    try { localStorage.setItem("admin_notif_sound_enabled", next ? "1" : "0"); } catch { /* ignora */ }
-  };
-  const playNotifBeep = () => {
     try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      const ctx = new AudioCtx();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.value = 880;
-      gain.gain.setValueAtTime(0.15, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.35);
-    } catch { /* navegador sem suporte a Web Audio — ignora */ }
+      const stored = localStorage.getItem("admin_notif_sound_enabled");
+      return stored === null ? true : stored === "1";
+    } catch {
+      return true;
+    }
+  });
+
+  const handleToggleOrRequestNotifs = async () => {
+    if (permState !== "granted") {
+      const granted = await requestNotificationPermission();
+      setPermState(getNotificationPermission());
+      if (granted) {
+        setNotifSoundEnabled(true);
+        localStorage.setItem("admin_notif_sound_enabled", "1");
+      }
+    } else {
+      const next = !notifSoundEnabled;
+      setNotifSoundEnabled(next);
+      localStorage.setItem("admin_notif_sound_enabled", next ? "1" : "0");
+      if (next) {
+        playNotificationChime();
+        toast.success("Alertas sonoros e pop-ups ativados!");
+      } else {
+        toast.info("Alertas sonoros pausados temporariamente.");
+      }
+    }
+  };
+
+  const handleTestWindowsNotification = () => {
+    notifyAdmin({
+      title: "🛒 Teste de Notificação no Windows!",
+      body: "Seu Windows está configurado perfeitamente! Os pedidos e chats da Eforte Games aparecerão assim.",
+      onClickUrl: "/admin?tab=compras_pendentes",
+      actionLabel: "Abrir Pedidos",
+      onAction: () => setActiveTab("compras_pendentes"),
+    });
   };
 
   const notificationFeed = useMemo(() => {
@@ -2072,26 +2092,16 @@ export default function AdminDashboard() {
 
     const newOnes = notificationFeed.filter(n => n.status === "pendente" && n.category !== "mensagem" && !seenNotifIdsRef.current!.has(n.id));
     newOnes.forEach(n => {
-      toast(n.title, {
-        description: n.subtitle,
-        duration: 8000,
-        action: {
-          label: "Ver",
-          onClick: () => setActiveTab("notificacoes"),
-        },
+      notifyAdmin({
+        title: n.title,
+        body: n.subtitle,
+        tag: n.id,
+        onClickUrl: `/admin?tab=notificacoes`,
+        actionLabel: "Ver",
+        onAction: () => setActiveTab("notificacoes"),
+        playSound: notifSoundEnabled,
       });
     });
-
-    if (newOnes.length > 0 && notifSoundEnabled) {
-      playNotifBeep();
-      if (typeof Notification !== "undefined" && Notification.permission === "granted" && document.hidden) {
-        try {
-          new Notification(newOnes.length === 1 ? newOnes[0].title : `${newOnes.length} novas notificações`, {
-            body: newOnes.length === 1 ? newOnes[0].subtitle : newOnes.map(n => n.title).join(" • "),
-          });
-        } catch { /* navegador sem suporte — ignora */ }
-      }
-    }
 
     seenNotifIdsRef.current = new Set(pendingIds);
   }, [notificationFeed, notifSoundEnabled]);
@@ -3045,6 +3055,16 @@ export default function AdminDashboard() {
             </div>
             
             <div className="flex items-center gap-2 sm:gap-3">
+              {permState !== "granted" && (
+                <button
+                  onClick={handleToggleOrRequestNotifs}
+                  className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-950/40 hover:bg-red-900/50 border border-red-500/30 text-red-300 text-xs font-bold transition-all animate-pulse"
+                  title="Clique para ativar pop-ups no Windows e avisos sonoros"
+                >
+                  <span>🔔</span>
+                  <span>Ativar Alertas Windows</span>
+                </button>
+              )}
               <button
                 onClick={() => setActiveTab("notificacoes")}
                 className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-red-600/40 flex items-center justify-center transition-all shrink-0"
@@ -3297,11 +3317,11 @@ export default function AdminDashboard() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={toggleNotifSound}
-                    title={notifSoundEnabled ? "Avisos sonoros ativados — clique pra desativar" : "Ativar som/aviso do navegador pra notificação nova"}
+                    onClick={handleToggleOrRequestNotifs}
+                    title={notifSoundEnabled ? "Alertas sonoros e pop-ups ativados" : "Ativar alertas sonoros e pop-ups"}
                     className={`h-8 text-xs px-3 ${notifSoundEnabled ? "border-red-600/50 text-red-400 bg-red-950/20" : "border-slate-700 text-slate-400 hover:bg-slate-800"}`}
                   >
-                    {notifSoundEnabled ? "🔔 Som Ativo" : "🔕 Som Desativado"}
+                    {notifSoundEnabled ? "🔔 Som Ativo" : "🔕 Som Pausado"}
                   </Button>
                   {notifSelectMode && (
                     <Button
@@ -3324,6 +3344,62 @@ export default function AdminDashboard() {
                   >
                     {notifSelectMode ? "Cancelar" : "Selecionar"}
                   </Button>
+                </div>
+              </div>
+
+              {/* Card de Configuração de Notificações no Windows e Alertas */}
+              <div className="bg-slate-900/90 border border-red-600/20 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 card-neon shadow-lg">
+                <div className="flex items-center gap-3.5">
+                  <div className={`w-11 h-11 rounded-2xl flex items-center justify-center text-xl shrink-0 shadow-inner ${
+                    permState === "granted" && notifSoundEnabled ? "bg-green-500/20 text-green-400 border border-green-500/30" : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                  }`}>
+                    {permState === "granted" && notifSoundEnabled ? "🔔" : "🔕"}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="text-sm font-black text-white">
+                        Pop-ups no Windows & Avisos Sonoros
+                      </h4>
+                      {permState === "granted" && notifSoundEnabled ? (
+                        <span className="text-[10px] bg-green-500/20 text-green-400 px-2.5 py-0.5 rounded-full font-bold border border-green-500/30 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" /> Ativo no Windows
+                        </span>
+                      ) : (
+                        <span className="text-[10px] bg-amber-500/20 text-amber-400 px-2.5 py-0.5 rounded-full font-bold border border-amber-500/30">
+                          {permState === "denied" ? "Bloqueado no Navegador" : "Aguardando Permissão"}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
+                      {permState === "granted"
+                        ? "O sistema emitirá pop-ups nativos no canto do Windows e som harmônico sempre que um cliente comprar, resgatar prêmios ou enviar mensagens no chat."
+                        : permState === "denied"
+                        ? "Notificações bloqueadas pelo navegador. Para ativar: clique no ícone de cadeado na barra de endereços (ao lado do site) e mude Notificações para 'Permitir'."
+                        : "Clique no botão ao lado para autorizar o navegador a exibir balões pop-up no Windows quando entrarem novas compras ou conversas."}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                  <Button
+                    onClick={handleToggleOrRequestNotifs}
+                    className={`font-bold text-xs h-9 px-4 flex-1 sm:flex-initial ${
+                      permState === "granted" && notifSoundEnabled
+                        ? "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+                        : "bg-red-600 hover:bg-red-700 text-white btn-neon"
+                    }`}
+                  >
+                    {permState === "granted" && notifSoundEnabled ? "🔕 Pausar Som" : "🔔 Ativar no Windows"}
+                  </Button>
+                  {permState === "granted" && (
+                    <Button
+                      variant="outline"
+                      onClick={handleTestWindowsNotification}
+                      className="border-red-500/40 text-red-400 hover:bg-red-950/30 font-bold text-xs h-9 px-3"
+                      title="Disparar pop-up de teste no Windows agora"
+                    >
+                      🔊 Testar Alerta
+                    </Button>
+                  )}
                 </div>
               </div>
 

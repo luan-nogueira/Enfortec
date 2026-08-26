@@ -1,15 +1,14 @@
 import { useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { toast } from "sonner";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { notifyAdmin } from "@/lib/soundAndNotifications";
 
 /**
  * Avisa qualquer gestor/colaborador logado, em qualquer página do site (não só
  * dentro do painel /admin), quando um cliente inicia ou continua uma conversa
- * no chat de atendimento. Compartilhado entre todos os admins, já que hoje o
- * atendimento cai numa caixa única (sem roteamento por pessoa específica).
+ * no chat de atendimento com Pop-up nativo no Windows, som e toast.
  */
 export default function GlobalChatNotifier() {
   const { isAuthenticated, isAdmin, isCollaborator, loading } = useAuth();
@@ -35,13 +34,15 @@ export default function GlobalChatNotifier() {
 
       const newOnes = chats.filter((c) => c.unreadByAdmin && !seenPendingIdsRef.current!.has(c.id));
       newOnes.forEach((c) => {
-        toast(`💬 ${c.userName || "Um cliente"} quer falar com você`, {
-          description: c.lastMessage || "Nova mensagem no chat de atendimento.",
-          duration: 12000,
-          action: {
-            label: "Responder",
-            onClick: () => navigate("/admin?tab=negociacoes"),
-          },
+        const title = `💬 Mensagem de ${c.userName || "Cliente"}`;
+        const body = c.lastMessage || "Nova mensagem no chat de atendimento.";
+        notifyAdmin({
+          title,
+          body,
+          tag: `chat-${c.id}`,
+          onClickUrl: "/admin?tab=negociacoes",
+          actionLabel: "Responder",
+          onAction: () => navigate("/admin?tab=negociacoes"),
         });
       });
 
