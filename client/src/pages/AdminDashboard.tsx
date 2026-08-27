@@ -1638,11 +1638,18 @@ export default function AdminDashboard() {
     const failed: string[] = [];
     for (const game of batchGames) {
       try {
+        const primaryPriceToSave = (game.pricePrimary !== undefined && game.pricePrimary !== null && !isNaN(Number(game.pricePrimary)) && Number(game.pricePrimary) > 0)
+          ? Number(game.pricePrimary)
+          : (Number(game.price) || 33.30);
+        const secondaryPriceToSave = (game.priceSecondary !== undefined && game.priceSecondary !== null && !isNaN(Number(game.priceSecondary)) && Number(game.priceSecondary) > 0)
+          ? Number(game.priceSecondary)
+          : null;
+
         await batchCreateGameMutation.mutateAsync({
           name: game.name.trim(),
-          price: Number(game.price) || 33.30,
-          pricePrimary: null,
-          priceSecondary: null,
+          price: primaryPriceToSave,
+          pricePrimary: primaryPriceToSave,
+          priceSecondary: secondaryPriceToSave,
           type: "jogo",
           platform: game.platform?.trim() || "PS4/PS5",
           imageUrl: game.imageUrl?.trim() || undefined,
@@ -2395,8 +2402,15 @@ export default function AdminDashboard() {
     setEditingGameId(game.id);
     setGameName(game.name || "");
     setGamePrice(game.price || 0);
-    setGamePricePrimary(game.pricePrimary ?? game.price_primary ?? "");
-    setGamePriceSecondary(game.priceSecondary ?? game.price_secondary ?? "");
+
+    const rawPrimary = game.pricePrimary ?? game.price_primary;
+    const rawSecondary = game.priceSecondary ?? game.price_secondary;
+    const effectivePrimary = (rawPrimary !== undefined && rawPrimary !== null && rawPrimary !== "")
+      ? String(rawPrimary)
+      : (!rawSecondary && game.price ? String(game.price) : "");
+
+    setGamePricePrimary(effectivePrimary);
+    setGamePriceSecondary(rawSecondary !== undefined && rawSecondary !== null ? String(rawSecondary) : "");
     setGamePlatform(game.platform || "");
     setGameCategory(game.category || "");
     setGameImageUrl(game.imageUrl || "");
@@ -2865,8 +2879,8 @@ export default function AdminDashboard() {
                 await adminUpdateGameMutation.mutateAsync({
                   id: existingGame.id,
                   name: game.name,
-                  price: game.price,
-                  pricePrimary: null,
+                  price: Number(game.price),
+                  pricePrimary: Number(game.price),
                   priceSecondary: null,
                   type: "jogo",
                   platform: game.platform,
@@ -2884,8 +2898,8 @@ export default function AdminDashboard() {
               } else {
                 await adminCreateGameMutation.mutateAsync({
                   name: game.name,
-                  price: game.price,
-                  pricePrimary: null,
+                  price: Number(game.price),
+                  pricePrimary: Number(game.price),
                   priceSecondary: null,
                   type: "jogo",
                   platform: game.platform,
@@ -6030,7 +6044,9 @@ export default function AdminDashboard() {
                           value={game.price}
                           onChange={(e) => {
                             const updated = [...batchGames];
-                            updated[idx].price = Number(e.target.value);
+                            const val = Number(e.target.value);
+                            updated[idx].price = val;
+                            updated[idx].pricePrimary = val;
                             setBatchGames(updated);
                           }}
                           className="bg-slate-900 border-slate-800 h-8 text-xs text-white"
@@ -6140,7 +6156,9 @@ export default function AdminDashboard() {
                             value={game.price}
                             onChange={(e) => {
                               const updated = [...batchGames];
-                              updated[idx].price = Number(e.target.value);
+                              const val = Number(e.target.value);
+                              updated[idx].price = val;
+                              updated[idx].pricePrimary = val;
                               setBatchGames(updated);
                             }}
                             className="bg-slate-950 border-slate-800 h-8 text-xs text-white"

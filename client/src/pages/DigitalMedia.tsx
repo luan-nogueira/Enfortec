@@ -512,8 +512,16 @@ export default function DigitalMedia() {
   const hasPrimaryPrice = (prod: any) => {
     if (!prod) return false;
     const prim = prod.pricePrimary ?? prod.price_primary;
-    if (prim === undefined || prim === null || prim === "" || prim === 0 || prim === "0" || prim === "0.00") return false;
-    return parseFloat(prim) > 0;
+    if (prim !== undefined && prim !== null && prim !== "" && prim !== 0 && prim !== "0" && prim !== "0.00") {
+      return parseFloat(prim) > 0;
+    }
+    // Fallback: se o produto não tem secundária cadastrada, o próprio `price` base é o preço da Primária!
+    const sec = prod.priceSecondary ?? prod.price_secondary;
+    const hasSec = sec !== undefined && sec !== null && sec !== "" && parseFloat(sec) > 0;
+    if (!hasSec && prod.price && parseFloat(prod.price) > 0) {
+      return true;
+    }
+    return false;
   };
 
   const getProductPrice = (prod: any, accType: "primaria" | "secundaria") => {

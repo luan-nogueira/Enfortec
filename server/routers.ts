@@ -531,11 +531,15 @@ export const appRouter = router({
         const database = await getDb();
         if (!database) throw new Error("Database not available");
         
+        const effectivePrimary = (input.pricePrimary !== undefined && input.pricePrimary !== null)
+          ? input.pricePrimary.toString()
+          : (!input.priceSecondary ? input.price.toString() : null);
+
         return database.insert(digitalProducts).values({
           name: input.name,
           description: input.description,
           price: input.price.toString(),
-          pricePrimary: input.pricePrimary?.toString() || null,
+          pricePrimary: effectivePrimary,
           priceSecondary: input.priceSecondary?.toString() || null,
           type: input.type,
           imageUrl: input.imageUrl,
@@ -574,11 +578,15 @@ export const appRouter = router({
         const database = await getDb();
         if (!database) throw new Error("Database not available");
         
+        const effectivePrimary = (input.pricePrimary !== undefined && input.pricePrimary !== null)
+          ? input.pricePrimary.toString()
+          : (!input.priceSecondary ? input.price.toString() : null);
+
         return database.update(digitalProducts).set({
           name: input.name,
           description: input.description,
           price: input.price.toString(),
-          pricePrimary: input.pricePrimary?.toString() || null,
+          pricePrimary: effectivePrimary,
           priceSecondary: input.priceSecondary?.toString() || null,
           type: input.type,
           imageUrl: input.imageUrl,

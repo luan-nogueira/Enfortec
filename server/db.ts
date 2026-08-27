@@ -294,13 +294,25 @@ export async function getActiveDigitalProducts() {
     .leftJoin(users, eq(sellers.userId, users.id))
     .where(and(eq(digitalProducts.isActive, true), eq(digitalProducts.status, "aprovado")))
     .orderBy(desc(digitalProducts.createdAt));
-  return rows.map((r) => ({ ...r.product, sellerName: r.sellerName, sellerOpenId: r.sellerOpenId }));
+  return rows.map((r) => {
+    const p = r.product;
+    const pricePrimary = (p.pricePrimary !== null && p.pricePrimary !== undefined && p.pricePrimary !== "")
+      ? p.pricePrimary
+      : (!p.priceSecondary && p.price ? p.price : null);
+    return { ...p, pricePrimary, sellerName: r.sellerName, sellerOpenId: r.sellerOpenId };
+  });
 }
 
 export async function getAllDigitalProducts() {
   const db = getDb();
   if (!db) return [];
-  return db.select().from(digitalProducts).orderBy(desc(digitalProducts.createdAt));
+  const rows = await db.select().from(digitalProducts).orderBy(desc(digitalProducts.createdAt));
+  return rows.map((p) => {
+    const pricePrimary = (p.pricePrimary !== null && p.pricePrimary !== undefined && p.pricePrimary !== "")
+      ? p.pricePrimary
+      : (!p.priceSecondary && p.price ? p.price : null);
+    return { ...p, pricePrimary };
+  });
 }
 
 export async function getAllDigitalProductsWithSeller() {
@@ -319,12 +331,19 @@ export async function getAllDigitalProductsWithSeller() {
     .leftJoin(sellers, eq(digitalProducts.sellerId, sellers.id))
     .leftJoin(users, eq(sellers.userId, users.id))
     .orderBy(desc(digitalProducts.createdAt));
-  return rows.map((r) => ({
-    ...r.product,
-    sellerStoreName: r.sellerStoreName || undefined,
-    sellerEmail: r.sellerEmail || r.directUserEmail || undefined,
-    sellerName: r.sellerName || r.directUserName || undefined,
-  }));
+  return rows.map((r) => {
+    const p = r.product;
+    const pricePrimary = (p.pricePrimary !== null && p.pricePrimary !== undefined && p.pricePrimary !== "")
+      ? p.pricePrimary
+      : (!p.priceSecondary && p.price ? p.price : null);
+    return {
+      ...p,
+      pricePrimary,
+      sellerStoreName: r.sellerStoreName || undefined,
+      sellerEmail: r.sellerEmail || r.directUserEmail || undefined,
+      sellerName: r.sellerName || r.directUserName || undefined,
+    };
+  });
 }
 
 export async function getDigitalProductsBySellerId(sellerId: number) {

@@ -71,6 +71,8 @@ app.get("/api/migrate-db", async (req, res) => {
     
     await sql.query(`ALTER TABLE "digitalProducts" ADD COLUMN IF NOT EXISTS "pricePrimary" numeric(10, 2)`);
     await sql.query(`ALTER TABLE "digitalProducts" ADD COLUMN IF NOT EXISTS "priceSecondary" numeric(10, 2)`);
+    // Backfill pricePrimary para jogos cadastrados anteriormente onde pricePrimary estava nulo mas o jogo tem price base
+    await sql.query(`UPDATE "digitalProducts" SET "pricePrimary" = "price" WHERE ("pricePrimary" IS NULL OR "pricePrimary"::text = '') AND ("priceSecondary" IS NULL OR "priceSecondary"::text = '') AND "price" IS NOT NULL`);
     // Default 'aprovado' preserva a visibilidade de tudo que já estava publicado; o mutation
     // digitalProducts.create (cadastro de conta pelo vendedor da comunidade) sobrescreve para
     // 'pendente' explicitamente, exigindo aprovação do gestor antes de aparecer na loja pública.
