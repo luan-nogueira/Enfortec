@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { Gamepad2, ShoppingBag, Trophy, X, ShieldCheck, Sparkles } from "lucide-react";
 
 const FIRST_NAMES = [
@@ -62,12 +63,13 @@ function generateRandomActivity() {
 }
 
 export default function SocialProofToast() {
+  const [location] = useLocation();
   const [currentActivity, setCurrentActivity] = useState<any>(null);
   const [visible, setVisible] = useState(false);
   const [closedByUser, setClosedByUser] = useState(false);
 
   useEffect(() => {
-    if (closedByUser) return;
+    if (closedByUser || location.startsWith("/admin") || location.startsWith("/colaborador")) return;
 
     // First delay 4 seconds
     const initialTimer = setTimeout(() => {
@@ -76,10 +78,10 @@ export default function SocialProofToast() {
     }, 4000);
 
     return () => clearTimeout(initialTimer);
-  }, [closedByUser]);
+  }, [closedByUser, location]);
 
   useEffect(() => {
-    if (closedByUser || !visible) return;
+    if (closedByUser || !visible || location.startsWith("/admin") || location.startsWith("/colaborador")) return;
 
     // Hide after 6 seconds
     const hideTimer = setTimeout(() => {
@@ -96,9 +98,9 @@ export default function SocialProofToast() {
       clearTimeout(hideTimer);
       clearTimeout(nextTimer);
     };
-  }, [visible, closedByUser]);
+  }, [visible, closedByUser, location]);
 
-  if (closedByUser || !visible || !currentActivity) return null;
+  if (location.startsWith("/admin") || location.startsWith("/colaborador") || closedByUser || !visible || !currentActivity) return null;
 
   const Icon = currentActivity.icon;
 

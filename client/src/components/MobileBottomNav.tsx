@@ -59,7 +59,7 @@ export default function MobileBottomNav() {
     setOpenMenu(false);
   };
 
-  if (hasOpenModal) return null;
+  if (location.startsWith("/admin") || location.startsWith("/colaborador") || hasOpenModal) return null;
 
   const navItems = [
     {
