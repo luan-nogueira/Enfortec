@@ -290,11 +290,20 @@ export default function JogueComEconomia() {
                   </div>
 
                   {/* Image Container */}
-                  <div className="relative aspect-[3/4] w-full overflow-hidden bg-slate-950 flex items-center justify-center">
+                  <div className="relative h-44 sm:h-56 w-full overflow-hidden bg-slate-950 flex items-center justify-center">
+                    {/* Ambient blurred background glow */}
+                    <img
+                      src={product.imageUrl || "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?q=80&w=600"}
+                      alt=""
+                      aria-hidden="true"
+                      className="absolute inset-0 w-full h-full object-cover blur-xl opacity-35 scale-125 pointer-events-none"
+                    />
+
+                    {/* Main cover image - 100% uncropped */}
                     <img
                       src={product.imageUrl || "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?q=80&w=600"}
                       alt={product.name}
-                      className={`w-full h-full ${product.coverFit === 'contain' ? 'object-contain p-1.5' : 'object-cover'} group-hover:scale-105 transition-transform duration-500`}
+                      className="relative z-10 w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300"
                       onError={(e) => {
                         const target = e.currentTarget as HTMLImageElement;
                         if (!target.dataset.fallbackApplied) {
@@ -303,7 +312,6 @@ export default function JogueComEconomia() {
                         }
                       }}
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none" />
                   </div>
 
                   {/* Details */}

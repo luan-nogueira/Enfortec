@@ -750,20 +750,30 @@ export default function DigitalMedia() {
                 const isOutOfStock = product.stock !== undefined && product.stock !== null && Number(product.stock) <= 0;
                 return (
                 <div key={product.id} className={`card-neon game-card-shine overflow-hidden group hover:scale-[1.03] transition-all duration-250 flex flex-col ${isOutOfStock ? 'opacity-70' : ''}`}>
-                  <div className="relative overflow-hidden bg-slate-800 h-36 sm:h-52">
+                  <div className="relative overflow-hidden bg-slate-950 h-40 sm:h-52 flex items-center justify-center">
                     {product.imageUrl ? (
-                      <img
-                        src={product.imageUrl}
-                        alt={product.name}
-                        className={`w-full h-full ${product.coverFit === 'contain' ? 'object-contain bg-slate-900/60 p-2' : 'object-cover'} group-hover:scale-110 transition-transform duration-500`}
-                        onError={(e) => {
-                          const target = e.currentTarget as HTMLImageElement;
-                          if (!target.dataset.fallbackApplied) {
-                            target.dataset.fallbackApplied = "true";
-                            target.src = "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=800";
-                          }
-                        }}
-                      />
+                      <>
+                        {/* Ambient blurred glow */}
+                        <img
+                          src={product.imageUrl}
+                          alt=""
+                          aria-hidden="true"
+                          className="absolute inset-0 w-full h-full object-cover blur-xl opacity-35 scale-125 pointer-events-none"
+                        />
+                        {/* Main uncropped cover */}
+                        <img
+                          src={product.imageUrl}
+                          alt={product.name}
+                          className="relative z-10 w-full h-full object-contain p-1.5 group-hover:scale-105 transition-transform duration-300"
+                          onError={(e) => {
+                            const target = e.currentTarget as HTMLImageElement;
+                            if (!target.dataset.fallbackApplied) {
+                              target.dataset.fallbackApplied = "true";
+                              target.src = "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=800";
+                            }
+                          }}
+                        />
+                      </>
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         {getTypeIcon(product.type)}
