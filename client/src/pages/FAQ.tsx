@@ -138,7 +138,7 @@ export default function FAQ() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-12 max-w-3xl">
+      <div className="container mx-auto px-4 py-12 pb-28 lg:pb-12 max-w-3xl">
         {/* Intro */}
         <div className="text-center mb-12">
           <p className="text-slate-400 text-lg">

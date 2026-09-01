@@ -232,7 +232,7 @@ export default function JogueComEconomia() {
       </section>
 
       {/* Product List Section */}
-      <section className="max-w-7xl mx-auto px-4 py-10">
+      <section className="max-w-7xl mx-auto px-4 py-10 pb-28 lg:pb-12">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h2 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
@@ -271,32 +271,39 @@ export default function JogueComEconomia() {
                   key={product.id}
                   className={`group relative bg-slate-900/80 rounded-xl border border-slate-800 hover:border-red-500/50 transition-all duration-300 flex flex-col overflow-hidden shadow-lg hover:shadow-[0_0_20px_rgba(220,38,38,0.2)] ${isOutOfStock ? 'opacity-70' : ''}`}
                 >
-                  {/* Badge */}
-                  <div className="absolute top-2 left-2 z-10 flex flex-col gap-1">
+                  {/* Badges */}
+                  <div className="absolute top-2 left-2 right-2 z-10 flex flex-wrap gap-1 items-start pointer-events-none">
                     {isOutOfStock ? (
-                      <span className="bg-red-600/90 border border-red-500 text-white font-black text-[10px] uppercase px-2 py-0.5 rounded shadow">
+                      <span className="bg-red-600/90 border border-red-500 text-white font-black text-[8px] sm:text-[9px] uppercase px-1.5 py-0.5 rounded shadow">
                         Esgotado
                       </span>
                     ) : (
-                      <span className={`text-white font-black text-[10px] uppercase px-2 py-0.5 rounded shadow ${
+                      <span className={`text-white font-black text-[8px] sm:text-[9px] uppercase px-1.5 py-0.5 rounded shadow ${
                         licenseType === "primaria" ? "bg-blue-600" : licenseType === "ambas" ? "bg-purple-600" : "bg-red-600"
                       }`}>
-                        {licenseType === "primaria" ? "Conta Primária" : licenseType === "ambas" ? "Primária ou Secundária" : "Conta Secundária"}
+                        {licenseType === "primaria" ? "Primária" : licenseType === "ambas" ? "Pri / Sec" : "Secundária"}
                       </span>
                     )}
-                    <span className="bg-amber-500 text-slate-950 font-black text-[9px] px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">
-                      🎁 +7 FC Cashback
+                    <span className="bg-amber-500 text-slate-950 font-black text-[8px] sm:text-[9px] px-1.5 py-0.5 rounded shadow flex items-center gap-0.5">
+                      🎁 +7 FC
                     </span>
                   </div>
 
                   {/* Image Container */}
-                  <div className="relative aspect-[3/4] w-full overflow-hidden bg-slate-950">
+                  <div className="relative aspect-[3/4] w-full overflow-hidden bg-slate-950 flex items-center justify-center">
                     <img
                       src={product.imageUrl || "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?q=80&w=600"}
                       alt={product.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      className={`w-full h-full ${product.coverFit === 'contain' ? 'object-contain p-1.5' : 'object-cover'} group-hover:scale-105 transition-transform duration-500`}
+                      onError={(e) => {
+                        const target = e.currentTarget as HTMLImageElement;
+                        if (!target.dataset.fallbackApplied) {
+                          target.dataset.fallbackApplied = "true";
+                          target.src = "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?q=80&w=600";
+                        }
+                      }}
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-80" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none" />
                   </div>
 
                   {/* Details */}

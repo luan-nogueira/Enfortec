@@ -103,7 +103,7 @@ export default function SocialProofToast() {
   const Icon = currentActivity.icon;
 
   return (
-    <div className="fixed bottom-20 left-4 z-[9990] hidden sm:flex items-center gap-3 bg-slate-900/95 border border-slate-800 p-3.5 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.8)] backdrop-blur-md max-w-sm animate-in fade-in slide-in-from-bottom-5 duration-500">
+    <div className="fixed bottom-20 left-4 z-30 hidden sm:flex items-center gap-3 bg-slate-900/95 border border-slate-800 p-3.5 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.8)] backdrop-blur-md max-w-sm animate-in fade-in slide-in-from-bottom-5 duration-500">
       <div className="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center shrink-0">
         <Icon className={`w-5 h-5 ${currentActivity.color}`} />
       </div>

@@ -332,7 +332,7 @@ export default function FloatingChat() {
     <>
       {/* Botão Flutuante (quando fechado) */}
       {!isOpen && (
-        <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-[9990]">
+        <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-30">
           <Button
             onClick={() => setIsOpen(true)}
             aria-label="Abrir chat de atendimento"
