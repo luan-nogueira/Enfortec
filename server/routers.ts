@@ -760,6 +760,11 @@ export const appRouter = router({
       .input(z.object({
         code: z.string().min(1),
         discountPercentage: z.string().min(1),
+        appliesTo: z.string().optional(),
+        allowPreVenda: z.boolean().optional(),
+        allowEconomia: z.boolean().optional(),
+        allowPartnerSellers: z.boolean().optional(),
+        minOrderValue: z.string().nullable().optional(),
         maxUses: z.number().nullable().optional(),
         expiresAt: z.string().nullable().optional(),
       }))
@@ -769,6 +774,11 @@ export const appRouter = router({
         return db.createCoupon({
           code: input.code.toUpperCase().trim(),
           discountPercentage: input.discountPercentage,
+          appliesTo: input.appliesTo || 'all',
+          allowPreVenda: input.allowPreVenda ?? false,
+          allowEconomia: input.allowEconomia ?? false,
+          allowPartnerSellers: input.allowPartnerSellers ?? true,
+          minOrderValue: input.minOrderValue ? String(input.minOrderValue) : null,
           maxUses: input.maxUses ?? null,
           expiresAt: expiresAtDate,
           isActive: true,
@@ -780,6 +790,11 @@ export const appRouter = router({
         isActive: z.boolean().optional(),
         code: z.string().optional(),
         discountPercentage: z.string().optional(),
+        appliesTo: z.string().optional(),
+        allowPreVenda: z.boolean().optional(),
+        allowEconomia: z.boolean().optional(),
+        allowPartnerSellers: z.boolean().optional(),
+        minOrderValue: z.string().nullable().optional(),
         maxUses: z.number().nullable().optional(),
         expiresAt: z.string().nullable().optional(),
       }))
@@ -789,6 +804,11 @@ export const appRouter = router({
         if (input.isActive !== undefined) updateData.isActive = input.isActive;
         if (input.code !== undefined) updateData.code = input.code.toUpperCase().trim();
         if (input.discountPercentage !== undefined) updateData.discountPercentage = input.discountPercentage;
+        if (input.appliesTo !== undefined) updateData.appliesTo = input.appliesTo;
+        if (input.allowPreVenda !== undefined) updateData.allowPreVenda = input.allowPreVenda;
+        if (input.allowEconomia !== undefined) updateData.allowEconomia = input.allowEconomia;
+        if (input.allowPartnerSellers !== undefined) updateData.allowPartnerSellers = input.allowPartnerSellers;
+        if (input.minOrderValue !== undefined) updateData.minOrderValue = input.minOrderValue ? String(input.minOrderValue) : null;
         if (input.maxUses !== undefined) updateData.maxUses = input.maxUses;
         if (input.expiresAt !== undefined) {
           updateData.expiresAt = input.expiresAt ? new Date(input.expiresAt) : null;
@@ -804,6 +824,13 @@ export const appRouter = router({
     validate: publicProcedure
       .input(z.object({
         code: z.string(),
+        productId: z.number().optional(),
+        productType: z.string().optional(), // 'digital' | 'store' | 'used' | 'platinador'
+        category: z.string().optional(),
+        isPreVenda: z.boolean().optional(),
+        isEconomia: z.boolean().optional(),
+        isPartnerSeller: z.boolean().optional(),
+        price: z.number().optional(),
       }))
       .mutation(async ({ input }) => {
         const coupon = await db.getCouponByCode(input.code.toUpperCase().trim());
@@ -824,11 +851,48 @@ export const appRouter = router({
         if (coupon.maxUses !== null && (coupon.usedCount || 0) >= coupon.maxUses) {
           throw new Error("Cupom esgotado (limite de usos atingido)");
         }
+
+        // Min order value check
+        if (coupon.minOrderValue && input.price !== undefined && input.price < parseFloat(coupon.minOrderValue)) {
+          throw new Error(`Este cupom exige um valor mínimo de compra de R$ ${parseFloat(coupon.minOrderValue).toFixed(2).replace('.', ',')}.`);
+        }
+
+        // Category / appliesTo check
+        if (coupon.appliesTo && coupon.appliesTo !== "all" && input.productType) {
+          if (coupon.appliesTo === "digital" && input.productType !== "digital") {
+            throw new Error("Este cupom é válido apenas para Jogos Digitais.");
+          }
+          if (coupon.appliesTo === "store" && input.productType !== "store") {
+            throw new Error("Este cupom é válido apenas para produtos da Loja.");
+          }
+          if (coupon.appliesTo === "used" && input.productType !== "used") {
+            throw new Error("Este cupom é válido apenas para Mídia Física Usada.");
+          }
+          if (coupon.appliesTo === "assinatura" && input.category !== "assinatura" && input.productType !== "platinador") {
+            throw new Error("Este cupom é válido apenas para Assinaturas.");
+          }
+        }
+
+        // Pre-Venda check (default: false = block)
+        if (coupon.allowPreVenda === false && input.isPreVenda) {
+          throw new Error("Este cupom não é válido para jogos em Pré-Venda.");
+        }
+
+        // Economia check (default: false = block)
+        if (coupon.allowEconomia === false && input.isEconomia) {
+          throw new Error("Este cupom não é válido para jogos da seção Jogue com Economia.");
+        }
+
+        // Partner sellers check (default: true = allow)
+        if (coupon.allowPartnerSellers === false && input.isPartnerSeller) {
+          throw new Error("Este cupom não pode ser aplicado em produtos de Vendedores Parceiros.");
+        }
         
         return {
           id: coupon.id,
           code: coupon.code,
           discountPercentage: parseFloat(coupon.discountPercentage),
+          appliesTo: coupon.appliesTo,
         };
       }),
   }),

@@ -242,12 +242,20 @@ export function registerPaymentRoute(app: Express) {
             isExpired = expiryDate.getTime() < Date.now();
           }
           const isExceeded = coupon.maxUses !== null && (coupon.usedCount || 0) >= coupon.maxUses;
+          const isMinOrderInvalid = coupon.minOrderValue && verifiedPrice < parseFloat(coupon.minOrderValue);
+          const isAppliesToInvalid = coupon.appliesTo && coupon.appliesTo !== "all" && (
+            (coupon.appliesTo === "digital" && productType !== "digital") ||
+            (coupon.appliesTo === "store" && productType !== "store") ||
+            (coupon.appliesTo === "used" && productType !== "used")
+          );
+          const isPreVendaBlocked = coupon.allowPreVenda === false && verifiedIsPreVenda;
+          const isPartnerSellerBlocked = coupon.allowPartnerSellers === false && !!mysqlSellerId;
 
-          if (!isExpired && !isExceeded) {
+          if (!isExpired && !isExceeded && !isMinOrderInvalid && !isAppliesToInvalid && !isPreVendaBlocked && !isPartnerSellerBlocked) {
             couponDiscount = verifiedPrice * (parseFloat(coupon.discountPercentage) / 100);
             validCouponCode = coupon.code;
           } else {
-            console.warn(`[Checkout] Cupom ${couponCode} está expirado ou esgotado.`);
+            console.warn(`[Checkout] Cupom ${couponCode} não elegível para este produto/categoria.`);
           }
         } else {
           console.warn(`[Checkout] Cupom ${couponCode} não foi encontrado ou está inativo.`);

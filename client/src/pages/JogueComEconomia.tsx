@@ -325,7 +325,7 @@ export default function JogueComEconomia() {
                           <ShieldCheck className="w-2.5 h-2.5" /> Verificado
                         </span>
                       </div>
-                      {(product.sellerId || product.seller_id || product.sellerOpenId || product.sellerName) ? (
+                      {(product.sellerId || product.sellerOpenId || product.sellerName) ? (
                         <div className="mb-1">
                           <span className="text-[8px] sm:text-[9px] font-black bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-sm">
                             🤝 Vendedor Parceiro

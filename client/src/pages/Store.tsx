@@ -76,7 +76,17 @@ export default function Store() {
     setCouponError(null);
     setIsValidatingCoupon(true);
     try {
-      const res = await validateCouponMutation.mutateAsync({ code: couponCode });
+      const currentPrice = selectedProduct ? parseFloat(selectedProduct.price || "0") : 0;
+      const res = await validateCouponMutation.mutateAsync({
+        code: couponCode,
+        productId: selectedProduct?.id,
+        productType: 'store',
+        category: selectedProduct?.category,
+        isPreVenda: false,
+        isEconomia: false,
+        isPartnerSeller: false,
+        price: currentPrice,
+      });
       setDiscountPercentage(res.discountPercentage);
       setAppliedCoupon(res.code);
       toast.success(`Cupom ${res.code} aplicado com sucesso!`);

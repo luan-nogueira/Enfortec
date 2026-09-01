@@ -171,7 +171,17 @@ export default function DigitalMedia() {
     setCouponError(null);
     setIsValidatingCoupon(true);
     try {
-      const res = await validateCouponMutation.mutateAsync({ code: couponCode });
+      const currentPrice = selectedProduct ? getProductPrice(selectedProduct, accountType) : 0;
+      const res = await validateCouponMutation.mutateAsync({
+        code: couponCode,
+        productId: selectedProduct?.id,
+        productType: 'digital',
+        category: selectedProduct?.type,
+        isPreVenda: !!selectedProduct?.isPreVenda,
+        isEconomia: !!selectedProduct?.showInEconomia,
+        isPartnerSeller: !!(selectedProduct?.sellerId),
+        price: currentPrice,
+      });
       setDiscountPercentage(res.discountPercentage);
       setAppliedCoupon(res.code);
       toast.success(`Cupom ${res.code} aplicado com sucesso!`);

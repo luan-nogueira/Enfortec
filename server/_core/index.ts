@@ -260,12 +260,24 @@ async function runMigrations() {
       "id" serial PRIMARY KEY,
       "code" varchar(50) NOT NULL UNIQUE,
       "discountPercentage" numeric(5, 2) NOT NULL,
+      "appliesTo" varchar(50) DEFAULT 'all',
+      "allowPreVenda" boolean DEFAULT false,
+      "allowEconomia" boolean DEFAULT false,
+      "allowPartnerSellers" boolean DEFAULT true,
+      "minOrderValue" numeric(10, 2),
       "maxUses" integer,
       "usedCount" integer DEFAULT 0,
       "expiresAt" timestamp,
       "isActive" boolean DEFAULT true,
       "createdAt" timestamp DEFAULT now() NOT NULL
     )`);
+
+    // Garantir colunas novas de restrição na tabela de cupons
+    await sql.query(`ALTER TABLE "coupons" ADD COLUMN IF NOT EXISTS "appliesTo" varchar(50) DEFAULT 'all'`);
+    await sql.query(`ALTER TABLE "coupons" ADD COLUMN IF NOT EXISTS "allowPreVenda" boolean DEFAULT false`);
+    await sql.query(`ALTER TABLE "coupons" ADD COLUMN IF NOT EXISTS "allowEconomia" boolean DEFAULT false`);
+    await sql.query(`ALTER TABLE "coupons" ADD COLUMN IF NOT EXISTS "allowPartnerSellers" boolean DEFAULT true`);
+    await sql.query(`ALTER TABLE "coupons" ADD COLUMN IF NOT EXISTS "minOrderValue" numeric(10, 2)`);
 
     // Adicionar colunas de localização e categoria nos produtos usados
     await sql.query(`ALTER TABLE "usedProducts" ADD COLUMN IF NOT EXISTS "estado" varchar(50)`);
