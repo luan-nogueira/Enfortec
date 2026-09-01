@@ -738,19 +738,34 @@ export default function Home() {
                   className={`bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-red-500/40 transition-all hover:-translate-y-1.5 hover:shadow-[0_8px_30px_rgba(220,38,38,0.2)] flex flex-col h-full cursor-pointer min-w-[160px] sm:min-w-[220px] lg:min-w-0 w-[45vw] sm:w-[35vw] lg:w-auto snap-start shrink-0 group game-card-shine ${isOutOfStock ? 'opacity-70' : ''}`}
                   onClick={() => !isOutOfStock && navigate(isFisico ? '/usados' : `/digital?search=${encodeURIComponent(listing.name)}&buy=${listing.id}`)}
                 >
-                  <div className="h-28 sm:h-40 bg-slate-800 relative overflow-hidden">
+                  <div className="h-28 sm:h-40 bg-slate-950 relative overflow-hidden flex items-center justify-center">
                     {listing.imageUrl || (listing.images && listing.images.length > 0) ? (
-                      <img 
-                        src={listing.imageUrl || listing.images[0]} 
-                        alt={listing.name} 
-                        className={`w-full h-full ${(listing.coverFit === 'contain' || isFisico) ? 'object-contain bg-slate-900/60 p-2' : 'object-cover'} group-hover:scale-105 transition-transform duration-500`} 
-                      />
+                      <>
+                        <img
+                          src={listing.imageUrl || listing.images[0]}
+                          alt=""
+                          aria-hidden="true"
+                          className="absolute inset-0 w-full h-full object-cover blur-xl opacity-35 scale-125 pointer-events-none"
+                        />
+                        <img 
+                          src={listing.imageUrl || listing.images[0]} 
+                          alt={listing.name} 
+                          className="relative z-10 w-full h-full object-contain p-1.5 group-hover:scale-105 transition-transform duration-300" 
+                          onError={(e) => {
+                            const target = e.currentTarget as HTMLImageElement;
+                            if (!target.dataset.fallbackApplied) {
+                              target.dataset.fallbackApplied = "true";
+                              target.src = "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=800";
+                            }
+                          }}
+                        />
+                      </>
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-slate-600 bg-slate-800/50">
                         <Gamepad2 className="w-8 h-8 sm:w-12 sm:h-12 opacity-50" />
                       </div>
                     )}
-                    <div className={`absolute top-1.5 left-1.5 sm:top-2 sm:left-2 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded text-[8px] sm:text-[10px] uppercase font-bold text-white shadow-md backdrop-blur-sm ${
+                    <div className={`absolute top-1.5 left-1.5 sm:top-2 sm:left-2 z-20 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded text-[8px] sm:text-[10px] uppercase font-bold text-white shadow-md backdrop-blur-sm ${
                       isAssinatura
                         ? 'bg-amber-600 border border-amber-500/30'
                         : isFisico
@@ -763,14 +778,10 @@ export default function Home() {
                     </div>
 
                     {isOutOfStock && (
-                      <div className="absolute top-1.5 right-1.5 z-10 bg-red-600/95 border border-red-500 text-white text-[7px] sm:text-[9px] font-black px-1.5 sm:px-2 py-0.5 rounded-full uppercase tracking-wider shadow-md">
+                      <div className="absolute top-1.5 right-1.5 z-20 bg-red-600/95 border border-red-500 text-white text-[7px] sm:text-[9px] font-black px-1.5 sm:px-2 py-0.5 rounded-full uppercase tracking-wider shadow-md">
                         Esgotado
                       </div>
                     )}
-
-                    {/* Verified & Cashback Badges */}
-                    <div className="absolute bottom-1.5 right-1.5 flex flex-col items-end gap-1">
-                    </div>
                   </div>
                   <div className="p-3 sm:p-4 flex flex-col flex-grow">
                     <div className="flex items-center gap-1 mb-1">
@@ -778,6 +789,13 @@ export default function Home() {
                         <ShieldCheck className="w-2.5 h-2.5" /> Verificado
                       </span>
                     </div>
+                    {(listing.sellerId || listing.seller_id || listing.sellerOpenId || listing.sellerName) ? (
+                      <div className="mb-1">
+                        <span className="text-[8px] sm:text-[9px] font-black bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-sm">
+                          🤝 Vendedor Parceiro
+                        </span>
+                      </div>
+                    ) : null}
                     <h3 className="text-white font-medium text-xs sm:text-base line-clamp-2 mb-1.5 sm:mb-2 group-hover:text-red-400 transition-colors">
                       {listing.name}
                     </h3>
