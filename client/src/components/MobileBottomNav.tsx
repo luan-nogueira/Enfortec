@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
@@ -37,11 +37,29 @@ export default function MobileBottomNav() {
   const [location, navigate] = useLocation();
   const { user } = useAuth();
   const [openMenu, setOpenMenu] = useState(false);
+  const [hasOpenModal, setHasOpenModal] = useState(false);
+
+  // Esconde a barra inferior automaticamente caso qualquer modal/dialog esteja aberto na tela
+  useEffect(() => {
+    const checkModal = () => {
+      const isModalOpen = Boolean(
+        document.querySelector('[data-slot="dialog-content"], [role="dialog"], [data-radix-dialog-content]')
+      );
+      setHasOpenModal(isModalOpen);
+    };
+
+    const observer = new MutationObserver(checkModal);
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+    checkModal();
+    return () => observer.disconnect();
+  }, []);
 
   const handleNavigate = (path: string) => {
     navigate(path);
     setOpenMenu(false);
   };
+
+  if (hasOpenModal) return null;
 
   const navItems = [
     {

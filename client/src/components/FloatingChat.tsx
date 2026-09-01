@@ -325,8 +325,23 @@ export default function FloatingChat() {
   };
 
   const currentUserId = isAuthenticated && user?.id ? user.id : "guest";
+  const [hasOpenModal, setHasOpenModal] = useState(false);
 
-  if (location.startsWith("/admin")) return null;
+  useEffect(() => {
+    const checkModal = () => {
+      const isModalOpen = Boolean(
+        document.querySelector('[data-slot="dialog-content"], [role="dialog"], [data-radix-dialog-content]')
+      );
+      setHasOpenModal(isModalOpen);
+    };
+
+    const observer = new MutationObserver(checkModal);
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+    checkModal();
+    return () => observer.disconnect();
+  }, []);
+
+  if (location.startsWith("/admin") || (hasOpenModal && !isOpen)) return null;
 
   return (
     <>
