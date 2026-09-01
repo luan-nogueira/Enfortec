@@ -317,7 +317,11 @@ async function runMigrations() {
   }
 }
 
-const migrationsPromise = runMigrations();
+// Otimização Neon: Não executa 12 DDL queries em todo cold start serverless da Vercel.
+// Para migrações pontuais, use a rota protegida /api/migrate-db ou scripts locais.
+const migrationsPromise = (process.env.RUN_STARTUP_MIGRATIONS === "true" || process.env.NODE_ENV === "development")
+  ? runMigrations()
+  : Promise.resolve();
 
 async function startServer() {
   console.log("[Server] starting server...");

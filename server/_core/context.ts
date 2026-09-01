@@ -59,17 +59,32 @@ export async function createContext(
         
         try {
           user = (await db.getUserByOpenId(uid)) || (email ? await db.getUserByEmail(email) : undefined) || null;
-          console.log("[TRPC Server] Database user lookup result:", user ? `found (id: ${user.id}, openId: ${user.openId})` : "not found");
           
-          await db.upsertUser({
-            openId: uid,
-            name: name,
-            email: email,
-            loginMethod: "firebase",
-            lastSignedIn: new Date(),
-          });
-          
-          user = (await db.getUserByOpenId(uid)) || (email ? await db.getUserByEmail(email) : undefined) || null;
+          if (!user) {
+            // Usuário novo: insere no Postgres uma única vez
+            await db.upsertUser({
+              openId: uid,
+              name: name,
+              email: email,
+              loginMethod: "firebase",
+              lastSignedIn: new Date(),
+            });
+            user = (await db.getUserByOpenId(uid)) || (email ? await db.getUserByEmail(email) : undefined) || null;
+          } else {
+            // Otimização Neon: Só atualiza lastSignedIn se o último registro tiver mais de 12 horas
+            const lastSigned = user.lastSignedIn ? new Date(user.lastSignedIn).getTime() : 0;
+            const twelveHoursAgo = Date.now() - 12 * 60 * 60 * 1000;
+            if (lastSigned < twelveHoursAgo) {
+              // Executa em background sem bloquear o request
+              db.upsertUser({
+                openId: uid,
+                name: user.name || name,
+                email: user.email || email,
+                loginMethod: user.loginMethod || "firebase",
+                lastSignedIn: new Date(),
+              }).catch(() => {});
+            }
+          }
         } catch (dbErr) {
           console.error("[TRPC Server] User auth processing error:", dbErr);
         }

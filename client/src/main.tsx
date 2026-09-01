@@ -33,7 +33,17 @@ window.addEventListener("unhandledrejection", (event) => {
   }
 });
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 3, // 3 minutos de cache antes de revalidar dados
+      gcTime: 1000 * 60 * 15,   // Mantém em memória por 15 minutos
+      refetchOnWindowFocus: false, // Evita reconsultar o banco ao trocar de aba
+      refetchOnReconnect: false,   // Evita picos de requisições ao reconectar rede
+      retry: 1,
+    },
+  },
+});
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;

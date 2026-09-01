@@ -1218,9 +1218,8 @@ export default function AdminDashboard() {
 
   const { data: sales, isLoading: loadingSales, refetch: refetchSales } = trpc.orders.listAll.useQuery(undefined, {
     enabled: isAuthenticated && isAdmin,
-    // Pedidos não são real-time (vêm do Postgres via tRPC, diferente do resto que é Firestore
-    // onSnapshot) — sem polling, uma venda nova só apareceria depois de recarregar a página.
-    refetchInterval: 15000,
+    // Otimização Neon: Só atualiza automaticamente a cada 60s se a aba estiver visível/em foco
+    refetchInterval: () => (typeof document !== "undefined" && !document.hidden ? 60000 : false),
   });
 
   const deliverOrderMutation = trpc.orders.deliverOrder.useMutation({
@@ -1331,7 +1330,7 @@ export default function AdminDashboard() {
   // Visão Geral sempre dava 0 ali. Atualiza a cada 30s pra ficar razoavelmente ao vivo.
   const adminUsersQuery = trpc.auth.adminListUsers.useQuery(undefined, {
     enabled: !!(isAuthenticated && isAdmin),
-    refetchInterval: 30000,
+    refetchInterval: () => (typeof document !== "undefined" && !document.hidden ? 120000 : false),
   });
   const realUsers = adminUsersQuery.data || [];
 

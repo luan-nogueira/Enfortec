@@ -48,7 +48,8 @@ export function useAuth(options?: UseAuthOptions) {
 
   const pgUserQuery = trpc.auth.me.useQuery(undefined, {
     enabled: state.isAuthenticated && !!auth.currentUser,
-    refetchInterval: 5000,
+    staleTime: 1000 * 60 * 5, // 5 minutos de cache - evita requisições constantes ao Postgres
+    refetchOnWindowFocus: false,
   });
   const pgUser = pgUserQuery.data;
 
