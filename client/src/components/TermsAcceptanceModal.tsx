@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { ShieldCheck, LogOut, ArrowRight, BookOpen } from "lucide-react";
+import { ShieldCheck, LogOut, ArrowRight, ArrowLeft, BookOpen, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function TermsAcceptanceModal() {
@@ -28,7 +28,6 @@ export default function TermsAcceptanceModal() {
 
   useEffect(() => {
     // Only open if logged in, load finished, and hasn't accepted either terms
-    // Also ensure CPF completion modal has higher priority or they don't overlap.
     // Show terms modal only if user is logged in, loading is done, has CPF,
     // but lacks acceptedForteCoinsTerms or acceptedGamesTerms.
     if (!loading && isAuthenticated && user && user.cpf && (!user.acceptedForteCoinsTerms || !user.acceptedGamesTerms)) {
@@ -38,15 +37,43 @@ export default function TermsAcceptanceModal() {
     }
   }, [isAuthenticated, user, loading]);
 
+  // Automatically check if content is small enough to not require scrolling
+  useEffect(() => {
+    if (!isOpen) return;
+    const timer = setTimeout(() => {
+      if (forteCoinsScrollRef.current) {
+        if (forteCoinsScrollRef.current.scrollHeight <= forteCoinsScrollRef.current.clientHeight + 40) {
+          setScrolledForteCoins(true);
+        }
+      }
+      if (gamesScrollRef.current) {
+        if (gamesScrollRef.current.scrollHeight <= gamesScrollRef.current.clientHeight + 40) {
+          setScrolledGames(true);
+        }
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [isOpen, activeTab]);
+
   const handleScroll = (
     e: React.UIEvent<HTMLDivElement>,
     setScrolled: React.Dispatch<React.SetStateAction<boolean>>
   ) => {
     const target = e.currentTarget;
-    // Calculate scroll distance
-    const threshold = 15; // pixels from the bottom
+    // Calculate scroll distance with a forgiving threshold on mobile
+    const threshold = 35;
     const isAtBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + threshold;
     if (isAtBottom) {
+      setScrolled(true);
+    }
+  };
+
+  const scrollToBottom = (
+    ref: React.RefObject<HTMLDivElement | null>,
+    setScrolled: React.Dispatch<React.SetStateAction<boolean>>
+  ) => {
+    if (ref.current) {
+      ref.current.scrollTo({ top: ref.current.scrollHeight, behavior: "smooth" });
       setScrolled(true);
     }
   };
@@ -84,46 +111,77 @@ export default function TermsAcceptanceModal() {
 
   if (!isOpen) return null;
 
+  const bothAccepted = acceptedForteCoins && acceptedGames;
+
   return (
-    <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full p-6 sm:p-8 shadow-[0_0_50px_rgba(239,68,68,0.15)] flex flex-col max-h-[95vh] animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-md z-[9999] flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full p-3.5 sm:p-6 shadow-[0_0_50px_rgba(239,68,68,0.2)] flex flex-col h-[94dvh] max-h-[94dvh] sm:h-auto sm:max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200 my-auto">
         
         {/* Header */}
-        <div className="flex items-center gap-3 border-b border-slate-800 pb-4 mb-6">
-          <div className="w-12 h-12 bg-red-950 border border-red-500/30 rounded-xl flex items-center justify-center text-red-500">
-            <ShieldCheck className="w-6 h-6" />
+        <div className="flex items-center justify-between gap-3 border-b border-slate-800 pb-2.5 mb-2.5 sm:pb-3 sm:mb-4 shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 bg-red-950/80 border border-red-500/40 rounded-xl flex items-center justify-center text-red-500 shrink-0">
+              <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6" />
+            </div>
+            <div>
+              <h2 className="text-base sm:text-xl font-black text-white leading-tight">
+                Contratos e Termos Obrigatórios
+              </h2>
+              <p className="text-slate-400 text-[11px] sm:text-xs leading-tight mt-0.5">
+                Leia e aceite os 2 termos abaixo para continuar na plataforma
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-xl sm:text-2xl font-black text-white">Contratos e Termos Obrigatórios</h2>
-            <p className="text-slate-400 text-xs sm:text-sm">Por favor, leia e aceite os regulamentos abaixo para continuar na plataforma</p>
+
+          {/* Status Badge */}
+          <div className="shrink-0 hidden xs:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border border-slate-700/80 bg-slate-950">
+            {bothAccepted ? (
+              <span className="text-green-400 flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> 2/2 Aceitos
+              </span>
+            ) : (
+              <span className="text-amber-400">
+                {(acceptedForteCoins ? 1 : 0) + (acceptedGames ? 1 : 0)}/2 Aceitos
+              </span>
+            )}
           </div>
         </div>
 
         {/* Tab Controls */}
-        <div className="flex gap-2 border-b border-slate-800 pb-3 mb-4">
+        <div className="grid grid-cols-2 gap-2 border-b border-slate-800 pb-2 mb-2 sm:pb-3 sm:mb-3 shrink-0">
           <button
+            type="button"
             onClick={() => setActiveTab("fortecoins")}
-            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
+            className={`flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
               activeTab === "fortecoins"
                 ? "bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)]"
                 : "bg-slate-950 text-slate-400 hover:text-white border border-slate-800"
             }`}
           >
-            <BookOpen className="w-4 h-4" />
-            1. Regulamento ForteCoins
-            {acceptedForteCoins && <span className="ml-1 text-green-400">✓</span>}
+            <BookOpen className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">1. ForteCoins</span>
+            {acceptedForteCoins ? (
+              <span className="text-[10px] bg-green-500/20 text-green-400 px-1 rounded font-bold shrink-0">✓</span>
+            ) : (
+              <span className="text-[10px] bg-amber-500/15 text-amber-400/90 px-1 rounded font-normal shrink-0">Pendente</span>
+            )}
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab("games")}
-            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
+            className={`flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
               activeTab === "games"
                 ? "bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)]"
                 : "bg-slate-950 text-slate-400 hover:text-white border border-slate-800"
             }`}
           >
-            <BookOpen className="w-4 h-4" />
-            2. Licenciamento e Garantia
-            {acceptedGames && <span className="ml-1 text-green-400">✓</span>}
+            <BookOpen className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">2. Licenciamento</span>
+            {acceptedGames ? (
+              <span className="text-[10px] bg-green-500/20 text-green-400 px-1 rounded font-bold shrink-0">✓</span>
+            ) : (
+              <span className="text-[10px] bg-amber-500/15 text-amber-400/90 px-1 rounded font-normal shrink-0">Pendente</span>
+            )}
           </button>
         </div>
 
@@ -132,19 +190,19 @@ export default function TermsAcceptanceModal() {
           
           {/* Tab 1: ForteCoins Terms */}
           {activeTab === "fortecoins" && (
-            <div className="flex-1 flex flex-col min-h-0">
+            <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
               <div
                 ref={forteCoinsScrollRef}
                 onScroll={(e) => handleScroll(e, setScrolledForteCoins)}
-                className="flex-1 overflow-y-auto pr-2 border border-slate-800 rounded-xl p-4 sm:p-6 bg-slate-950/60 text-slate-300 text-xs sm:text-sm space-y-4 mb-4 select-none"
+                className="flex-1 min-h-0 overflow-y-auto pr-2 border border-slate-800 rounded-xl p-3 sm:p-5 bg-slate-950/60 text-slate-300 text-xs sm:text-sm space-y-3 mb-2.5 sm:mb-3 select-none scrollbar-thin scrollbar-thumb-red-600"
               >
-                <div className="text-center pb-4 mb-4 border-b border-slate-800">
-                  <h3 className="text-sm sm:text-base font-black text-white uppercase">
+                <div className="text-center pb-3 mb-3 border-b border-slate-800">
+                  <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-wide">
                     TERMO DE USO E REGULAMENTO DO PROGRAMA DE RECOMPENSAS FORTECOINS – EFORTEGAMES
                   </h3>
                 </div>
 
-                <div className="space-y-4 text-justify">
+                <div className="space-y-3 text-justify">
                   <section className="space-y-1">
                     <h4 className="font-bold text-white border-l-2 border-red-500 pl-2">1. OBJETIVO</h4>
                     <p>O presente Termo de Uso e Regulamento tem por finalidade estabelecer as regras, condições e diretrizes aplicáveis ao Programa de Recompensas ForteCoins, disponibilizado pela EFORTEGAMES, visando recompensar a fidelidade, participação e engajamento dos usuários nas atividades promovidas pela plataforma.</p>
@@ -155,7 +213,7 @@ export default function TermsAcceptanceModal() {
                     <h4 className="font-bold text-white border-l-2 border-red-500 pl-2">2. DEFINIÇÃO DAS FORTECOINS</h4>
                     <p>As ForteCoins são moedas virtuais promocionais disponibilizadas pela EFORTEGAMES para utilização exclusiva dentro da plataforma e de seus serviços.</p>
                     <p>As ForteCoins possuem caráter exclusivamente promocional e não constituem moeda oficial, ativo financeiro, investimento, valor mobiliário, crédito financeiro ou qualquer outra forma de patrimônio econômico.</p>
-                    <div className="bg-slate-900 border border-slate-800 p-3 rounded-lg text-[11px] text-slate-400">
+                    <div className="bg-slate-900 border border-slate-800 p-2.5 rounded-lg text-[11px] text-slate-400">
                       <strong>As ForteCoins não poderão, em hipótese alguma:</strong>
                       <ul className="list-disc pl-5 mt-1 space-y-0.5">
                         <li>Ser convertidas em dinheiro;</li>
@@ -169,7 +227,7 @@ export default function TermsAcceptanceModal() {
                   <section className="space-y-1">
                     <h4 className="font-bold text-white border-l-2 border-red-500 pl-2">3. FORMAS DE ACÚMULO</h4>
                     <p>Os usuários poderão acumular ForteCoins através das atividades disponibilizadas pela EFORTEGAMES, incluindo:</p>
-                    <ul className="list-disc pl-5 space-y-1">
+                    <ul className="list-disc pl-5 space-y-0.5">
                       <li><strong>Compras na plataforma:</strong> Cashback em moedas conforme pontuação vigente.</li>
                       <li><strong>Revenda:</strong> Recebimento de bônus por negociações autorizadas no marketplace.</li>
                       <li><strong>Indicação:</strong> Recompensa ao indicar novos participantes para grupos oficiais, desde que sejam legítimos.</li>
@@ -215,39 +273,52 @@ export default function TermsAcceptanceModal() {
               </div>
 
               {/* Checkbox block for Tab 1 */}
-              <div className="p-3 bg-slate-950/30 rounded-xl border border-slate-800/80 mb-4 flex flex-col gap-2">
-                <div className="flex items-start gap-3">
+              <div className="p-2.5 sm:p-3 bg-slate-950/60 rounded-xl border border-slate-800/80 mb-2 sm:mb-2.5 flex flex-col gap-1.5 shrink-0">
+                <div className="flex items-start gap-2.5">
                   <Checkbox
                     id="checkbox-fortecoins"
                     disabled={!scrolledForteCoins}
                     checked={acceptedForteCoins}
                     onCheckedChange={(checked) => setAcceptedForteCoins(checked === true)}
-                    className="mt-0.5 border-slate-700 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
+                    className="mt-0.5 border-slate-600 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
                   />
-                  <div className="grid gap-1.5 leading-none">
+                  <div className="grid gap-1 leading-none flex-1">
                     <label
                       htmlFor="checkbox-fortecoins"
                       className={`text-xs font-bold transition-colors cursor-pointer ${
-                        scrolledForteCoins ? "text-slate-200" : "text-slate-500"
+                        scrolledForteCoins ? "text-slate-200" : "text-slate-400"
                       }`}
                     >
                       Eu li e concordo com o Regulamento do Programa ForteCoins.
                     </label>
-                    {!scrolledForteCoins && (
-                      <p className="text-[10px] text-red-500 font-bold">
-                        * Role o documento até o final para liberar este aceite.
-                      </p>
+                    {!scrolledForteCoins ? (
+                      <div className="flex items-center justify-between gap-2 mt-0.5">
+                        <span className="text-[10px] text-amber-400 font-medium">
+                          * Role o texto até o final para liberar o aceite.
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => scrollToBottom(forteCoinsScrollRef, setScrolledForteCoins)}
+                          className="text-[10px] text-red-400 hover:text-red-300 font-bold underline shrink-0 cursor-pointer"
+                        >
+                          Rolar ao fim ↓
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-green-400 font-medium mt-0.5">
+                        ✓ Leitura completa. Marque a caixa para confirmar seu aceite.
+                      </span>
                     )}
                   </div>
                 </div>
                 
                 {scrolledForteCoins && !acceptedForteCoins && (
-                  <div className="flex justify-end">
+                  <div className="flex justify-end pt-1">
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={() => setAcceptedForteCoins(true)}
-                      className="text-red-500 hover:text-red-400 font-bold text-xs h-auto p-1"
+                      className="text-red-400 hover:text-red-300 font-bold text-xs h-7 px-2 py-0 bg-red-950/40 hover:bg-red-900/50 border border-red-500/30"
                     >
                       Marcar como Aceito
                     </Button>
@@ -259,21 +330,21 @@ export default function TermsAcceptanceModal() {
 
           {/* Tab 2: Games Terms */}
           {activeTab === "games" && (
-            <div className="flex-1 flex flex-col min-h-0">
+            <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
               <div
                 ref={gamesScrollRef}
                 onScroll={(e) => handleScroll(e, setScrolledGames)}
-                className="flex-1 overflow-y-auto pr-2 border border-slate-800 rounded-xl p-4 sm:p-6 bg-slate-950/60 text-slate-300 text-xs sm:text-sm space-y-4 mb-4 select-none"
+                className="flex-1 min-h-0 overflow-y-auto pr-2 border border-slate-800 rounded-xl p-3 sm:p-5 bg-slate-950/60 text-slate-300 text-xs sm:text-sm space-y-3 mb-2.5 sm:mb-3 select-none scrollbar-thin scrollbar-thumb-red-600"
               >
-                <div className="text-center pb-4 mb-4 border-b border-slate-800">
-                  <h3 className="text-sm sm:text-base font-black text-white uppercase">
+                <div className="text-center pb-3 mb-3 border-b border-slate-800">
+                  <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-wide">
                     TERMOS DE USO, GARANTIA E LICENCIAMENTO DIGITAL – EFORTEGAMES
                   </h3>
-                  <p className="text-[10px] text-slate-500 mt-1">Última atualização: 19/06/2026</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Última atualização: 19/06/2026</p>
                 </div>
 
-                <div className="space-y-4 text-justify">
-                  <p className="italic text-slate-400">Ao efetuar a compra de qualquer produto digital comercializado pela EFORTEGAMES, o cliente declara que leu, compreendeu e concordou integralmente com os presentes Termos de Uso, Garantia e Licenciamento Digital.</p>
+                <div className="space-y-3 text-justify">
+                  <p className="italic text-slate-400 text-[11px] sm:text-xs">Ao efetuar a compra de qualquer produto digital comercializado pela EFORTEGAMES, o cliente declara que leu, compreendeu e concordou integralmente com os presentes Termos de Uso, Garantia e Licenciamento Digital.</p>
 
                   <section className="space-y-1">
                     <h4 className="font-bold text-white border-l-2 border-red-500 pl-2">1. DISPOSIÇÕES GERAIS</h4>
@@ -342,39 +413,52 @@ export default function TermsAcceptanceModal() {
               </div>
 
               {/* Checkbox block for Tab 2 */}
-              <div className="p-3 bg-slate-950/30 rounded-xl border border-slate-800/80 mb-4 flex flex-col gap-2">
-                <div className="flex items-start gap-3">
+              <div className="p-2.5 sm:p-3 bg-slate-950/60 rounded-xl border border-slate-800/80 mb-2 sm:mb-2.5 flex flex-col gap-1.5 shrink-0">
+                <div className="flex items-start gap-2.5">
                   <Checkbox
                     id="checkbox-games"
                     disabled={!scrolledGames}
                     checked={acceptedGames}
                     onCheckedChange={(checked) => setAcceptedGames(checked === true)}
-                    className="mt-0.5 border-slate-700 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
+                    className="mt-0.5 border-slate-600 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
                   />
-                  <div className="grid gap-1.5 leading-none">
+                  <div className="grid gap-1 leading-none flex-1">
                     <label
                       htmlFor="checkbox-games"
                       className={`text-xs font-bold transition-colors cursor-pointer ${
-                        scrolledGames ? "text-slate-200" : "text-slate-500"
+                        scrolledGames ? "text-slate-200" : "text-slate-400"
                       }`}
                     >
                       Eu li e concordo com os Termos de Uso, Garantia e Licenciamento Digital.
                     </label>
-                    {!scrolledGames && (
-                      <p className="text-[10px] text-red-500 font-bold">
-                        * Role o documento até o final para liberar este aceite.
-                      </p>
+                    {!scrolledGames ? (
+                      <div className="flex items-center justify-between gap-2 mt-0.5">
+                        <span className="text-[10px] text-amber-400 font-medium">
+                          * Role o texto até o final para liberar o aceite.
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => scrollToBottom(gamesScrollRef, setScrolledGames)}
+                          className="text-[10px] text-red-400 hover:text-red-300 font-bold underline shrink-0 cursor-pointer"
+                        >
+                          Rolar ao fim ↓
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-green-400 font-medium mt-0.5">
+                        ✓ Leitura completa. Marque a caixa para confirmar seu aceite.
+                      </span>
                     )}
                   </div>
                 </div>
 
                 {scrolledGames && !acceptedGames && (
-                  <div className="flex justify-end">
+                  <div className="flex justify-end pt-1">
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={() => setAcceptedGames(true)}
-                      className="text-red-500 hover:text-red-400 font-bold text-xs h-auto p-1"
+                      className="text-red-400 hover:text-red-300 font-bold text-xs h-7 px-2 py-0 bg-red-950/40 hover:bg-red-900/50 border border-red-500/30"
                     >
                       Marcar como Aceito
                     </Button>
@@ -387,47 +471,71 @@ export default function TermsAcceptanceModal() {
         </div>
 
         {/* Footer actions */}
-        <div className="flex flex-col sm:flex-row items-center gap-3 border-t border-slate-800 pt-4 mt-2">
+        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3 border-t border-slate-800 pt-2.5 sm:pt-4 mt-auto shrink-0">
           <Button
+            type="button"
             variant="ghost"
             onClick={() => logout()}
-            className="w-full sm:w-auto text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center gap-2"
+            className="w-full sm:w-auto text-slate-400 hover:text-white hover:bg-slate-800/80 text-xs sm:text-sm h-8 sm:h-9 px-3 flex items-center justify-center gap-1.5"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-3.5 h-3.5" />
             Fazer Logout / Sair
           </Button>
 
-          <div className="flex-1" />
-
-          {/* Tab switching navigation helper */}
-          {activeTab === "fortecoins" && (
-            <Button
-              onClick={() => {
-                if (!acceptedForteCoins) {
-                  toast.warning("Marque o aceite das ForteCoins antes de passar para a próxima aba.");
-                } else {
-                  setActiveTab("games");
-                }
-              }}
-              className="w-full sm:w-auto bg-slate-800 hover:bg-slate-700 text-white font-bold flex items-center justify-center gap-2"
-            >
-              Próximo Termo
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          )}
-
-          {activeTab === "games" && (
-            <Button
-              onClick={handleAccept}
-              disabled={isSubmitting || !acceptedForteCoins || !acceptedGames}
-              className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white font-black px-8 py-5 text-sm sm:text-base shadow-[0_0_20px_rgba(220,38,38,0.4)] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            >
-              {isSubmitting ? "Salvando..." : "Aceitar todos e Entrar"}
-            </Button>
-          )}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            {/* When both are accepted, the user can immediately finalize from any tab */}
+            {bothAccepted ? (
+              <Button
+                type="button"
+                onClick={handleAccept}
+                disabled={isSubmitting}
+                className="w-full sm:w-auto bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-black px-6 sm:px-8 h-10 sm:h-11 text-xs sm:text-sm shadow-[0_0_25px_rgba(220,38,38,0.5)] transition-all flex items-center justify-center gap-2 cursor-pointer animate-pulse"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                {isSubmitting ? "Salvando..." : "Aceitar todos e Entrar"}
+              </Button>
+            ) : activeTab === "fortecoins" ? (
+              <Button
+                type="button"
+                onClick={() => {
+                  if (!acceptedForteCoins) {
+                    toast.warning("Marque o aceite do Regulamento ForteCoins antes de passar para a próxima aba.");
+                  } else {
+                    setActiveTab("games");
+                  }
+                }}
+                disabled={!acceptedForteCoins}
+                className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white font-bold px-4 sm:px-6 h-10 sm:h-11 text-xs sm:text-sm shadow-[0_0_15px_rgba(220,38,38,0.3)] disabled:opacity-50 disabled:bg-slate-800 disabled:text-slate-400 disabled:shadow-none flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>Próximo: Licenciamento</span>
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            ) : (
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setActiveTab("fortecoins")}
+                  className="border-slate-700 bg-slate-800/80 text-slate-300 hover:text-white text-xs h-10 sm:h-11 px-3 sm:px-4 flex items-center gap-1"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Voltar</span>
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleAccept}
+                  disabled={isSubmitting || !acceptedGames || !acceptedForteCoins}
+                  className="flex-1 sm:flex-initial bg-red-600 hover:bg-red-700 text-white font-black px-4 sm:px-6 h-10 sm:h-11 text-xs sm:text-sm shadow-[0_0_20px_rgba(220,38,38,0.4)] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5"
+                >
+                  {isSubmitting ? "Salvando..." : "Aceitar todos e Entrar"}
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
 
       </div>
     </div>
   );
 }
+
