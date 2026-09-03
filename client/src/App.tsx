@@ -11,6 +11,7 @@ import SocialProofToast from "./components/SocialProofToast";
 import MobileBottomNav from "./components/MobileBottomNav";
 import CPFCompletionModal from "./components/CPFCompletionModal";
 import TermsAcceptanceModal from "./components/TermsAcceptanceModal";
+import OrderDeliveredNotifier from "./components/OrderDeliveredNotifier";
 
 import { lazy, Suspense, useEffect, useState } from "react";
 import MaintenanceScreen from "./components/MaintenanceScreen";
@@ -126,6 +127,7 @@ function App() {
           <Router />
           <FloatingChat />
           <GlobalChatNotifier />
+          <OrderDeliveredNotifier />
           <SocialProofToast />
           <MobileBottomNav />
           <CPFCompletionModal />

@@ -14,14 +14,22 @@ import {
 import { auth } from "@/lib/firebase";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { toast } from "sonner";
-import { User, Mail, Lock, KeyRound, LogOut, Loader2, ShieldCheck, Coins } from "lucide-react";
+import { User, Mail, Lock, KeyRound, LogOut, Loader2, ShieldCheck, Coins, Package, Star, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { trpc } from "@/lib/trpc";
 
 export default function UserProfileButton() {
   const { user, isAuthenticated, logout, isAdmin, isCollaborator } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [, navigate] = useLocation();
+
+  const { data: orders } = trpc.orders.getByBuyerId.useQuery(undefined, {
+    enabled: isAuthenticated && !!user,
+    refetchInterval: 30000,
+  });
+
+  const pendingDeliveredCount = (orders || []).filter((o: any) => o.status === "enviado").length;
 
   if (!isAuthenticated || !user) return null;
 
@@ -55,7 +63,7 @@ export default function UserProfileButton() {
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="flex items-center justify-center rounded-full border border-red-600/30 hover:border-red-500 hover:shadow-[0_0_12px_rgba(220,38,38,0.4)] transition-all shrink-0 focus:outline-none focus:ring-2 focus:ring-red-500/50"
+        className="relative flex items-center justify-center rounded-full border border-red-600/30 hover:border-red-500 hover:shadow-[0_0_12px_rgba(220,38,38,0.4)] transition-all shrink-0 focus:outline-none focus:ring-2 focus:ring-red-500/50"
         aria-label="Abrir Perfil"
       >
         <Avatar className="h-9 w-9 bg-slate-900 border-none">
@@ -63,6 +71,12 @@ export default function UserProfileButton() {
             {user?.name?.charAt(0).toUpperCase()}
           </AvatarFallback>
         </Avatar>
+        {pendingDeliveredCount > 0 && (
+          <span
+            className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-slate-950 animate-pulse"
+            title="Você tem jogo entregue pronto para avaliação!"
+          />
+        )}
       </button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -82,6 +96,55 @@ export default function UserProfileButton() {
           </DialogHeader>
 
           <div className="py-4 space-y-4">
+            {/* Aviso de Entrega Pronta */}
+            {pendingDeliveredCount > 0 && (
+              <div className="p-3.5 bg-emerald-950/40 border border-emerald-500/40 rounded-xl space-y-2 animate-in fade-in duration-300">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] text-emerald-400 font-black uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse" /> Entrega Concluída!
+                  </span>
+                  <span className="text-[9px] bg-emerald-600 text-white font-black px-1.5 py-0.5 rounded uppercase tracking-wider">
+                    {pendingDeliveredCount} jogo{pendingDeliveredCount > 1 ? "s" : ""}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 leading-snug">
+                  Seus dados de acesso já estão disponíveis. Teste seu jogo e avalie o atendimento para ganhar ForteCoins!
+                </p>
+                <Button
+                  onClick={() => {
+                    setIsOpen(false);
+                    navigate("/minhas-compras");
+                  }}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold h-9 text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30"
+                >
+                  <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
+                  Ver Acesso & Avaliar Atendimento
+                </Button>
+              </div>
+            )}
+
+            {/* Atalho para Minhas Compras */}
+            <Button
+              onClick={() => {
+                setIsOpen(false);
+                navigate("/minhas-compras");
+              }}
+              variant="outline"
+              className="w-full border-slate-800 bg-slate-900/60 hover:bg-slate-800 text-slate-200 h-10 font-bold flex items-center justify-between px-3 text-xs"
+            >
+              <span className="flex items-center gap-2">
+                <Package className="w-4 h-4 text-red-500" />
+                Minhas Compras
+              </span>
+              {pendingDeliveredCount > 0 ? (
+                <span className="bg-emerald-600 text-white text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider animate-pulse">
+                  {pendingDeliveredCount} pronto{pendingDeliveredCount > 1 ? "s" : ""}
+                </span>
+              ) : (
+                <span className="text-slate-500 text-[10px]">Ver histórico</span>
+              )}
+            </Button>
+
             {/* E-mail Field */}
             <div className="space-y-1.5">
               <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">E-mail</label>

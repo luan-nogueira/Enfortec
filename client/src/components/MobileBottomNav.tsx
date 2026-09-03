@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { Badge } from "@/components/ui/badge";
+import { trpc } from "@/lib/trpc";
 import {
   Home as HomeIcon,
   ShoppingBag,
@@ -38,6 +39,13 @@ export default function MobileBottomNav() {
   const { user } = useAuth();
   const [openMenu, setOpenMenu] = useState(false);
   const [hasOpenModal, setHasOpenModal] = useState(false);
+
+  const { data: orders } = trpc.orders.getByBuyerId.useQuery(undefined, {
+    enabled: !!user,
+    refetchInterval: 30000,
+  });
+
+  const pendingDeliveredCount = (orders || []).filter((o: any) => o.status === "enviado").length;
 
   // Esconde a barra inferior automaticamente caso qualquer modal/dialog esteja aberto na tela
   useEffect(() => {
@@ -165,6 +173,7 @@ export default function MobileBottomNav() {
           icon: ShoppingCart,
           path: "/minhas-compras",
           color: "text-gray-300",
+          badge: pendingDeliveredCount > 0 ? "Entrega Pronta" : undefined,
         },
         {
           label: "Avaliações de Clientes",
@@ -209,6 +218,9 @@ export default function MobileBottomNav() {
                   />
                   {item.highlight && (
                     <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[#dc143c] animate-ping" />
+                  )}
+                  {item.path === "/minhas-compras" && pendingDeliveredCount > 0 && (
+                    <span className="absolute -top-1 -right-1.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-slate-950 animate-pulse" />
                   )}
                 </div>
                 <span className="text-[10px] tracking-tight mt-0.5 font-medium leading-none">
