@@ -246,9 +246,21 @@ export default function JogueComEconomia() {
         </div>
 
         {isLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
             {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
-              <div key={i} className="h-64 bg-slate-900/50 animate-pulse rounded-xl border border-slate-800" />
+              <div key={i} className="bg-slate-900/50 animate-pulse rounded-xl border border-slate-800 flex flex-col overflow-hidden">
+                <div className="aspect-[16/9] w-full bg-slate-800/60" />
+                <div className="p-3.5 space-y-2 flex-1 flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <div className="h-3 w-1/3 bg-slate-800/60 rounded" />
+                    <div className="h-4 w-4/5 bg-slate-800/60 rounded" />
+                  </div>
+                  <div className="pt-3 border-t border-slate-800 space-y-2">
+                    <div className="h-5 w-1/2 bg-slate-800/60 rounded" />
+                    <div className="h-8 w-full bg-slate-800/60 rounded-lg" />
+                  </div>
+                </div>
+              </div>
             ))}
           </div>
         ) : filteredProducts.length === 0 ? (
@@ -258,7 +270,7 @@ export default function JogueComEconomia() {
             <p className="text-sm text-slate-500 mt-1">Tente buscar por outro nome de jogo.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
             {filteredProducts.map((product) => {
               const isOutOfStock = product.stock !== undefined && product.stock !== null && Number(product.stock) <= 0;
               const licenseType = product.economiaLicenseType || "secundaria";
@@ -272,7 +284,7 @@ export default function JogueComEconomia() {
                   className={`group relative bg-slate-900/80 rounded-xl border border-slate-800 hover:border-red-500/50 transition-all duration-300 flex flex-col overflow-hidden shadow-lg hover:shadow-[0_0_20px_rgba(220,38,38,0.2)] ${isOutOfStock ? 'opacity-70' : ''}`}
                 >
                   {/* Badges */}
-                  <div className="absolute top-2 left-2 right-2 z-10 flex flex-wrap gap-1 items-start pointer-events-none">
+                  <div className="absolute top-2 left-2 right-2 z-20 flex flex-wrap gap-1 items-start pointer-events-none">
                     {isOutOfStock ? (
                       <span className="bg-red-600/90 border border-red-500 text-white font-black text-[8px] sm:text-[9px] uppercase px-1.5 py-0.5 rounded shadow">
                         Esgotado
@@ -289,21 +301,26 @@ export default function JogueComEconomia() {
                     </span>
                   </div>
 
-                  {/* Image Container */}
-                  <div className="relative h-44 sm:h-56 w-full overflow-hidden bg-slate-950 flex items-center justify-center">
-                    {/* Ambient blurred background glow */}
-                    <img
-                      src={product.imageUrl || "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?q=80&w=600"}
-                      alt=""
-                      aria-hidden="true"
-                      className="absolute inset-0 w-full h-full object-cover blur-xl opacity-35 scale-125 pointer-events-none"
-                    />
+                  {/* Image Container - Aspect 16:9 idêntico ao Admin, preenchendo o espaço perfeitamente */}
+                  <div className="relative aspect-[16/9] w-full overflow-hidden bg-slate-950 flex items-center justify-center">
+                    {/* Fundo suave ambiente apenas se o jogo estiver explicitamente configurado como 'contain' */}
+                    {product.coverFit === 'contain' && (
+                      <img
+                        src={product.imageUrl || "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?q=80&w=600"}
+                        alt=""
+                        aria-hidden="true"
+                        className="absolute inset-0 w-full h-full object-cover blur-xl opacity-35 scale-125 pointer-events-none"
+                      />
+                    )}
 
-                    {/* Main cover image - 100% uncropped */}
+                    {/* Gradiente suave no topo para contraste com badges */}
+                    <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-transparent pointer-events-none z-10" />
+
+                    {/* Capa principal preenchendo 100% da área */}
                     <img
                       src={product.imageUrl || "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?q=80&w=600"}
                       alt={product.name}
-                      className="relative z-10 w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300"
+                      className={`w-full h-full ${product.coverFit === 'contain' ? 'object-contain p-1.5 relative z-10' : 'object-cover'} group-hover:scale-105 transition-transform duration-500`}
                       onError={(e) => {
                         const target = e.currentTarget as HTMLImageElement;
                         if (!target.dataset.fallbackApplied) {
@@ -412,10 +429,10 @@ export default function JogueComEconomia() {
                 <img
                   src={selectedProduct.imageUrl || "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?q=80&w=200"}
                   alt={selectedProduct.name}
-                  className="w-12 h-16 object-cover rounded"
+                  className="w-20 aspect-video object-cover rounded border border-slate-800 shrink-0"
                 />
-                <div>
-                  <h4 className="font-bold text-sm text-white">{selectedProduct.name}</h4>
+                <div className="min-w-0 flex-1">
+                  <h4 className="font-bold text-sm text-white line-clamp-1">{selectedProduct.name}</h4>
                   <p className="text-xs text-slate-400 mt-0.5">Plataforma: {selectedProduct.platform || "PS4 / PS5"}</p>
                   <p className="text-base font-black text-red-500 mt-1">
                     Valor: R$ {getItemPrice(selectedProduct, selectedAccountType).toFixed(2)}

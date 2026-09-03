@@ -738,19 +738,24 @@ export default function Home() {
                   className={`bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-red-500/40 transition-all hover:-translate-y-1.5 hover:shadow-[0_8px_30px_rgba(220,38,38,0.2)] flex flex-col h-full cursor-pointer min-w-[160px] sm:min-w-[220px] lg:min-w-0 w-[45vw] sm:w-[35vw] lg:w-auto snap-start shrink-0 group game-card-shine ${isOutOfStock ? 'opacity-70' : ''}`}
                   onClick={() => !isOutOfStock && navigate(isFisico ? '/usados' : `/digital?search=${encodeURIComponent(listing.name)}&buy=${listing.id}`)}
                 >
-                  <div className="h-28 sm:h-40 bg-slate-950 relative overflow-hidden flex items-center justify-center">
+                  <div className="aspect-[16/9] w-full bg-slate-950 relative overflow-hidden flex items-center justify-center">
                     {listing.imageUrl || (listing.images && listing.images.length > 0) ? (
                       <>
-                        <img
-                          src={listing.imageUrl || listing.images[0]}
-                          alt=""
-                          aria-hidden="true"
-                          className="absolute inset-0 w-full h-full object-cover blur-xl opacity-35 scale-125 pointer-events-none"
-                        />
+                        {/* Fundo ambiente suave apenas para contain */}
+                        {listing.coverFit === 'contain' && (
+                          <img
+                            src={listing.imageUrl || listing.images[0]}
+                            alt=""
+                            aria-hidden="true"
+                            className="absolute inset-0 w-full h-full object-cover blur-xl opacity-35 scale-125 pointer-events-none"
+                          />
+                        )}
+                        {/* Gradiente sutil para legibilidade das tags */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 pointer-events-none z-10" />
                         <img 
                           src={listing.imageUrl || listing.images[0]} 
                           alt={listing.name} 
-                          className="relative z-10 w-full h-full object-contain p-1.5 group-hover:scale-105 transition-transform duration-300" 
+                          className={`w-full h-full ${listing.coverFit === 'contain' ? 'object-contain p-1.5 relative z-10' : 'object-cover'} group-hover:scale-105 transition-transform duration-500`} 
                           onError={(e) => {
                             const target = e.currentTarget as HTMLImageElement;
                             if (!target.dataset.fallbackApplied) {
