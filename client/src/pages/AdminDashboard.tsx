@@ -4500,7 +4500,9 @@ export default function AdminDashboard() {
                                       `Obrigado por adquirir o jogo ${sale.productName}, aqui está o login e senha para acesso a conta:\n\n` +
                                       `Login: \n` +
                                       `Senha: \n\n` +
-                                      `Qualquer coisa estaremos a disposição para ajudar no que precisar, você pode entrar em contato conosco pelo chat do site ou pelo nosso WhatsApp: +55 43 8425-3691.`
+                                      `Qualquer coisa estaremos a disposição para ajudar no que precisar, você pode entrar em contato conosco pelo chat do site ou pelos nossos WhatsApp:\n` +
+                                      `• André: +55 43 8425-3691\n` +
+                                      `• Sandro: +55 71 98765-0840`
                                     );
                                     setDeliverGameOpen(true);
                                   }}

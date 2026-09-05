@@ -43,7 +43,9 @@ ${deliveryDetails}
 --------------------------------------------------
 
 Qualquer dúvida ou problema, nossa equipe estará totalmente à disposição para lhe ajudar!
-Você pode entrar em contato conosco diretamente pelo chat do site ou pelo nosso WhatsApp: +55 43 8425-3691.
+Você pode entrar em contato conosco diretamente pelo chat do site ou pelos nossos WhatsApp:
+• André: +55 43 8425-3691
+• Sandro: +55 71 98765-0840
 
 Atenciosamente,
 Equipe Eforte Games`;
@@ -60,7 +62,10 @@ Equipe Eforte Games`;
       </div>
       
       <p>Qualquer dúvida ou problema, estamos à total disposição para ajudar no que for preciso.</p>
-      <p>Você pode entrar em contato conosco pelo chat em nosso site ou diretamente através do nosso <strong>WhatsApp: +55 43 8425-3691</strong>.</p>
+      <p>Você pode entrar em contato conosco pelo chat em nosso site ou diretamente através dos nossos WhatsApp:<br>
+        <strong>• André: +55 43 8425-3691</strong><br>
+        <strong>• Sandro: +55 71 98765-0840</strong>
+      </p>
       
       <hr style="border: 0; border-top: 1px solid #eeeeee; margin: 30px 0;">
       <p style="font-size: 12px; color: #777777; text-align: center;">Eforte Games — Diversão garantida no seu console</p>
