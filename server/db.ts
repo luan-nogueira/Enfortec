@@ -1,4 +1,4 @@
-import { eq, and, desc, sql, inArray, like, lt } from "drizzle-orm";
+import { eq, and, or, lte, desc, sql, inArray, like, lt } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { InsertUser, InsertCoupon, users, sellers, products, usedProducts, digitalProducts, orders, reviews, coupons, platformSettings, adminDismissedNotifications, messages, platinumSubmissions } from "../drizzle/schema";
@@ -292,7 +292,12 @@ export async function getActiveDigitalProducts() {
     .from(digitalProducts)
     .leftJoin(sellers, eq(digitalProducts.sellerId, sellers.id))
     .leftJoin(users, eq(sellers.userId, users.id))
-    .where(and(eq(digitalProducts.isActive, true), eq(digitalProducts.status, "aprovado")))
+    .where(
+      and(
+        or(eq(digitalProducts.isActive, true), lte(digitalProducts.stock, 0)),
+        eq(digitalProducts.status, "aprovado")
+      )
+    )
     .orderBy(desc(digitalProducts.createdAt));
   return rows.map((r) => {
     const p = r.product;

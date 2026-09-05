@@ -730,7 +730,7 @@ export default function Home() {
               const isAssinatura = listing.type === 'assinatura';
               const isDigital = listing._type === 'digital' && !isAssinatura;
               const isFisico = listing._type === 'used';
-              const isOutOfStock = isDigital && listing.stock !== undefined && listing.stock !== null && Number(listing.stock) <= 0;
+              const isOutOfStock = isDigital && (listing.isActive === false || Number(listing.stock ?? 0) <= 0);
 
               return (
                 <div 

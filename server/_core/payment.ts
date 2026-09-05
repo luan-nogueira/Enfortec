@@ -335,7 +335,7 @@ export function registerPaymentRoute(app: Express) {
           const prod = await database.select().from(digitalProducts).where(eq(digitalProducts.id, insertValues.digitalProductId)).limit(1);
           if (prod.length > 0) {
             const newStock = Math.max(0, (prod[0].stock || 1) - 1);
-            await database.update(digitalProducts).set({ stock: newStock, isActive: newStock > 0 }).where(eq(digitalProducts.id, insertValues.digitalProductId));
+            await database.update(digitalProducts).set({ stock: newStock }).where(eq(digitalProducts.id, insertValues.digitalProductId));
           }
         } else if (productType === "store" && insertValues.productId) {
           const prod = await database.select().from(products).where(eq(products.id, insertValues.productId)).limit(1);
@@ -633,7 +633,7 @@ export function registerPaymentRoute(app: Express) {
           const prod = await database.select().from(digitalProducts).where(eq(digitalProducts.id, insertValues.digitalProductId)).limit(1);
           if (prod.length > 0) {
             const newStock = Math.max(0, (prod[0].stock || 1) - 1);
-            await database.update(digitalProducts).set({ stock: newStock, isActive: newStock > 0 }).where(eq(digitalProducts.id, insertValues.digitalProductId));
+            await database.update(digitalProducts).set({ stock: newStock }).where(eq(digitalProducts.id, insertValues.digitalProductId));
           }
         } else if (productType === "store" && insertValues.productId) {
           const prod = await database.select().from(products).where(eq(products.id, insertValues.productId)).limit(1);

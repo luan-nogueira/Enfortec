@@ -69,7 +69,7 @@ export default function JogueComEconomia() {
       return;
     }
 
-    if (product.stock !== undefined && product.stock !== null && Number(product.stock) <= 0) {
+    if (product.isActive === false || Number(product.stock ?? 0) <= 0) {
       toast.error("Este jogo está esgotado no momento.");
       return;
     }
@@ -272,7 +272,7 @@ export default function JogueComEconomia() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
             {filteredProducts.map((product) => {
-              const isOutOfStock = product.stock !== undefined && product.stock !== null && Number(product.stock) <= 0;
+              const isOutOfStock = product.isActive === false || Number(product.stock ?? 0) <= 0;
               const licenseType = product.economiaLicenseType || "secundaria";
               const secPrice = Number(product.priceSecondary ?? product.price);
               const primPrice = Number(product.pricePrimary ?? product.price);

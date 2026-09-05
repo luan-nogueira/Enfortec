@@ -250,7 +250,7 @@ export default function DigitalMedia() {
       return;
     }
 
-    if (product.stock !== undefined && product.stock !== null && Number(product.stock) <= 0) {
+    if (product.isActive === false || Number(product.stock ?? 0) <= 0) {
       toast.error("Este jogo está esgotado no momento.");
       return;
     }
@@ -757,7 +757,7 @@ export default function DigitalMedia() {
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-4">
               {filteredProducts.map((product: any) => {
-                const isOutOfStock = product.stock !== undefined && product.stock !== null && Number(product.stock) <= 0;
+                const isOutOfStock = product.isActive === false || Number(product.stock ?? 0) <= 0;
                 return (
                 <div key={product.id} className={`card-neon game-card-shine overflow-hidden group hover:scale-[1.03] transition-all duration-250 flex flex-col ${isOutOfStock ? 'opacity-70' : ''}`}>
                   <div className="relative overflow-hidden bg-slate-950 aspect-[16/9] w-full flex items-center justify-center">
