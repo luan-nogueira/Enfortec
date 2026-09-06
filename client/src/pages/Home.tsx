@@ -93,12 +93,17 @@ function BannerCountdown({ expiresAt }: { expiresAt: string }) {
   const padZero = (n: number) => n.toString().padStart(2, "0");
 
   return (
-    <div className="inline-flex gap-2 items-center bg-red-600/30 backdrop-blur-md px-3 py-1.5 rounded-lg border border-red-500/30 text-white font-bold text-[10px] sm:text-xs">
-      <span>OFERTA TERMINA EM:</span>
-      <span className="bg-slate-950/80 px-2 py-0.5 rounded text-red-500 font-mono">{timeLeft.days}D</span>
-      <span className="bg-slate-950/80 px-2 py-0.5 rounded text-red-500 font-mono">{padZero(timeLeft.hours)}h</span>
-      <span className="bg-slate-950/80 px-2 py-0.5 rounded text-red-500 font-mono">{padZero(timeLeft.minutes)}m</span>
-      <span className="bg-slate-950/80 px-2 py-0.5 rounded text-red-500 font-mono">{padZero(timeLeft.seconds)}s</span>
+    <div className="inline-flex gap-1.5 sm:gap-2 items-center bg-slate-950/85 backdrop-blur-md px-3 py-1.5 rounded-xl border border-red-500/40 text-white font-bold text-[10px] sm:text-xs shadow-[0_0_15px_rgba(220,38,38,0.25)]">
+      <span className="flex items-center gap-1.5 text-red-400 font-extrabold tracking-wide">
+        <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse inline-block" />
+        OFERTA TERMINA EM:
+      </span>
+      <div className="flex items-center gap-1 font-mono">
+        <span className="bg-red-950/60 border border-red-500/30 px-1.5 py-0.5 rounded text-red-400 font-bold">{timeLeft.days}d</span>
+        <span className="bg-red-950/60 border border-red-500/30 px-1.5 py-0.5 rounded text-red-400 font-bold">{padZero(timeLeft.hours)}h</span>
+        <span className="bg-red-950/60 border border-red-500/30 px-1.5 py-0.5 rounded text-red-400 font-bold">{padZero(timeLeft.minutes)}m</span>
+        <span className="bg-red-950/60 border border-red-500/30 px-1.5 py-0.5 rounded text-red-400 font-bold">{padZero(timeLeft.seconds)}s</span>
+      </div>
     </div>
   );
 }
@@ -247,9 +252,9 @@ export default function Home() {
             {/* Desktop & Mobile Sheet Drawer Trigger Button */}
             <Sheet>
               <SheetTrigger asChild>
-                <button className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-red-500/50 hover:bg-slate-800 text-xs font-bold text-slate-200 transition-all shadow-sm">
+                <button className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-red-500/50 hover:bg-slate-800 text-xs font-bold text-slate-200 transition-all shadow-sm active:scale-95">
                   <Menu className="w-4 h-4 text-red-500" />
-                  <span className="hidden sm:inline">Menu & Categorias</span>
+                  <span className="text-[11px] sm:text-xs font-bold">Categorias</span>
                 </button>
               </SheetTrigger>
               <SheetContent side="left" className="bg-slate-950 border-r border-slate-800 text-white w-80 sm:w-96 p-0 overflow-y-auto">
@@ -466,9 +471,9 @@ export default function Home() {
                 </>
               )}
 
-              {/* Dot Indicators */}
+              {/* Slide Indicators */}
               {finalBanners.length > 1 && (
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-20 px-2.5 py-1 rounded-full bg-slate-950/60 backdrop-blur-sm border border-slate-800/80">
                   {finalBanners.map((_, i) => (
                     <button
                       key={i}
@@ -476,8 +481,8 @@ export default function Home() {
                         e.stopPropagation();
                         setCurrentSlide(i);
                       }}
-                      className={`w-1.5 h-1.5 rounded-full transition-all ${
-                        i === currentSlide ? "bg-red-500 w-4" : "bg-slate-500/60 hover:bg-slate-400"
+                      className={`h-1.5 rounded-full transition-all duration-300 ${
+                        i === currentSlide ? "bg-red-500 w-5 shadow-[0_0_8px_rgba(220,38,38,0.8)]" : "bg-slate-500/60 hover:bg-slate-400 w-1.5"
                       }`}
                     />
                   ))}
@@ -579,26 +584,27 @@ export default function Home() {
           {/* Search bar below the banner */}
           <div className="max-w-3xl mx-auto mt-6 flex flex-col sm:flex-row gap-2 relative">
             <div className="relative w-full">
-              <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-6 sm:h-6 text-slate-500" />
+              <Search className="absolute left-3.5 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
               <Input 
                 type="text" 
-                placeholder="Busque por jogos, gift cards..." 
+                placeholder="Busque por jogos (ex: Mad Max), gift cards..." 
                 value={heroSearch}
                 onChange={(e) => setHeroSearch(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && heroSearch.trim()) navigate(`/digital?search=${encodeURIComponent(heroSearch.trim())}`); }}
-                className="w-full h-11 sm:h-16 pl-9 sm:pl-14 pr-4 bg-slate-900/80 border-slate-800 text-white text-sm sm:text-lg rounded-xl focus:border-red-500 focus:ring-red-500/20 shadow-xl"
+                className="w-full h-12 sm:h-14 pl-10 sm:pl-12 pr-4 bg-slate-900/80 border-slate-800 text-white text-sm sm:text-base rounded-xl focus:border-red-500 focus:ring-red-500/20 shadow-xl placeholder:text-slate-500 transition-all"
               />
             </div>
             <Button
-              className="h-11 sm:h-16 px-5 sm:px-8 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm sm:text-lg font-bold shrink-0 shadow-[0_0_20px_rgba(220,38,38,0.4)] w-full sm:w-auto"
+              className="h-12 sm:h-14 px-6 sm:px-8 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm sm:text-base font-bold shrink-0 shadow-[0_0_20px_rgba(220,38,38,0.35)] w-full sm:w-auto active:scale-95 transition-all flex items-center justify-center gap-2"
               onClick={() => { if (heroSearch.trim()) navigate(`/digital?search=${encodeURIComponent(heroSearch.trim())}`); }}
             >
-              Buscar
+              <Search className="w-4 h-4 sm:hidden" />
+              <span>Buscar</span>
             </Button>
           </div>
 
           {/* Quick Search Pills & Console Filter Pills */}
-          <div className="max-w-4xl mx-auto mt-4 px-4 pb-4 space-y-3">
+          <div className="max-w-4xl mx-auto mt-4 px-4 pb-2 space-y-3">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-xs text-slate-400">
               <span className="font-bold text-slate-500 shrink-0">Buscas populares:</span>
               <div className="flex sm:flex-wrap items-center gap-2 overflow-x-auto sm:overflow-visible w-full sm:w-auto py-1 scrollbar-none justify-start sm:justify-center max-w-full">
@@ -638,6 +644,48 @@ export default function Home() {
             </div>
           </div>
 
+          {/* Trust Badges Bar */}
+          <div className="max-w-5xl mx-auto mt-4 pt-4 border-t border-slate-800/80">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4">
+              <div className="flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-slate-900/50 border border-slate-800/70 backdrop-blur-sm">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-red-600/10 border border-red-500/20 flex items-center justify-center shrink-0">
+                  <Zap className="w-4 h-4 text-red-500" />
+                </div>
+                <div>
+                  <h4 className="text-[11px] sm:text-xs font-bold text-white leading-tight">Entrega Imediata</h4>
+                  <p className="text-[10px] sm:text-[11px] text-slate-400">Ativação rápida e fácil</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-slate-900/50 border border-slate-800/70 backdrop-blur-sm">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-emerald-600/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                </div>
+                <div>
+                  <h4 className="text-[11px] sm:text-xs font-bold text-white leading-tight">Compra Segura</h4>
+                  <p className="text-[10px] sm:text-[11px] text-slate-400">Garantia Eforte Games</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-slate-900/50 border border-slate-800/70 backdrop-blur-sm">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-amber-600/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+                  <Coins className="w-4 h-4 text-amber-400" />
+                </div>
+                <div>
+                  <h4 className="text-[11px] sm:text-xs font-bold text-white leading-tight">Cashback ForteCoins</h4>
+                  <p className="text-[10px] sm:text-[11px] text-slate-400">Moedas em cada compra</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-slate-900/50 border border-slate-800/70 backdrop-blur-sm">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-blue-600/10 border border-blue-500/20 flex items-center justify-center shrink-0">
+                  <Gamepad2 className="w-4 h-4 text-blue-400" />
+                </div>
+                <div>
+                  <h4 className="text-[11px] sm:text-xs font-bold text-white leading-tight">PS4, PS5 & Físicos</h4>
+                  <p className="text-[10px] sm:text-[11px] text-slate-400">Catálogo atualizado</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </section>
 
@@ -660,6 +708,33 @@ export default function Home() {
                 <span className="text-[9px] sm:text-xs font-semibold text-slate-300 text-center">{cat.name}</span>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Banner Destaque Jogue com Economia */}
+      <section className="py-4 container mx-auto px-4">
+        <div 
+          onClick={() => navigate("/jogue-com-economia")}
+          className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-red-950/80 via-slate-900/90 to-slate-950 border border-red-500/30 p-5 sm:p-7 cursor-pointer group shadow-[0_0_25px_rgba(220,38,38,0.15)] hover:shadow-[0_0_35px_rgba(220,38,38,0.3)] transition-all hover:border-red-500/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+        >
+          <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-red-600/10 rounded-full blur-3xl pointer-events-none group-hover:bg-red-600/20 transition-all" />
+          <div className="space-y-1.5 max-w-xl relative z-10">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-600/20 border border-red-500/30 text-red-400 text-[10px] sm:text-xs font-black uppercase tracking-wider">
+              <Zap className="w-3.5 h-3.5 animate-pulse" /> Seção Especial
+            </div>
+            <h3 className="text-lg sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
+              Jogue com Economia <span className="text-red-500">— Até 70% OFF</span>
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-300">
+              Quer jogar os melhores títulos pagando muito menos? Descubra nosso catálogo selecionado de contas secundárias verificadas com suporte e garantia.
+            </p>
+          </div>
+          <div className="relative z-10 shrink-0">
+            <Button className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-xl shadow-[0_0_15px_rgba(220,38,38,0.4)] group-hover:scale-105 transition-transform flex items-center gap-2">
+              <span>Explorar Ofertas</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </Button>
           </div>
         </div>
       </section>
@@ -789,10 +864,15 @@ export default function Home() {
                     )}
                   </div>
                   <div className="p-3 sm:p-4 flex flex-col flex-grow">
-                    <div className="flex items-center gap-1 mb-1">
+                    <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                       <span className="text-[9px] font-bold text-green-400 bg-green-950/60 px-1.5 py-0.5 rounded border border-green-800/40 flex items-center gap-1">
                         <ShieldCheck className="w-2.5 h-2.5" /> Verificado
                       </span>
+                      {isDigital && (
+                        <span className="text-[9px] font-bold text-amber-400 bg-amber-950/50 px-1.5 py-0.5 rounded border border-amber-800/40 flex items-center gap-0.5">
+                          <Coins className="w-2.5 h-2.5 text-amber-400" /> +7 FC
+                        </span>
+                      )}
                     </div>
                     {(listing.sellerId || listing.seller_id || listing.sellerOpenId || listing.sellerName) ? (
                       <div className="mb-1">

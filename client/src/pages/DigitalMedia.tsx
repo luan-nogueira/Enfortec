@@ -103,6 +103,9 @@ function getGameBadge(product: any) {
   if (product.isPreVenda || product.name?.toLowerCase().includes("pré-venda") || product.name?.toLowerCase().includes("pre-venda") || product.name?.toLowerCase().includes("prevenda")) {
     return { label: "📅 Pré-Venda", color: "bg-amber-600 shadow-[0_0_10px_rgba(217,119,6,0.5)] border border-amber-500/30" };
   }
+  if (product.showInEconomia) {
+    return { label: "⚡ Jogue com Economia", color: "bg-red-600 text-white font-bold shadow-[0_0_10px_rgba(220,38,38,0.5)] border border-red-500/30" };
+  }
   const name = product.name || "";
   const key = Object.keys(GAME_BADGES).find(k => name.toUpperCase().includes(k));
   return key ? GAME_BADGES[key] : null;
@@ -434,7 +437,8 @@ export default function DigitalMedia() {
   }, [products]);
 
   const filteredProducts = products.filter((p: any) => {
-    if (p.showInEconomia === true) return false;
+    const isSearching = searchTerm.trim().length > 0;
+    if (p.showInEconomia === true && !isSearching && selectedType !== "economia") return false;
     const nameLower = p.name.toLowerCase();
     const matchesSearch = !searchTerm || nameLower.includes(searchTerm.toLowerCase()) ||
       p.description?.toLowerCase().includes(searchTerm.toLowerCase());

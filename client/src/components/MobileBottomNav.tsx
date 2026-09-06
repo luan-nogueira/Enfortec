@@ -23,6 +23,7 @@ import {
   LogOut,
   ChevronRight,
   Sparkles,
+  Search,
 } from "lucide-react";
 import {
   Sheet,
@@ -233,15 +234,17 @@ export default function MobileBottomNav() {
           {/* 5th Item: Menu Drawer Trigger */}
           <Sheet open={openMenu} onOpenChange={setOpenMenu}>
             <SheetTrigger asChild>
-              <button className="flex flex-col items-center justify-center py-1 px-1 rounded-xl text-gray-400 hover:text-white transition-all">
-                <Menu className="w-5 h-5 text-gray-300" />
-                <span className="text-[10px] tracking-tight mt-0.5 font-medium leading-none">
-                  Menu
+              <button className="flex flex-col items-center justify-center py-1 px-1 rounded-xl text-slate-300 hover:text-white transition-all group active:scale-95">
+                <div className="relative p-1 rounded-lg bg-red-600/10 border border-red-500/25 group-hover:border-red-500/50 transition-colors">
+                  <Menu className="w-4 h-4 text-red-500 group-hover:text-red-400" />
+                </div>
+                <span className="text-[10px] tracking-tight mt-0.5 font-bold leading-none text-slate-300">
+                  Categorias
                 </span>
               </button>
             </SheetTrigger>
 
-            <SheetContent side="right" className="w-[85vw] sm:w-[380px] bg-[#0c0c0c] border-[#dc143c]/30 text-white p-0 flex flex-col justify-between z-[10000]">
+            <SheetContent side="right" className="w-[88vw] sm:w-[380px] bg-[#0c0c0c] border-[#dc143c]/30 text-white p-0 flex flex-col justify-between z-[10000]">
               <SheetHeader className="p-5 border-b border-gray-800 text-left bg-gradient-to-r from-[#18080b] to-[#0c0c0c]">
                 <div className="flex items-center justify-between">
                   <SheetTitle className="text-lg font-black text-white flex items-center gap-2">
@@ -255,6 +258,23 @@ export default function MobileBottomNav() {
                       <X className="w-5 h-5" />
                     </Button>
                   </SheetClose>
+                </div>
+
+                {/* Quick Search inside Mobile Drawer */}
+                <div className="mt-3">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Buscar jogo (ex: Mad Max)..."
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && (e.target as HTMLInputElement).value.trim()) {
+                          handleNavigate(`/digital?search=${encodeURIComponent((e.target as HTMLInputElement).value.trim())}`);
+                        }
+                      }}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-red-500 transition-colors"
+                    />
+                  </div>
                 </div>
 
                 {user ? (
