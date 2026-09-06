@@ -58,7 +58,7 @@ export default function MobileBottomNav() {
     };
 
     const observer = new MutationObserver(checkModal);
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+    observer.observe(document.body, { childList: true, subtree: true });
     checkModal();
     return () => observer.disconnect();
   }, []);

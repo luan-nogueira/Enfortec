@@ -88,8 +88,6 @@ const trpcClient = trpc.createClient({
           } catch (e) {
             console.error("[TRPC Client] Failed to get Firebase ID token:", e);
           }
-        } else {
-          console.warn("[TRPC Client] auth.currentUser is null.");
         }
         return {};
       },
