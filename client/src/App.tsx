@@ -50,36 +50,34 @@ function RouteFallback() {
 
 function Router() {
   return (
-    <WouterRouter>
-      <Suspense fallback={<RouteFallback />}>
-        <Switch>
-          <Route path={"/"} component={Home} />
-          <Route path={"/loja"} component={Store} />
-          <Route path={"/usados"} component={UsedMarketplace} />
-          <Route path={"/digital"} component={DigitalMedia} />
-          <Route path={"/jogue-com-economia"} component={JogueComEconomia} />
-          <Route path={"/economia"} component={JogueComEconomia} />
-          <Route path={"/promocoes"} component={PromotionsPage} />
-          <Route path={"/platinador"} component={PlatinadorPage} />
-          <Route path={"/admin"} component={AdminDashboard} />
-          <Route path={"/vendedor"} component={SellerDashboard} />
-          <Route path={"/virar-vendedor"} component={BecomeSellerForm} />
-          <Route path={"/vendedor/cadastro"} component={BecomeSellerForm} />
-          <Route path={"/vendedor/novo-produto-usado"} component={AddUsedProduct} />
-          <Route path={"/digital/vender"} component={SellDigitalProduct} />
-          <Route path={"/login"} component={Login} />
-          <Route path={"/colaborador"} component={CollaboratorDashboard} />
-          <Route path={"/minhas-compras"} component={MyPurchases} />
-          <Route path={"/fortecoins"} component={FortecoinsPage} />
-          <Route path={"/termos"} component={TermsFortecoins} />
-          <Route path={"/faq"} component={FAQ} />
-          <Route path={"/avaliacoes"} component={Reviews} />
-          <Route path={"/404"} component={NotFound} />
-          {/* Final fallback route */}
-          <Route component={NotFound} />
-        </Switch>
-      </Suspense>
-    </WouterRouter>
+    <Suspense fallback={<RouteFallback />}>
+      <Switch>
+        <Route path={"/"} component={Home} />
+        <Route path={"/loja"} component={Store} />
+        <Route path={"/usados"} component={UsedMarketplace} />
+        <Route path={"/digital"} component={DigitalMedia} />
+        <Route path={"/jogue-com-economia"} component={JogueComEconomia} />
+        <Route path={"/economia"} component={JogueComEconomia} />
+        <Route path={"/promocoes"} component={PromotionsPage} />
+        <Route path={"/platinador"} component={PlatinadorPage} />
+        <Route path={"/admin"} component={AdminDashboard} />
+        <Route path={"/vendedor"} component={SellerDashboard} />
+        <Route path={"/virar-vendedor"} component={BecomeSellerForm} />
+        <Route path={"/vendedor/cadastro"} component={BecomeSellerForm} />
+        <Route path={"/vendedor/novo-produto-usado"} component={AddUsedProduct} />
+        <Route path={"/digital/vender"} component={SellDigitalProduct} />
+        <Route path={"/login"} component={Login} />
+        <Route path={"/colaborador"} component={CollaboratorDashboard} />
+        <Route path={"/minhas-compras"} component={MyPurchases} />
+        <Route path={"/fortecoins"} component={FortecoinsPage} />
+        <Route path={"/termos"} component={TermsFortecoins} />
+        <Route path={"/faq"} component={FAQ} />
+        <Route path={"/avaliacoes"} component={Reviews} />
+        <Route path={"/404"} component={NotFound} />
+        {/* Final fallback route */}
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
   );
 }
 function App() {
@@ -123,15 +121,17 @@ function App() {
         defaultTheme="light"
       >
         <TooltipProvider>
-          <Toaster />
-          <Router />
-          <FloatingChat />
-          <GlobalChatNotifier />
-          <OrderDeliveredNotifier />
-          <SocialProofToast />
-          <MobileBottomNav />
-          <CPFCompletionModal />
-          <TermsAcceptanceModal />
+          <WouterRouter>
+            <Toaster />
+            <Router />
+            <FloatingChat />
+            <GlobalChatNotifier />
+            <OrderDeliveredNotifier />
+            <SocialProofToast />
+            <MobileBottomNav />
+            <CPFCompletionModal />
+            <TermsAcceptanceModal />
+          </WouterRouter>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

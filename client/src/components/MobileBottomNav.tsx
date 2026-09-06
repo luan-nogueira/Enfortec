@@ -48,11 +48,11 @@ export default function MobileBottomNav() {
 
   const pendingDeliveredCount = (orders || []).filter((o: any) => o.status === "enviado").length;
 
-  // Esconde a barra inferior automaticamente caso qualquer modal/dialog esteja aberto na tela
+  // Esconde a barra inferior automaticamente caso qualquer modal/dialog esteja aberto na tela (ignora gavetas laterais)
   useEffect(() => {
     const checkModal = () => {
       const isModalOpen = Boolean(
-        document.querySelector('[data-slot="dialog-content"], [role="dialog"], [data-radix-dialog-content]')
+        document.querySelector('[data-slot="dialog-content"]')
       );
       setHasOpenModal(isModalOpen);
     };
@@ -66,9 +66,10 @@ export default function MobileBottomNav() {
   const handleNavigate = (path: string) => {
     navigate(path);
     setOpenMenu(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  if (location.startsWith("/admin") || location.startsWith("/colaborador") || hasOpenModal) return null;
+  if (location.startsWith("/admin") || location.startsWith("/colaborador")) return null;
 
   const navItems = [
     {
@@ -196,7 +197,9 @@ export default function MobileBottomNav() {
     <>
       {/* Bottom Bar fixed on Mobile */}
       <nav
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-[#080808]/95 backdrop-blur-xl border-t border-[#dc143c]/30 px-2 py-1.5 shadow-[0_-5px_20px_rgba(0,0,0,0.8)] pb-[calc(6px+env(safe-area-inset-bottom,0px))]"
+        className={`lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-[#080808]/95 backdrop-blur-xl border-t border-[#dc143c]/30 px-2 py-1.5 shadow-[0_-5px_20px_rgba(0,0,0,0.8)] pb-[calc(6px+env(safe-area-inset-bottom,0px))] transition-transform duration-200 ${
+          hasOpenModal ? "translate-y-full opacity-0 pointer-events-none" : "translate-y-0 opacity-100"
+        }`}
       >
         <div className="grid grid-cols-5 items-center justify-between max-w-md mx-auto">
           {navItems.map((item) => {
@@ -204,8 +207,9 @@ export default function MobileBottomNav() {
             return (
               <button
                 key={item.label}
+                type="button"
                 onClick={() => handleNavigate(item.path)}
-                className={`flex flex-col items-center justify-center py-1 px-1 rounded-xl transition-all ${
+                className={`flex flex-col items-center justify-center py-1 px-1 rounded-xl transition-all cursor-pointer active:scale-95 ${
                   item.active
                     ? "text-[#dc143c] font-bold scale-105"
                     : "text-gray-400 hover:text-gray-200"
@@ -234,7 +238,11 @@ export default function MobileBottomNav() {
           {/* 5th Item: Menu Drawer Trigger */}
           <Sheet open={openMenu} onOpenChange={setOpenMenu}>
             <SheetTrigger asChild>
-              <button className="flex flex-col items-center justify-center py-1 px-1 rounded-xl text-slate-300 hover:text-white transition-all group active:scale-95">
+              <button
+                type="button"
+                onClick={() => setOpenMenu(true)}
+                className="flex flex-col items-center justify-center py-1 px-1 rounded-xl text-slate-300 hover:text-white transition-all group active:scale-95 cursor-pointer"
+              >
                 <div className="relative p-1 rounded-lg bg-red-600/10 border border-red-500/25 group-hover:border-red-500/50 transition-colors">
                   <Menu className="w-4 h-4 text-red-500 group-hover:text-red-400" />
                 </div>
