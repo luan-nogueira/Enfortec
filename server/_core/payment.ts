@@ -397,11 +397,26 @@ export function registerPaymentRoute(app: Express) {
         statement_descriptor: "ENFORTEC GAMES",
       };
 
+      // Tenta obter o CPF do comprador (ou enviado no customer, ou do usuário logado no banco)
+      let resolvedCpf: string | null = customer?.cpf ? String(customer.cpf).replace(/\D/g, "") : null;
+      if (!resolvedCpf && buyerId > 0) {
+        const buyerRows = await database.select().from(users).where(eq(users.id, buyerId)).limit(1);
+        if (buyerRows[0]?.cpf) {
+          resolvedCpf = buyerRows[0].cpf.replace(/\D/g, "");
+        }
+      }
+
       if (customer && typeof customer === "object") {
         preferencePayload.payer = {
           name: customer.name || undefined,
           email: customer.email || undefined,
-          phone: customer.phone_number ? { number: customer.phone_number.replace(/\D/g, "") } : undefined
+          phone: customer.phone_number ? { number: customer.phone_number.replace(/\D/g, "") } : undefined,
+          ...(resolvedCpf && resolvedCpf.length === 11 ? {
+            identification: {
+              type: "CPF",
+              number: resolvedCpf
+            }
+          } : {})
         };
       }
 

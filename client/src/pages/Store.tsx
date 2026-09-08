@@ -228,7 +228,8 @@ export default function Store() {
           customer: {
             name: customerName,
             email: customerEmail,
-            phone_number: formattedPhone
+            phone_number: formattedPhone,
+            cpf: user?.cpf || undefined
           }
         })
       });
@@ -239,7 +240,9 @@ export default function Store() {
         localStorage.setItem("customerPhone", customerPhone);
 
         if (data.url) {
-          window.open(data.url, "_blank");
+          // Redireciona diretamente para o checkout do Mercado Pago (evita bloqueio de pop-up em celulares e WhatsApp)
+          window.location.href = data.url;
+          return;
         } else if (data.paidWithCoins) {
           // Compra 100% paga com moedas
           if (user?.id) {
