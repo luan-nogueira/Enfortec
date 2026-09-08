@@ -719,24 +719,71 @@ export default function AdminDashboard() {
     return () => window.removeEventListener("popstate", handleUrlTab);
   }, []);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [selectedPeriod, setSelectedPeriod] = useState<"current_month" | "previous_month" | "last_30" | "last_7" | "all">("current_month");
+  const [chartDays, setChartDays] = useState<number>(7);
 
   // Helpers to calculate sales stats
   const getSalesStats = () => {
-    if (!sales) return { total: 0, today: 0, week: 0, month: 0, count: 0, todayCount: 0, weekCount: 0, monthCount: 0 };
+    if (!sales) return { 
+      total: 0, 
+      today: 0, 
+      week: 0, 
+      month: 0, 
+      prevMonth: 0,
+      count: 0, 
+      todayCount: 0, 
+      weekCount: 0, 
+      monthCount: 0,
+      prevMonthCount: 0,
+      filtered: 0,
+      filteredCount: 0,
+      filteredLabel: "Este Mês",
+      filteredAvg: 0,
+      currentMonthName: "Mês Atual",
+      prevMonthName: "Mês Anterior",
+      totalAvg: 0,
+    };
     
     const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    
+    // Hoje
+    const startOfToday = new Date(currentYear, currentMonth, now.getDate()).getTime();
+    
+    // Últimos 7 dias
     const oneWeekAgo = now.getTime() - 7 * 24 * 60 * 60 * 1000;
-    const oneMonthAgo = now.getTime() - 30 * 24 * 60 * 60 * 1000;
+    
+    // Mês Atual Calendário (ex: 01/09/2026 00:00:00 até 01/10/2026 00:00:00)
+    const startOfCurrentMonth = new Date(currentYear, currentMonth, 1).getTime();
+    const endOfCurrentMonth = new Date(currentYear, currentMonth + 1, 1).getTime();
+    
+    // Mês Anterior Calendário (ex: 01/08/2026 00:00:00 até 01/09/2026 00:00:00)
+    const startOfPrevMonth = new Date(currentYear, currentMonth - 1, 1).getTime();
+    const endOfPrevMonth = startOfCurrentMonth;
+    
+    // Últimos 30 dias rolantes
+    const last30Days = now.getTime() - 30 * 24 * 60 * 60 * 1000;
+
+    const currentMonthName = now.toLocaleDateString("pt-BR", { month: "long" });
+    const capitalizedCurrentMonth = currentMonthName.charAt(0).toUpperCase() + currentMonthName.slice(1);
+
+    const prevDate = new Date(currentYear, currentMonth - 1, 1);
+    const prevMonthName = prevDate.toLocaleDateString("pt-BR", { month: "long" });
+    const capitalizedPrevMonth = prevMonthName.charAt(0).toUpperCase() + prevMonthName.slice(1);
     
     let total = 0;
     let today = 0;
     let week = 0;
     let month = 0;
+    let prevMonth = 0;
+    let last30 = 0;
     let count = 0;
     let todayCount = 0;
     let weekCount = 0;
     let monthCount = 0;
+    let prevMonthCount = 0;
+    let last30Count = 0;
     
     const paidStatuses = ["pago", "enviado", "entregue"];
     
@@ -757,19 +804,70 @@ export default function AdminDashboard() {
         week += price;
         weekCount += 1;
       }
-      if (timestamp >= oneMonthAgo) {
+      if (timestamp >= startOfCurrentMonth && timestamp < endOfCurrentMonth) {
         month += price;
         monthCount += 1;
       }
+      if (timestamp >= startOfPrevMonth && timestamp < endOfPrevMonth) {
+        prevMonth += price;
+        prevMonthCount += 1;
+      }
+      if (timestamp >= last30Days) {
+        last30 += price;
+        last30Count += 1;
+      }
     });
+
+    let filtered = month;
+    let filteredCount = monthCount;
+    let filteredLabel = `Mês Atual (${capitalizedCurrentMonth})`;
+
+    if (selectedPeriod === "previous_month") {
+      filtered = prevMonth;
+      filteredCount = prevMonthCount;
+      filteredLabel = `Mês Anterior (${capitalizedPrevMonth})`;
+    } else if (selectedPeriod === "last_30") {
+      filtered = last30;
+      filteredCount = last30Count;
+      filteredLabel = "Últimos 30 Dias";
+    } else if (selectedPeriod === "last_7") {
+      filtered = week;
+      filteredCount = weekCount;
+      filteredLabel = "Últimos 7 Dias";
+    } else if (selectedPeriod === "all") {
+      filtered = total;
+      filteredCount = count;
+      filteredLabel = "Todo o Período";
+    }
+
+    const filteredAvg = filteredCount > 0 ? (filtered / filteredCount) : 0;
+    const totalAvg = count > 0 ? (total / count) : 0;
     
-    return { total, today, week, month, count, todayCount, weekCount, monthCount };
+    return { 
+      total, 
+      today, 
+      week, 
+      month, 
+      prevMonth, 
+      count, 
+      todayCount, 
+      weekCount, 
+      monthCount,
+      prevMonthCount,
+      filtered,
+      filteredCount,
+      filteredLabel,
+      filteredAvg,
+      currentMonthName: capitalizedCurrentMonth,
+      prevMonthName: capitalizedPrevMonth,
+      totalAvg
+    };
   };
 
   const getChartData = () => {
     if (!sales) return [];
     
-    const days = 7;
+    const days = chartDays || 7;
     const data = [];
     const paidStatuses = ["pago", "enviado", "entregue"];
     
@@ -3702,48 +3800,119 @@ export default function AdminDashboard() {
 
                 return (
                   <>
+                    {/* Barra de Filtro de Período & Cabeçalho Financeiro */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/60 p-4 rounded-2xl border border-red-600/20 backdrop-blur-sm shadow-xl">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-red-600/10 border border-red-500/30 flex items-center justify-center text-red-500 shadow-[0_0_15px_rgba(220,38,38,0.2)]">
+                          <BarChart3 className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h2 className="text-sm sm:text-base font-black text-white uppercase tracking-wider flex items-center gap-2">
+                            Painel de Faturamento & Métricas
+                          </h2>
+                          <p className="text-[11px] text-slate-400">
+                            Acompanhamento em tempo real das vendas e ticket médio da loja.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Seletor de Período do Mês */}
+                      <div className="flex items-center gap-2 bg-slate-950/80 p-1.5 rounded-xl border border-slate-800 self-start sm:self-auto shadow-inner">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-2 flex items-center gap-1">
+                          <Filter className="w-3 h-3 text-red-500" /> Período:
+                        </span>
+                        <select
+                          value={selectedPeriod}
+                          onChange={(e) => setSelectedPeriod(e.target.value as any)}
+                          className="bg-slate-900 border border-red-600/30 text-white text-xs font-bold rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-red-500 cursor-pointer hover:border-red-500/60 transition-all"
+                        >
+                          <option value="current_month">📅 Mês Atual ({stats.currentMonthName})</option>
+                          <option value="previous_month">⏪ Mês Anterior ({stats.prevMonthName})</option>
+                          <option value="last_30">⏳ Últimos 30 Dias</option>
+                          <option value="last_7">🗓️ Últimos 7 Dias</option>
+                          <option value="all">🌐 Geral (Histórico Completo)</option>
+                        </select>
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                      <Card className="bg-slate-900 border-red-600/10 p-6 card-neon">
-                        <div className="flex justify-between items-start">
+                      <Card className="bg-slate-900 border-red-600/20 p-5 sm:p-6 card-neon relative overflow-hidden group hover:border-red-500/40 transition-all">
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-red-600/5 rounded-full blur-xl group-hover:bg-red-600/10 transition-all" />
+                        <div className="flex justify-between items-start relative z-10">
                           <div>
-                            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Faturamento Hoje</p>
-                            <p className="text-2xl font-black text-white">R$ {stats.today.toFixed(2).replace(".", ",")}</p>
-                            <p className="text-[10px] text-slate-500 mt-1 font-semibold">{stats.todayCount} venda(s)</p>
+                            <div className="flex items-center gap-1.5 mb-1.5">
+                              <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                              <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Faturamento Hoje</p>
+                            </div>
+                            <p className="text-2xl sm:text-3xl font-black text-white">R$ {stats.today.toFixed(2).replace(".", ",")}</p>
+                            <p className="text-[10px] text-slate-500 mt-1 font-semibold">{stats.todayCount} venda(s) hoje</p>
                           </div>
-                          <Coins className="w-8 h-8 text-red-500" />
+                          <div className="w-11 h-11 rounded-xl bg-red-600/10 border border-red-600/20 flex items-center justify-center shrink-0">
+                            <Coins className="w-6 h-6 text-red-500" />
+                          </div>
                         </div>
                       </Card>
 
-                      <Card className="bg-slate-900 border-red-600/10 p-6 card-neon">
-                        <div className="flex justify-between items-start">
+                      <Card className="bg-slate-900 border-orange-500/20 p-5 sm:p-6 card-neon relative overflow-hidden group hover:border-orange-500/40 transition-all">
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-orange-500/5 rounded-full blur-xl group-hover:bg-orange-500/10 transition-all" />
+                        <div className="flex justify-between items-start relative z-10">
                           <div>
-                            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Faturamento na Semana</p>
-                            <p className="text-2xl font-black text-white">R$ {stats.week.toFixed(2).replace(".", ",")}</p>
-                            <p className="text-[10px] text-slate-500 mt-1 font-semibold">{stats.weekCount} venda(s)</p>
+                            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1.5">Faturamento na Semana</p>
+                            <p className="text-2xl sm:text-3xl font-black text-white">R$ {stats.week.toFixed(2).replace(".", ",")}</p>
+                            <p className="text-[10px] text-slate-500 mt-1 font-semibold">{stats.weekCount} venda(s) nos últimos 7 dias</p>
                           </div>
-                          <Coins className="w-8 h-8 text-orange-500" />
+                          <div className="w-11 h-11 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center shrink-0">
+                            <Coins className="w-6 h-6 text-orange-500" />
+                          </div>
                         </div>
                       </Card>
 
-                      <Card className="bg-slate-900 border-red-600/10 p-6 card-neon">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Faturamento no Mês</p>
-                            <p className="text-2xl font-black text-white">R$ {stats.month.toFixed(2).replace(".", ",")}</p>
-                            <p className="text-[10px] text-slate-500 mt-1 font-semibold">{stats.monthCount} venda(s)</p>
+                      <Card className="bg-slate-900 border-yellow-500/30 p-5 sm:p-6 card-neon relative overflow-hidden group hover:border-yellow-500/50 transition-all shadow-[0_0_20px_rgba(234,179,8,0.1)]">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-yellow-500/10 rounded-full blur-2xl group-hover:bg-yellow-500/15 transition-all" />
+                        <div className="flex justify-between items-start relative z-10">
+                          <div className="min-w-0 pr-2">
+                            <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+                              <p className="text-slate-300 text-xs font-bold uppercase tracking-wider">
+                                Faturamento {selectedPeriod === "current_month" ? `no Mês (${stats.currentMonthName})` : selectedPeriod === "previous_month" ? `em ${stats.prevMonthName}` : selectedPeriod === "last_30" ? "Últimos 30 Dias" : selectedPeriod === "last_7" ? "Últimos 7 Dias" : "Acumulado"}
+                              </p>
+                              <span className="text-[9px] bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-1.5 py-0.2 rounded font-black">
+                                FILTRADO
+                              </span>
+                            </div>
+                            <p className="text-2xl sm:text-3xl font-black text-yellow-400">R$ {stats.filtered.toFixed(2).replace(".", ",")}</p>
+                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                              <span className="text-[10px] text-slate-400 font-semibold">{stats.filteredCount} venda(s)</span>
+                              {stats.filteredCount > 0 && (
+                                <span className="text-[9px] bg-slate-950 text-slate-300 border border-slate-800 px-1.5 py-0.5 rounded font-bold">
+                                  TM: R$ {stats.filteredAvg.toFixed(2).replace(".", ",")}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <Coins className="w-8 h-8 text-yellow-500" />
+                          <div className="w-11 h-11 rounded-xl bg-yellow-500/15 border border-yellow-500/30 flex items-center justify-center shrink-0 shadow-[0_0_10px_rgba(234,179,8,0.2)]">
+                            <Coins className="w-6 h-6 text-yellow-400" />
+                          </div>
                         </div>
                       </Card>
 
-                      <Card className="bg-slate-900 border-red-600/10 p-6 card-neon">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Faturamento Total</p>
-                            <p className="text-2xl font-black text-red-500">R$ {stats.total.toFixed(2).replace(".", ",")}</p>
-                            <p className="text-[10px] text-slate-500 mt-1 font-semibold">{stats.count} venda(s) concluída(s)</p>
+                      <Card className="bg-slate-900 border-red-600/30 p-5 sm:p-6 card-neon relative overflow-hidden group hover:border-red-600/50 transition-all">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-red-600/10 rounded-full blur-2xl group-hover:bg-red-600/15 transition-all" />
+                        <div className="flex justify-between items-start relative z-10">
+                          <div className="min-w-0 pr-2">
+                            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1.5">Faturamento Total</p>
+                            <p className="text-2xl sm:text-3xl font-black text-red-500">R$ {stats.total.toFixed(2).replace(".", ",")}</p>
+                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                              <span className="text-[10px] text-slate-500 font-semibold">{stats.count} venda(s) total</span>
+                              {stats.count > 0 && (
+                                <span className="text-[9px] bg-slate-950 text-slate-300 border border-slate-800 px-1.5 py-0.5 rounded font-bold">
+                                  TM Geral: R$ {stats.totalAvg.toFixed(2).replace(".", ",")}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <Coins className="w-8 h-8 text-red-600 animate-pulse" />
+                          <div className="w-11 h-11 rounded-xl bg-red-600/15 border border-red-600/30 flex items-center justify-center shrink-0">
+                            <Coins className="w-6 h-6 text-red-600 animate-pulse" />
+                          </div>
                         </div>
                       </Card>
                     </div>
@@ -3779,9 +3948,27 @@ export default function AdminDashboard() {
               {/* Chart Section */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <Card className="lg:col-span-2 bg-slate-900 border-red-600/10 p-6 card-neon">
-                  <h3 className="text-base font-bold text-white mb-6 uppercase tracking-wider flex items-center gap-2">
-                    📈 Faturamento Diário (Últimos 7 Dias)
-                  </h3>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+                    <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                      📈 Evolução do Faturamento ({chartDays} Dias)
+                    </h3>
+                    <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 self-start sm:self-auto">
+                      {[7, 14, 30].map((d) => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => setChartDays(d)}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                            chartDays === d
+                              ? "bg-red-600 text-white shadow-md shadow-red-600/30"
+                              : "text-slate-400 hover:text-white hover:bg-slate-900"
+                          }`}
+                        >
+                          {d}D
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <div className="h-[300px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={getChartData()} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
