@@ -1496,6 +1496,9 @@ export default function AdminDashboard() {
   const [gameStock, setGameStock] = useState(999);
   const [gameIsActive, setGameIsActive] = useState(true);
   const [gameIsPreVenda, setGameIsPreVenda] = useState(false);
+  // Data/hora (formato do input datetime-local) em que este jogo específico deixa de
+  // poder ser comprado — vazio significa "sem prazo", disponível normalmente.
+  const [gameExpiresAt, setGameExpiresAt] = useState("");
   const [gameShowInEconomia, setGameShowInEconomia] = useState(false);
   const [gameEconomiaLicenseType, setGameEconomiaLicenseType] = useState<"secundaria" | "primaria" | "ambas">("secundaria");
   const [gameCoverFit, setGameCoverFit] = useState<"cover" | "contain">("cover");
@@ -2545,6 +2548,7 @@ export default function AdminDashboard() {
       isPreVenda: gameIsPreVenda,
       showInEconomia: gameShowInEconomia,
       economiaLicenseType: gameEconomiaLicenseType,
+      expiresAt: gameExpiresAt ? new Date(gameExpiresAt).toISOString() : null,
       description: "Mídia Digital Eforte Games.",
     };
 
@@ -2567,9 +2571,20 @@ export default function AdminDashboard() {
     setGameStock(999);
     setGameIsActive(true);
     setGameIsPreVenda(false);
+    setGameExpiresAt("");
     setGameShowInEconomia(false);
     setGameEconomiaLicenseType("secundaria");
     setEditingGameId(null);
+  };
+
+  // Converte um timestamp do banco (ISO string ou Date) para o formato aceito pelo
+  // input datetime-local ("YYYY-MM-DDTHH:mm"), já no horário local do navegador.
+  const toDatetimeLocalValue = (value: any) => {
+    if (!value) return "";
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
 
   const openEditGame = (game: any) => {
@@ -2592,6 +2607,7 @@ export default function AdminDashboard() {
     setGameStock(game.stock ?? 999);
     setGameIsActive(game.isActive ?? true);
     setGameIsPreVenda(game.isPreVenda ?? false);
+    setGameExpiresAt(toDatetimeLocalValue(game.expiresAt));
     setGameShowInEconomia(game.showInEconomia ?? false);
     setGameEconomiaLicenseType(game.economiaLicenseType || "secundaria");
     setShowGameModal(true);
@@ -6055,6 +6071,23 @@ export default function AdminDashboard() {
                   <span className="text-[10px] sm:text-xs font-bold text-slate-300 uppercase font-black text-amber-500">Pré-Venda</span>
                 </label>
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-slate-300 font-bold uppercase">Temporizador (opcional)</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="datetime-local"
+                  value={gameExpiresAt}
+                  onChange={(e) => setGameExpiresAt(e.target.value)}
+                  className="bg-slate-950 border-red-600/20 text-white"
+                />
+                {gameExpiresAt && (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setGameExpiresAt("")} className="text-slate-400 hover:text-white shrink-0">
+                    Remover
+                  </Button>
+                )}
+              </div>
+              <p className="text-[10px] text-slate-500">Quando essa data/hora passar, o jogo continua aparecendo na loja mas fica indisponível para compra (botão desabilitado). Deixe em branco para não usar temporizador.</p>
             </div>
             <DialogFooter className="mt-6">
               <Button type="button" variant="ghost" onClick={() => { setShowGameModal(false); resetGameForm(); }} className="text-slate-400 hover:text-white">

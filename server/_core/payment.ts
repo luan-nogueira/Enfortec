@@ -174,6 +174,9 @@ export function registerPaymentRoute(app: Express) {
               if (rows[0].isActive === false || (rows[0].stock !== undefined && rows[0].stock <= 0)) {
                 return res.status(400).json({ success: false, error: "Este jogo está esgotado no momento." });
               }
+              if (rows[0].expiresAt && new Date(rows[0].expiresAt) < new Date()) {
+                return res.status(400).json({ success: false, error: "O prazo de disponibilidade deste jogo já encerrou." });
+              }
               verifiedPrice = computeDigitalPrice(rows[0], accountType);
               realProductName = rows[0].name;
               verifiedIsPreVenda = !!rows[0].isPreVenda;

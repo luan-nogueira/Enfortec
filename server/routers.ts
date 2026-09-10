@@ -525,12 +525,13 @@ export const appRouter = router({
         isPreVenda: z.boolean().optional(),
         showInEconomia: z.boolean().optional(),
         economiaLicenseType: z.string().optional(),
+        expiresAt: z.string().nullable().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
         const database = await getDb();
         if (!database) throw new Error("Database not available");
-        
+
         const effectivePrimary = (input.pricePrimary !== undefined && input.pricePrimary !== null)
           ? input.pricePrimary.toString()
           : (!input.priceSecondary ? input.price.toString() : null);
@@ -551,6 +552,7 @@ export const appRouter = router({
           isPreVenda: input.isPreVenda,
           showInEconomia: input.showInEconomia,
           economiaLicenseType: input.economiaLicenseType,
+          expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
           status: "aprovado",
         });
       }),
@@ -572,12 +574,13 @@ export const appRouter = router({
         isPreVenda: z.boolean().optional(),
         showInEconomia: z.boolean().optional(),
         economiaLicenseType: z.string().optional(),
+        expiresAt: z.string().nullable().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
         const database = await getDb();
         if (!database) throw new Error("Database not available");
-        
+
         const effectivePrimary = (input.pricePrimary !== undefined && input.pricePrimary !== null)
           ? input.pricePrimary.toString()
           : (!input.priceSecondary ? input.price.toString() : null);
@@ -598,6 +601,7 @@ export const appRouter = router({
           isPreVenda: input.isPreVenda,
           showInEconomia: input.showInEconomia,
           economiaLicenseType: input.economiaLicenseType,
+          expiresAt: input.expiresAt !== undefined ? (input.expiresAt ? new Date(input.expiresAt) : null) : undefined,
         }).where(eq(digitalProducts.id, input.id));
       }),
     adminDelete: protectedProcedure

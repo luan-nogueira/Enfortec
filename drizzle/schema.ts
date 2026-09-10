@@ -119,6 +119,10 @@ export const digitalProducts = pgTable("digitalProducts", {
   category: varchar("category", { length: 100 }),
   coverFit: varchar("coverFit", { length: 20 }),
   isPreVenda: boolean("isPreVenda").default(false),
+  // Prazo opcional de disponibilidade de um jogo específico (ex.: promoção por tempo
+  // limitado). Quando definido e no passado, o jogo fica visível na loja mas indisponível
+  // para compra — ver checagem em server/_core/payment.ts (handleCheckout).
+  expiresAt: timestamp("expiresAt"),
   showInEconomia: boolean("showInEconomia").default(false),
   economiaLicenseType: varchar("economiaLicenseType", { length: 50 }),
   // "pendente" | "aprovado" | "rejeitado" — contas cadastradas por vendedores da comunidade

@@ -99,6 +99,55 @@ function isConsoleSelectableProduct(product: any): boolean {
   );
 }
 
+/** Contador regressivo até `expiresAt` (prazo de disponibilidade de um jogo específico). */
+function GameCountdown({ expiresAt, compact = false }: { expiresAt: string; compact?: boolean }) {
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0, expired: false });
+
+  useEffect(() => {
+    const calculateTime = () => {
+      const difference = +new Date(expiresAt) - +new Date();
+      if (difference <= 0) {
+        return { days: 0, hours: 0, minutes: 0, seconds: 0, expired: true };
+      }
+      return {
+        days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((difference / 1000 / 60) % 60),
+        seconds: Math.floor((difference / 1000) % 60),
+        expired: false,
+      };
+    };
+
+    setTimeLeft(calculateTime());
+    const timer = setInterval(() => {
+      setTimeLeft(calculateTime());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [expiresAt]);
+
+  if (timeLeft.expired) return null;
+
+  const padZero = (n: number) => n.toString().padStart(2, "0");
+
+  return (
+    <div className={`inline-flex gap-1 sm:gap-1.5 items-center bg-slate-950/85 backdrop-blur-md rounded-lg border border-red-500/40 text-white font-bold shadow-[0_0_10px_rgba(220,38,38,0.25)] ${compact ? "px-1.5 py-0.5 text-[8px]" : "px-2.5 py-1 text-[10px] sm:text-xs"}`}>
+      <span className="flex items-center gap-1 text-red-400 font-extrabold tracking-wide">
+        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse inline-block" />
+        {!compact && "TERMINA EM:"}
+      </span>
+      <div className="flex items-center gap-1 font-mono">
+        {timeLeft.days > 0 && (
+          <span className="bg-red-950/60 border border-red-500/30 px-1 py-0.5 rounded text-red-400 font-bold">{timeLeft.days}d</span>
+        )}
+        <span className="bg-red-950/60 border border-red-500/30 px-1 py-0.5 rounded text-red-400 font-bold">{padZero(timeLeft.hours)}h</span>
+        <span className="bg-red-950/60 border border-red-500/30 px-1 py-0.5 rounded text-red-400 font-bold">{padZero(timeLeft.minutes)}m</span>
+        <span className="bg-red-950/60 border border-red-500/30 px-1 py-0.5 rounded text-red-400 font-bold">{padZero(timeLeft.seconds)}s</span>
+      </div>
+    </div>
+  );
+}
+
 function getGameBadge(product: any) {
   if (product.isPreVenda || product.name?.toLowerCase().includes("pré-venda") || product.name?.toLowerCase().includes("pre-venda") || product.name?.toLowerCase().includes("prevenda")) {
     return { label: "📅 Pré-Venda", color: "bg-amber-600 shadow-[0_0_10px_rgba(217,119,6,0.5)] border border-amber-500/30" };
@@ -255,6 +304,11 @@ export default function DigitalMedia() {
 
     if (product.isActive === false || Number(product.stock ?? 0) <= 0) {
       toast.error("Este jogo está esgotado no momento.");
+      return;
+    }
+
+    if (product.expiresAt && new Date(product.expiresAt) < new Date()) {
+      toast.error("O prazo de disponibilidade deste jogo já encerrou.");
       return;
     }
 
@@ -765,8 +819,10 @@ export default function DigitalMedia() {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-4">
               {filteredProducts.map((product: any) => {
                 const isOutOfStock = product.isActive === false || Number(product.stock ?? 0) <= 0;
+                const isExpired = !!product.expiresAt && new Date(product.expiresAt) < new Date();
+                const isUnavailable = isOutOfStock || isExpired;
                 return (
-                <div key={product.id} className={`card-neon game-card-shine overflow-hidden group hover:scale-[1.03] transition-all duration-250 flex flex-col ${isOutOfStock ? 'opacity-70' : ''}`}>
+                <div key={product.id} className={`card-neon game-card-shine overflow-hidden group hover:scale-[1.03] transition-all duration-250 flex flex-col ${isUnavailable ? 'opacity-70' : ''}`}>
                   <div className="relative overflow-hidden bg-slate-950 aspect-[16/9] w-full flex items-center justify-center">
                     {product.imageUrl ? (
                       <>
@@ -805,6 +861,10 @@ export default function DigitalMedia() {
                       <div className="absolute top-1.5 right-1.5 z-10 bg-red-600/90 border border-red-500 text-white text-[7px] sm:text-[9px] font-black px-1.5 sm:px-2 py-0.5 rounded-full uppercase tracking-wider shadow-lg">
                         Esgotado
                       </div>
+                    ) : isExpired ? (
+                      <div className="absolute top-1.5 right-1.5 z-10 bg-red-600/90 border border-red-500 text-white text-[7px] sm:text-[9px] font-black px-1.5 sm:px-2 py-0.5 rounded-full uppercase tracking-wider shadow-lg">
+                        Prazo Encerrado
+                      </div>
                     ) : (() => {
                       const badge = getGameBadge(product);
                       return badge ? (
@@ -813,6 +873,11 @@ export default function DigitalMedia() {
                         </div>
                       ) : null;
                     })()}
+                    {!isUnavailable && product.expiresAt && (
+                      <div className="absolute bottom-1.5 right-1.5 z-10">
+                        <GameCountdown expiresAt={product.expiresAt} compact />
+                      </div>
+                    )}
                     <div className="absolute bottom-1.5 left-1.5 z-10">
                       <span 
                         onClick={(e) => {
@@ -874,14 +939,14 @@ export default function DigitalMedia() {
                       <Button
                         size="sm"
                         className={`w-full font-bold text-[10px] sm:text-xs h-8 sm:h-9 ${
-                          isOutOfStock
+                          isUnavailable
                             ? "bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed"
                             : "bg-red-600 hover:bg-red-700 text-white btn-neon"
                         }`}
-                        onClick={() => !isOutOfStock && handleBuyClick(product)}
-                        disabled={isOutOfStock || (isProcessingCheckout && selectedProduct?.id === product.id)}
+                        onClick={() => !isUnavailable && handleBuyClick(product)}
+                        disabled={isUnavailable || (isProcessingCheckout && selectedProduct?.id === product.id)}
                       >
-                        {isOutOfStock ? (
+                        {isUnavailable ? (
                           "Indisponível"
                         ) : parseFloat(product.price) === 0 ? (
                           "Consultar"
@@ -944,6 +1009,11 @@ export default function DigitalMedia() {
                 <div className="mt-2 text-lg font-black text-red-500">
                   R$ {price.toFixed(2).replace('.', ',')}
                 </div>
+                {selectedProduct?.expiresAt && new Date(selectedProduct.expiresAt) > new Date() && (
+                  <div className="mt-2">
+                    <GameCountdown expiresAt={selectedProduct.expiresAt} />
+                  </div>
+                )}
               </div>
             </div>
 
