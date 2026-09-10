@@ -5,6 +5,7 @@ dotenv.config();
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local"), override: false });
 process.env.NODE_ENV = process.env.NODE_ENV || "development";
 import express from "express";
+import compression from "compression";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
@@ -36,6 +37,12 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 export const app = express();
+
+// Comprime respostas (gzip/brotli) antes de sair — as respostas JSON do tRPC (listas de
+// jogos, pedidos, etc.) não tinham nenhuma compressão, o que inflava bastante o Fast
+// Origin Transfer no Vercel sem mudar nada no comportamento do site (é transparente pro
+// cliente, só reduz o tamanho em trânsito).
+app.use(compression());
 
 // Configure body parser with larger size limit for file uploads
 app.use(express.json({ limit: "50mb" }));
