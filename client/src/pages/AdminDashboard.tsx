@@ -1626,18 +1626,30 @@ export default function AdminDashboard() {
 
       // Caso A: Se a linha contiver ponto e vírgula, tratamos como delimitador clássico
       if (text.includes(";")) {
-        const parts = text.split(";");
-        name = parts[0]?.trim() || "";
-        if (parts.length >= 5) {
-          pricePrimary = parts[1] ? parseFloat(parts[1].trim().replace(",", ".")) : 0;
-          priceSecondary = parts[2] ? parseFloat(parts[2].trim().replace(",", ".")) : null;
-          platform = parts[3]?.trim() || "PS4/PS5";
-          stock = parts[4] ? parseInt(parts[4].trim()) : 999;
+        const parts = text.split(";").map((p) => p.trim());
+        // Formato mais comum ao colar listas (ex.: "Nome: 164,90; PS5; 999"): o preço vem
+        // embutido no primeiro campo, separado por ":", em vez de ser um campo próprio.
+        const priceInNameRegex = /[:\s]+(\d+[,.]\d{2})\s*$/;
+        const nameMatch = parts[0]?.match(priceInNameRegex);
+
+        if (nameMatch) {
+          name = parts[0].replace(priceInNameRegex, "").replace(/[:\-–—]+$/, "").trim();
+          pricePrimary = parseFloat(nameMatch[1].replace(",", "."));
+          platform = parts[1] || "PS4/PS5";
+          stock = parts[2] ? parseInt(parts[2]) : 999;
+          price = pricePrimary;
+        } else if (parts.length >= 5) {
+          name = parts[0] || "";
+          pricePrimary = parts[1] ? parseFloat(parts[1].replace(",", ".")) : 0;
+          priceSecondary = parts[2] ? parseFloat(parts[2].replace(",", ".")) : null;
+          platform = parts[3] || "PS4/PS5";
+          stock = parts[4] ? parseInt(parts[4]) : 999;
           price = pricePrimary;
         } else {
-          pricePrimary = parts[1] ? parseFloat(parts[1].trim().replace(",", ".")) : 0;
-          platform = parts[2]?.trim() || "PS4/PS5";
-          stock = parts[3] ? parseInt(parts[3].trim()) : 999;
+          name = parts[0] || "";
+          pricePrimary = parts[1] ? parseFloat(parts[1].replace(",", ".")) : 0;
+          platform = parts[2] || "PS4/PS5";
+          stock = parts[3] ? parseInt(parts[3]) : 999;
           price = pricePrimary;
         }
       } else {
