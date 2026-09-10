@@ -185,6 +185,14 @@ export async function getProductById(id: number) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+/** Atualiza o telefone/WhatsApp de contato do próprio usuário logado. */
+export async function updateUserPhone(userId: number, phone: string) {
+  const database = getDb();
+  if (!database) throw new Error("Database not available");
+  await database.update(users).set({ phone }).where(eq(users.id, userId));
+  return { success: true };
+}
+
 /** Bane um usuário: bloqueia qualquer ação autenticada dele e desativa a loja, se tiver. */
 export async function banUser(userId: number) {
   const database = getDb();
@@ -253,6 +261,7 @@ export async function getSellerFullDetails(sellerId: number) {
     seller: row.seller,
     contactName: row.user?.name || null,
     contactEmail: row.user?.email || null,
+    contactPhone: row.user?.phone || null,
     isBanned: row.user?.isBanned ?? false,
     usedProducts: usedProductsList,
     digitalProducts: digitalProductsList,

@@ -29,6 +29,10 @@ export const users = pgTable("users", {
   loginMethod: varchar("loginMethod", { length: 64 }),
   cpf: varchar("cpf", { length: 18 }),
   psnId: varchar("psnId", { length: 100 }),
+  // Telefone/WhatsApp de contato — coletado no cadastro de loja ou editável no painel do
+  // vendedor. Usado pelo admin em "Ver Loja" pra chamar o vendedor quando ele não vê
+  // notificação no site.
+  phone: varchar("phone", { length: 30 }),
   forteCoins: integer("forteCoins").default(10).notNull(),
   role: roleEnum("role").default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

@@ -34,6 +34,11 @@ export const appRouter = router({
         .from(users)
         .orderBy(desc(users.lastSignedIn));
     }),
+    updateMyPhone: protectedProcedure
+      .input(z.object({ phone: z.string().min(8).max(20) }))
+      .mutation(async ({ ctx, input }) => {
+        return db.updateUserPhone(ctx.user.id, input.phone);
+      }),
     adminBanUser: protectedProcedure
       .input(z.object({ userId: z.number() }))
       .mutation(async ({ ctx, input }) => {

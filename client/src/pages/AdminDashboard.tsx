@@ -1554,6 +1554,15 @@ export default function AdminDashboard() {
     onError: (err: any) => toast.error(err.message || "Erro ao desbanir usuário."),
   });
 
+  // Prepara um telefone pro link wa.me: só adiciona "55" se o número ainda não tiver o
+  // código do país — usa o tamanho (12/13 dígitos), não só o prefixo, porque DDD 55
+  // (Santa Maria/RS) existe de verdade e não pode ser confundido com "já tem +55".
+  const toWhatsAppNumber = (phone: string) => {
+    const digits = (phone || "").replace(/\D/g, "");
+    const hasCountryCode = digits.startsWith("55") && (digits.length === 12 || digits.length === 13);
+    return hasCountryCode ? digits : `55${digits}`;
+  };
+
   const normalizeGameNameForMatch = (n: string) => {
     const noAccents = (n || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
     return noAccents
@@ -6679,6 +6688,19 @@ export default function AdminDashboard() {
                 <p className="text-xs text-slate-400">ID #{sellerDetailsQuery.data.seller.id} · Comissão: {sellerDetailsQuery.data.seller.commissionPercentage}%</p>
                 <p className="text-xs text-slate-300">👤 {sellerDetailsQuery.data.contactName || "—"}</p>
                 <p className="text-xs text-slate-300">✉️ {sellerDetailsQuery.data.contactEmail || "—"}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-slate-300">📱 {sellerDetailsQuery.data.contactPhone || "Não informado"}</p>
+                  {sellerDetailsQuery.data.contactPhone && (
+                    <a
+                      href={`https://wa.me/${toWhatsAppNumber(sellerDetailsQuery.data.contactPhone)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] font-bold text-green-400 hover:text-green-300 underline"
+                    >
+                      Falar no WhatsApp
+                    </a>
+                  )}
+                </div>
                 <div className="flex items-center justify-between gap-2 pt-2 mt-1 border-t border-slate-800">
                   <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${sellerDetailsQuery.data.isBanned ? "bg-red-600/20 text-red-400 border border-red-600/40" : "bg-slate-800 text-slate-400 border border-slate-700"}`}>
                     {sellerDetailsQuery.data.isBanned ? "🚫 Usuário Banido" : "Conta Normal"}

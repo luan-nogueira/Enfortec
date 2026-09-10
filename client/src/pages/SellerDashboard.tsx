@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import SellerChatsPanel from "@/components/SellerChatsPanel";
 import { SELLER_CHATS } from "@/lib/sellerChat";
+import { isValidWhatsApp } from "@/lib/utils";
 
 const BRAZIL_STATES = [
   { uf: "AC", name: "Acre" },
@@ -75,7 +76,22 @@ export default function SellerDashboard() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const { data: pgUser } = trpc.auth.me.useQuery(undefined, { enabled: isAuthenticated });
+  const { data: pgUser, refetch: refetchMe } = trpc.auth.me.useQuery(undefined, { enabled: isAuthenticated });
+
+  // Telefone de contato pro admin conseguir chamar o vendedor quando ele não vê
+  // notificação no site — editável aqui, mostrado em "Ver Loja" no painel admin.
+  const [phoneInput, setPhoneInput] = useState("");
+  useEffect(() => {
+    if (pgUser?.phone !== undefined) setPhoneInput(pgUser.phone || "");
+  }, [pgUser?.phone]);
+  const updatePhoneMutation = trpc.auth.updateMyPhone.useMutation({
+    onSuccess: () => {
+      toast.success("Telefone de contato salvo!");
+      refetchMe();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao salvar telefone."),
+  });
+
   const createProductMutation = trpc.usedProducts.create.useMutation();
   const boostProductMutation = trpc.usedProducts.boost.useMutation();
   const deleteUsedProductMutation = trpc.usedProducts.delete.useMutation();
@@ -342,6 +358,33 @@ export default function SellerDashboard() {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-4 sm:py-8 pb-36 lg:pb-16">
+        <Card className={`p-4 sm:p-5 card-neon mb-6 sm:mb-8 ${pgUser?.phone ? "border-slate-800" : "border-amber-500/40 bg-amber-950/10"}`}>
+          <p className={`text-xs sm:text-sm font-bold mb-2 ${pgUser?.phone ? "text-slate-400" : "text-amber-300"}`}>
+            📱 {pgUser?.phone ? "Telefone de contato" : "Cadastre seu telefone de contato — é assim que o suporte consegue te chamar caso não veja uma notificação no site."}
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Input
+              value={phoneInput}
+              onChange={(e) => setPhoneInput(e.target.value)}
+              placeholder="Ex: 47999998888 (DDD + número)"
+              className="bg-slate-950 border-slate-800 text-white text-sm h-10 font-mono"
+            />
+            <Button
+              onClick={() => {
+                if (!isValidWhatsApp(phoneInput)) {
+                  toast.error("Número inválido. Digite DDD + número, só dígitos.");
+                  return;
+                }
+                updatePhoneMutation.mutate({ phone: phoneInput.replace(/\D/g, "") });
+              }}
+              disabled={updatePhoneMutation.isPending}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-bold shrink-0"
+            >
+              {updatePhoneMutation.isPending ? "Salvando..." : "Salvar"}
+            </Button>
+          </div>
+        </Card>
+
         {/* KPI Cards (Saldo Escrow vs Liberado & Reputação) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
           {/* Card 1: Saldo Liberado */}
