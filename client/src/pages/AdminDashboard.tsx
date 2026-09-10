@@ -1504,6 +1504,14 @@ export default function AdminDashboard() {
     },
     onError: (err: any) => toast.error(err.message || "Erro ao adicionar contas."),
   });
+
+  // Cadastro em lote de contas pra VÁRIOS jogos de uma vez (aba Estoque). Sem callbacks
+  // de toast aqui — cada jogo do lote dispara sua própria chamada, e o resultado geral
+  // é resumido num único toast ao final em handleBulkAccountsSubmit.
+  const [showBulkAccountsModal, setShowBulkAccountsModal] = useState(false);
+  const [bulkAccountsRawText, setBulkAccountsRawText] = useState("");
+  const [isSubmittingBulkAccounts, setIsSubmittingBulkAccounts] = useState(false);
+  const bulkAddAccountsMutation = trpc.digitalProducts.accounts.addBulk.useMutation();
   const removeAccountMutation = trpc.digitalProducts.accounts.remove.useMutation({
     onSuccess: () => {
       toast.success("Conta removida do estoque.");
@@ -1517,6 +1525,88 @@ export default function AdminDashboard() {
   const openAccountsModal = (game: any) => {
     setAccountsRawText("");
     setAccountsModalGame({ id: game.id, name: game.name });
+  };
+
+  const normalizeGameNameForMatch = (n: string) => {
+    const noAccents = (n || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+    return noAccents
+      .replace(/\b(ps4\/ps5|ps5|ps4|xbox|pc)\b/g, "")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  };
+
+  // Reconhece uma linha de conta ("email:senha" ou "email;senha") vs. uma linha de nome
+  // de jogo — qualquer linha que não pareça um email:senha começa um novo bloco de jogo.
+  const bulkAccountLineRegex = /^([^\s:;]+@[^\s:;]+)[:;](.+)$/;
+
+  // Agrupa o texto colado em blocos por jogo (nome + linhas de conta), casando cada nome
+  // com um jogo já cadastrado. Uma linha em branco também encerra o bloco atual.
+  const bulkAccountsGroups = useMemo(() => {
+    const groups: { gameName: string; gameId: number | null; accounts: { email: string; password: string }[] }[] = [];
+    let current: (typeof groups)[number] | null = null;
+
+    for (const rawLine of bulkAccountsRawText.split("\n")) {
+      const line = rawLine.trim();
+      if (!line) {
+        current = null;
+        continue;
+      }
+      const match = line.match(bulkAccountLineRegex);
+      if (match && current) {
+        current.accounts.push({ email: match[1].trim(), password: match[2].trim() });
+        continue;
+      }
+      if (match && !current) {
+        continue; // conta órfã, sem nome de jogo antes — ignora
+      }
+      const norm = normalizeGameNameForMatch(line);
+      const found = gamesList.find((g: any) => normalizeGameNameForMatch(g.name) === norm);
+      current = { gameName: line, gameId: found?.id ?? null, accounts: [] };
+      groups.push(current);
+    }
+
+    return groups.filter((g) => g.accounts.length > 0);
+  }, [bulkAccountsRawText, gamesList]);
+
+  const handleBulkAccountsSubmit = async () => {
+    const matched = bulkAccountsGroups.filter((g) => g.gameId !== null);
+    if (matched.length === 0) {
+      toast.warning("Nenhum jogo reconhecido no texto colado.");
+      return;
+    }
+
+    setIsSubmittingBulkAccounts(true);
+    let totalInserted = 0;
+    const failed: string[] = [];
+
+    for (const group of matched) {
+      try {
+        const rawText = group.accounts.map((a) => `${a.email}:${a.password}`).join("\n");
+        const result = await bulkAddAccountsMutation.mutateAsync({ digitalProductId: group.gameId as number, rawText });
+        totalInserted += result.inserted;
+      } catch (err: any) {
+        failed.push(group.gameName);
+      }
+    }
+
+    setIsSubmittingBulkAccounts(false);
+    accountsSummaryQuery.refetch();
+    adminDigitalProductsQuery.refetch();
+
+    const unmatchedCount = bulkAccountsGroups.length - matched.length;
+    if (totalInserted > 0) {
+      toast.success(`${totalInserted} conta${totalInserted !== 1 ? "s" : ""} adicionada${totalInserted !== 1 ? "s" : ""} em ${matched.length} jogo${matched.length !== 1 ? "s" : ""}!`);
+    }
+    if (failed.length > 0) {
+      toast.error(`Falha ao adicionar contas em: ${failed.join(", ")}`);
+    }
+    if (unmatchedCount > 0) {
+      toast.warning(`${unmatchedCount} jogo${unmatchedCount !== 1 ? "s" : ""} do texto não ${unmatchedCount !== 1 ? "foram encontrados" : "foi encontrado"} no catálogo (confira os nomes destacados em vermelho).`);
+    }
+    if (failed.length === 0 && unmatchedCount === 0) {
+      setBulkAccountsRawText("");
+      setShowBulkAccountsModal(false);
+    }
   };
 
   const [showGameModal, setShowGameModal] = useState(false);
@@ -4487,12 +4577,22 @@ export default function AdminDashboard() {
           </TabsContent>
 
           <TabsContent value="estoque">
-            <h2 className="text-xl font-bold text-white mb-2 border-l-4 border-red-600 pl-4 uppercase tracking-widest text-sm italic">Estoque</h2>
-            <p className="text-xs text-slate-500 mb-4 pl-4">
-              Visão geral do estoque de todos os jogos. "Pool de contas" é o estoque de email+senha usado pra entrega automática — jogos sem contas cadastradas continuam com entrega manual normalmente.
-            </p>
-            <div className="relative mb-6 max-w-sm">
-              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4 border-l-4 border-red-600 pl-4">
+              <div>
+                <h2 className="text-xl font-bold text-white uppercase tracking-widest text-sm italic">Estoque</h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  Visão geral do estoque de todos os jogos. "Pool de contas" é o estoque de email+senha usado pra entrega automática — jogos sem contas cadastradas continuam com entrega manual normalmente.
+                </p>
+              </div>
+              <Button
+                onClick={() => { setBulkAccountsRawText(""); setShowBulkAccountsModal(true); }}
+                className="bg-slate-900 border border-amber-600/30 hover:border-amber-600/60 text-amber-400 font-bold flex items-center justify-center gap-2 w-full sm:w-auto text-xs sm:text-sm shrink-0"
+              >
+                📦 Cadastrar Contas em Lote
+              </Button>
+            </div>
+            <div className="relative mb-6 max-w-sm pl-4">
+              <Filter className="absolute left-7 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <Input
                 value={stockSearchQuery}
                 onChange={(e) => setStockSearchQuery(e.target.value)}
@@ -6298,6 +6398,66 @@ export default function AdminDashboard() {
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => setAccountsModalGame(null)} className="text-slate-400 hover:text-white">
               Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Cadastrar Contas em Lote (vários jogos de uma vez) */}
+      <Dialog open={showBulkAccountsModal} onOpenChange={setShowBulkAccountsModal}>
+        <DialogContent className="bg-slate-900 border-amber-600/30 text-white max-w-2xl card-neon max-h-[85dvh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-neon flex items-center gap-2">📦 Cadastrar Contas em Lote</DialogTitle>
+            <DialogDescription className="text-slate-400 text-xs">
+              Cole o nome de cada jogo (igual aparece no site), seguido das contas dele (email:senha, uma por linha). Deixe uma linha em branco entre jogos diferentes.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <textarea
+              value={bulkAccountsRawText}
+              onChange={(e) => setBulkAccountsRawText(e.target.value)}
+              placeholder={"Resident Evil Requiem\nconta1@exemplo.com:senha123\nconta2@exemplo.com:senha456\n\nPragmata\ncontaA@exemplo.com:senhaA"}
+              rows={10}
+              className="w-full bg-slate-950 border border-red-600/20 rounded-md p-3 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-red-500/50"
+            />
+
+            {bulkAccountsGroups.length > 0 && (
+              <div className="space-y-1.5">
+                <Label className="text-xs text-slate-300 font-bold uppercase">Prévia ({bulkAccountsGroups.length} jogo{bulkAccountsGroups.length !== 1 ? "s" : ""} reconhecido{bulkAccountsGroups.length !== 1 ? "s" : ""} no texto)</Label>
+                <div className="max-h-56 overflow-y-auto space-y-1 pr-1">
+                  {bulkAccountsGroups.map((group, idx) => (
+                    <div
+                      key={idx}
+                      className={`flex items-center justify-between gap-2 rounded-lg px-3 py-1.5 border text-xs ${
+                        group.gameId
+                          ? "bg-green-950/30 border-green-800/40"
+                          : "bg-red-950/30 border-red-800/40"
+                      }`}
+                    >
+                      <span className={`truncate ${group.gameId ? "text-slate-200" : "text-red-400 font-bold"}`}>
+                        {group.gameName}
+                        {!group.gameId && " — jogo não encontrado no catálogo"}
+                      </span>
+                      <span className="text-slate-400 shrink-0">{group.accounts.length} conta{group.accounts.length !== 1 ? "s" : ""}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setShowBulkAccountsModal(false)} className="text-slate-400 hover:text-white">
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              disabled={isSubmittingBulkAccounts || bulkAccountsGroups.filter((g) => g.gameId).length === 0}
+              onClick={handleBulkAccountsSubmit}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-bold btn-neon"
+            >
+              {isSubmittingBulkAccounts ? "Cadastrando..." : "Cadastrar Contas"}
             </Button>
           </DialogFooter>
         </DialogContent>
