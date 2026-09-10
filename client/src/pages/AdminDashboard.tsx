@@ -1485,6 +1485,39 @@ export default function AdminDashboard() {
     }
   });
 
+  // Pool de contas (email+senha) em estoque por jogo — entrega automática na compra
+  const [accountsModalGame, setAccountsModalGame] = useState<{ id: number; name: string } | null>(null);
+  const [accountsRawText, setAccountsRawText] = useState("");
+  const accountsSummaryQuery = trpc.digitalProducts.accounts.summary.useQuery(undefined, { enabled: !!(isAuthenticated && isAdmin) });
+  const accountsListQuery = trpc.digitalProducts.accounts.list.useQuery(
+    { digitalProductId: accountsModalGame?.id ?? 0 },
+    { enabled: !!accountsModalGame }
+  );
+  const addAccountsMutation = trpc.digitalProducts.accounts.addBulk.useMutation({
+    onSuccess: (data) => {
+      toast.success(`${data.inserted} conta${data.inserted !== 1 ? "s" : ""} adicionada${data.inserted !== 1 ? "s" : ""} ao estoque!`);
+      setAccountsRawText("");
+      accountsListQuery.refetch();
+      accountsSummaryQuery.refetch();
+      adminDigitalProductsQuery.refetch();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao adicionar contas."),
+  });
+  const removeAccountMutation = trpc.digitalProducts.accounts.remove.useMutation({
+    onSuccess: () => {
+      toast.success("Conta removida do estoque.");
+      accountsListQuery.refetch();
+      accountsSummaryQuery.refetch();
+      adminDigitalProductsQuery.refetch();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao remover conta."),
+  });
+
+  const openAccountsModal = (game: any) => {
+    setAccountsRawText("");
+    setAccountsModalGame({ id: game.id, name: game.name });
+  };
+
   const [showGameModal, setShowGameModal] = useState(false);
   const [gameName, setGameName] = useState("");
   const [gamePrice, setGamePrice] = useState(0);
@@ -2321,6 +2354,7 @@ export default function AdminDashboard() {
       section: "Catálogo",
     },
     { value: "jogos", label: "Gerenciar Jogos", icon: Gamepad2, section: "Catálogo" },
+    { value: "estoque", label: "Estoque", icon: Lock, section: "Catálogo" },
     { value: "midia_fisica", label: "Mídia Física / Usados", icon: Package, section: "Catálogo" },
     { value: "vendas", label: "Gerenciar Vendas", icon: ShoppingBag, section: "Vendas & Clube" },
     { value: "premios", label: "Gerenciar Prêmios", icon: Gift, section: "Vendas & Clube" },
@@ -4317,6 +4351,9 @@ export default function AdminDashboard() {
                         <Button variant="ghost" size="icon" onClick={() => openEditGame(game)} className="h-6 w-6 text-blue-400 hover:text-blue-300 hover:bg-blue-400/10">
                           <Edit className="w-3 h-3" />
                         </Button>
+                        <Button variant="ghost" size="icon" onClick={() => openAccountsModal(game)} title="Gerenciar Contas em Estoque" className="h-6 w-6 text-amber-400 hover:text-amber-300 hover:bg-amber-400/10">
+                          <Lock className="w-3 h-3" />
+                        </Button>
                         <Button variant="ghost" size="icon" onClick={() => handleDeleteGame(game.id)} className="h-6 w-6 text-red-500 hover:text-red-400 hover:bg-red-500/10">
                           <Trash2 className="w-3 h-3" />
                         </Button>
@@ -4446,6 +4483,68 @@ export default function AdminDashboard() {
             </div>
               );
             })()}
+          </TabsContent>
+
+          <TabsContent value="estoque">
+            <h2 className="text-xl font-bold text-white mb-2 border-l-4 border-red-600 pl-4 uppercase tracking-widest text-sm italic">Estoque</h2>
+            <p className="text-xs text-slate-500 mb-6 pl-4">
+              Visão geral do estoque de todos os jogos. "Pool de contas" é o estoque de email+senha usado pra entrega automática — jogos sem contas cadastradas continuam com entrega manual normalmente.
+            </p>
+            <div className="overflow-x-auto rounded-xl border border-slate-800">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-900 text-left text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                    <th className="p-3">Jogo</th>
+                    <th className="p-3">Plataforma</th>
+                    <th className="p-3">Estoque</th>
+                    <th className="p-3">Pool de Contas</th>
+                    <th className="p-3"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...gamesList]
+                    .sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""))
+                    .map((game: any) => {
+                      const poolInfo = accountsSummaryQuery.data?.[game.id];
+                      return (
+                        <tr key={game.id} className="border-t border-slate-800 hover:bg-slate-900/50">
+                          <td className="p-3 text-white font-medium max-w-[240px] truncate" title={game.name}>{game.name}</td>
+                          <td className="p-3 text-slate-400">{game.platform || "—"}</td>
+                          <td className="p-3">
+                            <span className={`font-bold ${Number(game.stock ?? 0) <= 0 ? "text-red-400" : "text-slate-200"}`}>
+                              {game.stock ?? 0}
+                            </span>
+                          </td>
+                          <td className="p-3">
+                            {poolInfo ? (
+                              <span className="text-xs">
+                                <span className="text-green-400 font-bold">{poolInfo.available} disponíveis</span>
+                                {" · "}
+                                <span className="text-slate-500">{poolInfo.delivered} entregues</span>
+                              </span>
+                            ) : (
+                              <span className="text-xs text-slate-600">Entrega manual (sem pool)</span>
+                            )}
+                          </td>
+                          <td className="p-3 text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openAccountsModal(game)}
+                              className="h-7 text-amber-400 hover:text-amber-300 hover:bg-amber-400/10 text-xs"
+                            >
+                              <Lock className="w-3 h-3 mr-1" /> Gerenciar
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+              {gamesList.length === 0 && (
+                <p className="text-center text-slate-500 text-sm py-8">Nenhum jogo cadastrado ainda.</p>
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="midia_fisica">
@@ -6098,6 +6197,83 @@ export default function AdminDashboard() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Gerenciar Contas em Estoque (pool de email+senha, entrega automática) */}
+      <Dialog open={!!accountsModalGame} onOpenChange={(open) => !open && setAccountsModalGame(null)}>
+        <DialogContent className="bg-slate-900 border-amber-600/30 text-white max-w-lg card-neon max-h-[85dvh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-neon flex items-center gap-2">
+              <Lock className="w-5 h-5 text-amber-400" /> Contas em Estoque
+            </DialogTitle>
+            <DialogDescription className="text-slate-400 text-xs">
+              {accountsModalGame?.name} — cadastre contas (email+senha) aqui pra elas serem entregues automaticamente assim que alguém comprar este jogo.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="flex items-center gap-3 text-xs font-bold">
+              <span className="bg-green-950/50 border border-green-800/50 text-green-400 px-2.5 py-1 rounded-full">
+                {accountsListQuery.data?.available.length ?? 0} disponíveis
+              </span>
+              <span className="bg-slate-800 border border-slate-700 text-slate-300 px-2.5 py-1 rounded-full">
+                {accountsListQuery.data?.deliveredCount ?? 0} já entregues
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs text-slate-300 font-bold uppercase">Adicionar Contas</Label>
+              <textarea
+                value={accountsRawText}
+                onChange={(e) => setAccountsRawText(e.target.value)}
+                placeholder={"email1@exemplo.com:senha123\nemail2@exemplo.com:senha456"}
+                rows={4}
+                className="w-full bg-slate-950 border border-red-600/20 rounded-md p-3 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-red-500/50"
+              />
+              <p className="text-[10px] text-slate-500">Uma conta por linha, no formato email:senha (ou email;senha).</p>
+              <Button
+                type="button"
+                disabled={!accountsRawText.trim() || addAccountsMutation.isPending}
+                onClick={() => accountsModalGame && addAccountsMutation.mutate({ digitalProductId: accountsModalGame.id, rawText: accountsRawText })}
+                className="bg-amber-600 hover:bg-amber-700 text-white font-bold btn-neon"
+              >
+                {addAccountsMutation.isPending ? "Adicionando..." : "Adicionar ao Estoque"}
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs text-slate-300 font-bold uppercase">Disponíveis</Label>
+              {accountsListQuery.isLoading ? (
+                <p className="text-xs text-slate-500">Carregando...</p>
+              ) : (accountsListQuery.data?.available.length ?? 0) === 0 ? (
+                <p className="text-xs text-slate-500">Nenhuma conta disponível — o jogo continua com entrega manual até você adicionar contas aqui.</p>
+              ) : (
+                <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                  {accountsListQuery.data?.available.map((acc: any) => (
+                    <div key={acc.id} className="flex items-center justify-between gap-2 bg-slate-950/60 border border-slate-800 rounded-lg px-3 py-1.5">
+                      <span className="text-xs font-mono text-slate-300 truncate">{acc.email}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeAccountMutation.mutate({ id: acc.id })}
+                        disabled={removeAccountMutation.isPending}
+                        className="h-6 w-6 text-red-500 hover:text-red-400 hover:bg-red-500/10 shrink-0"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setAccountsModalGame(null)} className="text-slate-400 hover:text-white">
+              Fechar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

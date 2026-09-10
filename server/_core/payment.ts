@@ -311,7 +311,7 @@ export function registerPaymentRoute(app: Express) {
           insertValues.buyerPhone = customerPhone;
         }
 
-        await database.insert(orders).values(insertValues);
+        const [insertedOrder] = await database.insert(orders).values(insertValues).returning({ id: orders.id });
 
         // Deduz ForteCoins usadas e concede 7 coins de cashback
         if (buyerId > 0) {
@@ -339,6 +339,20 @@ export function registerPaymentRoute(app: Express) {
           if (prod.length > 0) {
             const newStock = Math.max(0, (prod[0].stock || 1) - 1);
             await database.update(digitalProducts).set({ stock: newStock }).where(eq(digitalProducts.id, insertValues.digitalProductId));
+          }
+
+          // Se o jogo tiver contas cadastradas no pool de estoque, entrega automaticamente
+          // (reivindicação atômica + email). Se não tiver nenhuma disponível, não faz nada
+          // e o pedido segue pro fluxo manual existente, sem quebrar nada.
+          try {
+            await db.attemptAutoDeliverDigitalOrder(database, {
+              orderId: insertedOrder.id,
+              digitalProductId: insertValues.digitalProductId,
+              buyerId,
+              productName: productNameStr,
+            });
+          } catch (autoDeliverErr) {
+            console.error("[Checkout] Erro na entrega automática de conta:", autoDeliverErr);
           }
         } else if (productType === "store" && insertValues.productId) {
           const prod = await database.select().from(products).where(eq(products.id, insertValues.productId)).limit(1);
@@ -624,7 +638,7 @@ export function registerPaymentRoute(app: Express) {
           insertValues.buyerPhone = phone;
         }
 
-        await database.insert(orders).values(insertValues);
+        const [insertedOrder] = await database.insert(orders).values(insertValues).returning({ id: orders.id });
 
         // Atualiza ForteCoins (dedução de moedas usadas + 7 moedas de cashback)
         if (buyerId > 0) {
@@ -652,6 +666,20 @@ export function registerPaymentRoute(app: Express) {
           if (prod.length > 0) {
             const newStock = Math.max(0, (prod[0].stock || 1) - 1);
             await database.update(digitalProducts).set({ stock: newStock }).where(eq(digitalProducts.id, insertValues.digitalProductId));
+          }
+
+          // Se o jogo tiver contas cadastradas no pool de estoque, entrega automaticamente
+          // (reivindicação atômica + email). Se não tiver nenhuma disponível, não faz nada
+          // e o pedido segue pro fluxo manual existente, sem quebrar nada.
+          try {
+            await db.attemptAutoDeliverDigitalOrder(database, {
+              orderId: insertedOrder.id,
+              digitalProductId: insertValues.digitalProductId,
+              buyerId,
+              productName,
+            });
+          } catch (autoDeliverErr) {
+            console.error("[Mercado Pago Webhook] Erro na entrega automática de conta:", autoDeliverErr);
           }
         } else if (productType === "store" && insertValues.productId) {
           const prod = await database.select().from(products).where(eq(products.id, insertValues.productId)).limit(1);

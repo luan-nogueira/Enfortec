@@ -136,6 +136,23 @@ export const digitalProducts = pgTable("digitalProducts", {
 export type DigitalProduct = typeof digitalProducts.$inferSelect;
 export type InsertDigitalProduct = typeof digitalProducts.$inferInsert;
 
+// Pool de contas (email+senha) de um jogo específico, usado para entrega automática:
+// cada linha é uma conta; "disponivel" vira "entregue" (e ganha orderId/deliveredAt) quando
+// reivindicada atomicamente na confirmação do pagamento — ver claimDigitalProductAccount em server/db.ts.
+export const digitalProductAccounts = pgTable("digitalProductAccounts", {
+  id: serial("id").primaryKey(),
+  digitalProductId: integer("digitalProductId").notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  password: varchar("password", { length: 255 }).notNull(),
+  status: varchar("status", { length: 20 }).default("disponivel").notNull(),
+  orderId: integer("orderId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  deliveredAt: timestamp("deliveredAt"),
+});
+
+export type DigitalProductAccount = typeof digitalProductAccounts.$inferSelect;
+export type InsertDigitalProductAccount = typeof digitalProductAccounts.$inferInsert;
+
 // Orders table - for all purchases
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),

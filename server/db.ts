@@ -1,7 +1,7 @@
 import { eq, and, or, lte, desc, sql, inArray, like, lt } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
-import { InsertUser, InsertCoupon, users, sellers, products, usedProducts, digitalProducts, orders, reviews, coupons, platformSettings, adminDismissedNotifications, messages, platinumSubmissions } from "../drizzle/schema";
+import { InsertUser, InsertCoupon, users, sellers, products, usedProducts, digitalProducts, digitalProductAccounts, orders, reviews, coupons, platformSettings, adminDismissedNotifications, messages, platinumSubmissions } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 /**
@@ -580,6 +580,181 @@ export async function deliverOrder(orderId: number, deliveryDetails: string) {
   }
 
   return { success: true };
+}
+
+/**
+ * Reivindica atomicamente uma conta "disponivel" do pool de um jogo e a marca como
+ * "entregue" para o pedido informado. A subquery com FOR UPDATE SKIP LOCKED dentro do
+ * UPDATE garante, no próprio Postgres, que duas compras simultâneas nunca recebem a
+ * mesma conta — mesmo sobre o driver HTTP do Neon, que executa cada chamada como uma
+ * única instrução atômica (não precisa de BEGIN/COMMIT explícito).
+ *
+ * Também sobrescreve digitalProducts.stock com a contagem real de contas "disponivel"
+ * restantes, mantendo esse campo (já usado em toda a loja/admin) sempre fiel à
+ * realidade para jogos que usam esse pool.
+ *
+ * Retorna a conta reivindicada, ou null se não havia nenhuma "disponivel" (jogo não usa
+ * o pool, ou o estoque zerou) — quem chama deve tratar null como "sem entrega
+ * automática, segue pro fluxo manual existente".
+ */
+export async function claimDigitalProductAccount(
+  database: any,
+  digitalProductId: number,
+  orderId: number
+): Promise<{ email: string; password: string } | null> {
+  const claimResult: any = await database.execute(sql`
+    UPDATE "digitalProductAccounts"
+    SET status = 'entregue', "orderId" = ${orderId}, "deliveredAt" = now()
+    WHERE id = (
+      SELECT id FROM "digitalProductAccounts"
+      WHERE "digitalProductId" = ${digitalProductId} AND status = 'disponivel'
+      ORDER BY id
+      LIMIT 1
+      FOR UPDATE SKIP LOCKED
+    )
+    RETURNING id, email, password
+  `);
+  const claimedRows: any[] = Array.isArray(claimResult) ? claimResult : (claimResult?.rows ?? []);
+  const claimed = claimedRows[0];
+  if (!claimed) return null;
+
+  await syncDigitalProductAccountStock(database, digitalProductId);
+
+  return { email: claimed.email, password: claimed.password };
+}
+
+/**
+ * Tenta entregar automaticamente uma conta do pool para um pedido de jogo digital recém
+ * criado. Chamada nos dois pontos do fluxo de pagamento que confirmam uma compra digital
+ * (server/_core/payment.ts: handleWebhook e o caminho 100% ForteCoins/cupom do
+ * handleCheckout). Não lança erro se algo falhar no envio do email — só loga — pra nunca
+ * quebrar o registro do pedido, que já aconteceu antes dessa chamada.
+ */
+export async function attemptAutoDeliverDigitalOrder(
+  database: any,
+  params: { orderId: number; digitalProductId: number; buyerId: number; productName: string }
+) {
+  const { orderId, digitalProductId, buyerId, productName } = params;
+
+  const account = await claimDigitalProductAccount(database, digitalProductId, orderId);
+  if (!account) return { delivered: false as const };
+
+  const deliveryDetails = `Email: ${account.email}\nSenha: ${account.password}`;
+  await database.update(orders).set({ deliveryDetails, status: "enviado" }).where(eq(orders.id, orderId));
+
+  const buyerResult = await database.select().from(users).where(eq(users.id, buyerId)).limit(1);
+  const buyer = buyerResult[0];
+  if (buyer?.email) {
+    try {
+      const { sendDeliveryEmail } = await import("./email");
+      await sendDeliveryEmail({
+        to: buyer.email,
+        buyerName: buyer.name || "Cliente",
+        productName,
+        deliveryDetails,
+      });
+    } catch (emailErr) {
+      console.error("[Email] Erro ao enviar email de entrega automática:", emailErr);
+    }
+  }
+
+  return { delivered: true as const, deliveryDetails };
+}
+
+/** Recalcula digitalProducts.stock a partir da contagem real de contas "disponivel". */
+async function syncDigitalProductAccountStock(database: any, digitalProductId: number) {
+  const countResult: any = await database.execute(sql`
+    SELECT COUNT(*)::int AS count FROM "digitalProductAccounts"
+    WHERE "digitalProductId" = ${digitalProductId} AND status = 'disponivel'
+  `);
+  const countRows: any[] = Array.isArray(countResult) ? countResult : (countResult?.rows ?? []);
+  const remaining = countRows[0]?.count ?? 0;
+  await database.update(digitalProducts).set({ stock: remaining }).where(eq(digitalProducts.id, digitalProductId));
+  return remaining;
+}
+
+/** Resumo do pool de contas de TODOS os jogos de uma vez (pra aba "Estoque" do admin), sem N+1. */
+export async function listDigitalProductAccountsSummary(): Promise<
+  Record<number, { available: number; delivered: number }>
+> {
+  const database = getDb();
+  if (!database) throw new Error("Database not available");
+
+  const result: any = await database.execute(sql`
+    SELECT "digitalProductId" AS "digitalProductId",
+      COUNT(*) FILTER (WHERE status = 'disponivel')::int AS available,
+      COUNT(*) FILTER (WHERE status = 'entregue')::int AS delivered
+    FROM "digitalProductAccounts"
+    GROUP BY "digitalProductId"
+  `);
+  const rows: any[] = Array.isArray(result) ? result : (result?.rows ?? []);
+
+  const summary: Record<number, { available: number; delivered: number }> = {};
+  for (const row of rows) {
+    summary[row.digitalProductId] = { available: row.available, delivered: row.delivered };
+  }
+  return summary;
+}
+
+/** Lista as contas do pool de um jogo: disponíveis (com credenciais) + contagem de entregues. */
+export async function listDigitalProductAccounts(digitalProductId: number) {
+  const database = getDb();
+  if (!database) throw new Error("Database not available");
+
+  const available = await database
+    .select({ id: digitalProductAccounts.id, email: digitalProductAccounts.email, password: digitalProductAccounts.password })
+    .from(digitalProductAccounts)
+    .where(and(eq(digitalProductAccounts.digitalProductId, digitalProductId), eq(digitalProductAccounts.status, "disponivel")))
+    .orderBy(digitalProductAccounts.id);
+
+  const deliveredCountResult = await database
+    .select({ count: sql<number>`count(*)::int` })
+    .from(digitalProductAccounts)
+    .where(and(eq(digitalProductAccounts.digitalProductId, digitalProductId), eq(digitalProductAccounts.status, "entregue")));
+
+  return { available, deliveredCount: deliveredCountResult[0]?.count ?? 0 };
+}
+
+/** Adiciona várias contas de uma vez (uma por linha, "email:senha" ou "email;senha"). */
+export async function addDigitalProductAccountsBulk(digitalProductId: number, rawText: string) {
+  const database = getDb();
+  if (!database) throw new Error("Database not available");
+
+  const rows = rawText
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const parts = line.split(/[:;]/);
+      const email = parts[0]?.trim();
+      const password = parts.slice(1).join(":").trim();
+      return { email, password };
+    })
+    .filter((r) => r.email && r.password);
+
+  if (rows.length === 0) return { inserted: 0, available: 0 };
+
+  await database.insert(digitalProductAccounts).values(
+    rows.map((r) => ({ digitalProductId, email: r.email, password: r.password }))
+  );
+
+  const remaining = await syncDigitalProductAccountStock(database, digitalProductId);
+  return { inserted: rows.length, available: remaining };
+}
+
+/** Remove uma conta ainda não entregue (contas já usadas em um pedido ficam preservadas). */
+export async function removeDigitalProductAccount(id: number) {
+  const database = getDb();
+  if (!database) throw new Error("Database not available");
+
+  const existing = await database.select().from(digitalProductAccounts).where(eq(digitalProductAccounts.id, id)).limit(1);
+  const account = existing[0];
+  if (!account) throw new Error("Conta não encontrada");
+  if (account.status !== "disponivel") throw new Error("Essa conta já foi entregue em um pedido e não pode ser removida");
+
+  await database.delete(digitalProductAccounts).where(eq(digitalProductAccounts.id, id));
+  const remaining = await syncDigitalProductAccountStock(database, account.digitalProductId);
+  return { available: remaining };
 }
 
 // Coupons queries

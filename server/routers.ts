@@ -632,6 +632,32 @@ export const appRouter = router({
         await database.delete(digitalProducts).where(eq(digitalProducts.id, input.id));
         return { success: true };
       }),
+    // Pool de contas (email+senha) por jogo, usado pra entrega automática — ver
+    // db.attemptAutoDeliverDigitalOrder, chamado no webhook de pagamento.
+    accounts: router({
+      summary: protectedProcedure.query(async ({ ctx }) => {
+        if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+        return db.listDigitalProductAccountsSummary();
+      }),
+      list: protectedProcedure
+        .input(z.object({ digitalProductId: z.number() }))
+        .query(async ({ ctx, input }) => {
+          if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+          return db.listDigitalProductAccounts(input.digitalProductId);
+        }),
+      addBulk: protectedProcedure
+        .input(z.object({ digitalProductId: z.number(), rawText: z.string().min(1) }))
+        .mutation(async ({ ctx, input }) => {
+          if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+          return db.addDigitalProductAccountsBulk(input.digitalProductId, input.rawText);
+        }),
+      remove: protectedProcedure
+        .input(z.object({ id: z.number() }))
+        .mutation(async ({ ctx, input }) => {
+          if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+          return db.removeDigitalProductAccount(input.id);
+        }),
+    }),
   }),
 
   // Orders Router
