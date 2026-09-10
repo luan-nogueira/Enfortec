@@ -202,7 +202,12 @@ export default function Home() {
   const FALLBACK_GAME_IMAGE = "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?q=80&w=1200";
 
   // Mix dynamic games from the database into the slides as requested by the user
-  const dbGameBanners = digitalProducts.filter(game => game.showInEconomia !== true).map(game => {
+  const dbGameBanners = digitalProducts.filter(game => {
+    if (game.showInEconomia === true) return false;
+    const isOutOfStock = game.isActive === false || Number(game.stock ?? 0) <= 0;
+    const isExpired = !!game.expiresAt && new Date(game.expiresAt) < new Date();
+    return !isOutOfStock && !isExpired;
+  }).map(game => {
     let imageUrl = game.imageUrl;
     return {
       id: `game-banner-${game.id}`,
@@ -858,8 +863,12 @@ export default function Home() {
               const isAssinatura = listing.type === 'assinatura';
               const isDigital = listing._type === 'digital' && !isAssinatura;
               const isFisico = listing._type === 'used';
-              const isOutOfStock = isDigital && (listing.isActive === false || Number(listing.stock ?? 0) <= 0);
-              const isExpired = isDigital && !!listing.expiresAt && new Date(listing.expiresAt) < new Date();
+              // Estoque/validade precisam ser checados pra QUALQUER produto digital, incluindo
+              // assinaturas — usar "isDigital" aqui (que exclui assinatura de propósito, só pra
+              // rótulo/badge) fazia assinatura esgotada nunca mostrar "Indisponível" na Home.
+              const isAnyDigital = listing._type === 'digital';
+              const isOutOfStock = isAnyDigital && (listing.isActive === false || Number(listing.stock ?? 0) <= 0);
+              const isExpired = isAnyDigital && !!listing.expiresAt && new Date(listing.expiresAt) < new Date();
               const isUnavailable = isOutOfStock || isExpired;
 
               return (
