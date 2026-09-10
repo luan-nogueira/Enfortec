@@ -2,8 +2,7 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ChevronDown, ChevronUp, HelpCircle, MessageCircle } from "lucide-react";
 import { useState } from "react";
-
-const WA = "https://wa.me/554384253691";
+import { trpc } from "@/lib/trpc";
 
 const faqs = [
   {
@@ -122,6 +121,8 @@ function FaqItem({ q, a }: { q: string; a: string }) {
 
 export default function FAQ() {
   const [, navigate] = useLocation();
+  const { data: platformSettings } = trpc.settings.get.useQuery();
+  const WA = `https://wa.me/${platformSettings?.supportWhatsapp || "554384253691"}`;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900">

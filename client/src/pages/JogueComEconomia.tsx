@@ -624,7 +624,7 @@ export default function JogueComEconomia() {
                     type="button"
                     onClick={() => {
                       const msg = encodeURIComponent(`Olá André! Tenho uma dúvida antes de finalizar a compra do jogo "${selectedProduct.name}". Podem me ajudar?`);
-                      window.open(`https://wa.me/554384253691?text=${msg}`, "_blank");
+                      window.open(`https://wa.me/${platformSettings?.supportWhatsapp || "554384253691"}?text=${msg}`, "_blank");
                     }}
                     className="w-full py-2 bg-green-950/40 border border-green-800/40 hover:bg-green-900/50 text-green-400 font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-colors"
                   >

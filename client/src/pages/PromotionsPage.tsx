@@ -6,10 +6,12 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, query, where, orderBy } from "firebase/firestore";
+import { trpc } from "@/lib/trpc";
 
 export default function PromotionsPage() {
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
+  const { data: platformSettings } = trpc.settings.get.useQuery();
   const [selectedCategory, setSelectedCategory] = useState<"jogo" | "gift_card_playstation" | "gift_card_xbox">("jogo");
   const [promotions, setPromotions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -200,7 +202,7 @@ export default function PromotionsPage() {
                           const msg = encodeURIComponent(
                             `Olá! Vi a promoção "${promo.title}" por R$ ${parseFloat(promo.price).toFixed(2).replace(".", ",")} no site. Gostaria de comprar!`
                           );
-                          window.open(`https://wa.me/554384253691?text=${msg}`, "_blank");
+                          window.open(`https://wa.me/${platformSettings?.supportWhatsapp || "554384253691"}?text=${msg}`, "_blank");
                         }
                       }}
                       className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-11 text-sm btn-neon uppercase tracking-wider rounded-xl"

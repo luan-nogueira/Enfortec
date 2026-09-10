@@ -56,6 +56,7 @@ const mockEarningsData = [
 export default function SellerDashboard() {
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
+  const { data: platformSettings } = trpc.settings.get.useQuery();
   const [activeTab, setActiveTab] = useState<"vendas" | "produtos" | "mensagens" | "avaliacoes">("vendas");
 
   const [usedProducts, setUsedProducts] = useState<any[]>([]);
@@ -360,7 +361,7 @@ export default function SellerDashboard() {
               onClick={() => {
                 const amount = parseFloat(pgUser?.balance || "0.00").toFixed(2).replace('.', ',');
                 const text = encodeURIComponent(`Olá! Gostaria de solicitar o saque do meu saldo acumulado de R$ ${amount} no painel da Eforte Games.`);
-                window.open(`https://wa.me/554384253691?text=${text}`, "_blank");
+                window.open(`https://wa.me/${platformSettings?.supportWhatsapp || "554384253691"}?text=${text}`, "_blank");
               }}
               disabled={parseFloat(pgUser?.balance || "0.00") <= 0}
               className="w-full mt-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs"

@@ -10,6 +10,7 @@ import { Shield, User, Store, Flame, ArrowLeft, Info, HelpCircle } from "lucide-
 export default function BecomeSellerForm() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   const [, navigate] = useLocation();
+  const { data: platformSettings } = trpc.settings.get.useQuery();
   const [storeName, setStoreName] = useState("");
   const [description, setDescription] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -110,7 +111,7 @@ export default function BecomeSellerForm() {
 
   const handleNegotiateAccount = () => {
     const message = `Olá! Gostaria de negociar a revenda da minha conta para a Eforte Games. Confirmo que ela cumpre com todos os requisitos mínimos (e-mail da loja e desativação solicitada). Como prosseguimos?`;
-    const phone = "554384253691";
+    const phone = platformSettings?.supportWhatsapp || "554384253691";
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
   };
 

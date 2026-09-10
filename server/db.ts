@@ -810,12 +810,23 @@ export async function getPlatformSettings() {
   if (result.length === 0) {
     // Initialize singleton row if not exists
     await db.insert(platformSettings).values({ id: 1, commissionPercentage: "6" }).onConflictDoNothing();
-    return { id: 1, commissionPercentage: "6", vipWhatsappUrl: null, maxCoinsPerPurchase: 10, maxCoinsPreVenda: 50 };
+    return {
+      id: 1, commissionPercentage: "6", vipWhatsappUrl: null, maxCoinsPerPurchase: 10, maxCoinsPreVenda: 50,
+      supportWhatsapp: "554384253691", deliveryHelpVideo1Url: null, deliveryHelpVideo2Url: null,
+    };
   }
   return result[0];
 }
 
-export async function updatePlatformSettings(data: { commissionPercentage?: string, vipWhatsappUrl?: string, maxCoinsPerPurchase?: number, maxCoinsPreVenda?: number }) {
+export async function updatePlatformSettings(data: {
+  commissionPercentage?: string,
+  vipWhatsappUrl?: string,
+  maxCoinsPerPurchase?: number,
+  maxCoinsPreVenda?: number,
+  supportWhatsapp?: string,
+  deliveryHelpVideo1Url?: string | null,
+  deliveryHelpVideo2Url?: string | null,
+}) {
   const db = getDb();
   if (!db) return;
   await db.update(platformSettings).set(data).where(eq(platformSettings.id, 1));

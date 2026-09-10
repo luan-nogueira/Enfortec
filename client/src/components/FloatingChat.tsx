@@ -19,6 +19,7 @@ import {
 import { MessageCircle, X, Send, Bot, ShieldCheck, Zap, Trophy, ShoppingBag, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { containsLink, LINK_BLOCKED_MESSAGE } from "@/lib/textFilters";
+import { trpc } from "@/lib/trpc";
 
 // Catalog is now fetched dynamically from Firestore
 
@@ -41,7 +42,7 @@ const STOP = new Set(["tem", "voce", "voces", "o", "de", "com", "jogo", "jogos",
   "e", "do", "da", "game", "games", "ps4", "ps5", "quais", "todos", "lista",
   "algum", "tao", "ter", "qualquer", "sobre"]);
 
-function aiAnswer(q: string, catalog: any[]): string {
+function aiAnswer(q: string, catalog: any[], waBase: string = WA_BASE): string {
   const nq = norm(q);
 
   if (/jogue com economia|secundaria|conta secundaria/.test(nq))
@@ -54,7 +55,7 @@ function aiAnswer(q: string, catalog: any[]): string {
     return "💼 **Vender sua conta ou Mídias Físicas na Eforte Games**!\n\n• **Revenda de Contas**: Comissão de 35% com retenção do valor em escrow até a entrega.\n• **Mídias Físicas / Consoles**: Taxa de 8% com intermediação segura.\n\n[👉 Virar Revendedor](/virar-vendedor)";
 
   if (/preciso de ajuda|ajuda com algum jogo|qual jogo deseja ajuda/.test(nq))
-    return "Com certeza! Estou aqui para ajudar. 🎮\n\nSe você deseja ajuda com um jogo específico, digite o nome dele e eu vejo se temos disponível no nosso catálogo!\n\n[👉 Chamar no WhatsApp](" + WA_BASE + ")";
+    return "Com certeza! Estou aqui para ajudar. 🎮\n\nSe você deseja ajuda com um jogo específico, digite o nome dele e eu vejo se temos disponível no nosso catálogo!\n\n[👉 Chamar no WhatsApp](" + waBase + ")";
 
   if (/pagamento|pix|cartao|boleto|pagar|pago|mercadopago|mercado pago|infinitepay/.test(nq))
     return "Aceitamos **Pix**, **Cartão de Crédito**, **Boleto** e **Saldo Mercado Pago** via Mercado Pago. 💳\n\nVocê também pode usar suas **ForteCoins** como desconto! (10 FC = R$ 1,00 de desconto)";
@@ -66,7 +67,7 @@ function aiAnswer(q: string, catalog: any[]): string {
     return "Mídias digitais são enviadas via **WhatsApp ou e-mail** logo após a confirmação do pagamento. 📦\n\nProdutos físicos vão pelos Correios com rastreio.";
 
   if (/contato|whatsapp|telefone|suporte|falar com|atendimento|adm/.test(nq))
-    return `Fale diretamente com a nossa equipe no WhatsApp:\n[👉 Abrir Suporte no WhatsApp](${WA_BASE})`;
+    return `Fale diretamente com a nossa equipe no WhatsApp:\n[👉 Abrir Suporte no WhatsApp](${waBase})`;
 
   if (/oi|ola|olá|bom dia|boa tarde|boa noite|tudo bem/.test(nq))
     return "Olá! 👋 Sou o assistente inteligente da **Eforte Games**.\n\nComo posso te ajudar hoje? Escolha um atalho abaixo ou digite o nome do jogo!";
@@ -91,7 +92,7 @@ function aiAnswer(q: string, catalog: any[]): string {
   }).filter(x => x.score >= 15).sort((a, b) => b.score - a.score);
 
   if (scored.length === 0)
-    return `Não encontrei esse jogo exatamente no catálogo padrão. 😕\n\nTente outro nome ou [fale com o atendimento no WhatsApp](${WA_BASE})!`;
+    return `Não encontrei esse jogo exatamente no catálogo padrão. 😕\n\nTente outro nome ou [fale com o atendimento no WhatsApp](${waBase})!`;
 
   if (scored[0].score >= 80 && scored.length === 1 && !isListMode) {
     const g = scored[0].g;
@@ -179,6 +180,8 @@ export default function FloatingChat() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [catalog, setCatalog] = useState<{name: string; price: number}[]>([]);
   const [isPageScrolling, setIsPageScrolling] = useState(false);
+  const { data: platformSettings } = trpc.settings.get.useQuery();
+  const waBase = `https://wa.me/${platformSettings?.supportWhatsapp || WA_NUMBER}`;
 
   // Reduz opacidade do botão flutuante enquanto a página é rolada
   useEffect(() => {
@@ -283,7 +286,7 @@ export default function FloatingChat() {
 
     setThinking(true);
     await new Promise(r => setTimeout(r, 400));
-    const answer = aiAnswer(msg, catalog);
+    const answer = aiAnswer(msg, catalog, waBase);
     setThinking(false);
 
     if (isAuthenticated && user?.id) {

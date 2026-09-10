@@ -282,7 +282,7 @@ export default function DigitalMedia() {
     if (!selectedBargainProduct || !bargainOffer.trim()) return;
     const price = parseFloat(selectedBargainProduct.price);
     const message = `Olá! Tenho interesse no jogo digital: ${selectedBargainProduct.name} (Preço original: R$ ${price.toFixed(2).replace('.', ',')}). Gostaria de fazer uma pechincha: você fecharia por R$ ${parseFloat(bargainOffer).toFixed(2).replace('.', ',')}?`;
-    window.open(`https://wa.me/554384253691?text=${encodeURIComponent(message)}`, "_blank");
+    window.open(`https://wa.me/${platformSettings?.supportWhatsapp || "554384253691"}?text=${encodeURIComponent(message)}`, "_blank");
     setSelectedBargainProduct(null);
   };
 
@@ -290,7 +290,7 @@ export default function DigitalMedia() {
     const price = parseFloat(product.price);
     if (price === 0) {
       const msg = encodeURIComponent(`Olá! Tenho interesse no jogo "${product.name}" - valor sob consulta. Como faço para comprar?`);
-      window.open(`https://wa.me/554384253691?text=${msg}`, '_blank');
+      window.open(`https://wa.me/${platformSettings?.supportWhatsapp || "554384253691"}?text=${msg}`, '_blank');
       return;
     }
 
@@ -460,7 +460,7 @@ export default function DigitalMedia() {
         );
         const prodTitle = isConsoleSelectable ? `${selectedProduct.name} (${selectedConsole})` : selectedProduct.name;
         const msg = encodeURIComponent(`Olá! Tenho interesse no produto "${prodTitle}" - R$ ${price.toFixed(2).replace('.', ',')}. Como faço para comprar?`);
-        window.open(`https://wa.me/554384253691?text=${msg}`, '_blank');
+        window.open(`https://wa.me/${platformSettings?.supportWhatsapp || "554384253691"}?text=${msg}`, '_blank');
         setSelectedProduct(null);
       } else {
         setCheckoutError(error.message || "Erro desconhecido ao processar pagamento.");

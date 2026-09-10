@@ -2053,6 +2053,30 @@ export default function AdminDashboard() {
     }
   }, [coinLimitsQuery.data?.maxCoinsPerPurchase, coinLimitsQuery.data?.maxCoinsPreVenda]);
 
+  // Número de WhatsApp de suporte + vídeos de ajuda mostrados em "Minhas Compras" — fonte
+  // única (Postgres, via settings.get) lida em todas as páginas que hoje têm o número fixo.
+  const supportSettingsQuery = trpc.settings.get.useQuery();
+  const [supportSettingsInput, setSupportSettingsInput] = useState({
+    supportWhatsapp: "554384253691",
+    deliveryHelpVideo1Url: "",
+    deliveryHelpVideo2Url: "",
+  });
+  useEffect(() => {
+    if (supportSettingsQuery.data?.supportWhatsapp !== undefined) {
+      setSupportSettingsInput({
+        supportWhatsapp: supportSettingsQuery.data.supportWhatsapp || "554384253691",
+        deliveryHelpVideo1Url: supportSettingsQuery.data.deliveryHelpVideo1Url || "",
+        deliveryHelpVideo2Url: supportSettingsQuery.data.deliveryHelpVideo2Url || "",
+      });
+    }
+  }, [supportSettingsQuery.data?.supportWhatsapp, supportSettingsQuery.data?.deliveryHelpVideo1Url, supportSettingsQuery.data?.deliveryHelpVideo2Url]);
+
+  // Sem toast de sucesso aqui — mutateAsync é chamado dentro de handleSaveWaConfig, que já
+  // mostra um único toast agregando os dois salvamentos (Firestore + Postgres).
+  const updateSupportSettingsMutation = trpc.settings.updateSupportSettings.useMutation({
+    onSuccess: () => supportSettingsQuery.refetch(),
+  });
+
   const updateCoinLimitsMutation = trpc.settings.updateCoinLimits.useMutation({
     onSuccess: () => {
       toast.success("Teto de ForteCoins por compra salvo com sucesso!");
@@ -2106,6 +2130,13 @@ export default function AdminDashboard() {
     try {
       await setDoc(doc(db, "settings", "whatsapp"), waConfig, { merge: true });
       await updateWhatsappUrlMutation.mutateAsync({ vipWhatsappUrl: waConfig.groupUrl });
+      // supportNumber precisa ir pro Postgres (settings.get), não só pro Firestore acima —
+      // é essa fonte que as páginas do site (FAQ, chat, entrega, etc.) realmente leem.
+      await updateSupportSettingsMutation.mutateAsync({
+        supportWhatsapp: waConfig.supportNumber,
+        deliveryHelpVideo1Url: supportSettingsInput.deliveryHelpVideo1Url || null,
+        deliveryHelpVideo2Url: supportSettingsInput.deliveryHelpVideo2Url || null,
+      });
       toast.success("Link do Grupo e Número do WhatsApp salvos com sucesso!");
     } catch (err) {
       console.error("Erro ao salvar config do WhatsApp:", err);
@@ -5666,7 +5697,7 @@ export default function AdminDashboard() {
                     <MessageCircle className="w-5 h-5 text-green-500" /> Gerenciar Link do WhatsApp & Comunidade
                   </h4>
                   <p className="text-slate-400 text-xs mt-0.5">
-                    Caso o grupo do WhatsApp fique cheio, atualize o link abaixo para redirecionar novos clientes automaticamente.
+                    Caso o grupo do WhatsApp fique cheio, atualize o link abaixo para redirecionar novos clientes automaticamente. O número de atendimento é usado em todo o site (chat flutuante, FAQ, entrega, etc.).
                   </p>
                 </div>
                 <Button
@@ -5675,7 +5706,7 @@ export default function AdminDashboard() {
                   className="bg-green-600 hover:bg-green-700 text-white font-bold h-9 px-4 text-xs flex items-center gap-1.5 shrink-0"
                 >
                   <Check className="w-4 h-4" />
-                  {savingWaConfig ? "Salvando..." : "Salvar Link do WhatsApp"}
+                  {savingWaConfig ? "Salvando..." : "Salvar Configurações"}
                 </Button>
               </div>
 
@@ -5700,6 +5731,29 @@ export default function AdminDashboard() {
                     className="bg-slate-950 border-slate-800 text-white text-xs h-10 mt-1 font-mono"
                   />
                   <span className="text-[10px] text-slate-500 mt-1 block">Formato: 55 + DDD + Número (apenas dígitos)</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-slate-800">
+                <div>
+                  <Label className="text-xs text-slate-300 font-bold">Vídeo de Ajuda #1 (mostrado em "Minhas Compras")</Label>
+                  <Input
+                    value={supportSettingsInput.deliveryHelpVideo1Url}
+                    onChange={(e) => setSupportSettingsInput({ ...supportSettingsInput, deliveryHelpVideo1Url: e.target.value })}
+                    placeholder="Ex: https://youtube.com/watch?v=..."
+                    className="bg-slate-950 border-slate-800 text-white text-xs h-10 mt-1 font-mono"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-1 block">Link do vídeo (YouTube etc.) com passo a passo em caso de problema com a conta entregue</span>
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-300 font-bold">Vídeo de Ajuda #2 (mostrado em "Minhas Compras")</Label>
+                  <Input
+                    value={supportSettingsInput.deliveryHelpVideo2Url}
+                    onChange={(e) => setSupportSettingsInput({ ...supportSettingsInput, deliveryHelpVideo2Url: e.target.value })}
+                    placeholder="Ex: https://youtube.com/watch?v=..."
+                    className="bg-slate-950 border-slate-800 text-white text-xs h-10 mt-1 font-mono"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-1 block">Deixe em branco se quiser usar só um vídeo</span>
                 </div>
               </div>
             </Card>

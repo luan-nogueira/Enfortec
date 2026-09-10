@@ -29,6 +29,7 @@ export default function MyPurchases() {
   const { data: orders, isLoading, refetch } = trpc.orders.getByBuyerId.useQuery(undefined, {
     enabled: isAuthenticated,
   });
+  const { data: platformSettings } = trpc.settings.get.useQuery();
 
   useEffect(() => {
     if (user?.pendingRefund && orders && orders.length > 0) {
@@ -167,6 +168,43 @@ export default function MyPurchases() {
                       <pre className="text-slate-200 text-xs font-mono whitespace-pre-wrap select-all bg-slate-950/40 p-2.5 rounded border border-red-950/40">
                         {order.deliveryDetails}
                       </pre>
+                      {(platformSettings?.deliveryHelpVideo1Url || platformSettings?.deliveryHelpVideo2Url || platformSettings?.supportWhatsapp) && (
+                        <div className="mt-3 pt-3 border-t border-red-950/40">
+                          <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mb-2">Deu algum problema pra acessar?</p>
+                          <div className="flex flex-wrap gap-2">
+                            {platformSettings?.deliveryHelpVideo1Url && (
+                              <a
+                                href={platformSettings.deliveryHelpVideo1Url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs bg-slate-900 border border-slate-700 hover:border-red-500/50 text-slate-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
+                              >
+                                ▶️ Vídeo de Ajuda 1
+                              </a>
+                            )}
+                            {platformSettings?.deliveryHelpVideo2Url && (
+                              <a
+                                href={platformSettings.deliveryHelpVideo2Url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs bg-slate-900 border border-slate-700 hover:border-red-500/50 text-slate-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
+                              >
+                                ▶️ Vídeo de Ajuda 2
+                              </a>
+                            )}
+                            {platformSettings?.supportWhatsapp && (
+                              <a
+                                href={`https://wa.me/${platformSettings.supportWhatsapp}?text=${encodeURIComponent(`Olá! Tive um problema com a conta entregue do pedido #${order.id} (${order.productName || "meu pedido"}). Pode me ajudar?`)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs bg-green-600 hover:bg-green-700 text-white font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
+                              >
+                                💬 Falar no WhatsApp
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                   {(order.status === 'pago' || order.status === 'enviado') && (

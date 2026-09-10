@@ -747,6 +747,22 @@ export const appRouter = router({
         if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
         return db.updatePlatformSettings({ maxCoinsPerPurchase: input.maxCoinsPerPurchase, maxCoinsPreVenda: input.maxCoinsPreVenda });
       }),
+    // Numero de WhatsApp de suporte (fonte única usada em wa.me/<numero> no site inteiro)
+    // e os 2 vídeos de ajuda mostrados junto com a conta entregue em "Minhas Compras".
+    updateSupportSettings: protectedProcedure
+      .input(z.object({
+        supportWhatsapp: z.string().min(8),
+        deliveryHelpVideo1Url: z.string().nullable().optional(),
+        deliveryHelpVideo2Url: z.string().nullable().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+        return db.updatePlatformSettings({
+          supportWhatsapp: input.supportWhatsapp,
+          deliveryHelpVideo1Url: input.deliveryHelpVideo1Url || null,
+          deliveryHelpVideo2Url: input.deliveryHelpVideo2Url || null,
+        });
+      }),
   }),
 
   // Central de Notificações do admin — "dispensar" aqui só esconde da lista (compartilhado
