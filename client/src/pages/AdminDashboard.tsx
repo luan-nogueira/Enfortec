@@ -1537,6 +1537,22 @@ export default function AdminDashboard() {
     { sellerId: viewingSellerId ?? 0 },
     { enabled: viewingSellerId !== null }
   );
+  const banUserMutation = trpc.auth.adminBanUser.useMutation({
+    onSuccess: () => {
+      toast.success("Usuário banido: login bloqueado e loja desativada.");
+      sellerDetailsQuery.refetch();
+      adminDigitalProductsQuery.refetch();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao banir usuário."),
+  });
+  const unbanUserMutation = trpc.auth.adminUnbanUser.useMutation({
+    onSuccess: () => {
+      toast.success("Usuário desbanido: login e loja reativados.");
+      sellerDetailsQuery.refetch();
+      adminDigitalProductsQuery.refetch();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao desbanir usuário."),
+  });
 
   const normalizeGameNameForMatch = (n: string) => {
     const noAccents = (n || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -6663,6 +6679,39 @@ export default function AdminDashboard() {
                 <p className="text-xs text-slate-400">ID #{sellerDetailsQuery.data.seller.id} · Comissão: {sellerDetailsQuery.data.seller.commissionPercentage}%</p>
                 <p className="text-xs text-slate-300">👤 {sellerDetailsQuery.data.contactName || "—"}</p>
                 <p className="text-xs text-slate-300">✉️ {sellerDetailsQuery.data.contactEmail || "—"}</p>
+                <div className="flex items-center justify-between gap-2 pt-2 mt-1 border-t border-slate-800">
+                  <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${sellerDetailsQuery.data.isBanned ? "bg-red-600/20 text-red-400 border border-red-600/40" : "bg-slate-800 text-slate-400 border border-slate-700"}`}>
+                    {sellerDetailsQuery.data.isBanned ? "🚫 Usuário Banido" : "Conta Normal"}
+                  </span>
+                  {sellerDetailsQuery.data.isBanned ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => unbanUserMutation.mutate({ userId: sellerDetailsQuery.data!.seller.userId })}
+                      disabled={unbanUserMutation.isPending}
+                      className="bg-green-600 hover:bg-green-700 text-white font-bold h-7 text-xs"
+                    >
+                      Desbanir Usuário
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        toast(`Banir "${sellerDetailsQuery.data!.contactName || sellerDetailsQuery.data!.seller.storeName}"? Isso bloqueia o login dele e desativa a loja.`, {
+                          action: {
+                            label: "Banir",
+                            onClick: () => banUserMutation.mutate({ userId: sellerDetailsQuery.data!.seller.userId }),
+                          },
+                        });
+                      }}
+                      disabled={banUserMutation.isPending}
+                      className="bg-red-600 hover:bg-red-700 text-white font-bold h-7 text-xs"
+                    >
+                      Banir Usuário
+                    </Button>
+                  )}
+                </div>
               </div>
 
               <div>

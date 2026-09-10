@@ -17,6 +17,12 @@ const requireUser = t.middleware(async opts => {
     throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
   }
 
+  // Bloqueia qualquer ação autenticada de uma conta banida (comprar, vender, chat, etc.)
+  // sem quebrar a navegação pública do site, que usa publicProcedure e não passa por aqui.
+  if ((ctx.user as any).isBanned) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Sua conta foi suspensa por descumprir as regras da plataforma." });
+  }
+
   return next({
     ctx: {
       ...ctx,

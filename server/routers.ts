@@ -34,6 +34,18 @@ export const appRouter = router({
         .from(users)
         .orderBy(desc(users.lastSignedIn));
     }),
+    adminBanUser: protectedProcedure
+      .input(z.object({ userId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores" });
+        return db.banUser(input.userId);
+      }),
+    adminUnbanUser: protectedProcedure
+      .input(z.object({ userId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores" });
+        return db.unbanUser(input.userId);
+      }),
     adminGetDatabaseStats: protectedProcedure.query(async ({ ctx }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores" });
       const stats = await db.getDatabaseStorageStats();

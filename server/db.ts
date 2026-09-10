@@ -185,6 +185,30 @@ export async function getProductById(id: number) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+/** Bane um usuário: bloqueia qualquer ação autenticada dele e desativa a loja, se tiver. */
+export async function banUser(userId: number) {
+  const database = getDb();
+  if (!database) throw new Error("Database not available");
+
+  const target = await getUserById(userId);
+  if (target?.role === "admin") {
+    throw new Error("Não é possível banir uma conta de administrador.");
+  }
+
+  await database.update(users).set({ isBanned: true }).where(eq(users.id, userId));
+  await database.update(sellers).set({ isActive: false }).where(eq(sellers.userId, userId));
+  return { success: true };
+}
+
+/** Reverte o banimento: reativa o login e a loja (se ele tiver uma). */
+export async function unbanUser(userId: number) {
+  const database = getDb();
+  if (!database) throw new Error("Database not available");
+  await database.update(users).set({ isBanned: false }).where(eq(users.id, userId));
+  await database.update(sellers).set({ isActive: true }).where(eq(sellers.userId, userId));
+  return { success: true };
+}
+
 // Sellers queries
 export async function getSellerByUserId(userId: number) {
   try {
@@ -229,6 +253,7 @@ export async function getSellerFullDetails(sellerId: number) {
     seller: row.seller,
     contactName: row.user?.name || null,
     contactEmail: row.user?.email || null,
+    isBanned: row.user?.isBanned ?? false,
     usedProducts: usedProductsList,
     digitalProducts: digitalProductsList,
     orders: salesHistory,

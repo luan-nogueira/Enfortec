@@ -35,6 +35,9 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => new Date()),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
   balance: numeric("balance", { precision: 12, scale: 2 }).default("0").notNull(),
+  // Banimento por descumprimento das regras: bloqueia qualquer ação autenticada (ver
+  // requireUser em server/_core/trpc.ts) e desativa a loja/anúncios dele, se tiver.
+  isBanned: boolean("isBanned").default(false).notNull(),
 });
 
 export type User = typeof users.$inferSelect;
