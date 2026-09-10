@@ -108,6 +108,47 @@ function BannerCountdown({ expiresAt }: { expiresAt: string }) {
   );
 }
 
+/** Versão compacta do contador, para o card de um jogo específico na vitrine. */
+function GameCardCountdown({ expiresAt }: { expiresAt: string }) {
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0, expired: false });
+
+  useEffect(() => {
+    const calculateTime = () => {
+      const difference = +new Date(expiresAt) - +new Date();
+      if (difference <= 0) {
+        return { days: 0, hours: 0, minutes: 0, seconds: 0, expired: true };
+      }
+      return {
+        days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((difference / 1000 / 60) % 60),
+        seconds: Math.floor((difference / 1000) % 60),
+        expired: false,
+      };
+    };
+
+    setTimeLeft(calculateTime());
+    const timer = setInterval(() => setTimeLeft(calculateTime()), 1000);
+    return () => clearInterval(timer);
+  }, [expiresAt]);
+
+  if (timeLeft.expired) return null;
+
+  const padZero = (n: number) => n.toString().padStart(2, "0");
+
+  return (
+    <div className="inline-flex gap-1 items-center bg-slate-950/85 backdrop-blur-md px-1.5 py-0.5 rounded-lg border border-red-500/40 text-white font-bold text-[8px] shadow-[0_0_10px_rgba(220,38,38,0.25)]">
+      <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse inline-block" />
+      <div className="flex items-center gap-1 font-mono">
+        {timeLeft.days > 0 && <span className="bg-red-950/60 border border-red-500/30 px-1 py-0.5 rounded text-red-400 font-bold">{timeLeft.days}d</span>}
+        <span className="bg-red-950/60 border border-red-500/30 px-1 py-0.5 rounded text-red-400 font-bold">{padZero(timeLeft.hours)}h</span>
+        <span className="bg-red-950/60 border border-red-500/30 px-1 py-0.5 rounded text-red-400 font-bold">{padZero(timeLeft.minutes)}m</span>
+        <span className="bg-red-950/60 border border-red-500/30 px-1 py-0.5 rounded text-red-400 font-bold">{padZero(timeLeft.seconds)}s</span>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const { user, isAuthenticated, isAdmin, isCollaborator, logout } = useAuth();
   const [, navigate] = useLocation();
@@ -806,12 +847,14 @@ export default function Home() {
               const isDigital = listing._type === 'digital' && !isAssinatura;
               const isFisico = listing._type === 'used';
               const isOutOfStock = isDigital && (listing.isActive === false || Number(listing.stock ?? 0) <= 0);
+              const isExpired = isDigital && !!listing.expiresAt && new Date(listing.expiresAt) < new Date();
+              const isUnavailable = isOutOfStock || isExpired;
 
               return (
-                <div 
+                <div
                   key={`${listing._type}-${listing.id}`}
-                  className={`bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-red-500/40 transition-all hover:-translate-y-1.5 hover:shadow-[0_8px_30px_rgba(220,38,38,0.2)] flex flex-col h-full cursor-pointer min-w-[160px] sm:min-w-[220px] lg:min-w-0 w-[45vw] sm:w-[35vw] lg:w-auto snap-start shrink-0 group game-card-shine ${isOutOfStock ? 'opacity-70' : ''}`}
-                  onClick={() => !isOutOfStock && navigate(isFisico ? '/usados' : `/digital?search=${encodeURIComponent(listing.name)}&buy=${listing.id}`)}
+                  className={`bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-red-500/40 transition-all hover:-translate-y-1.5 hover:shadow-[0_8px_30px_rgba(220,38,38,0.2)] flex flex-col h-full cursor-pointer min-w-[160px] sm:min-w-[220px] lg:min-w-0 w-[45vw] sm:w-[35vw] lg:w-auto snap-start shrink-0 group game-card-shine ${isUnavailable ? 'opacity-70' : ''}`}
+                  onClick={() => !isUnavailable && navigate(isFisico ? '/usados' : `/digital?search=${encodeURIComponent(listing.name)}&buy=${listing.id}`)}
                 >
                   <div className="aspect-[16/9] w-full bg-slate-950 relative overflow-hidden flex items-center justify-center">
                     {listing.imageUrl || (listing.images && listing.images.length > 0) ? (
@@ -857,9 +900,18 @@ export default function Home() {
                       {isAssinatura ? '⭐ Assinatura VIP' : isFisico ? '📦 Mídia Física' : '🎮 Mídia Digital'}
                     </div>
 
-                    {isOutOfStock && (
+                    {isOutOfStock ? (
                       <div className="absolute top-1.5 right-1.5 z-20 bg-red-600/95 border border-red-500 text-white text-[7px] sm:text-[9px] font-black px-1.5 sm:px-2 py-0.5 rounded-full uppercase tracking-wider shadow-md">
                         Esgotado
+                      </div>
+                    ) : isExpired ? (
+                      <div className="absolute top-1.5 right-1.5 z-20 bg-red-600/95 border border-red-500 text-white text-[7px] sm:text-[9px] font-black px-1.5 sm:px-2 py-0.5 rounded-full uppercase tracking-wider shadow-md">
+                        Prazo Encerrado
+                      </div>
+                    ) : null}
+                    {!isUnavailable && listing.expiresAt && (
+                      <div className="absolute bottom-1.5 right-1.5 z-20">
+                        <GameCardCountdown expiresAt={listing.expiresAt} />
                       </div>
                     )}
                   </div>
@@ -931,14 +983,14 @@ export default function Home() {
                       <Button
                         size="sm"
                         className={`w-full rounded-lg px-2.5 py-1.5 text-[10px] sm:text-xs font-bold mt-2 ${
-                          isOutOfStock
+                          isUnavailable
                             ? "bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed"
                             : "bg-red-600 hover:bg-red-700 text-white btn-neon"
                         }`}
-                        disabled={isOutOfStock}
+                        disabled={isUnavailable}
                         onClick={(e: any) => {
                           e.stopPropagation();
-                          if (isOutOfStock) return;
+                          if (isUnavailable) return;
                           if (isFisico) {
                             navigate('/usados');
                           } else {
@@ -946,7 +998,7 @@ export default function Home() {
                           }
                         }}
                       >
-                        {isOutOfStock ? "Esgotado" : isFisico ? "Ver Anúncio" : primaryPrice === 0 ? "Contatar" : "Comprar / Escolher Conta"}
+                        {isOutOfStock ? "Esgotado" : isExpired ? "Indisponível" : isFisico ? "Ver Anúncio" : primaryPrice === 0 ? "Contatar" : "Comprar / Escolher Conta"}
                       </Button>
                     </div>
                   </div>
