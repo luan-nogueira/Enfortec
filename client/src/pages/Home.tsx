@@ -534,6 +534,9 @@ export default function Home() {
             {/* Right side: Sidebar Banners */}
             <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 lg:grid-rows-3 gap-3 sm:gap-4 lg:h-[420px]">
               {/* Top Banner Card */}
+              {isLoadingPromos ? (
+                <div className="relative h-[110px] sm:h-[130px] lg:h-full bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 animate-pulse" />
+              ) : (
               <div
                 onClick={() => navigate(sidebarTopBanner.link || "/")}
                 className="relative h-[110px] sm:h-[130px] lg:h-full bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-lg hover:border-red-500/30 hover:shadow-[0_0_20px_rgba(220,38,38,0.1)] transition-all duration-300 group/sidebar cursor-pointer flex flex-col justify-end p-4 sm:p-5"
@@ -561,8 +564,12 @@ export default function Home() {
                   </p>
                 </div>
               </div>
+              )}
 
               {/* Middle Banner Card */}
+              {isLoadingPromos ? (
+                <div className="relative h-[110px] sm:h-[130px] lg:h-full bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 animate-pulse" />
+              ) : (
               <div
                 onClick={() => navigate(sidebarBottomBanner.link || "/")}
                 className="relative h-[110px] sm:h-[130px] lg:h-full bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-lg hover:border-red-500/30 hover:shadow-[0_0_20px_rgba(220,38,38,0.1)] transition-all duration-300 group/sidebar cursor-pointer flex flex-col justify-end p-4 sm:p-5"
@@ -590,8 +597,12 @@ export default function Home() {
                   </p>
                 </div>
               </div>
+              )}
               
               {/* Bottom Banner Card (Platinador) */}
+              {isLoadingPromos ? (
+                <div className="relative h-[110px] sm:h-[130px] lg:h-full bg-slate-900 rounded-2xl overflow-hidden border border-amber-500/30 animate-pulse" />
+              ) : (
               <div
                 onClick={() => navigate(sidebarPlatinadorBanner.link || "/platinador")}
                 className="relative h-[110px] sm:h-[130px] lg:h-full bg-slate-900 rounded-2xl overflow-hidden border border-amber-500/30 shadow-lg hover:border-amber-400/50 hover:shadow-[0_0_20px_rgba(251,191,36,0.15)] transition-all duration-300 group/sidebar cursor-pointer flex flex-col justify-end p-4 sm:p-5"
@@ -619,6 +630,7 @@ export default function Home() {
                   </p>
                 </div>
               </div>
+              )}
             </div>
           </div>
 
