@@ -175,7 +175,10 @@ export const orders = pgTable("orders", {
   platformCommission: numeric("platformCommission", { precision: 10, scale: 2 }).notNull(),
   sellerAmount: numeric("sellerAmount", { precision: 10, scale: 2 }).notNull(),
   status: orderStatusEnum("status").default("pendente"),
-  paymentId: varchar("paymentId", { length: 255 }),
+  // Único no banco (além da checagem de idempotência em payment.ts) — fecha de vez a janela
+  // de corrida em que dois reenvios de webhook quase simultâneos passam pela checagem antes
+  // de qualquer um inserir, criando pedido duplicado pro mesmo pagamento.
+  paymentId: varchar("paymentId", { length: 255 }).unique(),
   productName: varchar("productName", { length: 255 }),
   firebaseProductId: varchar("firebaseProductId", { length: 255 }),
   accountType: varchar("accountType", { length: 20 }),

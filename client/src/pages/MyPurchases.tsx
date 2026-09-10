@@ -225,7 +225,10 @@ export default function MyPurchases() {
                       })()}
                     </div>
                   )}
-                  {(order.status === 'pago' || order.status === 'enviado') && (
+                  {/* Retenção/liberação de escrow só existe quando há um vendedor terceiro real —
+                      compras do catálogo próprio da Eforte (sellerId nulo) não têm esse conceito:
+                      é entregue automaticamente, sem precisar o comprador "liberar" nada. */}
+                  {order.sellerId && (order.status === 'pago' || order.status === 'enviado') && (
                     <div className="mt-2 text-xs text-amber-400 font-bold bg-amber-950/40 border border-amber-800/40 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
                       <span>🔒 Valor Retido em Segurança pela EforteGames</span>
                     </div>
@@ -246,15 +249,15 @@ export default function MyPurchases() {
                     buttonClassName="w-full md:w-auto bg-slate-900 border border-green-600/40 hover:border-green-500 text-green-400 font-bold text-xs py-2.5 px-4 rounded-xl flex items-center justify-center gap-1.5"
                   />
                   
-                  {(order.status === 'pago' || order.status === 'enviado') ? (
-                    <Button 
+                  {order.sellerId && (order.status === 'pago' || order.status === 'enviado') ? (
+                    <Button
                       className="bg-green-600 hover:bg-green-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow-lg shadow-green-600/20 w-full md:w-auto"
                       onClick={() => handleOpenReview(order.id)}
                       disabled={confirmMutation.isPending}
                     >
                       ⭐ Avaliar Vendedor & Liberar Pagamento
                     </Button>
-                  ) : order.status === 'entregue' ? (
+                  ) : order.sellerId && order.status === 'entregue' ? (
                     <div className="flex items-center text-green-500 text-sm font-bold bg-green-950/40 border border-green-800/40 px-3 py-1.5 rounded-lg">
                       <Star className="w-4 h-4 mr-1.5 fill-current" /> Recebido & Valor Liberado
                     </div>

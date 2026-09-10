@@ -723,10 +723,27 @@ export async function attemptAutoDeliverDigitalOrder(
   const { orderId, digitalProductId, buyerId, productName } = params;
 
   const account = await claimDigitalProductAccount(database, digitalProductId, orderId);
-  if (!account) return { delivered: false as const };
+  if (!account) {
+    console.log(`[AutoDeliver] Pedido #${orderId}: sem conta disponível no pool do jogo #${digitalProductId} — segue pro fluxo manual.`);
+    return { delivered: false as const };
+  }
+  console.log(`[AutoDeliver] Pedido #${orderId}: conta reivindicada do pool (${account.email}), atualizando pedido...`);
 
-  const deliveryDetails = `Email: ${account.email}\nSenha: ${account.password}`;
-  await database.update(orders).set({ deliveryDetails, status: "enviado" }).where(eq(orders.id, orderId));
+  const deliveryDetails = `🎮 Sua conta foi liberada automaticamente!\n\n📧 Email: ${account.email}\n🔑 Senha: ${account.password}\n\nQualquer dúvida ou problema para acessar, você encontra vídeos de ajuda e o contato do nosso suporte na página "Minhas Compras" do site.`;
+  const updateResult = await database
+    .update(orders)
+    .set({ deliveryDetails, status: "enviado" })
+    .where(eq(orders.id, orderId))
+    .returning({ id: orders.id });
+
+  // A conta já foi consumida do pool nesse ponto — se o pedido não existir mais por algum
+  // motivo, loga com a credencial completa pra dar pra recuperar manualmente depois, já que
+  // não há como "devolver" a conta pro pool sem reintroduzir risco de entregar em dobro.
+  if (updateResult.length === 0) {
+    console.error(`[AutoDeliver] CRÍTICO: pedido #${orderId} não encontrado ao tentar salvar a entrega. Conta consumida do pool do jogo #${digitalProductId}: ${account.email} / ${account.password}`);
+    return { delivered: false as const };
+  }
+  console.log(`[AutoDeliver] Pedido #${orderId}: status atualizado pra "enviado" com sucesso.`);
 
   const buyerResult = await database.select().from(users).where(eq(users.id, buyerId)).limit(1);
   const buyer = buyerResult[0];
