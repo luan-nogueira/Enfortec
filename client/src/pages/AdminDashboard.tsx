@@ -1716,6 +1716,38 @@ export default function AdminDashboard() {
     }
   };
 
+  // Upload direto (arquivo local) dos vídeos de ajuda mostrados em "Minhas Compras"
+  const [uploadingHelpVideo1, setUploadingHelpVideo1] = useState(false);
+  const [uploadingHelpVideo2, setUploadingHelpVideo2] = useState(false);
+
+  const handleHelpVideoFileChange = async (e: React.ChangeEvent<HTMLInputElement>, slot: 1 | 2) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 200 * 1024 * 1024) {
+      toast.error("Vídeo muito grande (máximo 200MB). Considere subir no YouTube e colar o link.");
+      return;
+    }
+
+    const setUploading = slot === 1 ? setUploadingHelpVideo1 : setUploadingHelpVideo2;
+    setUploading(true);
+    try {
+      const storageRef = ref(storage, `delivery_help_videos/${Date.now()}_${file.name}`);
+      const snapshot = await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(snapshot.ref);
+      setSupportSettingsInput((prev) => ({
+        ...prev,
+        [slot === 1 ? "deliveryHelpVideo1Url" : "deliveryHelpVideo2Url"]: url,
+      }));
+      toast.success("Vídeo enviado com sucesso! Clique em \"Salvar Configurações\" para aplicar.");
+    } catch (error: any) {
+      console.error("Erro ao fazer upload do vídeo:", error);
+      toast.error("Erro ao fazer upload do vídeo: " + (error.message || error));
+    } finally {
+      setUploading(false);
+    }
+  };
+
   // Cadastro em Lote
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [batchRawText, setBatchRawText] = useState("");
@@ -5735,25 +5767,41 @@ export default function AdminDashboard() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-slate-800">
-                <div>
+                <div className="space-y-2">
                   <Label className="text-xs text-slate-300 font-bold">Vídeo de Ajuda #1 (mostrado em "Minhas Compras")</Label>
                   <Input
                     value={supportSettingsInput.deliveryHelpVideo1Url}
                     onChange={(e) => setSupportSettingsInput({ ...supportSettingsInput, deliveryHelpVideo1Url: e.target.value })}
                     placeholder="Ex: https://youtube.com/watch?v=..."
-                    className="bg-slate-950 border-slate-800 text-white text-xs h-10 mt-1 font-mono"
+                    className="bg-slate-950 border-slate-800 text-white text-xs h-10 font-mono"
                   />
-                  <span className="text-[10px] text-slate-500 mt-1 block">Link do vídeo (YouTube etc.) com passo a passo em caso de problema com a conta entregue</span>
+                  <Input
+                    type="file"
+                    accept="video/*"
+                    onChange={(e) => handleHelpVideoFileChange(e, 1)}
+                    disabled={uploadingHelpVideo1}
+                    className="bg-slate-950 border-slate-800 text-white text-xs cursor-pointer file:bg-green-600 file:text-white file:border-0 file:rounded-md file:px-3 file:py-1 file:mr-3 hover:file:bg-green-700"
+                  />
+                  {uploadingHelpVideo1 && <p className="text-xs text-green-500 animate-pulse">Enviando vídeo...</p>}
+                  <span className="text-[10px] text-slate-500 block">Cole um link (YouTube etc.) ou envie o arquivo direto — o que você preencher por último vale.</span>
                 </div>
-                <div>
+                <div className="space-y-2">
                   <Label className="text-xs text-slate-300 font-bold">Vídeo de Ajuda #2 (mostrado em "Minhas Compras")</Label>
                   <Input
                     value={supportSettingsInput.deliveryHelpVideo2Url}
                     onChange={(e) => setSupportSettingsInput({ ...supportSettingsInput, deliveryHelpVideo2Url: e.target.value })}
                     placeholder="Ex: https://youtube.com/watch?v=..."
-                    className="bg-slate-950 border-slate-800 text-white text-xs h-10 mt-1 font-mono"
+                    className="bg-slate-950 border-slate-800 text-white text-xs h-10 font-mono"
                   />
-                  <span className="text-[10px] text-slate-500 mt-1 block">Deixe em branco se quiser usar só um vídeo</span>
+                  <Input
+                    type="file"
+                    accept="video/*"
+                    onChange={(e) => handleHelpVideoFileChange(e, 2)}
+                    disabled={uploadingHelpVideo2}
+                    className="bg-slate-950 border-slate-800 text-white text-xs cursor-pointer file:bg-green-600 file:text-white file:border-0 file:rounded-md file:px-3 file:py-1 file:mr-3 hover:file:bg-green-700"
+                  />
+                  {uploadingHelpVideo2 && <p className="text-xs text-green-500 animate-pulse">Enviando vídeo...</p>}
+                  <span className="text-[10px] text-slate-500 block">Deixe em branco se quiser usar só um vídeo. Máximo 200MB por arquivo.</span>
                 </div>
               </div>
             </Card>
