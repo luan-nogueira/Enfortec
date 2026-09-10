@@ -1422,6 +1422,7 @@ export default function AdminDashboard() {
   const adminDigitalProductsQuery = trpc.digitalProducts.adminList.useQuery(undefined, { enabled: !!(isAuthenticated && isAdmin) });
   const gamesList = adminDigitalProductsQuery.data || [];
   const [gameSearchQuery, setGameSearchQuery] = useState("");
+  const [stockSearchQuery, setStockSearchQuery] = useState("");
 
   // Usuários reais (Postgres) com atividade de verdade — a lista de "users" do Firestore
   // (usada em Gerenciar Acessos) nunca recebe lastSignedIn, então "Usuários Online" na
@@ -4487,9 +4488,18 @@ export default function AdminDashboard() {
 
           <TabsContent value="estoque">
             <h2 className="text-xl font-bold text-white mb-2 border-l-4 border-red-600 pl-4 uppercase tracking-widest text-sm italic">Estoque</h2>
-            <p className="text-xs text-slate-500 mb-6 pl-4">
+            <p className="text-xs text-slate-500 mb-4 pl-4">
               Visão geral do estoque de todos os jogos. "Pool de contas" é o estoque de email+senha usado pra entrega automática — jogos sem contas cadastradas continuam com entrega manual normalmente.
             </p>
+            <div className="relative mb-6 max-w-sm">
+              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <Input
+                value={stockSearchQuery}
+                onChange={(e) => setStockSearchQuery(e.target.value)}
+                placeholder="Pesquisar jogo pelo nome..."
+                className="bg-slate-950 border-red-600/20 text-white pl-9"
+              />
+            </div>
             <div className="overflow-x-auto rounded-xl border border-slate-800">
               <table className="w-full text-sm">
                 <thead>
@@ -4503,12 +4513,26 @@ export default function AdminDashboard() {
                 </thead>
                 <tbody>
                   {[...gamesList]
+                    .filter((game: any) => (game.name || "").toLowerCase().includes(stockSearchQuery.trim().toLowerCase()))
                     .sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""))
                     .map((game: any) => {
                       const poolInfo = accountsSummaryQuery.data?.[game.id];
                       return (
                         <tr key={game.id} className="border-t border-slate-800 hover:bg-slate-900/50">
-                          <td className="p-3 text-white font-medium max-w-[240px] truncate" title={game.name}>{game.name}</td>
+                          <td className="p-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-10 h-7 rounded bg-slate-800 overflow-hidden shrink-0 border border-slate-700">
+                                {game.imageUrl ? (
+                                  <img src={game.imageUrl} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    <Gamepad2 className="w-3.5 h-3.5 text-slate-600" />
+                                  </div>
+                                )}
+                              </div>
+                              <span className="text-white font-medium max-w-[200px] truncate" title={game.name}>{game.name}</span>
+                            </div>
+                          </td>
                           <td className="p-3 text-slate-400">{game.platform || "—"}</td>
                           <td className="p-3">
                             <span className={`font-bold ${Number(game.stock ?? 0) <= 0 ? "text-red-400" : "text-slate-200"}`}>
@@ -4541,8 +4565,10 @@ export default function AdminDashboard() {
                     })}
                 </tbody>
               </table>
-              {gamesList.length === 0 && (
+              {gamesList.length === 0 ? (
                 <p className="text-center text-slate-500 text-sm py-8">Nenhum jogo cadastrado ainda.</p>
+              ) : gamesList.filter((game: any) => (game.name || "").toLowerCase().includes(stockSearchQuery.trim().toLowerCase())).length === 0 && (
+                <p className="text-center text-slate-500 text-sm py-8">Nenhum jogo encontrado para "{stockSearchQuery}".</p>
               )}
             </div>
           </TabsContent>
