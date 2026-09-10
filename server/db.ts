@@ -514,6 +514,9 @@ export async function getOrdersByBuyerId(buyerId: number) {
       productName,
       sellerOpenId: r.sellerOpenId,
       sellerName: r.sellerName,
+      // Plataforma do jogo (PS4/PS5/PS4-PS5) pra filtrar os materiais de ajuda de entrega
+      // pela plataforma certa — usado só quando o pedido é digital.
+      digitalProductPlatform: r.digitalProduct?.platform || null,
     };
   });
 
@@ -895,7 +898,7 @@ export async function getPlatformSettings() {
     await db.insert(platformSettings).values({ id: 1, commissionPercentage: "6" }).onConflictDoNothing();
     return {
       id: 1, commissionPercentage: "6", vipWhatsappUrl: null, maxCoinsPerPurchase: 10, maxCoinsPreVenda: 50,
-      supportWhatsapp: "554384253691", deliveryHelpVideo1Url: null, deliveryHelpVideo2Url: null,
+      supportWhatsapp: "554384253691", deliveryHelpVideos: [] as { title: string; url: string; platform: "ps4" | "ps5" | "ambos" }[],
     };
   }
   return result[0];
@@ -907,8 +910,7 @@ export async function updatePlatformSettings(data: {
   maxCoinsPerPurchase?: number,
   maxCoinsPreVenda?: number,
   supportWhatsapp?: string,
-  deliveryHelpVideo1Url?: string | null,
-  deliveryHelpVideo2Url?: string | null,
+  deliveryHelpVideos?: { title: string; url: string; platform: "ps4" | "ps5" | "ambos" }[],
 }) {
   const db = getDb();
   if (!db) return;

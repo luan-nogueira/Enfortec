@@ -260,10 +260,11 @@ export const platformSettings = pgTable("platform_settings", {
   // Numero de WhatsApp de suporte (só dígitos, formato internacional, ex: 554384253691),
   // usado em wa.me/<numero> em todo o site — fonte única, editável pelo admin.
   supportWhatsapp: varchar("supportWhatsapp", { length: 20 }).default("554384253691"),
-  // Vídeos de ajuda mostrados ao comprador junto com a conta entregue em "Minhas Compras",
-  // com passo a passo do que fazer em caso de problema com o acesso.
-  deliveryHelpVideo1Url: varchar("deliveryHelpVideo1Url", { length: 500 }),
-  deliveryHelpVideo2Url: varchar("deliveryHelpVideo2Url", { length: 500 }),
+  // Lista flexível de vídeos de ajuda mostrados ao comprador junto com a conta entregue em
+  // "Minhas Compras" (passo a passo do que fazer em caso de problema com o acesso). Cada
+  // item: { title, url, platform: "ps4" | "ps5" | "ambos" } — o front só mostra pro
+  // comprador os vídeos com platform "ambos" ou que batem com a plataforma do jogo comprado.
+  deliveryHelpVideos: json("deliveryHelpVideos").$type<{ title: string; url: string; platform: "ps4" | "ps5" | "ambos" }[]>().default([]),
   updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => new Date()),
 });
 

@@ -1748,38 +1748,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Upload direto (arquivo local) dos vídeos de ajuda mostrados em "Minhas Compras"
-  const [uploadingHelpVideo1, setUploadingHelpVideo1] = useState(false);
-  const [uploadingHelpVideo2, setUploadingHelpVideo2] = useState(false);
-
-  const handleHelpVideoFileChange = async (e: React.ChangeEvent<HTMLInputElement>, slot: 1 | 2) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 200 * 1024 * 1024) {
-      toast.error("Vídeo muito grande (máximo 200MB). Considere subir no YouTube e colar o link.");
-      return;
-    }
-
-    const setUploading = slot === 1 ? setUploadingHelpVideo1 : setUploadingHelpVideo2;
-    setUploading(true);
-    try {
-      const storageRef = ref(storage, `delivery_help_videos/${Date.now()}_${file.name}`);
-      const snapshot = await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(snapshot.ref);
-      setSupportSettingsInput((prev) => ({
-        ...prev,
-        [slot === 1 ? "deliveryHelpVideo1Url" : "deliveryHelpVideo2Url"]: url,
-      }));
-      toast.success("Vídeo enviado com sucesso! Clique em \"Salvar Configurações\" para aplicar.");
-    } catch (error: any) {
-      console.error("Erro ao fazer upload do vídeo:", error);
-      toast.error("Erro ao fazer upload do vídeo: " + (error.message || error));
-    } finally {
-      setUploading(false);
-    }
-  };
-
   // Cadastro em Lote
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [batchRawText, setBatchRawText] = useState("");
@@ -2117,29 +2085,62 @@ export default function AdminDashboard() {
     }
   }, [coinLimitsQuery.data?.maxCoinsPerPurchase, coinLimitsQuery.data?.maxCoinsPreVenda]);
 
-  // Número de WhatsApp de suporte + vídeos de ajuda mostrados em "Minhas Compras" — fonte
-  // única (Postgres, via settings.get) lida em todas as páginas que hoje têm o número fixo.
+  // Número de WhatsApp de suporte + materiais de ajuda mostrados em "Minhas Compras" —
+  // fonte única (Postgres, via settings.get) lida em todas as páginas que hoje têm o
+  // número fixo.
   const supportSettingsQuery = trpc.settings.get.useQuery();
-  const [supportSettingsInput, setSupportSettingsInput] = useState({
-    supportWhatsapp: "554384253691",
-    deliveryHelpVideo1Url: "",
-    deliveryHelpVideo2Url: "",
-  });
-  useEffect(() => {
-    if (supportSettingsQuery.data?.supportWhatsapp !== undefined) {
-      setSupportSettingsInput({
-        supportWhatsapp: supportSettingsQuery.data.supportWhatsapp || "554384253691",
-        deliveryHelpVideo1Url: supportSettingsQuery.data.deliveryHelpVideo1Url || "",
-        deliveryHelpVideo2Url: supportSettingsQuery.data.deliveryHelpVideo2Url || "",
-      });
-    }
-  }, [supportSettingsQuery.data?.supportWhatsapp, supportSettingsQuery.data?.deliveryHelpVideo1Url, supportSettingsQuery.data?.deliveryHelpVideo2Url]);
 
   // Sem toast de sucesso aqui — mutateAsync é chamado dentro de handleSaveWaConfig, que já
   // mostra um único toast agregando os dois salvamentos (Firestore + Postgres).
   const updateSupportSettingsMutation = trpc.settings.updateSupportSettings.useMutation({
     onSuccess: () => supportSettingsQuery.refetch(),
   });
+
+  // Lista flexível de materiais de ajuda (vídeo ou link) mostrados em "Minhas Compras"
+  const [deliveryVideosInput, setDeliveryVideosInput] = useState<{ title: string; url: string; platform: "ps4" | "ps5" | "ambos" }[]>([]);
+  useEffect(() => {
+    if (supportSettingsQuery.data?.deliveryHelpVideos !== undefined) {
+      setDeliveryVideosInput((supportSettingsQuery.data.deliveryHelpVideos as any) || []);
+    }
+  }, [supportSettingsQuery.data?.deliveryHelpVideos]);
+
+  const updateDeliveryVideosMutation = trpc.settings.updateDeliveryHelpVideos.useMutation({
+    onSuccess: () => {
+      toast.success("Materiais de ajuda salvos com sucesso!");
+      supportSettingsQuery.refetch();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao salvar materiais de ajuda."),
+  });
+
+  const [uploadingDeliveryVideoIdx, setUploadingDeliveryVideoIdx] = useState<number | null>(null);
+
+  const handleDeliveryVideoFileChange = async (e: React.ChangeEvent<HTMLInputElement>, idx: number) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 200 * 1024 * 1024) {
+      toast.error("Vídeo muito grande (máximo 200MB). Considere subir no YouTube e colar o link.");
+      return;
+    }
+
+    setUploadingDeliveryVideoIdx(idx);
+    try {
+      const storageRef = ref(storage, `delivery_help_videos/${Date.now()}_${file.name}`);
+      const snapshot = await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(snapshot.ref);
+      setDeliveryVideosInput((prev) => {
+        const updated = [...prev];
+        updated[idx] = { ...updated[idx], url };
+        return updated;
+      });
+      toast.success("Vídeo enviado com sucesso! Clique em \"Salvar Materiais de Ajuda\" para aplicar.");
+    } catch (error: any) {
+      console.error("Erro ao fazer upload do vídeo:", error);
+      toast.error("Erro ao fazer upload do vídeo: " + (error.message || error));
+    } finally {
+      setUploadingDeliveryVideoIdx(null);
+    }
+  };
 
   const updateCoinLimitsMutation = trpc.settings.updateCoinLimits.useMutation({
     onSuccess: () => {
@@ -2196,11 +2197,7 @@ export default function AdminDashboard() {
       await updateWhatsappUrlMutation.mutateAsync({ vipWhatsappUrl: waConfig.groupUrl });
       // supportNumber precisa ir pro Postgres (settings.get), não só pro Firestore acima —
       // é essa fonte que as páginas do site (FAQ, chat, entrega, etc.) realmente leem.
-      await updateSupportSettingsMutation.mutateAsync({
-        supportWhatsapp: waConfig.supportNumber,
-        deliveryHelpVideo1Url: supportSettingsInput.deliveryHelpVideo1Url || null,
-        deliveryHelpVideo2Url: supportSettingsInput.deliveryHelpVideo2Url || null,
-      });
+      await updateSupportSettingsMutation.mutateAsync({ supportWhatsapp: waConfig.supportNumber });
       toast.success("Link do Grupo e Número do WhatsApp salvos com sucesso!");
     } catch (err) {
       console.error("Erro ao salvar config do WhatsApp:", err);
@@ -5823,69 +5820,96 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-slate-800">
-                <div className="space-y-2">
-                  <Label className="text-xs text-slate-300 font-bold">Vídeo de Ajuda #1 (mostrado em "Minhas Compras")</Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      value={supportSettingsInput.deliveryHelpVideo1Url}
-                      onChange={(e) => setSupportSettingsInput({ ...supportSettingsInput, deliveryHelpVideo1Url: e.target.value })}
-                      placeholder="Ex: https://youtube.com/watch?v=..."
-                      className="bg-slate-950 border-slate-800 text-white text-xs h-10 font-mono"
-                    />
-                    {supportSettingsInput.deliveryHelpVideo1Url && (
+            </Card>
+
+            {/* Card de Materiais de Ajuda na Entrega — lista flexível (vídeo ou link, ex.
+                tutorial no Canva), cada um podendo ser restrito a PS4/PS5 ou "ambos" */}
+            <Card className="bg-slate-900 border-green-500/30 p-6 card-neon space-y-4 mb-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800 pb-4">
+                <div>
+                  <h4 className="font-black text-white text-base flex items-center gap-2">
+                    ▶️ Materiais de Ajuda na Entrega
+                  </h4>
+                  <p className="text-slate-400 text-xs mt-0.5">
+                    Vídeos ou links (ex.: página de tutorial) mostrados em "Minhas Compras" junto com a conta entregue. Marque a plataforma certa pra só aparecer pro comprador do jogo daquele console.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => updateDeliveryVideosMutation.mutate({ videos: deliveryVideosInput })}
+                  disabled={updateDeliveryVideosMutation.isPending}
+                  className="bg-green-600 hover:bg-green-700 text-white font-bold h-9 px-4 text-xs flex items-center gap-1.5 shrink-0"
+                >
+                  <Check className="w-4 h-4" />
+                  {updateDeliveryVideosMutation.isPending ? "Salvando..." : "Salvar Materiais de Ajuda"}
+                </Button>
+              </div>
+
+              <div className="space-y-3">
+                {deliveryVideosInput.map((video, idx) => (
+                  <div key={idx} className="bg-slate-950/60 border border-slate-800 rounded-xl p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={video.title}
+                        onChange={(e) => {
+                          const updated = [...deliveryVideosInput];
+                          updated[idx] = { ...updated[idx], title: e.target.value };
+                          setDeliveryVideosInput(updated);
+                        }}
+                        placeholder="Ex: Removendo Cadeado PS5"
+                        className="bg-slate-950 border-slate-800 text-white text-xs h-9 font-bold"
+                      />
+                      <select
+                        value={video.platform}
+                        onChange={(e) => {
+                          const updated = [...deliveryVideosInput];
+                          updated[idx] = { ...updated[idx], platform: e.target.value as "ps4" | "ps5" | "ambos" };
+                          setDeliveryVideosInput(updated);
+                        }}
+                        className="bg-slate-950 border border-slate-800 rounded-md h-9 px-2 text-xs text-white shrink-0"
+                      >
+                        <option value="ambos">Ambos (PS4/PS5)</option>
+                        <option value="ps4">Só PS4</option>
+                        <option value="ps5">Só PS5</option>
+                      </select>
                       <Button
                         type="button"
                         variant="ghost"
-                        size="sm"
-                        onClick={() => setSupportSettingsInput({ ...supportSettingsInput, deliveryHelpVideo1Url: "" })}
-                        className="text-red-400 hover:text-red-300 hover:bg-red-400/10 shrink-0 h-10"
+                        size="icon"
+                        onClick={() => setDeliveryVideosInput(deliveryVideosInput.filter((_, i) => i !== idx))}
+                        className="h-9 w-9 text-red-500 hover:text-red-400 hover:bg-red-500/10 shrink-0"
                       >
-                        Remover
+                        <Trash2 className="w-3.5 h-3.5" />
                       </Button>
-                    )}
-                  </div>
-                  <Input
-                    type="file"
-                    accept="video/*"
-                    onChange={(e) => handleHelpVideoFileChange(e, 1)}
-                    disabled={uploadingHelpVideo1}
-                    className="bg-slate-950 border-slate-800 text-white text-xs cursor-pointer file:bg-green-600 file:text-white file:border-0 file:rounded-md file:px-3 file:py-1 file:mr-3 hover:file:bg-green-700"
-                  />
-                  {uploadingHelpVideo1 && <p className="text-xs text-green-500 animate-pulse">Enviando vídeo...</p>}
-                  <span className="text-[10px] text-slate-500 block">Cole um link (YouTube etc.) ou envie o arquivo direto — o que você preencher por último vale.</span>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs text-slate-300 font-bold">Vídeo de Ajuda #2 (mostrado em "Minhas Compras")</Label>
-                  <div className="flex items-center gap-2">
+                    </div>
                     <Input
-                      value={supportSettingsInput.deliveryHelpVideo2Url}
-                      onChange={(e) => setSupportSettingsInput({ ...supportSettingsInput, deliveryHelpVideo2Url: e.target.value })}
-                      placeholder="Ex: https://youtube.com/watch?v=..."
-                      className="bg-slate-950 border-slate-800 text-white text-xs h-10 font-mono"
+                      value={video.url}
+                      onChange={(e) => {
+                        const updated = [...deliveryVideosInput];
+                        updated[idx] = { ...updated[idx], url: e.target.value };
+                        setDeliveryVideosInput(updated);
+                      }}
+                      placeholder="Ex: https://youtube.com/watch?v=... ou https://efortegames.my.canva.site/..."
+                      className="bg-slate-950 border-slate-800 text-white text-xs h-9 font-mono"
                     />
-                    {supportSettingsInput.deliveryHelpVideo2Url && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setSupportSettingsInput({ ...supportSettingsInput, deliveryHelpVideo2Url: "" })}
-                        className="text-red-400 hover:text-red-300 hover:bg-red-400/10 shrink-0 h-10"
-                      >
-                        Remover
-                      </Button>
-                    )}
+                    <Input
+                      type="file"
+                      accept="video/*"
+                      onChange={(e) => handleDeliveryVideoFileChange(e, idx)}
+                      disabled={uploadingDeliveryVideoIdx === idx}
+                      className="bg-slate-950 border-slate-800 text-white text-xs cursor-pointer file:bg-green-600 file:text-white file:border-0 file:rounded-md file:px-3 file:py-1 file:mr-3 hover:file:bg-green-700"
+                    />
+                    {uploadingDeliveryVideoIdx === idx && <p className="text-xs text-green-500 animate-pulse">Enviando vídeo...</p>}
                   </div>
-                  <Input
-                    type="file"
-                    accept="video/*"
-                    onChange={(e) => handleHelpVideoFileChange(e, 2)}
-                    disabled={uploadingHelpVideo2}
-                    className="bg-slate-950 border-slate-800 text-white text-xs cursor-pointer file:bg-green-600 file:text-white file:border-0 file:rounded-md file:px-3 file:py-1 file:mr-3 hover:file:bg-green-700"
-                  />
-                  {uploadingHelpVideo2 && <p className="text-xs text-green-500 animate-pulse">Enviando vídeo...</p>}
-                  <span className="text-[10px] text-slate-500 block">Deixe em branco se quiser usar só um vídeo. Máximo 200MB por arquivo.</span>
-                </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setDeliveryVideosInput([...deliveryVideosInput, { title: "", url: "", platform: "ambos" }])}
+                  className="w-full border border-dashed border-slate-700 text-slate-400 hover:text-white hover:border-slate-600 text-xs"
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1" /> Adicionar Material de Ajuda
+                </Button>
+                <p className="text-[10px] text-slate-500">Cole um link (YouTube, Canva etc.) ou envie o arquivo de vídeo direto — máximo 200MB por arquivo.</p>
               </div>
             </Card>
 

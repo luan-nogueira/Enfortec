@@ -22,6 +22,30 @@ import { db } from "@/lib/firebase";
 import { doc, updateDoc } from "firebase/firestore";
 import { useEffect } from "react";
 
+type DeliveryHelpVideo = { title: string; url: string; platform: "ps4" | "ps5" | "ambos" };
+
+/**
+ * Detecta a plataforma do pedido (nome do produto costuma ter "(PS4)"/"(PS5)" quando o
+ * comprador escolheu console num jogo PS4/PS5, ver resolvedConsoleType em payment.ts;
+ * senão cai pro platform cadastrado no próprio jogo) e filtra só os materiais de ajuda
+ * relevantes: os marcados "ambos" sempre aparecem, os de PS4/PS5 só quando batem.
+ */
+function getRelevantHelpVideos(videos: DeliveryHelpVideo[] | null | undefined, order: any): DeliveryHelpVideo[] {
+  if (!videos || videos.length === 0) return [];
+
+  const name = (order?.productName || "").toUpperCase();
+  let platform: "ps4" | "ps5" | null = null;
+  if (name.includes("(PS5)") || name.includes("- PS5")) platform = "ps5";
+  else if (name.includes("(PS4)") || name.includes("- PS4")) platform = "ps4";
+  else {
+    const raw = (order?.digitalProductPlatform || "").toUpperCase();
+    if (raw === "PS5") platform = "ps5";
+    else if (raw === "PS4") platform = "ps4";
+  }
+
+  return videos.filter((v) => v.platform === "ambos" || v.platform === platform);
+}
+
 export default function MyPurchases() {
   const { user, isAuthenticated, loading } = useAuth();
   const [, navigate] = useLocation();
@@ -168,30 +192,23 @@ export default function MyPurchases() {
                       <pre className="text-slate-200 text-xs font-mono whitespace-pre-wrap select-all bg-slate-950/40 p-2.5 rounded border border-red-950/40">
                         {order.deliveryDetails}
                       </pre>
-                      {(platformSettings?.deliveryHelpVideo1Url || platformSettings?.deliveryHelpVideo2Url || platformSettings?.supportWhatsapp) && (
+                      {(() => {
+                        const relevantVideos = getRelevantHelpVideos(platformSettings?.deliveryHelpVideos, order);
+                        return (relevantVideos.length > 0 || platformSettings?.supportWhatsapp) && (
                         <div className="mt-3 pt-3 border-t border-red-950/40">
                           <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mb-2">Deu algum problema pra acessar?</p>
                           <div className="flex flex-wrap gap-2">
-                            {platformSettings?.deliveryHelpVideo1Url && (
+                            {relevantVideos.map((video, idx) => (
                               <a
-                                href={platformSettings.deliveryHelpVideo1Url}
+                                key={idx}
+                                href={video.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-xs bg-slate-900 border border-slate-700 hover:border-red-500/50 text-slate-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
                               >
-                                ▶️ Vídeo de Ajuda 1
+                                ▶️ {video.title}
                               </a>
-                            )}
-                            {platformSettings?.deliveryHelpVideo2Url && (
-                              <a
-                                href={platformSettings.deliveryHelpVideo2Url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs bg-slate-900 border border-slate-700 hover:border-red-500/50 text-slate-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
-                              >
-                                ▶️ Vídeo de Ajuda 2
-                              </a>
-                            )}
+                            ))}
                             {platformSettings?.supportWhatsapp && (
                               <a
                                 href={`https://wa.me/${platformSettings.supportWhatsapp}?text=${encodeURIComponent(`Olá! Tive um problema com a conta entregue do pedido #${order.id} (${order.productName || "meu pedido"}). Pode me ajudar?`)}`}
@@ -204,7 +221,8 @@ export default function MyPurchases() {
                             )}
                           </div>
                         </div>
-                      )}
+                        );
+                      })()}
                     </div>
                   )}
                   {(order.status === 'pago' || order.status === 'enviado') && (

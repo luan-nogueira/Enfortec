@@ -777,16 +777,25 @@ export const appRouter = router({
     updateSupportSettings: protectedProcedure
       .input(z.object({
         supportWhatsapp: z.string().min(8),
-        deliveryHelpVideo1Url: z.string().nullable().optional(),
-        deliveryHelpVideo2Url: z.string().nullable().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
-        return db.updatePlatformSettings({
-          supportWhatsapp: input.supportWhatsapp,
-          deliveryHelpVideo1Url: input.deliveryHelpVideo1Url || null,
-          deliveryHelpVideo2Url: input.deliveryHelpVideo2Url || null,
-        });
+        return db.updatePlatformSettings({ supportWhatsapp: input.supportWhatsapp });
+      }),
+    // Lista flexível de materiais de ajuda (vídeo ou link, ex.: página de tutorial no Canva)
+    // mostrados ao comprador em "Minhas Compras" — cada item pode ser restrito a PS4/PS5
+    // ou aparecer pra qualquer plataforma.
+    updateDeliveryHelpVideos: protectedProcedure
+      .input(z.object({
+        videos: z.array(z.object({
+          title: z.string().min(1),
+          url: z.string().min(1),
+          platform: z.enum(["ps4", "ps5", "ambos"]),
+        })),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+        return db.updatePlatformSettings({ deliveryHelpVideos: input.videos });
       }),
   }),
 
