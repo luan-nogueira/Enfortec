@@ -729,7 +729,7 @@ export async function attemptAutoDeliverDigitalOrder(
   }
   console.log(`[AutoDeliver] Pedido #${orderId}: conta reivindicada do pool (${account.email}), atualizando pedido...`);
 
-  const deliveryDetails = `🎮 Sua conta foi liberada automaticamente!\n\n📧 Email: ${account.email}\n🔑 Senha: ${account.password}\n\nQualquer dúvida ou problema para acessar, você encontra vídeos de ajuda e o contato do nosso suporte na página "Minhas Compras" do site.`;
+  const deliveryDetails = `🎮 Obrigado por comprar na EforteGames!\n\nSegue o acesso da sua conta — é só entrar e aproveitar:\n\n📧 Email: ${account.email}\n🔑 Senha: ${account.password}\n\nQualquer dúvida ou problema pra acessar, você encontra vídeos de ajuda e o contato do nosso suporte logo abaixo. Bom jogo! 🔥`;
   const updateResult = await database
     .update(orders)
     .set({ deliveryDetails, status: "enviado" })
