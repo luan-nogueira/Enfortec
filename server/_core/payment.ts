@@ -648,7 +648,22 @@ export function registerPaymentRoute(app: Express) {
           insertValues.buyerPhone = phone;
         }
 
-        const [insertedOrder] = await database.insert(orders).values(insertValues).returning({ id: orders.id });
+        let insertedOrder: { id: number } | undefined;
+        try {
+          [insertedOrder] = await database.insert(orders).values(insertValues).returning({ id: orders.id });
+        } catch (insertErr: any) {
+          // O Mercado Pago costuma mandar 2 notificações quase simultâneas pro mesmo
+          // pagamento (payment.created + payment.updated), rápido demais pra checagem de
+          // idempotência acima (SELECT) sempre pegar — a constraint UNIQUE em
+          // orders.paymentId é quem garante isso de verdade: se a outra notificação já
+          // inseriu primeiro, essa aqui recebe erro 23505 (unique_violation) e paramos
+          // por aqui sem duplicar nada.
+          if (insertErr?.code === "23505" || String(insertErr?.message || "").includes("orders_paymentid_unique")) {
+            console.log(`[Mercado Pago Webhook] Pagamento #${paymentId} já inserido por outra requisição concorrente — ignorando.`);
+            return res.status(200).json({ received: true, duplicate: true });
+          }
+          throw insertErr;
+        }
 
         // Atualiza ForteCoins (dedução de moedas usadas + 7 moedas de cashback)
         if (buyerId > 0) {

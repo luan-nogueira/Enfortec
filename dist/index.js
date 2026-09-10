@@ -1,12 +1,7 @@
 var __defProp = Object.defineProperty;
 var __getOwnPropNames = Object.getOwnPropertyNames;
-var __esm = (fn, res, err) => function __init() {
-  if (err) throw err[0];
-  try {
-    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
-  } catch (e) {
-    throw err = [e], e;
-  }
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
 };
 var __export = (target, all) => {
   for (var name in all)
@@ -20,6 +15,7 @@ __export(schema_exports, {
   challengeStatusEnum: () => challengeStatusEnum,
   conditionEnum: () => conditionEnum,
   coupons: () => coupons,
+  digitalProductAccounts: () => digitalProductAccounts,
   digitalProducts: () => digitalProducts,
   digitalProductsRelations: () => digitalProductsRelations,
   digitalTypeEnum: () => digitalTypeEnum,
@@ -49,7 +45,7 @@ __export(schema_exports, {
 });
 import { integer, pgEnum, pgTable, text, timestamp, varchar, numeric, boolean, json, serial } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-var roleEnum, conditionEnum, usedStatusEnum, digitalTypeEnum, productTypeEnum, orderStatusEnum, subscriptionStatusEnum, challengeStatusEnum, submissionStatusEnum, users, sellers, products, usedProducts, digitalProducts, orders, coupons, reviews, messages, adminDismissedNotifications, platformSettings, platinadorSubscriptions, platinumChallenges, platinumSubmissions, usersRelations, sellersRelations, usedProductsRelations, digitalProductsRelations, ordersRelations, reviewsRelations, messagesRelations;
+var roleEnum, conditionEnum, usedStatusEnum, digitalTypeEnum, productTypeEnum, orderStatusEnum, subscriptionStatusEnum, challengeStatusEnum, submissionStatusEnum, users, sellers, products, usedProducts, digitalProducts, digitalProductAccounts, orders, coupons, reviews, messages, adminDismissedNotifications, platformSettings, platinadorSubscriptions, platinumChallenges, platinumSubmissions, usersRelations, sellersRelations, usedProductsRelations, digitalProductsRelations, ordersRelations, reviewsRelations, messagesRelations;
 var init_schema = __esm({
   "drizzle/schema.ts"() {
     "use strict";
@@ -72,12 +68,19 @@ var init_schema = __esm({
       loginMethod: varchar("loginMethod", { length: 64 }),
       cpf: varchar("cpf", { length: 18 }),
       psnId: varchar("psnId", { length: 100 }),
+      // Telefone/WhatsApp de contato — coletado no cadastro de loja ou editável no painel do
+      // vendedor. Usado pelo admin em "Ver Loja" pra chamar o vendedor quando ele não vê
+      // notificação no site.
+      phone: varchar("phone", { length: 30 }),
       forteCoins: integer("forteCoins").default(10).notNull(),
       role: roleEnum("role").default("user").notNull(),
       createdAt: timestamp("createdAt").defaultNow().notNull(),
       updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => /* @__PURE__ */ new Date()),
       lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
-      balance: numeric("balance", { precision: 12, scale: 2 }).default("0").notNull()
+      balance: numeric("balance", { precision: 12, scale: 2 }).default("0").notNull(),
+      // Banimento por descumprimento das regras: bloqueia qualquer ação autenticada (ver
+      // requireUser em server/_core/trpc.ts) e desativa a loja/anúncios dele, se tiver.
+      isBanned: boolean("isBanned").default(false).notNull()
     });
     sellers = pgTable("sellers", {
       id: serial("id").primaryKey(),
@@ -142,6 +145,10 @@ var init_schema = __esm({
       category: varchar("category", { length: 100 }),
       coverFit: varchar("coverFit", { length: 20 }),
       isPreVenda: boolean("isPreVenda").default(false),
+      // Prazo opcional de disponibilidade de um jogo específico (ex.: promoção por tempo
+      // limitado). Quando definido e no passado, o jogo fica visível na loja mas indisponível
+      // para compra — ver checagem em server/_core/payment.ts (handleCheckout).
+      expiresAt: timestamp("expiresAt"),
       showInEconomia: boolean("showInEconomia").default(false),
       economiaLicenseType: varchar("economiaLicenseType", { length: 50 }),
       // "pendente" | "aprovado" | "rejeitado" — contas cadastradas por vendedores da comunidade
@@ -150,6 +157,16 @@ var init_schema = __esm({
       status: varchar("status", { length: 20 }).default("aprovado").notNull(),
       createdAt: timestamp("createdAt").defaultNow().notNull(),
       updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => /* @__PURE__ */ new Date())
+    });
+    digitalProductAccounts = pgTable("digitalProductAccounts", {
+      id: serial("id").primaryKey(),
+      digitalProductId: integer("digitalProductId").notNull(),
+      email: varchar("email", { length: 255 }).notNull(),
+      password: varchar("password", { length: 255 }).notNull(),
+      status: varchar("status", { length: 20 }).default("disponivel").notNull(),
+      orderId: integer("orderId"),
+      createdAt: timestamp("createdAt").defaultNow().notNull(),
+      deliveredAt: timestamp("deliveredAt")
     });
     orders = pgTable("orders", {
       id: serial("id").primaryKey(),
@@ -165,7 +182,10 @@ var init_schema = __esm({
       platformCommission: numeric("platformCommission", { precision: 10, scale: 2 }).notNull(),
       sellerAmount: numeric("sellerAmount", { precision: 10, scale: 2 }).notNull(),
       status: orderStatusEnum("status").default("pendente"),
-      paymentId: varchar("paymentId", { length: 255 }),
+      // Único no banco (além da checagem de idempotência em payment.ts) — fecha de vez a janela
+      // de corrida em que dois reenvios de webhook quase simultâneos passam pela checagem antes
+      // de qualquer um inserir, criando pedido duplicado pro mesmo pagamento.
+      paymentId: varchar("paymentId", { length: 255 }).unique(),
       productName: varchar("productName", { length: 255 }),
       firebaseProductId: varchar("firebaseProductId", { length: 255 }),
       accountType: varchar("accountType", { length: 20 }),
@@ -179,6 +199,11 @@ var init_schema = __esm({
       id: serial("id").primaryKey(),
       code: varchar("code", { length: 50 }).notNull().unique(),
       discountPercentage: numeric("discountPercentage", { precision: 5, scale: 2 }).notNull(),
+      appliesTo: varchar("appliesTo", { length: 50 }).default("all"),
+      allowPreVenda: boolean("allowPreVenda").default(false),
+      allowEconomia: boolean("allowEconomia").default(false),
+      allowPartnerSellers: boolean("allowPartnerSellers").default(true),
+      minOrderValue: numeric("minOrderValue", { precision: 10, scale: 2 }),
       maxUses: integer("maxUses"),
       usedCount: integer("usedCount").default(0),
       expiresAt: timestamp("expiresAt"),
@@ -215,6 +240,14 @@ var init_schema = __esm({
       // limitar o desconto, nunca confia em valor vindo do navegador.
       maxCoinsPerPurchase: integer("maxCoinsPerPurchase").default(10),
       maxCoinsPreVenda: integer("maxCoinsPreVenda").default(50),
+      // Numero de WhatsApp de suporte (só dígitos, formato internacional, ex: 554384253691),
+      // usado em wa.me/<numero> em todo o site — fonte única, editável pelo admin.
+      supportWhatsapp: varchar("supportWhatsapp", { length: 20 }).default("554384253691"),
+      // Lista flexível de vídeos de ajuda mostrados ao comprador junto com a conta entregue em
+      // "Minhas Compras" (passo a passo do que fazer em caso de problema com o acesso). Cada
+      // item: { title, url, platform: "ps4" | "ps5" | "ambos" } — o front só mostra pro
+      // comprador os vídeos com platform "ambos" ou que batem com a plataforma do jogo comprado.
+      deliveryHelpVideos: json("deliveryHelpVideos").$type().default([]),
       updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => /* @__PURE__ */ new Date())
     });
     platinadorSubscriptions = pgTable("platinador_subscriptions", {
@@ -387,7 +420,9 @@ ${deliveryDetails}
 --------------------------------------------------
 
 Qualquer d\xFAvida ou problema, nossa equipe estar\xE1 totalmente \xE0 disposi\xE7\xE3o para lhe ajudar!
-Voc\xEA pode entrar em contato conosco diretamente pelo chat do site ou pelo nosso WhatsApp: +55 43 8425-3691.
+Voc\xEA pode entrar em contato conosco diretamente pelo chat do site ou pelos nossos WhatsApp:
+\u2022 Andr\xE9: +55 43 8425-3691
+\u2022 Sandro: +55 71 98765-0840
 
 Atenciosamente,
 Equipe Eforte Games`;
@@ -403,7 +438,10 @@ Equipe Eforte Games`;
       </div>
       
       <p>Qualquer d\xFAvida ou problema, estamos \xE0 total disposi\xE7\xE3o para ajudar no que for preciso.</p>
-      <p>Voc\xEA pode entrar em contato conosco pelo chat em nosso site ou diretamente atrav\xE9s do nosso <strong>WhatsApp: +55 43 8425-3691</strong>.</p>
+      <p>Voc\xEA pode entrar em contato conosco pelo chat em nosso site ou diretamente atrav\xE9s dos nossos WhatsApp:<br>
+        <strong>\u2022 Andr\xE9: +55 43 8425-3691</strong><br>
+        <strong>\u2022 Sandro: +55 71 98765-0840</strong>
+      </p>
       
       <hr style="border: 0; border-top: 1px solid #eeeeee; margin: 30px 0;">
       <p style="font-size: 12px; color: #777777; text-align: center;">Eforte Games \u2014 Divers\xE3o garantida no seu console</p>
@@ -440,6 +478,7 @@ var init_email = __esm({
 import dotenv from "dotenv";
 import path from "path";
 import express from "express";
+import compression from "compression";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
@@ -453,7 +492,8 @@ var NOT_ADMIN_ERR_MSG = "You do not have required permission (10002)";
 
 // server/db.ts
 init_schema();
-import { eq, and, desc, sql, inArray, lt } from "drizzle-orm";
+import { eq, and, or, lte, desc, sql, inArray, lt } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 
@@ -466,7 +506,9 @@ var ENV = {
   ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
-  forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? ""
+  forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  mercadoPagoAccessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN ?? "",
+  mercadoPagoPublicKey: process.env.MERCADO_PAGO_PUBLIC_KEY ?? ""
 };
 
 // server/db.ts
@@ -624,6 +666,30 @@ async function getProductById(id) {
   const result = await db.select().from(products).where(eq(products.id, id)).limit(1);
   return result.length > 0 ? result[0] : void 0;
 }
+async function updateUserPhone(userId, phone) {
+  const database = getDb();
+  if (!database) throw new Error("Database not available");
+  await database.update(users).set({ phone }).where(eq(users.id, userId));
+  return { success: true };
+}
+async function banUser(userId) {
+  const database = getDb();
+  if (!database) throw new Error("Database not available");
+  const target = await getUserById(userId);
+  if (target?.role === "admin") {
+    throw new Error("N\xE3o \xE9 poss\xEDvel banir uma conta de administrador.");
+  }
+  await database.update(users).set({ isBanned: true }).where(eq(users.id, userId));
+  await database.update(sellers).set({ isActive: false }).where(eq(sellers.userId, userId));
+  return { success: true };
+}
+async function unbanUser(userId) {
+  const database = getDb();
+  if (!database) throw new Error("Database not available");
+  await database.update(users).set({ isBanned: false }).where(eq(users.id, userId));
+  await database.update(sellers).set({ isActive: true }).where(eq(sellers.userId, userId));
+  return { success: true };
+}
 async function getSellerByUserId(userId) {
   try {
     const db = getDb();
@@ -634,6 +700,28 @@ async function getSellerByUserId(userId) {
     console.error("[Database Error] getSellerByUserId failed:", error);
     return null;
   }
+}
+async function getSellerFullDetails(sellerId) {
+  const db = getDb();
+  if (!db) return null;
+  const sellerResult = await db.select({ seller: sellers, user: users }).from(sellers).leftJoin(users, eq(sellers.userId, users.id)).where(eq(sellers.id, sellerId)).limit(1);
+  const row = sellerResult[0];
+  if (!row) return null;
+  const [usedProductsList, digitalProductsList, salesHistory] = await Promise.all([
+    getUsedProductsBySellerId(sellerId),
+    getDigitalProductsBySellerId(sellerId),
+    row.seller.userId ? getOrdersBySellerId(row.seller.userId) : Promise.resolve([])
+  ]);
+  return {
+    seller: row.seller,
+    contactName: row.user?.name || null,
+    contactEmail: row.user?.email || null,
+    contactPhone: row.user?.phone || null,
+    isBanned: row.user?.isBanned ?? false,
+    usedProducts: usedProductsList,
+    digitalProducts: digitalProductsList,
+    orders: salesHistory
+  };
 }
 async function getActiveSellers() {
   const db = getDb();
@@ -691,8 +779,17 @@ async function getActiveDigitalProducts() {
     product: digitalProducts,
     sellerName: users.name,
     sellerOpenId: users.openId
-  }).from(digitalProducts).leftJoin(sellers, eq(digitalProducts.sellerId, sellers.id)).leftJoin(users, eq(sellers.userId, users.id)).where(and(eq(digitalProducts.isActive, true), eq(digitalProducts.status, "aprovado"))).orderBy(desc(digitalProducts.createdAt));
-  return rows.map((r) => ({ ...r.product, sellerName: r.sellerName, sellerOpenId: r.sellerOpenId }));
+  }).from(digitalProducts).leftJoin(sellers, eq(digitalProducts.sellerId, sellers.id)).leftJoin(users, eq(sellers.userId, users.id)).where(
+    and(
+      or(eq(digitalProducts.isActive, true), lte(digitalProducts.stock, 0)),
+      eq(digitalProducts.status, "aprovado")
+    )
+  ).orderBy(desc(digitalProducts.createdAt));
+  return rows.map((r) => {
+    const p = r.product;
+    const pricePrimary = p.pricePrimary !== null && p.pricePrimary !== void 0 && p.pricePrimary !== "" ? p.pricePrimary : !p.priceSecondary && p.price ? p.price : null;
+    return { ...p, pricePrimary, sellerName: r.sellerName, sellerOpenId: r.sellerOpenId };
+  });
 }
 async function getAllDigitalProductsWithSeller() {
   const db = getDb();
@@ -705,12 +802,17 @@ async function getAllDigitalProductsWithSeller() {
     directUserEmail: sql`(SELECT email FROM users WHERE id = ${digitalProducts.sellerId} LIMIT 1)`,
     directUserName: sql`(SELECT name FROM users WHERE id = ${digitalProducts.sellerId} LIMIT 1)`
   }).from(digitalProducts).leftJoin(sellers, eq(digitalProducts.sellerId, sellers.id)).leftJoin(users, eq(sellers.userId, users.id)).orderBy(desc(digitalProducts.createdAt));
-  return rows.map((r) => ({
-    ...r.product,
-    sellerStoreName: r.sellerStoreName || void 0,
-    sellerEmail: r.sellerEmail || r.directUserEmail || void 0,
-    sellerName: r.sellerName || r.directUserName || void 0
-  }));
+  return rows.map((r) => {
+    const p = r.product;
+    const pricePrimary = p.pricePrimary !== null && p.pricePrimary !== void 0 && p.pricePrimary !== "" ? p.pricePrimary : !p.priceSecondary && p.price ? p.price : null;
+    return {
+      ...p,
+      pricePrimary,
+      sellerStoreName: r.sellerStoreName || void 0,
+      sellerEmail: r.sellerEmail || r.directUserEmail || void 0,
+      sellerName: r.sellerName || r.directUserName || void 0
+    };
+  });
 }
 async function getDigitalProductsBySellerId(sellerId) {
   const db = getDb();
@@ -728,16 +830,36 @@ async function getDigitalProductsForAccount(userId, isAdminAccount) {
   if (!seller) return [];
   return getDigitalProductsBySellerId(seller.id);
 }
+function deduplicateOrders(items) {
+  const seenPaymentIds = /* @__PURE__ */ new Set();
+  const seenIds = /* @__PURE__ */ new Set();
+  const deduped = [];
+  for (const item of items) {
+    if (seenIds.has(item.id)) continue;
+    seenIds.add(item.id);
+    if (item.paymentId && item.paymentId.trim() !== "") {
+      if (seenPaymentIds.has(item.paymentId)) {
+        continue;
+      }
+      seenPaymentIds.add(item.paymentId);
+    }
+    deduped.push(item);
+  }
+  return deduped;
+}
 async function getOrdersByBuyerId(buyerId) {
   const db = getDb();
   if (!db) return [];
+  const sellerUsers = alias(users, "sellerUsers");
   const results = await db.select({
     order: orders,
     product: products,
     usedProduct: usedProducts,
-    digitalProduct: digitalProducts
-  }).from(orders).leftJoin(products, eq(orders.productId, products.id)).leftJoin(usedProducts, eq(orders.usedProductId, usedProducts.id)).leftJoin(digitalProducts, eq(orders.digitalProductId, digitalProducts.id)).where(eq(orders.buyerId, buyerId)).orderBy(desc(orders.createdAt));
-  return results.map((r) => {
+    digitalProduct: digitalProducts,
+    sellerOpenId: sellerUsers.openId,
+    sellerName: sellerUsers.name
+  }).from(orders).leftJoin(products, eq(orders.productId, products.id)).leftJoin(usedProducts, eq(orders.usedProductId, usedProducts.id)).leftJoin(digitalProducts, eq(orders.digitalProductId, digitalProducts.id)).leftJoin(sellerUsers, eq(orders.sellerId, sellerUsers.id)).where(eq(orders.buyerId, buyerId)).orderBy(desc(orders.createdAt));
+  const mapped = results.map((r) => {
     let productName = r.order.productName;
     if (!productName || productName.trim() === "" || productName === "Produto") {
       if (r.order.productType === "store" && r.product) {
@@ -752,9 +874,15 @@ async function getOrdersByBuyerId(buyerId) {
     }
     return {
       ...r.order,
-      productName
+      productName,
+      sellerOpenId: r.sellerOpenId,
+      sellerName: r.sellerName,
+      // Plataforma do jogo (PS4/PS5/PS4-PS5) pra filtrar os materiais de ajuda de entrega
+      // pela plataforma certa — usado só quando o pedido é digital.
+      digitalProductPlatform: r.digitalProduct?.platform || null
     };
   });
+  return deduplicateOrders(mapped);
 }
 async function getOrdersBySellerId(sellerId) {
   const db = getDb();
@@ -765,7 +893,7 @@ async function getOrdersBySellerId(sellerId) {
     usedProduct: usedProducts,
     digitalProduct: digitalProducts
   }).from(orders).leftJoin(products, eq(orders.productId, products.id)).leftJoin(usedProducts, eq(orders.usedProductId, usedProducts.id)).leftJoin(digitalProducts, eq(orders.digitalProductId, digitalProducts.id)).where(eq(orders.sellerId, sellerId)).orderBy(desc(orders.createdAt));
-  return results.map((r) => {
+  const mapped = results.map((r) => {
     let productName = r.order.productName;
     if (!productName || productName.trim() === "" || productName === "Produto") {
       if (r.order.productType === "store" && r.product) {
@@ -783,6 +911,7 @@ async function getOrdersBySellerId(sellerId) {
       productName
     };
   });
+  return deduplicateOrders(mapped);
 }
 async function getAllOrdersWithDetails() {
   const db = getDb();
@@ -794,7 +923,7 @@ async function getAllOrdersWithDetails() {
     usedProduct: usedProducts,
     digitalProduct: digitalProducts
   }).from(orders).leftJoin(users, eq(orders.buyerId, users.id)).leftJoin(products, eq(orders.productId, products.id)).leftJoin(usedProducts, eq(orders.usedProductId, usedProducts.id)).leftJoin(digitalProducts, eq(orders.digitalProductId, digitalProducts.id)).orderBy(desc(orders.createdAt));
-  return results.map((r) => {
+  const mapped = results.map((r) => {
     let productName = r.order.productName;
     if (!productName || productName.trim() === "" || productName === "Produto") {
       if (r.order.productType === "store" && r.product) {
@@ -812,9 +941,11 @@ async function getAllOrdersWithDetails() {
       buyerName: r.buyer?.name || "Sem Nome",
       buyerEmail: r.buyer?.email || "Sem E-mail",
       buyerPhone: r.order.buyerPhone || null,
+      buyerOpenId: r.buyer?.openId || null,
       productName
     };
   });
+  return deduplicateOrders(mapped);
 }
 async function deliverOrder(orderId, deliveryDetails) {
   const db = getDb();
@@ -856,6 +987,123 @@ async function deliverOrder(orderId, deliveryDetails) {
   }
   return { success: true };
 }
+async function claimDigitalProductAccount(database, digitalProductId, orderId) {
+  const claimResult = await database.execute(sql`
+    UPDATE "digitalProductAccounts"
+    SET status = 'entregue', "orderId" = ${orderId}, "deliveredAt" = now()
+    WHERE id = (
+      SELECT id FROM "digitalProductAccounts"
+      WHERE "digitalProductId" = ${digitalProductId} AND status = 'disponivel'
+      ORDER BY id
+      LIMIT 1
+      FOR UPDATE SKIP LOCKED
+    )
+    RETURNING id, email, password
+  `);
+  const claimedRows = Array.isArray(claimResult) ? claimResult : claimResult?.rows ?? [];
+  const claimed = claimedRows[0];
+  if (!claimed) return null;
+  await syncDigitalProductAccountStock(database, digitalProductId);
+  return { email: claimed.email, password: claimed.password };
+}
+async function attemptAutoDeliverDigitalOrder(database, params) {
+  const { orderId, digitalProductId, buyerId, productName } = params;
+  const account = await claimDigitalProductAccount(database, digitalProductId, orderId);
+  if (!account) {
+    console.log(`[AutoDeliver] Pedido #${orderId}: sem conta dispon\xEDvel no pool do jogo #${digitalProductId} \u2014 segue pro fluxo manual.`);
+    return { delivered: false };
+  }
+  console.log(`[AutoDeliver] Pedido #${orderId}: conta reivindicada do pool (${account.email}), atualizando pedido...`);
+  const deliveryDetails = `\u{1F3AE} Sua conta foi liberada automaticamente!
+
+\u{1F4E7} Email: ${account.email}
+\u{1F511} Senha: ${account.password}
+
+Qualquer d\xFAvida ou problema para acessar, voc\xEA encontra v\xEDdeos de ajuda e o contato do nosso suporte na p\xE1gina "Minhas Compras" do site.`;
+  const updateResult = await database.update(orders).set({ deliveryDetails, status: "enviado" }).where(eq(orders.id, orderId)).returning({ id: orders.id });
+  if (updateResult.length === 0) {
+    console.error(`[AutoDeliver] CR\xCDTICO: pedido #${orderId} n\xE3o encontrado ao tentar salvar a entrega. Conta consumida do pool do jogo #${digitalProductId}: ${account.email} / ${account.password}`);
+    return { delivered: false };
+  }
+  console.log(`[AutoDeliver] Pedido #${orderId}: status atualizado pra "enviado" com sucesso.`);
+  const buyerResult = await database.select().from(users).where(eq(users.id, buyerId)).limit(1);
+  const buyer = buyerResult[0];
+  if (buyer?.email) {
+    try {
+      const { sendDeliveryEmail: sendDeliveryEmail2 } = await Promise.resolve().then(() => (init_email(), email_exports));
+      await sendDeliveryEmail2({
+        to: buyer.email,
+        buyerName: buyer.name || "Cliente",
+        productName,
+        deliveryDetails
+      });
+    } catch (emailErr) {
+      console.error("[Email] Erro ao enviar email de entrega autom\xE1tica:", emailErr);
+    }
+  }
+  return { delivered: true, deliveryDetails };
+}
+async function syncDigitalProductAccountStock(database, digitalProductId) {
+  const countResult = await database.execute(sql`
+    SELECT COUNT(*)::int AS count FROM "digitalProductAccounts"
+    WHERE "digitalProductId" = ${digitalProductId} AND status = 'disponivel'
+  `);
+  const countRows = Array.isArray(countResult) ? countResult : countResult?.rows ?? [];
+  const remaining = countRows[0]?.count ?? 0;
+  await database.update(digitalProducts).set({ stock: remaining }).where(eq(digitalProducts.id, digitalProductId));
+  return remaining;
+}
+async function listDigitalProductAccountsSummary() {
+  const database = getDb();
+  if (!database) throw new Error("Database not available");
+  const result = await database.execute(sql`
+    SELECT "digitalProductId" AS "digitalProductId",
+      COUNT(*) FILTER (WHERE status = 'disponivel')::int AS available,
+      COUNT(*) FILTER (WHERE status = 'entregue')::int AS delivered
+    FROM "digitalProductAccounts"
+    GROUP BY "digitalProductId"
+  `);
+  const rows = Array.isArray(result) ? result : result?.rows ?? [];
+  const summary = {};
+  for (const row of rows) {
+    summary[row.digitalProductId] = { available: row.available, delivered: row.delivered };
+  }
+  return summary;
+}
+async function listDigitalProductAccounts(digitalProductId) {
+  const database = getDb();
+  if (!database) throw new Error("Database not available");
+  const available = await database.select({ id: digitalProductAccounts.id, email: digitalProductAccounts.email, password: digitalProductAccounts.password }).from(digitalProductAccounts).where(and(eq(digitalProductAccounts.digitalProductId, digitalProductId), eq(digitalProductAccounts.status, "disponivel"))).orderBy(digitalProductAccounts.id);
+  const deliveredCountResult = await database.select({ count: sql`count(*)::int` }).from(digitalProductAccounts).where(and(eq(digitalProductAccounts.digitalProductId, digitalProductId), eq(digitalProductAccounts.status, "entregue")));
+  return { available, deliveredCount: deliveredCountResult[0]?.count ?? 0 };
+}
+async function addDigitalProductAccountsBulk(digitalProductId, rawText) {
+  const database = getDb();
+  if (!database) throw new Error("Database not available");
+  const rows = rawText.split("\n").map((line) => line.trim()).filter(Boolean).map((line) => {
+    const parts = line.split(/[:;]/);
+    const email = parts[0]?.trim();
+    const password = parts.slice(1).join(":").trim();
+    return { email, password };
+  }).filter((r) => r.email && r.password);
+  if (rows.length === 0) return { inserted: 0, available: 0 };
+  await database.insert(digitalProductAccounts).values(
+    rows.map((r) => ({ digitalProductId, email: r.email, password: r.password }))
+  );
+  const remaining = await syncDigitalProductAccountStock(database, digitalProductId);
+  return { inserted: rows.length, available: remaining };
+}
+async function removeDigitalProductAccount(id) {
+  const database = getDb();
+  if (!database) throw new Error("Database not available");
+  const existing = await database.select().from(digitalProductAccounts).where(eq(digitalProductAccounts.id, id)).limit(1);
+  const account = existing[0];
+  if (!account) throw new Error("Conta n\xE3o encontrada");
+  if (account.status !== "disponivel") throw new Error("Essa conta j\xE1 foi entregue em um pedido e n\xE3o pode ser removida");
+  await database.delete(digitalProductAccounts).where(eq(digitalProductAccounts.id, id));
+  const remaining = await syncDigitalProductAccountStock(database, account.digitalProductId);
+  return { available: remaining };
+}
 async function getCouponByCode(code) {
   const db = getDb();
   if (!db) return void 0;
@@ -894,7 +1142,15 @@ async function getPlatformSettings() {
   const result = await db.select().from(platformSettings).where(eq(platformSettings.id, 1)).limit(1);
   if (result.length === 0) {
     await db.insert(platformSettings).values({ id: 1, commissionPercentage: "6" }).onConflictDoNothing();
-    return { id: 1, commissionPercentage: "6", vipWhatsappUrl: null, maxCoinsPerPurchase: 10, maxCoinsPreVenda: 50 };
+    return {
+      id: 1,
+      commissionPercentage: "6",
+      vipWhatsappUrl: null,
+      maxCoinsPerPurchase: 10,
+      maxCoinsPreVenda: 50,
+      supportWhatsapp: "554384253691",
+      deliveryHelpVideos: []
+    };
   }
   return result[0];
 }
@@ -1091,7 +1347,6 @@ var HttpError = class extends Error {
     this.statusCode = statusCode;
     this.name = "HttpError";
   }
-  statusCode;
 };
 var ForbiddenError = (msg) => new HttpError(403, msg);
 
@@ -1113,7 +1368,6 @@ var OAuthService = class {
       );
     }
   }
-  client;
   decodeState(state) {
     const redirectUri = atob(state);
     return redirectUri;
@@ -1716,15 +1970,29 @@ async function createContext(opts) {
         const name = decoded.name || email?.split("@")[0] || "User";
         try {
           user = await getUserByOpenId(uid) || (email ? await getUserByEmail(email) : void 0) || null;
-          console.log("[TRPC Server] Database user lookup result:", user ? `found (id: ${user.id}, openId: ${user.openId})` : "not found");
-          await upsertUser({
-            openId: uid,
-            name,
-            email,
-            loginMethod: "firebase",
-            lastSignedIn: /* @__PURE__ */ new Date()
-          });
-          user = await getUserByOpenId(uid) || (email ? await getUserByEmail(email) : void 0) || null;
+          if (!user) {
+            await upsertUser({
+              openId: uid,
+              name,
+              email,
+              loginMethod: "firebase",
+              lastSignedIn: /* @__PURE__ */ new Date()
+            });
+            user = await getUserByOpenId(uid) || (email ? await getUserByEmail(email) : void 0) || null;
+          } else {
+            const lastSigned = user.lastSignedIn ? new Date(user.lastSignedIn).getTime() : 0;
+            const twelveHoursAgo = Date.now() - 12 * 60 * 60 * 1e3;
+            if (lastSigned < twelveHoursAgo) {
+              upsertUser({
+                openId: uid,
+                name: user.name || name,
+                email: user.email || email,
+                loginMethod: user.loginMethod || "firebase",
+                lastSignedIn: /* @__PURE__ */ new Date()
+              }).catch(() => {
+              });
+            }
+          }
         } catch (dbErr) {
           console.error("[TRPC Server] User auth processing error:", dbErr);
         }
@@ -1881,18 +2149,30 @@ function registerPaymentRoute(app2) {
           if (productType === "store") {
             const rows = await database.select().from(products).where(eq3(products.id, pid)).limit(1);
             if (rows[0]) {
+              if (rows[0].isActive === false || rows[0].stock !== void 0 && rows[0].stock <= 0) {
+                return res.status(400).json({ success: false, error: "Este produto est\xE1 esgotado no momento." });
+              }
               verifiedPrice = parseFloat(rows[0].price);
               realProductName = rows[0].name;
             }
           } else if (productType === "used") {
             const rows = await database.select().from(usedProducts).where(eq3(usedProducts.id, pid)).limit(1);
             if (rows[0]) {
+              if (rows[0].status === "vendido") {
+                return res.status(400).json({ success: false, error: "Este produto usado j\xE1 foi vendido." });
+              }
               verifiedPrice = parseFloat(rows[0].price);
               realProductName = rows[0].name;
             }
           } else if (productType === "digital") {
             const rows = await database.select().from(digitalProducts).where(eq3(digitalProducts.id, pid)).limit(1);
             if (rows[0]) {
+              if (rows[0].isActive === false || rows[0].stock !== void 0 && rows[0].stock <= 0) {
+                return res.status(400).json({ success: false, error: "Este jogo est\xE1 esgotado no momento." });
+              }
+              if (rows[0].expiresAt && new Date(rows[0].expiresAt) < /* @__PURE__ */ new Date()) {
+                return res.status(400).json({ success: false, error: "O prazo de disponibilidade deste jogo j\xE1 encerrou." });
+              }
               verifiedPrice = computeDigitalPrice(rows[0], accountType);
               realProductName = rows[0].name;
               verifiedIsPreVenda = !!rows[0].isPreVenda;
@@ -1950,11 +2230,15 @@ function registerPaymentRoute(app2) {
             isExpired = expiryDate.getTime() < Date.now();
           }
           const isExceeded = coupon.maxUses !== null && (coupon.usedCount || 0) >= coupon.maxUses;
-          if (!isExpired && !isExceeded) {
+          const isMinOrderInvalid = coupon.minOrderValue && verifiedPrice < parseFloat(coupon.minOrderValue);
+          const isAppliesToInvalid = coupon.appliesTo && coupon.appliesTo !== "all" && (coupon.appliesTo === "digital" && productType !== "digital" || coupon.appliesTo === "store" && productType !== "store" || coupon.appliesTo === "used" && productType !== "used");
+          const isPreVendaBlocked = coupon.allowPreVenda === false && verifiedIsPreVenda;
+          const isPartnerSellerBlocked = coupon.allowPartnerSellers === false && !!mysqlSellerId;
+          if (!isExpired && !isExceeded && !isMinOrderInvalid && !isAppliesToInvalid && !isPreVendaBlocked && !isPartnerSellerBlocked) {
             couponDiscount = verifiedPrice * (parseFloat(coupon.discountPercentage) / 100);
             validCouponCode = coupon.code;
           } else {
-            console.warn(`[Checkout] Cupom ${couponCode} est\xE1 expirado ou esgotado.`);
+            console.warn(`[Checkout] Cupom ${couponCode} n\xE3o eleg\xEDvel para este produto/categoria.`);
           }
         } else {
           console.warn(`[Checkout] Cupom ${couponCode} n\xE3o foi encontrado ou est\xE1 inativo.`);
@@ -1972,6 +2256,9 @@ function registerPaymentRoute(app2) {
           }
         } catch (settingsErr) {
           console.warn("[Checkout] Erro ao buscar comiss\xE3o das configura\xE7\xF5es:", settingsErr);
+        }
+        if (productType === "used") {
+          commissionPct = "35.00";
         }
         const insertValues = {
           buyerId,
@@ -1999,7 +2286,7 @@ function registerPaymentRoute(app2) {
         if (customerPhone) {
           insertValues.buyerPhone = customerPhone;
         }
-        await database.insert(orders).values(insertValues);
+        const [insertedOrder] = await database.insert(orders).values(insertValues).returning({ id: orders.id });
         if (buyerId > 0) {
           const userResult = await database.select().from(users).where(eq3(users.id, buyerId)).limit(1);
           if (userResult.length > 0) {
@@ -2020,7 +2307,17 @@ function registerPaymentRoute(app2) {
           const prod = await database.select().from(digitalProducts).where(eq3(digitalProducts.id, insertValues.digitalProductId)).limit(1);
           if (prod.length > 0) {
             const newStock = Math.max(0, (prod[0].stock || 1) - 1);
-            await database.update(digitalProducts).set({ stock: newStock, isActive: newStock > 0 }).where(eq3(digitalProducts.id, insertValues.digitalProductId));
+            await database.update(digitalProducts).set({ stock: newStock }).where(eq3(digitalProducts.id, insertValues.digitalProductId));
+          }
+          try {
+            await attemptAutoDeliverDigitalOrder(database, {
+              orderId: insertedOrder.id,
+              digitalProductId: insertValues.digitalProductId,
+              buyerId,
+              productName: productNameStr
+            });
+          } catch (autoDeliverErr) {
+            console.error("[Checkout] Erro na entrega autom\xE1tica de conta:", autoDeliverErr);
           }
         } else if (productType === "store" && insertValues.productId) {
           const prod = await database.select().from(products).where(eq3(products.id, insertValues.productId)).limit(1);
@@ -2076,11 +2373,24 @@ function registerPaymentRoute(app2) {
         },
         statement_descriptor: "ENFORTEC GAMES"
       };
+      let resolvedCpf = customer?.cpf ? String(customer.cpf).replace(/\D/g, "") : null;
+      if (!resolvedCpf && buyerId > 0) {
+        const buyerRows = await database.select().from(users).where(eq3(users.id, buyerId)).limit(1);
+        if (buyerRows[0]?.cpf) {
+          resolvedCpf = buyerRows[0].cpf.replace(/\D/g, "");
+        }
+      }
       if (customer && typeof customer === "object") {
         preferencePayload.payer = {
           name: customer.name || void 0,
           email: customer.email || void 0,
-          phone: customer.phone_number ? { number: customer.phone_number.replace(/\D/g, "") } : void 0
+          phone: customer.phone_number ? { number: customer.phone_number.replace(/\D/g, "") } : void 0,
+          ...resolvedCpf && resolvedCpf.length === 11 ? {
+            identification: {
+              type: "CPF",
+              number: resolvedCpf
+            }
+          } : {}
         };
       }
       console.log("[Mercado Pago] Criando prefer\xEAncia:", JSON.stringify(preferencePayload));
@@ -2102,7 +2412,9 @@ function registerPaymentRoute(app2) {
   };
   app2.post("/api/mercadopago/checkout", handleCheckout);
   app2.post("/api/infinitepay/checkout", handleCheckout);
+  const activeProcessingPaymentIds = /* @__PURE__ */ new Set();
   const handleWebhook = async (req, res) => {
+    let paymentIdToUnlock = null;
     try {
       const expectedSecret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
       if (expectedSecret && req.query.secret !== expectedSecret) {
@@ -2116,6 +2428,13 @@ function registerPaymentRoute(app2) {
       if (!paymentId || topic && topic !== "payment" && topic !== "merchant_order" && event?.action !== "payment.created" && event?.action !== "payment.updated") {
         return res.status(200).json({ received: true, ignored: true });
       }
+      const strPaymentId = String(paymentId);
+      if (activeProcessingPaymentIds.has(strPaymentId)) {
+        console.log(`[Mercado Pago Webhook] Pagamento #${strPaymentId} j\xE1 est\xE1 sendo processado em paralelo por outra requisi\xE7\xE3o. Reenvio ignorado.`);
+        return res.status(200).json({ received: true, inProgress: true });
+      }
+      activeProcessingPaymentIds.add(strPaymentId);
+      paymentIdToUnlock = strPaymentId;
       const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
       if (!accessToken) {
         console.warn("[Mercado Pago Webhook] MERCADO_PAGO_ACCESS_TOKEN n\xE3o configurado no servidor.");
@@ -2202,6 +2521,9 @@ function registerPaymentRoute(app2) {
         } catch (settingsErr) {
           console.warn("[Mercado Pago Webhook] Erro ao buscar comiss\xE3o:", settingsErr);
         }
+        if (productType === "used") {
+          commissionPct = "35.00";
+        }
         const total = parseFloat(totalPrice);
         const pct = parseFloat(commissionPct) / 100;
         const platformCommission = (total * pct).toFixed(2);
@@ -2232,7 +2554,7 @@ function registerPaymentRoute(app2) {
         if (phone) {
           insertValues.buyerPhone = phone;
         }
-        await database.insert(orders).values(insertValues);
+        const [insertedOrder] = await database.insert(orders).values(insertValues).returning({ id: orders.id });
         if (buyerId > 0) {
           const userResult = await database.select().from(users).where(eq3(users.id, buyerId)).limit(1);
           if (userResult.length > 0) {
@@ -2253,7 +2575,17 @@ function registerPaymentRoute(app2) {
           const prod = await database.select().from(digitalProducts).where(eq3(digitalProducts.id, insertValues.digitalProductId)).limit(1);
           if (prod.length > 0) {
             const newStock = Math.max(0, (prod[0].stock || 1) - 1);
-            await database.update(digitalProducts).set({ stock: newStock, isActive: newStock > 0 }).where(eq3(digitalProducts.id, insertValues.digitalProductId));
+            await database.update(digitalProducts).set({ stock: newStock }).where(eq3(digitalProducts.id, insertValues.digitalProductId));
+          }
+          try {
+            await attemptAutoDeliverDigitalOrder(database, {
+              orderId: insertedOrder.id,
+              digitalProductId: insertValues.digitalProductId,
+              buyerId,
+              productName
+            });
+          } catch (autoDeliverErr) {
+            console.error("[Mercado Pago Webhook] Erro na entrega autom\xE1tica de conta:", autoDeliverErr);
           }
         } else if (productType === "store" && insertValues.productId) {
           const prod = await database.select().from(products).where(eq3(products.id, insertValues.productId)).limit(1);
@@ -2277,6 +2609,10 @@ ID: ${paymentId || "N/A"}`
     } catch (error) {
       console.error("[Mercado Pago Webhook] Erro ao processar evento:", error.message);
       return res.status(200).json({ received: true, error: error.message });
+    } finally {
+      if (paymentIdToUnlock) {
+        activeProcessingPaymentIds.delete(paymentIdToUnlock);
+      }
     }
   };
   app2.all("/api/mercadopago/webhook", handleWebhook);
@@ -2382,6 +2718,9 @@ var requireUser = t.middleware(async (opts) => {
   if (!ctx.user) {
     throw new TRPCError2({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
   }
+  if (ctx.user.isBanned) {
+    throw new TRPCError2({ code: "FORBIDDEN", message: "Sua conta foi suspensa por descumprir as regras da plataforma." });
+  }
   return next({
     ctx: {
       ...ctx,
@@ -2453,6 +2792,17 @@ var appRouter = router({
         lastSignedIn: users.lastSignedIn,
         createdAt: users.createdAt
       }).from(users).orderBy(desc2(users.lastSignedIn));
+    }),
+    updateMyPhone: protectedProcedure.input(z2.object({ phone: z2.string().min(8).max(20) })).mutation(async ({ ctx, input }) => {
+      return updateUserPhone(ctx.user.id, input.phone);
+    }),
+    adminBanUser: protectedProcedure.input(z2.object({ userId: z2.number() })).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Apenas administradores" });
+      return banUser(input.userId);
+    }),
+    adminUnbanUser: protectedProcedure.input(z2.object({ userId: z2.number() })).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Apenas administradores" });
+      return unbanUser(input.userId);
     }),
     adminGetDatabaseStats: protectedProcedure.query(async ({ ctx }) => {
       if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Apenas administradores" });
@@ -2606,7 +2956,12 @@ var appRouter = router({
         price: input.price.toString(),
         category: input.category
       };
-      if (input.stock !== void 0) updateValues.stock = input.stock;
+      if (input.stock !== void 0) {
+        updateValues.stock = input.stock;
+        if (input.stock <= 0 && input.isActive === void 0) {
+          updateValues.isActive = false;
+        }
+      }
       if (input.images !== void 0) updateValues.images = input.images;
       if (input.isActive !== void 0) updateValues.isActive = input.isActive;
       return database.update(products).set(updateValues).where(eq4(products.id, input.id));
@@ -2624,6 +2979,12 @@ var appRouter = router({
     getByUserId: protectedProcedure.query(async ({ ctx }) => {
       const seller = await getSellerByUserId(ctx.user.id);
       return seller || null;
+    }),
+    adminGetDetails: protectedProcedure.input(z2.object({ sellerId: z2.number() })).query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
+      const details = await getSellerFullDetails(input.sellerId);
+      if (!details) throw new TRPCError3({ code: "NOT_FOUND", message: "Vendedor n\xE3o encontrado" });
+      return details;
     }),
     create: protectedProcedure.input(z2.object({
       storeName: z2.string().min(3),
@@ -2850,16 +3211,18 @@ var appRouter = router({
       isActive: z2.boolean().optional(),
       isPreVenda: z2.boolean().optional(),
       showInEconomia: z2.boolean().optional(),
-      economiaLicenseType: z2.string().optional()
+      economiaLicenseType: z2.string().optional(),
+      expiresAt: z2.string().nullable().optional()
     })).mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
       const database = await getDb();
       if (!database) throw new Error("Database not available");
+      const effectivePrimary = input.pricePrimary !== void 0 && input.pricePrimary !== null ? input.pricePrimary.toString() : !input.priceSecondary ? input.price.toString() : null;
       return database.insert(digitalProducts).values({
         name: input.name,
         description: input.description,
         price: input.price.toString(),
-        pricePrimary: input.pricePrimary?.toString() || null,
+        pricePrimary: effectivePrimary,
         priceSecondary: input.priceSecondary?.toString() || null,
         type: input.type,
         imageUrl: input.imageUrl,
@@ -2871,6 +3234,7 @@ var appRouter = router({
         isPreVenda: input.isPreVenda,
         showInEconomia: input.showInEconomia,
         economiaLicenseType: input.economiaLicenseType,
+        expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
         status: "aprovado"
       });
     }),
@@ -2890,16 +3254,18 @@ var appRouter = router({
       isActive: z2.boolean().optional(),
       isPreVenda: z2.boolean().optional(),
       showInEconomia: z2.boolean().optional(),
-      economiaLicenseType: z2.string().optional()
+      economiaLicenseType: z2.string().optional(),
+      expiresAt: z2.string().nullable().optional()
     })).mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
       const database = await getDb();
       if (!database) throw new Error("Database not available");
+      const effectivePrimary = input.pricePrimary !== void 0 && input.pricePrimary !== null ? input.pricePrimary.toString() : !input.priceSecondary ? input.price.toString() : null;
       return database.update(digitalProducts).set({
         name: input.name,
         description: input.description,
         price: input.price.toString(),
-        pricePrimary: input.pricePrimary?.toString() || null,
+        pricePrimary: effectivePrimary,
         priceSecondary: input.priceSecondary?.toString() || null,
         type: input.type,
         imageUrl: input.imageUrl,
@@ -2910,7 +3276,8 @@ var appRouter = router({
         isActive: input.isActive !== void 0 ? input.isActive : true,
         isPreVenda: input.isPreVenda,
         showInEconomia: input.showInEconomia,
-        economiaLicenseType: input.economiaLicenseType
+        economiaLicenseType: input.economiaLicenseType,
+        expiresAt: input.expiresAt !== void 0 ? input.expiresAt ? new Date(input.expiresAt) : null : void 0
       }).where(eq4(digitalProducts.id, input.id));
     }),
     adminDelete: protectedProcedure.input(z2.number()).mutation(async ({ ctx, input }) => {
@@ -2932,6 +3299,26 @@ var appRouter = router({
       }
       await database.delete(digitalProducts).where(eq4(digitalProducts.id, input.id));
       return { success: true };
+    }),
+    // Pool de contas (email+senha) por jogo, usado pra entrega automática — ver
+    // db.attemptAutoDeliverDigitalOrder, chamado no webhook de pagamento.
+    accounts: router({
+      summary: protectedProcedure.query(async ({ ctx }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
+        return listDigitalProductAccountsSummary();
+      }),
+      list: protectedProcedure.input(z2.object({ digitalProductId: z2.number() })).query(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
+        return listDigitalProductAccounts(input.digitalProductId);
+      }),
+      addBulk: protectedProcedure.input(z2.object({ digitalProductId: z2.number(), rawText: z2.string().min(1) })).mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
+        return addDigitalProductAccountsBulk(input.digitalProductId, input.rawText);
+      }),
+      remove: protectedProcedure.input(z2.object({ id: z2.number() })).mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
+        return removeDigitalProductAccount(input.id);
+      })
     })
   }),
   // Orders Router
@@ -3003,6 +3390,27 @@ var appRouter = router({
     updateCoinLimits: protectedProcedure.input(z2.object({ maxCoinsPerPurchase: z2.number().min(0), maxCoinsPreVenda: z2.number().min(0) })).mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
       return updatePlatformSettings({ maxCoinsPerPurchase: input.maxCoinsPerPurchase, maxCoinsPreVenda: input.maxCoinsPreVenda });
+    }),
+    // Numero de WhatsApp de suporte (fonte única usada em wa.me/<numero> no site inteiro)
+    // e os 2 vídeos de ajuda mostrados junto com a conta entregue em "Minhas Compras".
+    updateSupportSettings: protectedProcedure.input(z2.object({
+      supportWhatsapp: z2.string().min(8)
+    })).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
+      return updatePlatformSettings({ supportWhatsapp: input.supportWhatsapp });
+    }),
+    // Lista flexível de materiais de ajuda (vídeo ou link, ex.: página de tutorial no Canva)
+    // mostrados ao comprador em "Minhas Compras" — cada item pode ser restrito a PS4/PS5
+    // ou aparecer pra qualquer plataforma.
+    updateDeliveryHelpVideos: protectedProcedure.input(z2.object({
+      videos: z2.array(z2.object({
+        title: z2.string().min(1),
+        url: z2.string().min(1),
+        platform: z2.enum(["ps4", "ps5", "ambos"])
+      }))
+    })).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
+      return updatePlatformSettings({ deliveryHelpVideos: input.videos });
     })
   }),
   // Central de Notificações do admin — "dispensar" aqui só esconde da lista (compartilhado
@@ -3037,6 +3445,11 @@ var appRouter = router({
     create: protectedProcedure.input(z2.object({
       code: z2.string().min(1),
       discountPercentage: z2.string().min(1),
+      appliesTo: z2.string().optional(),
+      allowPreVenda: z2.boolean().optional(),
+      allowEconomia: z2.boolean().optional(),
+      allowPartnerSellers: z2.boolean().optional(),
+      minOrderValue: z2.string().nullable().optional(),
       maxUses: z2.number().nullable().optional(),
       expiresAt: z2.string().nullable().optional()
     })).mutation(async ({ ctx, input }) => {
@@ -3045,6 +3458,11 @@ var appRouter = router({
       return createCoupon({
         code: input.code.toUpperCase().trim(),
         discountPercentage: input.discountPercentage,
+        appliesTo: input.appliesTo || "all",
+        allowPreVenda: input.allowPreVenda ?? false,
+        allowEconomia: input.allowEconomia ?? false,
+        allowPartnerSellers: input.allowPartnerSellers ?? true,
+        minOrderValue: input.minOrderValue ? String(input.minOrderValue) : null,
         maxUses: input.maxUses ?? null,
         expiresAt: expiresAtDate,
         isActive: true
@@ -3055,6 +3473,11 @@ var appRouter = router({
       isActive: z2.boolean().optional(),
       code: z2.string().optional(),
       discountPercentage: z2.string().optional(),
+      appliesTo: z2.string().optional(),
+      allowPreVenda: z2.boolean().optional(),
+      allowEconomia: z2.boolean().optional(),
+      allowPartnerSellers: z2.boolean().optional(),
+      minOrderValue: z2.string().nullable().optional(),
       maxUses: z2.number().nullable().optional(),
       expiresAt: z2.string().nullable().optional()
     })).mutation(async ({ ctx, input }) => {
@@ -3063,6 +3486,11 @@ var appRouter = router({
       if (input.isActive !== void 0) updateData.isActive = input.isActive;
       if (input.code !== void 0) updateData.code = input.code.toUpperCase().trim();
       if (input.discountPercentage !== void 0) updateData.discountPercentage = input.discountPercentage;
+      if (input.appliesTo !== void 0) updateData.appliesTo = input.appliesTo;
+      if (input.allowPreVenda !== void 0) updateData.allowPreVenda = input.allowPreVenda;
+      if (input.allowEconomia !== void 0) updateData.allowEconomia = input.allowEconomia;
+      if (input.allowPartnerSellers !== void 0) updateData.allowPartnerSellers = input.allowPartnerSellers;
+      if (input.minOrderValue !== void 0) updateData.minOrderValue = input.minOrderValue ? String(input.minOrderValue) : null;
       if (input.maxUses !== void 0) updateData.maxUses = input.maxUses;
       if (input.expiresAt !== void 0) {
         updateData.expiresAt = input.expiresAt ? new Date(input.expiresAt) : null;
@@ -3074,7 +3502,15 @@ var appRouter = router({
       return deleteCoupon(input);
     }),
     validate: publicProcedure.input(z2.object({
-      code: z2.string()
+      code: z2.string(),
+      productId: z2.number().optional(),
+      productType: z2.string().optional(),
+      // 'digital' | 'store' | 'used' | 'platinador'
+      category: z2.string().optional(),
+      isPreVenda: z2.boolean().optional(),
+      isEconomia: z2.boolean().optional(),
+      isPartnerSeller: z2.boolean().optional(),
+      price: z2.number().optional()
     })).mutation(async ({ input }) => {
       const coupon = await getCouponByCode(input.code.toUpperCase().trim());
       if (!coupon) throw new Error("Cupom inv\xE1lido ou inativo");
@@ -3090,10 +3526,37 @@ var appRouter = router({
       if (coupon.maxUses !== null && (coupon.usedCount || 0) >= coupon.maxUses) {
         throw new Error("Cupom esgotado (limite de usos atingido)");
       }
+      if (coupon.minOrderValue && input.price !== void 0 && input.price < parseFloat(coupon.minOrderValue)) {
+        throw new Error(`Este cupom exige um valor m\xEDnimo de compra de R$ ${parseFloat(coupon.minOrderValue).toFixed(2).replace(".", ",")}.`);
+      }
+      if (coupon.appliesTo && coupon.appliesTo !== "all" && input.productType) {
+        if (coupon.appliesTo === "digital" && input.productType !== "digital") {
+          throw new Error("Este cupom \xE9 v\xE1lido apenas para Jogos Digitais.");
+        }
+        if (coupon.appliesTo === "store" && input.productType !== "store") {
+          throw new Error("Este cupom \xE9 v\xE1lido apenas para produtos da Loja.");
+        }
+        if (coupon.appliesTo === "used" && input.productType !== "used") {
+          throw new Error("Este cupom \xE9 v\xE1lido apenas para M\xEDdia F\xEDsica Usada.");
+        }
+        if (coupon.appliesTo === "assinatura" && input.category !== "assinatura" && input.productType !== "platinador") {
+          throw new Error("Este cupom \xE9 v\xE1lido apenas para Assinaturas.");
+        }
+      }
+      if (coupon.allowPreVenda === false && input.isPreVenda) {
+        throw new Error("Este cupom n\xE3o \xE9 v\xE1lido para jogos em Pr\xE9-Venda.");
+      }
+      if (coupon.allowEconomia === false && input.isEconomia) {
+        throw new Error("Este cupom n\xE3o \xE9 v\xE1lido para jogos da se\xE7\xE3o Jogue com Economia.");
+      }
+      if (coupon.allowPartnerSellers === false && input.isPartnerSeller) {
+        throw new Error("Este cupom n\xE3o pode ser aplicado em produtos de Vendedores Parceiros.");
+      }
       return {
         id: coupon.id,
         code: coupon.code,
-        discountPercentage: parseFloat(coupon.discountPercentage)
+        discountPercentage: parseFloat(coupon.discountPercentage),
+        appliesTo: coupon.appliesTo
       };
     })
   }),
@@ -3437,6 +3900,7 @@ async function findAvailablePort(startPort = 3e3) {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 var app = express();
+app.use(compression());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 registerStorageProxy(app);
@@ -3467,6 +3931,7 @@ app.get("/api/migrate-db", async (req, res) => {
     )`);
     await sql3.query(`ALTER TABLE "digitalProducts" ADD COLUMN IF NOT EXISTS "pricePrimary" numeric(10, 2)`);
     await sql3.query(`ALTER TABLE "digitalProducts" ADD COLUMN IF NOT EXISTS "priceSecondary" numeric(10, 2)`);
+    await sql3.query(`UPDATE "digitalProducts" SET "pricePrimary" = "price" WHERE ("pricePrimary" IS NULL OR "pricePrimary"::text = '') AND ("priceSecondary" IS NULL OR "priceSecondary"::text = '') AND "price" IS NOT NULL`);
     await sql3.query(`ALTER TABLE "digitalProducts" ADD COLUMN IF NOT EXISTS "status" varchar(20) DEFAULT 'aprovado' NOT NULL`);
     await sql3.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "cpf" varchar(18)`);
     await sql3.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "psnId" varchar(100)`);
@@ -3618,12 +4083,22 @@ async function runMigrations() {
       "id" serial PRIMARY KEY,
       "code" varchar(50) NOT NULL UNIQUE,
       "discountPercentage" numeric(5, 2) NOT NULL,
+      "appliesTo" varchar(50) DEFAULT 'all',
+      "allowPreVenda" boolean DEFAULT false,
+      "allowEconomia" boolean DEFAULT false,
+      "allowPartnerSellers" boolean DEFAULT true,
+      "minOrderValue" numeric(10, 2),
       "maxUses" integer,
       "usedCount" integer DEFAULT 0,
       "expiresAt" timestamp,
       "isActive" boolean DEFAULT true,
       "createdAt" timestamp DEFAULT now() NOT NULL
     )`);
+    await sql3.query(`ALTER TABLE "coupons" ADD COLUMN IF NOT EXISTS "appliesTo" varchar(50) DEFAULT 'all'`);
+    await sql3.query(`ALTER TABLE "coupons" ADD COLUMN IF NOT EXISTS "allowPreVenda" boolean DEFAULT false`);
+    await sql3.query(`ALTER TABLE "coupons" ADD COLUMN IF NOT EXISTS "allowEconomia" boolean DEFAULT false`);
+    await sql3.query(`ALTER TABLE "coupons" ADD COLUMN IF NOT EXISTS "allowPartnerSellers" boolean DEFAULT true`);
+    await sql3.query(`ALTER TABLE "coupons" ADD COLUMN IF NOT EXISTS "minOrderValue" numeric(10, 2)`);
     await sql3.query(`ALTER TABLE "usedProducts" ADD COLUMN IF NOT EXISTS "estado" varchar(50)`);
     await sql3.query(`ALTER TABLE "usedProducts" ADD COLUMN IF NOT EXISTS "cidade" varchar(100)`);
     await sql3.query(`ALTER TABLE "usedProducts" ADD COLUMN IF NOT EXISTS "category" varchar(50) DEFAULT 'midia_fisica'`);
@@ -3646,7 +4121,7 @@ async function runMigrations() {
     console.warn("[Database] Aviso: Falha na migra\xE7\xE3o autom\xE1tica de inicializa\xE7\xE3o:", migErr.message);
   }
 }
-var migrationsPromise = runMigrations();
+var migrationsPromise = process.env.RUN_STARTUP_MIGRATIONS === "true" || process.env.NODE_ENV === "development" ? runMigrations() : Promise.resolve();
 async function startServer() {
   console.log("[Server] starting server...");
   await migrationsPromise;
