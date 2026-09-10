@@ -281,6 +281,10 @@ export function registerPaymentRoute(app: Express) {
         } catch (settingsErr) {
           console.warn("[Checkout] Erro ao buscar comissão das configurações:", settingsErr);
         }
+        // Revenda de conta pela comunidade — mesma comissão fixa de 35% do handleWebhook.
+        if (productType === "used") {
+          commissionPct = "35.00";
+        }
 
         const insertValues: any = {
           buyerId: buyerId,
@@ -602,6 +606,12 @@ export function registerPaymentRoute(app: Express) {
           }
         } catch (settingsErr) {
           console.warn("[Mercado Pago Webhook] Erro ao buscar comissão:", settingsErr);
+        }
+        // Revenda de conta pela comunidade (cliente vende a própria conta): comissão fixa
+        // de 35%, como já é anunciado pro vendedor em várias telas do site — sempre
+        // sobrepõe o percentual geral de platformSettings, que é só pra loja própria/digital.
+        if (productType === "used") {
+          commissionPct = "35.00";
         }
 
         const total = parseFloat(totalPrice);

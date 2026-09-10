@@ -1531,6 +1531,13 @@ export default function AdminDashboard() {
     setAccountsModalGame({ id: game.id, name: game.name });
   };
 
+  // Modal "Ver Loja" — detalhe de um vendedor da comunidade (contato, anúncios, vendas)
+  const [viewingSellerId, setViewingSellerId] = useState<number | null>(null);
+  const sellerDetailsQuery = trpc.sellers.adminGetDetails.useQuery(
+    { sellerId: viewingSellerId ?? 0 },
+    { enabled: viewingSellerId !== null }
+  );
+
   const normalizeGameNameForMatch = (n: string) => {
     const noAccents = (n || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
     return noAccents
@@ -4429,6 +4436,15 @@ export default function AdminDashboard() {
                       <div className="bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs space-y-1">
                         <p className="text-slate-400">Vendedor: <span className="text-white font-bold">{game.sellerName || game.sellerStoreName || "—"}</span></p>
                         <p className="text-slate-400">Email: <span className="text-white">{game.sellerEmail || "—"}</span></p>
+                        {game.sellerId && (
+                          <button
+                            type="button"
+                            onClick={() => setViewingSellerId(game.sellerId)}
+                            className="text-[10px] font-bold text-amber-300 hover:text-amber-200 underline"
+                          >
+                            🔍 Ver Loja
+                          </button>
+                        )}
                         {game.keyOrCode && (
                           <p className="text-slate-400">Login/Senha: <span className="text-white font-mono select-all">{game.keyOrCode}</span></p>
                         )}
@@ -4539,6 +4555,13 @@ export default function AdminDashboard() {
                                 🏪 Loja: {game.sellerStoreName}
                               </p>
                             )}
+                            <button
+                              type="button"
+                              onClick={() => setViewingSellerId(game.sellerId)}
+                              className="text-[10px] font-bold text-amber-300 hover:text-amber-200 underline mt-1"
+                            >
+                              🔍 Ver Loja
+                            </button>
                           </div>
                         )}
                       </div>
@@ -4843,6 +4866,15 @@ export default function AdminDashboard() {
                       </div>
                       <h3 className="font-bold text-white text-sm line-clamp-2 mb-1" title={p.name}>{p.name}</h3>
                       <p className="text-xs text-slate-400 mb-0.5">Vendedor: <span className="text-slate-300">{p.sellerStoreName || "—"}</span></p>
+                      {p.sellerId && (
+                        <button
+                          type="button"
+                          onClick={() => setViewingSellerId(p.sellerId)}
+                          className="text-[10px] font-bold text-amber-300 hover:text-amber-200 underline mb-1 block"
+                        >
+                          🔍 Ver Loja
+                        </button>
+                      )}
                       {(p.bairro || p.cidade) && (
                         <p className="text-[11px] text-slate-500 mb-1 flex items-center gap-1">
                           <MapPin className="w-3 h-3" /> {[p.bairro, p.cidade, p.estado].filter(Boolean).join(", ")}
@@ -6602,6 +6634,74 @@ export default function AdminDashboard() {
 
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => setAccountsModalGame(null)} className="text-slate-400 hover:text-white">
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal "Ver Loja" — detalhe de um vendedor da comunidade */}
+      <Dialog open={viewingSellerId !== null} onOpenChange={(open) => !open && setViewingSellerId(null)}>
+        <DialogContent className="bg-slate-900 border-amber-600/30 text-white max-w-2xl card-neon max-h-[85dvh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-neon flex items-center gap-2">🏪 Detalhes da Loja</DialogTitle>
+          </DialogHeader>
+
+          {sellerDetailsQuery.isLoading ? (
+            <p className="text-sm text-slate-500 py-6 text-center">Carregando...</p>
+          ) : !sellerDetailsQuery.data ? (
+            <p className="text-sm text-red-400 py-6 text-center">Vendedor não encontrado.</p>
+          ) : (
+            <div className="space-y-4 py-2">
+              <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="font-black text-white text-lg">{sellerDetailsQuery.data.seller.storeName}</h4>
+                  <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${sellerDetailsQuery.data.seller.isActive ? "bg-green-600/20 text-green-400 border border-green-600/40" : "bg-red-600/20 text-red-400 border border-red-600/40"}`}>
+                    {sellerDetailsQuery.data.seller.isActive ? "Ativo" : "Inativo"}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400">ID #{sellerDetailsQuery.data.seller.id} · Comissão: {sellerDetailsQuery.data.seller.commissionPercentage}%</p>
+                <p className="text-xs text-slate-300">👤 {sellerDetailsQuery.data.contactName || "—"}</p>
+                <p className="text-xs text-slate-300">✉️ {sellerDetailsQuery.data.contactEmail || "—"}</p>
+              </div>
+
+              <div>
+                <Label className="text-xs text-slate-300 font-bold uppercase">Produtos Anunciados ({sellerDetailsQuery.data.usedProducts.length + sellerDetailsQuery.data.digitalProducts.length})</Label>
+                <div className="max-h-40 overflow-y-auto space-y-1 mt-1.5">
+                  {[...sellerDetailsQuery.data.usedProducts, ...sellerDetailsQuery.data.digitalProducts].length === 0 ? (
+                    <p className="text-xs text-slate-600">Nenhum produto anunciado.</p>
+                  ) : (
+                    [...sellerDetailsQuery.data.usedProducts, ...sellerDetailsQuery.data.digitalProducts].map((prod: any) => (
+                      <div key={prod.id} className="flex items-center justify-between gap-2 bg-slate-950/40 border border-slate-800 rounded-lg px-3 py-1.5 text-xs">
+                        <span className="text-slate-200 truncate">{prod.name}</span>
+                        <span className="text-slate-500 shrink-0">{prod.status || (prod.isActive ? "ativo" : "inativo")}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-xs text-slate-300 font-bold uppercase">Histórico de Vendas ({sellerDetailsQuery.data.orders.length})</Label>
+                <div className="max-h-48 overflow-y-auto space-y-1 mt-1.5">
+                  {sellerDetailsQuery.data.orders.length === 0 ? (
+                    <p className="text-xs text-slate-600">Nenhuma venda ainda.</p>
+                  ) : (
+                    sellerDetailsQuery.data.orders.map((order: any) => (
+                      <div key={order.id} className="flex items-center justify-between gap-2 bg-slate-950/40 border border-slate-800 rounded-lg px-3 py-1.5 text-xs">
+                        <span className="text-slate-200 truncate">{order.productName}</span>
+                        <span className="text-slate-400 shrink-0">R$ {Number(order.totalPrice).toFixed(2)}</span>
+                        <span className="text-slate-500 shrink-0">{order.status}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setViewingSellerId(null)} className="text-slate-400 hover:text-white">
               Fechar
             </Button>
           </DialogFooter>

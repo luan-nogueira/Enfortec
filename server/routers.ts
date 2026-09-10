@@ -249,6 +249,14 @@ export const appRouter = router({
       const seller = await db.getSellerByUserId(ctx.user.id);
       return seller || null;
     }),
+    adminGetDetails: protectedProcedure
+      .input(z.object({ sellerId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+        const details = await db.getSellerFullDetails(input.sellerId);
+        if (!details) throw new TRPCError({ code: "NOT_FOUND", message: "Vendedor não encontrado" });
+        return details;
+      }),
     create: protectedProcedure
       .input(z.object({
         storeName: z.string().min(3),

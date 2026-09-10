@@ -1,4 +1,5 @@
 import { eq, and, or, lte, desc, sql, inArray, like, lt } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { InsertUser, InsertCoupon, users, sellers, products, usedProducts, digitalProducts, digitalProductAccounts, orders, reviews, coupons, platformSettings, adminDismissedNotifications, messages, platinumSubmissions } from "../drizzle/schema";
@@ -195,6 +196,43 @@ export async function getSellerByUserId(userId: number) {
     console.error("[Database Error] getSellerByUserId failed:", error);
     return null;
   }
+}
+
+/**
+ * Visão completa de uma loja/vendedor pro admin: dados de contato, produtos anunciados
+ * (usados e digitais) e histórico de vendas. `sellerId` aqui é o PK da tabela `sellers`
+ * (o mesmo "ID #7" já mostrado nos cards de produto no admin) — diferente de
+ * `orders.sellerId`, que é o `users.id` direto, então o histórico de vendas usa
+ * `seller.userId` pra buscar corretamente.
+ */
+export async function getSellerFullDetails(sellerId: number) {
+  const db = getDb();
+  if (!db) return null;
+
+  const sellerResult = await db
+    .select({ seller: sellers, user: users })
+    .from(sellers)
+    .leftJoin(users, eq(sellers.userId, users.id))
+    .where(eq(sellers.id, sellerId))
+    .limit(1);
+
+  const row = sellerResult[0];
+  if (!row) return null;
+
+  const [usedProductsList, digitalProductsList, salesHistory] = await Promise.all([
+    getUsedProductsBySellerId(sellerId),
+    getDigitalProductsBySellerId(sellerId),
+    row.seller.userId ? getOrdersBySellerId(row.seller.userId) : Promise.resolve([]),
+  ]);
+
+  return {
+    seller: row.seller,
+    contactName: row.user?.name || null,
+    contactEmail: row.user?.email || null,
+    usedProducts: usedProductsList,
+    digitalProducts: digitalProductsList,
+    orders: salesHistory,
+  };
 }
 
 export async function getActiveSellers() {
@@ -400,18 +438,27 @@ function deduplicateOrders<T extends { id: number; paymentId?: string | null }>(
 export async function getOrdersByBuyerId(buyerId: number) {
   const db = getDb();
   if (!db) return [];
-  
+
+  // Junta com users (aliado) pra expor o openId (uid do Firebase) e nome do vendedor —
+  // orders.sellerId já é o users.id direto (não sellers.id, diferente de usedProducts).
+  // Sem isso o botão "Falar com Vendedor" de Minhas Compras não tinha pra quem mandar o
+  // sellerId e a conversa caía sempre na Loja Eforte, mesmo em pedidos de vendedor real.
+  const sellerUsers = alias(users, "sellerUsers");
+
   const results = await db
     .select({
       order: orders,
       product: products,
       usedProduct: usedProducts,
       digitalProduct: digitalProducts,
+      sellerOpenId: sellerUsers.openId,
+      sellerName: sellerUsers.name,
     })
     .from(orders)
     .leftJoin(products, eq(orders.productId, products.id))
     .leftJoin(usedProducts, eq(orders.usedProductId, usedProducts.id))
     .leftJoin(digitalProducts, eq(orders.digitalProductId, digitalProducts.id))
+    .leftJoin(sellerUsers, eq(orders.sellerId, sellerUsers.id))
     .where(eq(orders.buyerId, buyerId))
     .orderBy(desc(orders.createdAt));
 
@@ -431,6 +478,8 @@ export async function getOrdersByBuyerId(buyerId: number) {
     return {
       ...r.order,
       productName,
+      sellerOpenId: r.sellerOpenId,
+      sellerName: r.sellerName,
     };
   });
 

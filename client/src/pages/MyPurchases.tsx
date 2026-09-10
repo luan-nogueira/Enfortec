@@ -222,6 +222,8 @@ export default function MyPurchases() {
                   <SellerChatDialog
                     productId={`pedido-${order.id}`}
                     productName={order.productName || "Pedido #" + order.id}
+                    sellerId={order.sellerOpenId || undefined}
+                    sellerName={order.sellerName || undefined}
                     buttonLabel="Falar sobre o Pedido"
                     buttonClassName="w-full md:w-auto bg-slate-900 border border-green-600/40 hover:border-green-500 text-green-400 font-bold text-xs py-2.5 px-4 rounded-xl flex items-center justify-center gap-1.5"
                   />
