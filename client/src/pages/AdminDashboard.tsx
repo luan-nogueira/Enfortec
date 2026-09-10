@@ -1,4 +1,4 @@
-import { initializeApp, deleteApp } from "firebase/app";
+﻿import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { firebaseConfig } from "@/lib/firebase";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -1569,6 +1569,12 @@ export default function AdminDashboard() {
       let text = line.trim();
       if (!text) return;
 
+      // Remove caracteres invisíveis (marcas de direção, zero-width, BOM) que apps como
+      // WhatsApp às vezes inserem ao redor de números, o que quebrava a extração do preço
+      // no final da linha e fazia o texto inteiro (nome + preço) cair no campo NOME.
+      text = text.replace(/\p{Cf}/gu, "").replace(/\p{Zs}/gu, " ").trim();
+      if (!text) return;
+
       // Filtra/Ignora cabeçalhos, avisos ou decorações de WhatsApp
       if (
         text.startsWith("🎮") || 
@@ -1637,9 +1643,11 @@ export default function AdminDashboard() {
       } else {
         // Caso B: Parse inteligente do texto corrido (ex: "A Plague Tale Requiem PS5 74 90")
         let nameAndPlatform = text;
-        const doubleNumberRegex = /\s+(\d+)\s+(\d{2})$/; // ex: "74 90" ou "134 90"
-        const singlePriceRegex = /\s+(\d+[,.]\d{2})$/;   // ex: "24.90" ou "24,90"
-        const simpleIntRegex = /\s+(\d+)$/;              // ex: "20" ou "60"
+        // Aceita ":" como delimitador antes do preço também (ex: "Nome: 74,90"),
+        // que é o formato mais comum quando o preço vem depois do nome com dois-pontos.
+        const doubleNumberRegex = /[:\s]+(\d+)\s+(\d{2})$/; // ex: "74 90" ou "134 90"
+        const singlePriceRegex = /[:\s]+(\d+[,.]\d{2})$/;   // ex: "24.90", "24,90" ou ": 24,90"
+        const simpleIntRegex = /[:\s]+(\d+)$/;              // ex: "20" ou "60"
 
         if (doubleNumberRegex.test(text)) {
           const match = text.match(doubleNumberRegex)!;
@@ -1657,6 +1665,8 @@ export default function AdminDashboard() {
           pricePrimary = price;
           nameAndPlatform = text.replace(simpleIntRegex, "").trim();
         }
+        // Remove ":" ou "-" residual que sobra no fim do nome quando o preço foi removido
+        nameAndPlatform = nameAndPlatform.replace(/[:\-–—]+$/, "").trim();
 
         // Tenta extrair plataforma do final do nome
         const platformRegex = /\s*\(?(PS4\s*[\/\-&eE]?\s*PS5|PS5\s*[\/\-&eE]?\s*PS4|PS5|PS4)\)?$/i;
