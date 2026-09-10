@@ -1423,6 +1423,10 @@ export default function AdminDashboard() {
   const gamesList = adminDigitalProductsQuery.data || [];
   const [gameSearchQuery, setGameSearchQuery] = useState("");
   const [stockSearchQuery, setStockSearchQuery] = useState("");
+  const [stockFilterMode, setStockFilterMode] = useState<"todos" | "com_pool" | "manual">("todos");
+  const [stockSortBy, setStockSortBy] = useState<"nome" | "estoque" | "pool">("nome");
+  const [stockSortDir, setStockSortDir] = useState<"asc" | "desc">("asc");
+  const LOW_STOCK_THRESHOLD = 3;
 
   // Usuários reais (Postgres) com atividade de verdade — a lista de "users" do Firestore
   // (usada em Gerenciar Acessos) nunca recebe lastSignedIn, então "Usuários Online" na
@@ -1608,6 +1612,43 @@ export default function AdminDashboard() {
       setShowBulkAccountsModal(false);
     }
   };
+
+  const toggleStockSort = (col: "nome" | "estoque" | "pool") => {
+    if (stockSortBy === col) {
+      setStockSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setStockSortBy(col);
+      setStockSortDir("asc");
+    }
+  };
+
+  const filteredStockGames = useMemo(() => {
+    const query = stockSearchQuery.trim().toLowerCase();
+    const withPool = gamesList.map((game: any) => ({
+      game,
+      poolInfo: accountsSummaryQuery.data?.[game.id] as { available: number; delivered: number } | undefined,
+    }));
+
+    const filtered = withPool.filter(({ game, poolInfo }) => {
+      if (query && !(game.name || "").toLowerCase().includes(query)) return false;
+      if (stockFilterMode === "com_pool" && !poolInfo) return false;
+      if (stockFilterMode === "manual" && poolInfo) return false;
+      return true;
+    });
+
+    const dir = stockSortDir === "asc" ? 1 : -1;
+    filtered.sort((a, b) => {
+      if (stockSortBy === "estoque") {
+        return (Number(a.game.stock ?? 0) - Number(b.game.stock ?? 0)) * dir;
+      }
+      if (stockSortBy === "pool") {
+        return ((a.poolInfo?.available ?? -1) - (b.poolInfo?.available ?? -1)) * dir;
+      }
+      return (a.game.name || "").localeCompare(b.game.name || "") * dir;
+    });
+
+    return filtered;
+  }, [gamesList, accountsSummaryQuery.data, stockSearchQuery, stockFilterMode, stockSortBy, stockSortDir]);
 
   const [showGameModal, setShowGameModal] = useState(false);
   const [gameName, setGameName] = useState("");
@@ -4591,84 +4632,120 @@ export default function AdminDashboard() {
                 📦 Cadastrar Contas em Lote
               </Button>
             </div>
-            <div className="relative mb-6 max-w-sm pl-4">
-              <Filter className="absolute left-7 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <Input
-                value={stockSearchQuery}
-                onChange={(e) => setStockSearchQuery(e.target.value)}
-                placeholder="Pesquisar jogo pelo nome..."
-                className="bg-slate-950 border-red-600/20 text-white pl-9"
-              />
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6 pl-4">
+              <div className="relative max-w-sm w-full">
+                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <Input
+                  value={stockSearchQuery}
+                  onChange={(e) => setStockSearchQuery(e.target.value)}
+                  placeholder="Pesquisar jogo pelo nome..."
+                  className="bg-slate-950 border-red-600/20 text-white pl-9"
+                />
+              </div>
+              <div className="flex gap-1.5 bg-slate-950 border border-slate-800 rounded-lg p-1 w-fit">
+                {([
+                  ["todos", "Todos"],
+                  ["com_pool", "Com Pool"],
+                  ["manual", "Manual"],
+                ] as const).map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setStockFilterMode(mode)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${
+                      stockFilterMode === mode ? "bg-red-600 text-white" : "text-slate-400 hover:bg-slate-800"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="overflow-x-auto rounded-xl border border-slate-800">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-slate-900 text-left text-[10px] uppercase tracking-wider text-slate-400 font-bold">
-                    <th className="p-3">Jogo</th>
+                    <th className="p-3 cursor-pointer select-none hover:text-white" onClick={() => toggleStockSort("nome")}>
+                      Jogo {stockSortBy === "nome" && (stockSortDir === "asc" ? "▲" : "▼")}
+                    </th>
                     <th className="p-3">Plataforma</th>
-                    <th className="p-3">Estoque</th>
-                    <th className="p-3">Pool de Contas</th>
+                    <th className="p-3 cursor-pointer select-none hover:text-white" onClick={() => toggleStockSort("estoque")}>
+                      Estoque {stockSortBy === "estoque" && (stockSortDir === "asc" ? "▲" : "▼")}
+                    </th>
+                    <th className="p-3 cursor-pointer select-none hover:text-white" onClick={() => toggleStockSort("pool")}>
+                      Pool de Contas {stockSortBy === "pool" && (stockSortDir === "asc" ? "▲" : "▼")}
+                    </th>
                     <th className="p-3"></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {[...gamesList]
-                    .filter((game: any) => (game.name || "").toLowerCase().includes(stockSearchQuery.trim().toLowerCase()))
-                    .sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""))
-                    .map((game: any) => {
-                      const poolInfo = accountsSummaryQuery.data?.[game.id];
-                      return (
-                        <tr key={game.id} className="border-t border-slate-800 hover:bg-slate-900/50">
-                          <td className="p-3">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-10 h-7 rounded bg-slate-800 overflow-hidden shrink-0 border border-slate-700">
-                                {game.imageUrl ? (
-                                  <img src={game.imageUrl} alt="" className="w-full h-full object-cover" />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center">
-                                    <Gamepad2 className="w-3.5 h-3.5 text-slate-600" />
-                                  </div>
-                                )}
-                              </div>
-                              <span className="text-white font-medium max-w-[200px] truncate" title={game.name}>{game.name}</span>
+                  {filteredStockGames.map(({ game, poolInfo }) => {
+                    const isLowStock = !!poolInfo && poolInfo.available > 0 && poolInfo.available <= LOW_STOCK_THRESHOLD;
+                    const isEmptyPool = !!poolInfo && poolInfo.available === 0;
+                    return (
+                      <tr
+                        key={game.id}
+                        className={`border-t border-slate-800 hover:bg-slate-900/50 ${
+                          isEmptyPool ? "bg-red-950/20" : isLowStock ? "bg-amber-950/10" : ""
+                        }`}
+                      >
+                        <td className="p-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-16 h-11 rounded-lg bg-slate-800 overflow-hidden shrink-0 border border-slate-700">
+                              {game.imageUrl ? (
+                                <img src={game.imageUrl} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <Gamepad2 className="w-5 h-5 text-slate-600" />
+                                </div>
+                              )}
                             </div>
-                          </td>
-                          <td className="p-3 text-slate-400">{game.platform || "—"}</td>
-                          <td className="p-3">
-                            <span className={`font-bold ${Number(game.stock ?? 0) <= 0 ? "text-red-400" : "text-slate-200"}`}>
-                              {game.stock ?? 0}
-                            </span>
-                          </td>
-                          <td className="p-3">
-                            {poolInfo ? (
-                              <span className="text-xs">
-                                <span className="text-green-400 font-bold">{poolInfo.available} disponíveis</span>
-                                {" · "}
-                                <span className="text-slate-500">{poolInfo.delivered} entregues</span>
+                            <span className="text-white font-medium max-w-[200px] truncate" title={game.name}>{game.name}</span>
+                          </div>
+                        </td>
+                        <td className="p-3 text-slate-400">{game.platform || "—"}</td>
+                        <td className="p-3">
+                          <span className={`font-bold ${Number(game.stock ?? 0) <= 0 ? "text-red-400" : "text-slate-200"}`}>
+                            {game.stock ?? 0}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          {poolInfo ? (
+                            <span className="text-xs flex items-center gap-1.5 flex-wrap">
+                              <span className={`font-bold ${isEmptyPool ? "text-red-400" : isLowStock ? "text-amber-400" : "text-green-400"}`}>
+                                {poolInfo.available} disponíveis
                               </span>
-                            ) : (
-                              <span className="text-xs text-slate-600">Entrega manual (sem pool)</span>
-                            )}
-                          </td>
-                          <td className="p-3 text-right">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openAccountsModal(game)}
-                              className="h-7 text-amber-400 hover:text-amber-300 hover:bg-amber-400/10 text-xs"
-                            >
-                              <Lock className="w-3 h-3 mr-1" /> Gerenciar
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                              <span className="text-slate-500">· {poolInfo.delivered} entregues</span>
+                              {isEmptyPool && (
+                                <span className="bg-red-600/20 border border-red-600/40 text-red-400 text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase">Estoque zerado</span>
+                              )}
+                              {isLowStock && (
+                                <span className="bg-amber-600/20 border border-amber-600/40 text-amber-400 text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase">Estoque baixo</span>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-600">Entrega manual (sem pool)</span>
+                          )}
+                        </td>
+                        <td className="p-3 text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openAccountsModal(game)}
+                            className="h-7 text-amber-400 hover:text-amber-300 hover:bg-amber-400/10 text-xs"
+                          >
+                            <Lock className="w-3 h-3 mr-1" /> Gerenciar
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
               {gamesList.length === 0 ? (
                 <p className="text-center text-slate-500 text-sm py-8">Nenhum jogo cadastrado ainda.</p>
-              ) : gamesList.filter((game: any) => (game.name || "").toLowerCase().includes(stockSearchQuery.trim().toLowerCase())).length === 0 && (
-                <p className="text-center text-slate-500 text-sm py-8">Nenhum jogo encontrado para "{stockSearchQuery}".</p>
+              ) : filteredStockGames.length === 0 && (
+                <p className="text-center text-slate-500 text-sm py-8">Nenhum jogo encontrado.</p>
               )}
             </div>
           </TabsContent>
