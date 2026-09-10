@@ -1014,12 +1014,14 @@ async function attemptAutoDeliverDigitalOrder(database, params) {
     return { delivered: false };
   }
   console.log(`[AutoDeliver] Pedido #${orderId}: conta reivindicada do pool (${account.email}), atualizando pedido...`);
-  const deliveryDetails = `\u{1F3AE} Sua conta foi liberada automaticamente!
+  const deliveryDetails = `\u{1F3AE} Obrigado por comprar na EforteGames!
+
+Segue o acesso da sua conta \u2014 \xE9 s\xF3 entrar e aproveitar:
 
 \u{1F4E7} Email: ${account.email}
 \u{1F511} Senha: ${account.password}
 
-Qualquer d\xFAvida ou problema para acessar, voc\xEA encontra v\xEDdeos de ajuda e o contato do nosso suporte na p\xE1gina "Minhas Compras" do site.`;
+Qualquer d\xFAvida ou problema pra acessar, voc\xEA encontra v\xEDdeos de ajuda e o contato do nosso suporte logo abaixo. Bom jogo! \u{1F525}`;
   const updateResult = await database.update(orders).set({ deliveryDetails, status: "enviado" }).where(eq(orders.id, orderId)).returning({ id: orders.id });
   if (updateResult.length === 0) {
     console.error(`[AutoDeliver] CR\xCDTICO: pedido #${orderId} n\xE3o encontrado ao tentar salvar a entrega. Conta consumida do pool do jogo #${digitalProductId}: ${account.email} / ${account.password}`);
@@ -2554,7 +2556,16 @@ function registerPaymentRoute(app2) {
         if (phone) {
           insertValues.buyerPhone = phone;
         }
-        const [insertedOrder] = await database.insert(orders).values(insertValues).returning({ id: orders.id });
+        let insertedOrder;
+        try {
+          [insertedOrder] = await database.insert(orders).values(insertValues).returning({ id: orders.id });
+        } catch (insertErr) {
+          if (insertErr?.code === "23505" || String(insertErr?.message || "").includes("orders_paymentid_unique")) {
+            console.log(`[Mercado Pago Webhook] Pagamento #${paymentId} j\xE1 inserido por outra requisi\xE7\xE3o concorrente \u2014 ignorando.`);
+            return res.status(200).json({ received: true, duplicate: true });
+          }
+          throw insertErr;
+        }
         if (buyerId > 0) {
           const userResult = await database.select().from(users).where(eq3(users.id, buyerId)).limit(1);
           if (userResult.length > 0) {

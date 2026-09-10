@@ -57,7 +57,10 @@ export default function SellerChatDialog({
     sellerName || (resolvedSellerId === STORE_SELLER_ID ? STORE_SELLER_NAME : "Vendedor");
   const isStoreThread = resolvedSellerId === STORE_SELLER_ID;
   const isOwnListing = Boolean(user?.id && sellerId && user.id === sellerId);
-  const isOrder = Boolean(productId && productId.startsWith("pedido-"));
+  // productId é tipado como string, mas várias telas passam product.id (number) direto —
+  // sem o String() aqui, .startsWith quebra com "d.startsWith is not a function" ao abrir
+  // o chat a partir de qualquer produto (não só de um pedido).
+  const isOrder = Boolean(productId && String(productId).startsWith("pedido-"));
 
   const threadId = useMemo(() => {
     if (!user?.id) return null;
