@@ -5769,12 +5769,25 @@ export default function AdminDashboard() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-slate-800">
                 <div className="space-y-2">
                   <Label className="text-xs text-slate-300 font-bold">Vídeo de Ajuda #1 (mostrado em "Minhas Compras")</Label>
-                  <Input
-                    value={supportSettingsInput.deliveryHelpVideo1Url}
-                    onChange={(e) => setSupportSettingsInput({ ...supportSettingsInput, deliveryHelpVideo1Url: e.target.value })}
-                    placeholder="Ex: https://youtube.com/watch?v=..."
-                    className="bg-slate-950 border-slate-800 text-white text-xs h-10 font-mono"
-                  />
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={supportSettingsInput.deliveryHelpVideo1Url}
+                      onChange={(e) => setSupportSettingsInput({ ...supportSettingsInput, deliveryHelpVideo1Url: e.target.value })}
+                      placeholder="Ex: https://youtube.com/watch?v=..."
+                      className="bg-slate-950 border-slate-800 text-white text-xs h-10 font-mono"
+                    />
+                    {supportSettingsInput.deliveryHelpVideo1Url && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSupportSettingsInput({ ...supportSettingsInput, deliveryHelpVideo1Url: "" })}
+                        className="text-red-400 hover:text-red-300 hover:bg-red-400/10 shrink-0 h-10"
+                      >
+                        Remover
+                      </Button>
+                    )}
+                  </div>
                   <Input
                     type="file"
                     accept="video/*"
@@ -5787,12 +5800,25 @@ export default function AdminDashboard() {
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs text-slate-300 font-bold">Vídeo de Ajuda #2 (mostrado em "Minhas Compras")</Label>
-                  <Input
-                    value={supportSettingsInput.deliveryHelpVideo2Url}
-                    onChange={(e) => setSupportSettingsInput({ ...supportSettingsInput, deliveryHelpVideo2Url: e.target.value })}
-                    placeholder="Ex: https://youtube.com/watch?v=..."
-                    className="bg-slate-950 border-slate-800 text-white text-xs h-10 font-mono"
-                  />
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={supportSettingsInput.deliveryHelpVideo2Url}
+                      onChange={(e) => setSupportSettingsInput({ ...supportSettingsInput, deliveryHelpVideo2Url: e.target.value })}
+                      placeholder="Ex: https://youtube.com/watch?v=..."
+                      className="bg-slate-950 border-slate-800 text-white text-xs h-10 font-mono"
+                    />
+                    {supportSettingsInput.deliveryHelpVideo2Url && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSupportSettingsInput({ ...supportSettingsInput, deliveryHelpVideo2Url: "" })}
+                        className="text-red-400 hover:text-red-300 hover:bg-red-400/10 shrink-0 h-10"
+                      >
+                        Remover
+                      </Button>
+                    )}
+                  </div>
                   <Input
                     type="file"
                     accept="video/*"
