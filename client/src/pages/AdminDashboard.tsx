@@ -32,6 +32,7 @@ import {
   playNotificationChime,
   requestNotificationPermission,
   getNotificationPermission,
+  initAudioUnlock,
   NotificationPermissionState,
 } from "@/lib/soundAndNotifications";
 
@@ -2454,6 +2455,12 @@ export default function AdminDashboard() {
     }
   });
 
+  // Destrava o áudio no primeiro clique/tecla do gestor no painel — sem isso, o aviso
+  // sonoro de pedido novo pode não tocar (navegador bloqueia autoplay sem gesto do usuário).
+  useEffect(() => {
+    initAudioUnlock();
+  }, []);
+
   const handleToggleOrRequestNotifs = async () => {
     if (permState !== "granted") {
       const granted = await requestNotificationPermission();
@@ -3563,11 +3570,11 @@ export default function AdminDashboard() {
               {permState !== "granted" && (
                 <button
                   onClick={handleToggleOrRequestNotifs}
-                  className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-950/40 hover:bg-red-900/50 border border-red-500/30 text-red-300 text-xs font-bold transition-all animate-pulse"
-                  title="Clique para ativar pop-ups no Windows e avisos sonoros"
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-red-950/40 hover:bg-red-900/50 border border-red-500/30 text-red-300 text-[10px] sm:text-xs font-bold transition-all animate-pulse shrink-0"
+                  title="Clique para ativar pop-ups e avisos sonoros de pedido novo"
                 >
                   <span>🔔</span>
-                  <span>Ativar Alertas Windows</span>
+                  <span>Ativar Alertas</span>
                 </button>
               )}
               <button

@@ -12,6 +12,7 @@ import MobileBottomNav from "./components/MobileBottomNav";
 import CPFCompletionModal from "./components/CPFCompletionModal";
 import TermsAcceptanceModal from "./components/TermsAcceptanceModal";
 import OrderDeliveredNotifier from "./components/OrderDeliveredNotifier";
+import { initAudioUnlock } from "./lib/soundAndNotifications";
 
 import { lazy, Suspense, useEffect, useState } from "react";
 import MaintenanceScreen from "./components/MaintenanceScreen";
@@ -83,6 +84,14 @@ function Router() {
 function App() {
   const { isAdmin, loading: isAuthLoading } = useAuth();
   const [maintenanceConfig, setMaintenanceConfig] = useState<any>(null);
+
+  // Destrava o áudio no primeiro clique/tecla/toque em qualquer lugar do site — sem isso,
+  // o navegador bloqueia o som dos avisos automáticos (pedido entregue, novo pedido no
+  // admin) por não ter um gesto do usuário por trás. Uma vez destravado, fica valendo
+  // pro resto da sessão, mesmo pros avisos que disparam sozinhos depois.
+  useEffect(() => {
+    initAudioUnlock();
+  }, []);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "settings", "maintenance"), (docSnap) => {

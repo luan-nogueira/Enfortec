@@ -12,15 +12,58 @@ export function getNotificationPermission(): NotificationPermissionState {
   return Notification.permission as NotificationPermissionState;
 }
 
+// Contexto de áudio único e reaproveitado — navegadores só deixam iniciar/retomar um
+// AudioContext em resposta direta a um gesto do usuário (clique, tecla). Se cada aviso
+// automático de pedido novo criasse um AudioContext do zero (como era antes), ele nascia
+// "suspended" e o resume() falhava silenciosamente, porque não tem gesto nenhum por trás
+// de um alerta disparado sozinho ao chegar um pedido — daí o "não apita" mesmo com o som
+// ativado. A solução é manter UM contexto vivo, destravado no primeiro clique/tecla que
+// o gestor der em qualquer lugar da página (ver initAudioUnlock), e reaproveitar ele pra
+// sempre — depois de destravado uma vez, ele continua tocável mesmo sem gesto novo.
+let sharedAudioCtx: AudioContext | null = null;
+let audioUnlockInitialized = false;
+
+function getSharedAudioContext(): AudioContext | null {
+  const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+  if (!AudioCtx) return null;
+  if (!sharedAudioCtx || sharedAudioCtx.state === "closed") {
+    sharedAudioCtx = new AudioCtx();
+  }
+  return sharedAudioCtx;
+}
+
+/**
+ * Destrava o áudio assim que o usuário interagir pela primeira vez com a página (clique,
+ * toque ou tecla) — chamar uma vez ao montar o painel admin. Sem isso, o primeiro aviso
+ * sonoro automático de um pedido novo pode não tocar por causa da política de autoplay.
+ */
+export function initAudioUnlock() {
+  if (audioUnlockInitialized || typeof document === "undefined") return;
+  audioUnlockInitialized = true;
+
+  const unlock = () => {
+    const ctx = getSharedAudioContext();
+    if (ctx && ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
+    document.removeEventListener("click", unlock);
+    document.removeEventListener("keydown", unlock);
+    document.removeEventListener("touchstart", unlock);
+  };
+
+  document.addEventListener("click", unlock);
+  document.addEventListener("keydown", unlock);
+  document.addEventListener("touchstart", unlock);
+}
+
 /**
  * Toca um som harmônico cristalino e moderno (estilo Slack/WhatsApp)
  * usando a Web Audio API, sem depender de arquivos externos.
  */
 export function playNotificationChime() {
   try {
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
+    const ctx = getSharedAudioContext();
+    if (!ctx) return;
 
     if (ctx.state === "suspended") {
       ctx.resume().catch(() => {});
