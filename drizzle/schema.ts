@@ -152,13 +152,26 @@ export const digitalProductAccounts = pgTable("digitalProductAccounts", {
   email: varchar("email", { length: 255 }).notNull(),
   password: varchar("password", { length: 255 }).notNull(),
   status: varchar("status", { length: 20 }).default("disponivel").notNull(),
-  // "primaria" | "secundaria" | null — jogos com as duas modalidades usam pools separados
-  // (emails diferentes) pra nunca entregar a conta errada; null = pool único (jogo sem
-  // divisão primária/secundária, ou conta cadastrada antes dessa coluna existir).
+  // "primaria" | "secundaria" | null — legado: contas cadastradas antes do modelo de cota
+  // abaixo, que só suportam 1 venda cada (ver fallback em claimDigitalProductAccount).
   accountType: varchar("accountType", { length: 20 }),
   orderId: integer("orderId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   deliveredAt: timestamp("deliveredAt"),
+  // Modelo de cota: uma mesma conta (email/senha) pode ser revendida várias vezes até
+  // estourar o limite de ativações que ela realmente aguenta, sem misturar plataforma.
+  // Preenchido automaticamente no cadastro com base na plataforma do jogo (ver
+  // computeAccountCaps em server/db.ts) — regra fixa: jogo de 1 plataforma = 2 primárias
+  // (daquela plataforma) + 1 secundária; jogo PS4/PS5 combinado = até 2 primárias por
+  // console, 3 no total combinado, + 1 secundária que vale pra qualquer uma das duas.
+  // cap = quanto a conta aguenta vender daquele tipo; used = quanto já foi vendido.
+  capPrimariaPs4: integer("capPrimariaPs4").default(0).notNull(),
+  capPrimariaPs5: integer("capPrimariaPs5").default(0).notNull(),
+  capPrimariaTotal: integer("capPrimariaTotal").default(0).notNull(),
+  capSecundaria: integer("capSecundaria").default(0).notNull(),
+  usedPrimariaPs4: integer("usedPrimariaPs4").default(0).notNull(),
+  usedPrimariaPs5: integer("usedPrimariaPs5").default(0).notNull(),
+  usedSecundaria: integer("usedSecundaria").default(0).notNull(),
 });
 
 export type DigitalProductAccount = typeof digitalProductAccounts.$inferSelect;

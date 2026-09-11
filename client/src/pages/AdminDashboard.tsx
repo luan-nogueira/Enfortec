@@ -6665,10 +6665,10 @@ export default function AdminDashboard() {
           <div className="space-y-4 py-2">
             <div className="flex items-center gap-3 text-xs font-bold">
               <span className="bg-green-950/50 border border-green-800/50 text-green-400 px-2.5 py-1 rounded-full">
-                {accountsListQuery.data?.available.length ?? 0} disponíveis
+                {(accountsListQuery.data?.available ?? []).reduce((sum: number, a: any) => sum + (a.isQuota ? a.remainingPrimariaPs4 + a.remainingPrimariaPs5 + a.remainingSecundaria : 1), 0)} vendas disponíveis
               </span>
               <span className="bg-slate-800 border border-slate-700 text-slate-300 px-2.5 py-1 rounded-full">
-                {accountsListQuery.data?.deliveredCount ?? 0} já entregues
+                {accountsListQuery.data?.deliveredCount ?? 0} já vendidas
               </span>
             </div>
 
@@ -6710,7 +6710,7 @@ export default function AdminDashboard() {
                     {addAccountsMutation.isPending ? "Adicionando..." : "Adicionar Secundárias"}
                   </Button>
                 </div>
-                <p className="text-[10px] text-slate-500 col-span-full -mt-1">Uma conta por linha, no formato email:senha (ou email;senha). Esse jogo tem preço de conta secundária configurado, então primária e secundária usam pools de e-mail separados — na compra, o cliente só recebe a credencial do tipo que ele pagou.</p>
+                <p className="text-[10px] text-slate-500 col-span-full -mt-1">Uma conta por linha, no formato email:senha (ou email;senha). Cada conta cadastrada é revendida automaticamente várias vezes até estourar a cota (2 primárias por console + 1 secundária, ou 3 primárias no total se o jogo for PS4/PS5 combinado) — o cliente sempre recebe a credencial do tipo certo que ele pagou, sem misturar plataforma.</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -6745,7 +6745,19 @@ export default function AdminDashboard() {
                   {accountsListQuery.data?.available.map((acc: any) => (
                     <div key={acc.id} className="flex items-center justify-between gap-2 bg-slate-950/60 border border-slate-800 rounded-lg px-3 py-1.5">
                       <span className="flex items-center gap-2 min-w-0">
-                        {accountsModalGame?.hasSecondary && (
+                        {acc.isQuota ? (
+                          <span className="flex items-center gap-1 shrink-0">
+                            {acc.remainingPrimariaPs4 > 0 && (
+                              <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-blue-950/60 text-blue-300">👤PS4 {acc.remainingPrimariaPs4}</span>
+                            )}
+                            {acc.remainingPrimariaPs5 > 0 && (
+                              <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-blue-950/60 text-blue-300">👤PS5 {acc.remainingPrimariaPs5}</span>
+                            )}
+                            {acc.remainingSecundaria > 0 && (
+                              <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-purple-950/60 text-purple-300">👥Sec {acc.remainingSecundaria}</span>
+                            )}
+                          </span>
+                        ) : accountsModalGame?.hasSecondary && (
                           <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${
                             acc.accountType === "secundaria" ? "bg-purple-950/60 text-purple-300" :
                             acc.accountType === "primaria" ? "bg-blue-950/60 text-blue-300" :

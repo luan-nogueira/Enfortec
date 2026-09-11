@@ -355,6 +355,7 @@ export function registerPaymentRoute(app: Express) {
               buyerId,
               productName: productNameStr,
               accountType,
+              consoleType: resolvedConsoleType || null,
             });
           } catch (autoDeliverErr) {
             console.error("[Checkout] Erro na entrega automática de conta:", autoDeliverErr);
@@ -414,6 +415,7 @@ export function registerPaymentRoute(app: Express) {
           product_name: productNameStr,
           buyer_phone: customerPhone || null,
           account_type: accountType || null,
+          console_type: resolvedConsoleType || null,
           quantity: Number(quantity) || 1,
         },
         statement_descriptor: "ENFORTEC GAMES",
@@ -551,6 +553,7 @@ export function registerPaymentRoute(app: Express) {
       const productName = metadata.product_name || paymentData.description || "Produto Enfortec Games";
       const phone = metadata.buyer_phone || null;
       const accountType = metadata.account_type || null;
+      const consoleType = metadata.console_type || null;
       const quantity = Number(metadata.quantity) || 1;
 
       const database = await db.getDb();
@@ -704,6 +707,7 @@ export function registerPaymentRoute(app: Express) {
               buyerId,
               productName,
               accountType,
+              consoleType,
             });
           } catch (autoDeliverErr) {
             console.error("[Mercado Pago Webhook] Erro na entrega automática de conta:", autoDeliverErr);

@@ -683,45 +683,124 @@ export async function deliverOrder(orderId: number, deliveryDetails: string) {
  * o pool, ou o estoque zerou) — quem chama deve tratar null como "sem entrega
  * automática, segue pro fluxo manual existente".
  */
+/**
+ * Regra fixa de quantas vezes uma mesma conta (email/senha) pode ser revendida sem
+ * misturar plataforma — combinada com Andre: jogo de 1 plataforma = 2 primárias (daquela
+ * plataforma) + 1 secundária; jogo PS4/PS5 combinado = até 2 primárias por console (3 no
+ * total combinado, a 3ª reservada pro console que ainda não vendeu nenhuma) + 1 secundária
+ * que vale pra qualquer uma das duas plataformas, vendida só 1 vez.
+ */
+function computeAccountCaps(platform: string | null | undefined, accountType: "primaria" | "secundaria") {
+  if (accountType === "secundaria") {
+    return { capPrimariaPs4: 0, capPrimariaPs5: 0, capPrimariaTotal: 0, capSecundaria: 1 };
+  }
+  const p = (platform || "").toUpperCase();
+  const isPs4Only = p.includes("PS4") && !p.includes("PS5");
+  const isPs5Only = p.includes("PS5") && !p.includes("PS4");
+  if (isPs4Only) return { capPrimariaPs4: 2, capPrimariaPs5: 0, capPrimariaTotal: 2, capSecundaria: 0 };
+  if (isPs5Only) return { capPrimariaPs4: 0, capPrimariaPs5: 2, capPrimariaTotal: 2, capSecundaria: 0 };
+  // Sem plataforma definida ou "PS4/PS5" explícito = jogo combinado (mesmo critério do
+  // seletor de console na loja — ver getGamePlatform em client/src/pages/DigitalMedia.tsx).
+  return { capPrimariaPs4: 2, capPrimariaPs5: 2, capPrimariaTotal: 3, capSecundaria: 0 };
+}
+
 export async function claimDigitalProductAccount(
   database: any,
   digitalProductId: number,
   orderId: number,
-  accountType?: string | null
+  accountType?: string | null,
+  consoleType?: string | null
 ): Promise<{ email: string; password: string } | null> {
-  // Quando o pedido tem tipo (primária/secundária), prioriza uma conta cadastrada com
-  // esse mesmo tipo e só recorre a uma conta sem tipo (pool antigo, de antes dessa
-  // distinção existir) se não houver nenhuma da modalidade certa — nunca entrega uma
-  // conta marcada com o tipo OPOSTO. Sem tipo no pedido (jogo sem divisão), só pega
-  // contas igualmente sem tipo, pra não invadir o pool reservado de um tipo específico.
-  const claimResult: any = accountType
-    ? await database.execute(sql`
-        UPDATE "digitalProductAccounts"
-        SET status = 'entregue', "orderId" = ${orderId}, "deliveredAt" = now()
-        WHERE id = (
-          SELECT id FROM "digitalProductAccounts"
-          WHERE "digitalProductId" = ${digitalProductId} AND status = 'disponivel'
-            AND ("accountType" = ${accountType} OR "accountType" IS NULL)
-          ORDER BY ("accountType" IS NULL) ASC, id ASC
-          LIMIT 1
-          FOR UPDATE SKIP LOCKED
-        )
-        RETURNING id, email, password
-      `)
-    : await database.execute(sql`
-        UPDATE "digitalProductAccounts"
-        SET status = 'entregue', "orderId" = ${orderId}, "deliveredAt" = now()
-        WHERE id = (
-          SELECT id FROM "digitalProductAccounts"
-          WHERE "digitalProductId" = ${digitalProductId} AND status = 'disponivel' AND "accountType" IS NULL
-          ORDER BY id ASC
-          LIMIT 1
-          FOR UPDATE SKIP LOCKED
-        )
-        RETURNING id, email, password
-      `);
-  const claimedRows: any[] = Array.isArray(claimResult) ? claimResult : (claimResult?.rows ?? []);
-  const claimed = claimedRows[0];
+  // 1) Modelo de cota: conta pode ser revendida várias vezes até estourar o limite de
+  // ativações que ela aguenta. Tentado primeiro — cobre toda conta cadastrada depois
+  // dessa feature existir (capPrimariaTotal/capSecundaria > 0).
+  let claimResult: any = null;
+  if (accountType === "secundaria") {
+    claimResult = await database.execute(sql`
+      UPDATE "digitalProductAccounts"
+      SET "usedSecundaria" = "usedSecundaria" + 1
+      WHERE id = (
+        SELECT id FROM "digitalProductAccounts"
+        WHERE "digitalProductId" = ${digitalProductId}
+          AND "capSecundaria" > 0 AND "usedSecundaria" < "capSecundaria"
+        ORDER BY id ASC
+        LIMIT 1
+        FOR UPDATE SKIP LOCKED
+      )
+      RETURNING id, email, password
+    `);
+  } else if (accountType === "primaria" && (consoleType === "PS4" || consoleType === "PS5")) {
+    claimResult = consoleType === "PS4"
+      ? await database.execute(sql`
+          UPDATE "digitalProductAccounts"
+          SET "usedPrimariaPs4" = "usedPrimariaPs4" + 1
+          WHERE id = (
+            SELECT id FROM "digitalProductAccounts"
+            WHERE "digitalProductId" = ${digitalProductId}
+              AND "capPrimariaTotal" > 0
+              AND ("usedPrimariaPs4" + "usedPrimariaPs5") < "capPrimariaTotal"
+              AND "usedPrimariaPs4" < "capPrimariaPs4"
+            ORDER BY id ASC
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
+          )
+          RETURNING id, email, password
+        `)
+      : await database.execute(sql`
+          UPDATE "digitalProductAccounts"
+          SET "usedPrimariaPs5" = "usedPrimariaPs5" + 1
+          WHERE id = (
+            SELECT id FROM "digitalProductAccounts"
+            WHERE "digitalProductId" = ${digitalProductId}
+              AND "capPrimariaTotal" > 0
+              AND ("usedPrimariaPs4" + "usedPrimariaPs5") < "capPrimariaTotal"
+              AND "usedPrimariaPs5" < "capPrimariaPs5"
+            ORDER BY id ASC
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
+          )
+          RETURNING id, email, password
+        `);
+  }
+  let claimedRows: any[] = claimResult ? (Array.isArray(claimResult) ? claimResult : (claimResult?.rows ?? [])) : [];
+  let claimed = claimedRows[0];
+
+  // 2) Fallback pro modelo antigo (uso único), só pra contas cadastradas antes da cota
+  // existir (capPrimariaTotal = 0 AND capSecundaria = 0) — nunca reusa uma conta de cota
+  // por esse caminho, senão ela seria marcada "entregue" pra sempre no primeiro uso.
+  if (!claimed) {
+    const legacyResult: any = accountType
+      ? await database.execute(sql`
+          UPDATE "digitalProductAccounts"
+          SET status = 'entregue', "orderId" = ${orderId}, "deliveredAt" = now()
+          WHERE id = (
+            SELECT id FROM "digitalProductAccounts"
+            WHERE "digitalProductId" = ${digitalProductId} AND status = 'disponivel'
+              AND "capPrimariaTotal" = 0 AND "capSecundaria" = 0
+              AND ("accountType" = ${accountType} OR "accountType" IS NULL)
+            ORDER BY ("accountType" IS NULL) ASC, id ASC
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
+          )
+          RETURNING id, email, password
+        `)
+      : await database.execute(sql`
+          UPDATE "digitalProductAccounts"
+          SET status = 'entregue', "orderId" = ${orderId}, "deliveredAt" = now()
+          WHERE id = (
+            SELECT id FROM "digitalProductAccounts"
+            WHERE "digitalProductId" = ${digitalProductId} AND status = 'disponivel' AND "accountType" IS NULL
+              AND "capPrimariaTotal" = 0 AND "capSecundaria" = 0
+            ORDER BY id ASC
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
+          )
+          RETURNING id, email, password
+        `);
+    const legacyRows: any[] = Array.isArray(legacyResult) ? legacyResult : (legacyResult?.rows ?? []);
+    claimed = legacyRows[0];
+  }
+
   if (!claimed) return null;
 
   await syncDigitalProductAccountStock(database, digitalProductId);
@@ -738,11 +817,22 @@ export async function claimDigitalProductAccount(
  */
 export async function attemptAutoDeliverDigitalOrder(
   database: any,
-  params: { orderId: number; digitalProductId: number; buyerId: number; productName: string; accountType?: string | null }
+  params: { orderId: number; digitalProductId: number; buyerId: number; productName: string; accountType?: string | null; consoleType?: string | null }
 ) {
   const { orderId, digitalProductId, buyerId, productName, accountType } = params;
+  let { consoleType } = params;
 
-  const account = await claimDigitalProductAccount(database, digitalProductId, orderId, accountType);
+  // Jogo de 1 plataforma só: a plataforma já é conhecida pelo cadastro do jogo, então não
+  // depende do cliente ter mandado consoleType certo no checkout (nem existe seletor de
+  // console pra ele escolher nesse caso).
+  if (accountType === "primaria" && consoleType !== "PS4" && consoleType !== "PS5") {
+    const prodRows = await database.select({ platform: digitalProducts.platform }).from(digitalProducts).where(eq(digitalProducts.id, digitalProductId)).limit(1);
+    const platform = (prodRows[0]?.platform || "").toUpperCase();
+    if (platform.includes("PS4") && !platform.includes("PS5")) consoleType = "PS4";
+    else if (platform.includes("PS5") && !platform.includes("PS4")) consoleType = "PS5";
+  }
+
+  const account = await claimDigitalProductAccount(database, digitalProductId, orderId, accountType, consoleType);
   if (!account) {
     console.log(`[AutoDeliver] Pedido #${orderId}: sem conta disponível no pool do jogo #${digitalProductId} — segue pro fluxo manual.`);
     return { delivered: false as const };
@@ -784,19 +874,38 @@ export async function attemptAutoDeliverDigitalOrder(
   return { delivered: true as const, deliveryDetails };
 }
 
-/** Recalcula digitalProducts.stock a partir da contagem real de contas "disponivel". */
+/**
+ * Recalcula digitalProducts.stock a partir da capacidade real restante: contas de cota
+ * somam o que ainda resta de primária+secundária (nunca contam como "disponível" só por
+ * status, já que esse fica sempre 'disponivel' mesmo depois de esgotada); contas do
+ * modelo antigo contam 1 se ainda não foram entregues.
+ */
 async function syncDigitalProductAccountStock(database: any, digitalProductId: number) {
   const countResult: any = await database.execute(sql`
-    SELECT COUNT(*)::int AS count FROM "digitalProductAccounts"
-    WHERE "digitalProductId" = ${digitalProductId} AND status = 'disponivel'
+    SELECT COALESCE(SUM(
+      CASE
+        WHEN "capPrimariaTotal" > 0 OR "capSecundaria" > 0 THEN
+          GREATEST(0, "capPrimariaTotal" - ("usedPrimariaPs4" + "usedPrimariaPs5"))
+          + GREATEST(0, "capSecundaria" - "usedSecundaria")
+        WHEN status = 'disponivel' THEN 1
+        ELSE 0
+      END
+    ), 0)::int AS remaining
+    FROM "digitalProductAccounts"
+    WHERE "digitalProductId" = ${digitalProductId}
   `);
   const countRows: any[] = Array.isArray(countResult) ? countResult : (countResult?.rows ?? []);
-  const remaining = countRows[0]?.count ?? 0;
+  const remaining = countRows[0]?.remaining ?? 0;
   await database.update(digitalProducts).set({ stock: remaining }).where(eq(digitalProducts.id, digitalProductId));
   return remaining;
 }
 
-/** Resumo do pool de contas de TODOS os jogos de uma vez (pra aba "Estoque" do admin), sem N+1. */
+/**
+ * Resumo do pool de contas de TODOS os jogos de uma vez (pra aba "Estoque" do admin), sem
+ * N+1. "available" = capacidade restante de venda (não conta de linhas — uma conta de
+ * cota vai perdendo capacidade conforme vende, mesmo com status ainda 'disponivel');
+ * "delivered" = unidades já vendidas (soma dos usos de cota + entregas do modelo antigo).
+ */
 export async function listDigitalProductAccountsSummary(): Promise<
   Record<number, { available: number; delivered: number }>
 > {
@@ -805,8 +914,17 @@ export async function listDigitalProductAccountsSummary(): Promise<
 
   const result: any = await database.execute(sql`
     SELECT "digitalProductId" AS "digitalProductId",
-      COUNT(*) FILTER (WHERE status = 'disponivel')::int AS available,
-      COUNT(*) FILTER (WHERE status = 'entregue')::int AS delivered
+      COALESCE(SUM(
+        CASE
+          WHEN "capPrimariaTotal" > 0 OR "capSecundaria" > 0 THEN
+            GREATEST(0, "capPrimariaTotal" - ("usedPrimariaPs4" + "usedPrimariaPs5"))
+            + GREATEST(0, "capSecundaria" - "usedSecundaria")
+          WHEN status = 'disponivel' THEN 1
+          ELSE 0
+        END
+      ), 0)::int AS available,
+      COALESCE(SUM("usedPrimariaPs4" + "usedPrimariaPs5" + "usedSecundaria"), 0)::int
+        + COUNT(*) FILTER (WHERE status = 'entregue' AND "capPrimariaTotal" = 0 AND "capSecundaria" = 0)::int AS delivered
     FROM "digitalProductAccounts"
     GROUP BY "digitalProductId"
   `);
@@ -819,31 +937,57 @@ export async function listDigitalProductAccountsSummary(): Promise<
   return summary;
 }
 
-/** Lista as contas do pool de um jogo: disponíveis (com credenciais) + contagem de entregues. */
+/**
+ * Lista as contas do pool de um jogo: disponíveis (com credenciais + capacidade restante
+ * por tipo/plataforma) + contagem de unidades já entregues daquela conta.
+ */
 export async function listDigitalProductAccounts(digitalProductId: number) {
   const database = getDb();
   if (!database) throw new Error("Database not available");
 
-  const available = await database
-    .select({
-      id: digitalProductAccounts.id,
-      email: digitalProductAccounts.email,
-      password: digitalProductAccounts.password,
-      accountType: digitalProductAccounts.accountType,
-    })
-    .from(digitalProductAccounts)
-    .where(and(eq(digitalProductAccounts.digitalProductId, digitalProductId), eq(digitalProductAccounts.status, "disponivel")))
-    .orderBy(digitalProductAccounts.id);
+  const availableResult: any = await database.execute(sql`
+    SELECT id, email, password, "accountType",
+      "capPrimariaPs4", "capPrimariaPs5", "capPrimariaTotal", "capSecundaria",
+      "usedPrimariaPs4", "usedPrimariaPs5", "usedSecundaria"
+    FROM "digitalProductAccounts"
+    WHERE "digitalProductId" = ${digitalProductId}
+      AND (
+        ("capPrimariaTotal" > 0 AND ("usedPrimariaPs4" + "usedPrimariaPs5") < "capPrimariaTotal")
+        OR ("capSecundaria" > 0 AND "usedSecundaria" < "capSecundaria")
+        OR ("capPrimariaTotal" = 0 AND "capSecundaria" = 0 AND status = 'disponivel')
+      )
+    ORDER BY id ASC
+  `);
+  const availableRows: any[] = Array.isArray(availableResult) ? availableResult : (availableResult?.rows ?? []);
+  const available = availableRows.map((r) => ({
+    id: r.id,
+    email: r.email,
+    password: r.password,
+    accountType: r.accountType,
+    isQuota: r.capPrimariaTotal > 0 || r.capSecundaria > 0,
+    remainingPrimariaPs4: Math.max(0, r.capPrimariaPs4 - r.usedPrimariaPs4),
+    remainingPrimariaPs5: Math.max(0, r.capPrimariaPs5 - r.usedPrimariaPs5),
+    remainingSecundaria: Math.max(0, r.capSecundaria - r.usedSecundaria),
+  }));
 
-  const deliveredCountResult = await database
-    .select({ count: sql<number>`count(*)::int` })
-    .from(digitalProductAccounts)
-    .where(and(eq(digitalProductAccounts.digitalProductId, digitalProductId), eq(digitalProductAccounts.status, "entregue")));
+  const deliveredResult: any = await database.execute(sql`
+    SELECT
+      COALESCE(SUM("usedPrimariaPs4" + "usedPrimariaPs5" + "usedSecundaria"), 0)::int
+        + COUNT(*) FILTER (WHERE status = 'entregue' AND "capPrimariaTotal" = 0 AND "capSecundaria" = 0)::int AS delivered
+    FROM "digitalProductAccounts"
+    WHERE "digitalProductId" = ${digitalProductId}
+  `);
+  const deliveredRows: any[] = Array.isArray(deliveredResult) ? deliveredResult : (deliveredResult?.rows ?? []);
 
-  return { available, deliveredCount: deliveredCountResult[0]?.count ?? 0 };
+  return { available, deliveredCount: deliveredRows[0]?.delivered ?? 0 };
 }
 
-/** Adiciona várias contas de uma vez (uma por linha, "email:senha" ou "email;senha"). */
+/**
+ * Adiciona várias contas de uma vez (uma por linha, "email:senha" ou "email;senha").
+ * Quando accountType é informado, cada conta nasce com a cota fixa correspondente
+ * (ver computeAccountCaps) calculada a partir da plataforma cadastrada do jogo — uma
+ * mesma conta poderá então ser vendida mais de uma vez, até estourar essa cota.
+ */
 export async function addDigitalProductAccountsBulk(digitalProductId: number, rawText: string, accountType?: string | null) {
   const database = getDb();
   if (!database) throw new Error("Database not available");
@@ -862,8 +1006,14 @@ export async function addDigitalProductAccountsBulk(digitalProductId: number, ra
 
   if (rows.length === 0) return { inserted: 0, available: 0 };
 
+  let caps = { capPrimariaPs4: 0, capPrimariaPs5: 0, capPrimariaTotal: 0, capSecundaria: 0 };
+  if (accountType === "primaria" || accountType === "secundaria") {
+    const prodRows = await database.select({ platform: digitalProducts.platform }).from(digitalProducts).where(eq(digitalProducts.id, digitalProductId)).limit(1);
+    caps = computeAccountCaps(prodRows[0]?.platform, accountType);
+  }
+
   await database.insert(digitalProductAccounts).values(
-    rows.map((r) => ({ digitalProductId, email: r.email, password: r.password, accountType: accountType || null }))
+    rows.map((r) => ({ digitalProductId, email: r.email, password: r.password, accountType: accountType || null, ...caps }))
   );
 
   const remaining = await syncDigitalProductAccountStock(database, digitalProductId);
@@ -878,7 +1028,11 @@ export async function removeDigitalProductAccount(id: number) {
   const existing = await database.select().from(digitalProductAccounts).where(eq(digitalProductAccounts.id, id)).limit(1);
   const account = existing[0];
   if (!account) throw new Error("Conta não encontrada");
-  if (account.status !== "disponivel") throw new Error("Essa conta já foi entregue em um pedido e não pode ser removida");
+  const isQuota = account.capPrimariaTotal > 0 || account.capSecundaria > 0;
+  const usedUnits = account.usedPrimariaPs4 + account.usedPrimariaPs5 + account.usedSecundaria;
+  if (isQuota ? usedUnits > 0 : account.status !== "disponivel") {
+    throw new Error("Essa conta já foi entregue em um pedido e não pode ser removida");
+  }
 
   await database.delete(digitalProductAccounts).where(eq(digitalProductAccounts.id, id));
   const remaining = await syncDigitalProductAccountStock(database, account.digitalProductId);
