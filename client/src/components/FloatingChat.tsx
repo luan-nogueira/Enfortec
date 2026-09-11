@@ -465,6 +465,7 @@ export default function FloatingChat() {
                 { label: "🏆 Platinador", query: "Clube do Platinador" },
                 { label: "💼 Revender", query: "Vender minha conta" },
                 { label: "📦 Entregas", query: "como recebo meu jogo" },
+                { label: "🆘 Ajuda", query: "problema pra acessar minha conta" },
                 { label: "💳 Pagamentos", query: "quais formas de pagamento" },
               ].map(topic => (
                 <button
