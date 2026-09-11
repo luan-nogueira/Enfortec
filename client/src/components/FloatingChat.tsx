@@ -42,14 +42,24 @@ const STOP = new Set(["tem", "voce", "voces", "o", "de", "com", "jogo", "jogos",
   "e", "do", "da", "game", "games", "ps4", "ps5", "quais", "todos", "lista",
   "algum", "tao", "ter", "qualquer", "sobre"]);
 
-function aiAnswer(q: string, catalog: any[], waBase: string = WA_BASE): string {
+type HelpVideo = { title: string; url: string; platform: "ps4" | "ps5" | "ambos" };
+
+function aiAnswer(q: string, catalog: any[], waBase: string = WA_BASE, helpVideos: HelpVideo[] = []): string {
   const nq = norm(q);
 
   if (/jogue com economia|secundaria|conta secundaria/.test(nq))
     return "⚡ **Jogue com Economia (Contas Secundárias)**!\n\nAs contas secundárias são a opção perfeita para jogar os lançamentos gastando muito menos.\n\n[👉 Ver Jogos em Jogue com Economia](/jogue-com-economia)";
 
-  if (/platinador|clube|clube do platinador|assinatura/.test(nq))
-    return "🏆 **Clube do Platinador VIP (R$ 35,00/mês)**!\n\n• **2 Sorteios por mês** de jogos no grupo VIP\n• **Desafios Semanais** de Platina acumulando ForteCoins\n\n[👉 Assinar Clube do Platinador](/platinador)";
+  if (/platinador|clube|clube do platinador|ranking/.test(nq))
+    return "🏆 **Clube do Platinador Eforte Games**!\n\n• **Desafios de Platina abertos pra todo mundo**, sem mensalidade\n• Platine, envie a comprovação e ganhe **ForteCoins**\n• Depois de aprovado, você entra no **ranking de platinadores**\n\n[👉 Ver Desafios e Ranking](/platinador)";
+
+  if (/nao consigo entrar|nao consigo acessar|problema.*acess|problema.*logar|nao.*logo|senha.*errad|cadeado|como instal|instrucao|tutorial|video.*ajuda/.test(nq)) {
+    if (helpVideos.length === 0) {
+      return `Poxa, ainda não tenho vídeos de ajuda cadastrados pra esse caso. 😕\n\n[👉 Fale com o suporte no WhatsApp](${waBase})`;
+    }
+    const list = helpVideos.slice(0, 6).map(v => `• [${v.title}](${v.url})`).join("\n");
+    return `Aqui estão nossos vídeos de ajuda! 🎥\n\n${list}\n\nSe não resolver, [fale com o suporte no WhatsApp](${waBase})`;
+  }
 
   if (/vender|revendedor|comissao|escrow|anunciar/.test(nq))
     return "💼 **Vender sua conta ou Mídias Físicas na Eforte Games**!\n\n• **Revenda de Contas**: Comissão de 35% com retenção do valor em escrow até a entrega.\n• **Mídias Físicas / Consoles**: Taxa de 8% com intermediação segura.\n\n[👉 Virar Revendedor](/virar-vendedor)";
@@ -287,7 +297,7 @@ export default function FloatingChat() {
 
     setThinking(true);
     await new Promise(r => setTimeout(r, 400));
-    const answer = aiAnswer(msg, catalog, waBase);
+    const answer = aiAnswer(msg, catalog, waBase, platformSettings?.deliveryHelpVideos || []);
     setThinking(false);
 
     if (isAuthenticated && user?.id) {
@@ -493,7 +503,7 @@ export default function FloatingChat() {
                   <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Atalhos Frequentes:</span>
                   {[
                     { emoji: "⚡", label: "Ver Jogos Secundários (Jogue com Economia)", query: "Jogue com Economia" },
-                    { emoji: "🏆", label: "Assinar Clube do Platinador VIP", query: "Clube do Platinador" },
+                    { emoji: "🏆", label: "Ver Clube do Platinador (Ranking)", query: "Clube do Platinador" },
                     { emoji: "💼", label: "Como Vender / Anunciar minha conta", query: "Vender minha conta" },
                     { emoji: "💬", label: "Falar com Atendente no WhatsApp", query: "contato" },
                   ].map(chip => (

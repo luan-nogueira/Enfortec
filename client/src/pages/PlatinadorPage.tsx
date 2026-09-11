@@ -12,7 +12,7 @@ import { getLoginUrl } from "@/const";
 import UserProfileButton from "@/components/UserProfileButton";
 import { storage } from "@/lib/firebase";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
-import { Trophy, Flame, CheckCircle, Coins, MessageSquare, ExternalLink, Zap, Star, Gamepad2, ArrowLeft, Clock, Sparkles, Check, AlertCircle, Award, Upload, Image as ImageIcon, Medal, Users } from "lucide-react";
+import { Trophy, Flame, Coins, ExternalLink, Zap, Star, Gamepad2, ArrowLeft, Clock, Sparkles, Check, AlertCircle, Award, Upload, Image as ImageIcon, Medal, Users } from "lucide-react";
 
 function useApprovedSubmissions() {
   const query = trpc.platinador.getApprovedSubmissions.useQuery();
@@ -47,7 +47,6 @@ export default function PlatinadorPage() {
   const [selectedChallenge, setSelectedChallenge] = useState<any>(null);
   const [proofUrl, setProofUrl] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSubscribing, setIsSubscribing] = useState(false);
   const [isUpdatingPsn, setIsUpdatingPsn] = useState(false);
   const [isUploadingProof, setIsUploadingProof] = useState(false);
   const proofFileRef = useRef<HTMLInputElement>(null);
@@ -92,18 +91,6 @@ export default function PlatinadorPage() {
     },
   });
 
-  const subscribeMutation = trpc.platinador.subscribe.useMutation({
-    onSuccess: (data) => {
-      toast.success(data.message);
-      statusQuery.refetch();
-      setIsSubscribing(false);
-    },
-    onError: (err: any) => {
-      toast.error(err.message || "Erro ao processar assinatura");
-      setIsSubscribing(false);
-    },
-  });
-
   const submitPlatinumMutation = trpc.platinador.submitPlatinum.useMutation({
     onSuccess: (data) => {
       toast.success(data.message);
@@ -123,39 +110,6 @@ export default function PlatinadorPage() {
     if (!psnInput.trim()) return toast.error("Insira uma PSN ID válida");
     setIsUpdatingPsn(true);
     updatePsnMutation.mutate({ psnId: psnInput.trim() });
-  };
-
-  const handleSubscribe = async () => {
-    if (!user) {
-      window.location.href = getLoginUrl();
-      return;
-    }
-    setIsSubscribing(true);
-    try {
-      const idToken = user.firebaseUser ? await user.firebaseUser.getIdToken() : "";
-      const res = await fetch("/api/mercadopago/checkout", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${idToken}`
-        },
-        body: JSON.stringify({
-          name: "Assinatura Clube Platinador - R$ 35/mês",
-          price: 35.00,
-          quantity: 1,
-          productType: "platinador",
-          redirectUrl: statusQuery.data?.vipWhatsappUrl || `${window.location.origin}/platinador`
-        })
-      });
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        subscribeMutation.mutate();
-      }
-    } catch {
-      subscribeMutation.mutate();
-    }
   };
 
   const handleSubmitProof = (e: React.FormEvent) => {
@@ -179,7 +133,6 @@ export default function PlatinadorPage() {
     });
   };
 
-  const isSubscribed = statusQuery.data?.isSubscribed || false;
   const userPsnId = statusQuery.data?.psnId || "";
   const forteCoins = statusQuery.data?.forteCoins ?? (user?.forteCoins || 0);
 
@@ -246,40 +199,8 @@ export default function PlatinadorPage() {
                 Jogue, Platine e Ganhe <span className="text-[#dc143c] drop-shadow-[0_0_15px_rgba(220,20,60,0.6)]">Prêmios & Descontos!</span>
               </h1>
               <p className="text-gray-200 text-sm sm:text-lg leading-relaxed">
-                Participe dos <strong className="text-amber-400">Desafios de Platina abertos para todos</strong>! Cumpra desafios na PSN, acumule <strong className="text-amber-400">ForteCoins</strong> para abater nas suas compras e entre no ranking.
-                Assine também o <strong className="text-white">Clube Platinador VIP</strong> por apenas <span className="text-amber-400 font-black text-xl">R$ 35,00/mês</span> para ter acesso ao <strong className="text-[#ff4d6d]">Grupo VIP Exclusivo com 2 Sorteios por mês</strong> de jogos (Conta Primária ou Secundária)!
+                Participe dos <strong className="text-amber-400">Desafios de Platina abertos para todos</strong>, <strong className="text-white">de graça</strong>! Cumpra desafios na PSN, envie a comprovação, acumule <strong className="text-amber-400">ForteCoins</strong> para abater nas suas compras e entre no ranking de platinadores.
               </p>
-
-              <div className="flex flex-wrap gap-4 pt-2">
-                {!isSubscribed ? (
-                  <Button
-                    onClick={handleSubscribe}
-                    disabled={isSubscribing}
-                    className="w-full sm:w-auto bg-gradient-to-r from-[#dc143c] via-[#ff2a55] to-[#dc143c] hover:from-[#b01030] hover:to-[#dc143c] text-white font-extrabold text-sm sm:text-base px-6 sm:px-8 py-4 sm:py-6 rounded-2xl shadow-xl shadow-[#dc143c]/40 transition-all hover:scale-105 whitespace-normal h-auto text-center flex items-center justify-center border border-[#ff4d6d]/30"
-                  >
-                    <Trophy className="w-5 h-5 mr-2 shrink-0 text-amber-400" />
-                    {isSubscribing ? "Processando..." : "Assinar Clube Platinador VIP — R$ 35,00/mês"}
-                  </Button>
-                ) : (
-                  <div className="flex flex-wrap items-center gap-3">
-                    <Badge className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-sm py-2 px-4 rounded-xl flex items-center gap-2 font-bold">
-                      <CheckCircle className="w-4 h-4" /> Membro Platinador VIP Ativo
-                    </Badge>
-                    {statusQuery.data?.vipWhatsappUrl && (
-                      <a
-                        href={statusQuery.data.vipWhatsappUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm px-6 py-3 rounded-xl shadow-lg shadow-emerald-600/30 transition-all"
-                      >
-                        <MessageSquare className="w-4 h-4" />
-                        Acessar Grupo VIP no WhatsApp
-                        <ExternalLink className="w-3.5 h-3.5 ml-1" />
-                      </a>
-                    )}
-                  </div>
-                )}
-              </div>
             </div>
 
             {/* STATUS / PSN ID CARD */}
@@ -322,12 +243,6 @@ export default function PlatinadorPage() {
 
                   <div className="border-t border-gray-800 pt-4 space-y-2">
                     <div className="flex justify-between text-xs">
-                      <span className="text-gray-400">Status da Assinatura:</span>
-                      <span className={isSubscribed ? "text-emerald-400 font-bold" : "text-amber-400 font-bold"}>
-                        {isSubscribed ? "Ativa (R$ 35/mês)" : "Não Assinado"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-xs">
                       <span className="text-gray-400">Saldo ForteCoins:</span>
                       <span className="text-amber-400 font-bold flex items-center gap-1">
                         <Coins className="w-3.5 h-3.5" /> {forteCoins} coins
@@ -347,34 +262,24 @@ export default function PlatinadorPage() {
               Como funciona o <span className="text-[#dc143c]">Clube Platinador</span>?
             </h2>
             <p className="text-gray-400 text-sm max-w-2xl mx-auto">
-              Ganhe prêmios, participe de sorteios e economize nos seus próximos jogos em 4 passos simples
+              Ganhe prêmios e economize nos seus próximos jogos em 3 passos simples — sem mensalidade
             </p>
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid sm:grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="bg-[#121212] border border-gray-800 p-6 rounded-2xl space-y-3 relative hover:border-[#dc143c]/40 transition-all">
               <div className="w-10 h-10 rounded-xl bg-[#dc143c]/10 text-[#dc143c] flex items-center justify-center font-black text-lg">
                 1
               </div>
-              <h3 className="font-bold text-white text-base">Assine por R$ 35/mês</h3>
+              <h3 className="font-bold text-white text-base">Vincule sua PSN ID</h3>
               <p className="text-gray-400 text-xs leading-relaxed">
-                Faça parte do clube mensal e garanta benefícios exclusivos e acesso imediato aos sorteios.
-              </p>
-            </div>
-
-            <div className="bg-[#121212] border border-gray-800 p-6 rounded-2xl space-y-3 relative hover:border-[#dc143c]/40 transition-all">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-black text-lg">
-                2
-              </div>
-              <h3 className="font-bold text-white text-base">Grupo VIP + 2 Sorteios/mês</h3>
-              <p className="text-gray-400 text-xs leading-relaxed">
-                Acesse o grupo VIP no WhatsApp e concorra a 2 sorteios mensais de jogos (Primária ou Secundária).
+                Cadastre sua ID da PSN aqui na plataforma pra gente validar suas platinas.
               </p>
             </div>
 
             <div className="bg-[#121212] border border-gray-800 p-6 rounded-2xl space-y-3 relative hover:border-[#dc143c]/40 transition-all">
               <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center font-black text-lg">
-                3
+                2
               </div>
               <h3 className="font-bold text-white text-base">Platine & Comprove</h3>
               <p className="text-gray-400 text-xs leading-relaxed">
@@ -384,11 +289,11 @@ export default function PlatinadorPage() {
 
             <div className="bg-[#121212] border border-gray-800 p-6 rounded-2xl space-y-3 relative hover:border-[#dc143c]/40 transition-all">
               <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center font-black text-lg">
-                4
+                3
               </div>
-              <h3 className="font-bold text-white text-base">Ganhe ForteCoins & Troque</h3>
+              <h3 className="font-bold text-white text-base">Aprovação, Coins & Ranking</h3>
               <p className="text-gray-400 text-xs leading-relaxed">
-                Após aprovação, receba ForteCoins na conta para resgatar jogos digitais e descontos em compras!
+                Após aprovação, você recebe ForteCoins e entra no ranking de platinadores do clube!
               </p>
             </div>
           </div>

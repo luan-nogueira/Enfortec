@@ -1,11 +1,9 @@
 import { Express } from "express";
 import axios from "axios";
 import * as db from "../db";
-import { orders, users, coupons, platinadorSubscriptions, products, usedProducts, digitalProducts } from "../../drizzle/schema";
+import { orders, users, coupons, products, usedProducts, digitalProducts } from "../../drizzle/schema";
 import { verifyFirebaseToken } from "./context";
 import { eq } from "drizzle-orm";
-
-const PLATINADOR_SUBSCRIPTION_PRICE = 35.0;
 
 // Preço da conta primária/secundária de um produto digital, com a mesma regra usada
 // no front (client/src/pages/DigitalMedia.tsx: getProductPrice) — precisa bater
@@ -145,9 +143,7 @@ export function registerPaymentRoute(app: Express) {
       let verifiedPrice: number | null = null;
       let realProductName: string | null = null;
       let verifiedIsPreVenda = false;
-      if (productType === "platinador") {
-        verifiedPrice = PLATINADOR_SUBSCRIPTION_PRICE;
-      } else if (productId) {
+      if (productId) {
         const pid = parseInt(String(productId));
         if (!isNaN(pid)) {
           if (productType === "store") {
@@ -569,39 +565,14 @@ export function registerPaymentRoute(app: Express) {
         return res.status(200).json({ received: true, duplicate: true });
       }
 
+      // O Clube do Platinador não tem mais assinatura paga (virou gratuito, só com ranking) —
+      // esse productType não é mais gerado no checkout, mas se algum webhook antigo/atrasado
+      // ainda chegar com ele, só confirma o recebimento sem processar nada.
       if (productType === "platinador") {
-        const existingSub = await database.select().from(platinadorSubscriptions).where(eq(platinadorSubscriptions.paymentId, String(paymentId))).limit(1);
-        if (existingSub.length > 0) {
-          console.log(`[Mercado Pago Webhook] Assinatura do Platinador pra pagamento #${paymentId} já processada.`);
-          return res.status(200).json({ received: true, duplicate: true });
-        }
-
-        if (buyerId > 0) {
-          const now = new Date();
-          const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-          const existing = await database.select().from(platinadorSubscriptions).where(eq(platinadorSubscriptions.userId, buyerId)).limit(1);
-
-          if (existing.length > 0) {
-            await database.update(platinadorSubscriptions).set({
-              status: "ativa",
-              startsAt: now,
-              expiresAt,
-              paymentId: String(paymentId)
-            }).where(eq(platinadorSubscriptions.id, existing[0].id));
-          } else {
-            await database.insert(platinadorSubscriptions).values({
-              userId: buyerId,
-              status: "ativa",
-              planName: "Clube Platinador VIP",
-              price: totalPrice,
-              startsAt: now,
-              expiresAt,
-              paymentId: String(paymentId),
-            });
-          }
-          console.log(`[Mercado Pago Webhook] Assinatura Platinador ativada para usuário #${buyerId} até ${expiresAt.toISOString()}`);
-        }
-      } else {
+        console.warn(`[Mercado Pago Webhook] Pagamento #${paymentId} com productType "platinador" recebido — assinatura paga foi descontinuada, ignorando.`);
+        return res.status(200).json({ received: true });
+      }
+      {
         let commissionPct = "6.00";
         try {
           const settings = await db.getPlatformSettings();

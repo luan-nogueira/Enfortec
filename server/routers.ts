@@ -5,7 +5,7 @@ import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
 import { getDb } from "./db";
-import { users, sellers, products, usedProducts, digitalProducts, orders, reviews, coupons, platinadorSubscriptions, platinumChallenges, platinumSubmissions, platformSettings } from "../drizzle/schema";
+import { users, sellers, products, usedProducts, digitalProducts, orders, reviews, coupons, platinumChallenges, platinumSubmissions, platformSettings } from "../drizzle/schema";
 import { eq, desc, sql } from "drizzle-orm";
 
 import { TRPCError } from "@trpc/server";
@@ -977,50 +977,13 @@ export const appRouter = router({
       }),
   }),
 
-  // Platinador Club Router
+  // Platinador Club Router — gratuito: comprova platina, admin aprova, entra no ranking.
+  // Sem assinatura/cobrança (removida — ver histórico de commits pra assinatura antiga).
   platinador: router({
     getStatus: protectedProcedure.query(async ({ ctx }) => {
-      const database = await getDb();
-      let isSubscribed = false;
-      let subscription = null;
-      let vipWhatsappUrl = "https://chat.whatsapp.com/Gkx7EforteGamesVipClub";
-
-      if (database) {
-        try {
-          const subs = await database
-            .select()
-            .from(platinadorSubscriptions)
-            .where(eq(platinadorSubscriptions.userId, ctx.user.id))
-            .limit(1);
-
-          if (subs.length > 0 && subs[0].status === "ativa") {
-            const now = new Date();
-            if (subs[0].expiresAt && new Date(subs[0].expiresAt) > now) {
-              isSubscribed = true;
-              subscription = subs[0];
-            }
-          }
-
-          const settings = await database
-            .select()
-            .from(platformSettings)
-            .where(eq(platformSettings.id, 1))
-            .limit(1);
-
-          if (settings.length > 0 && settings[0].vipWhatsappUrl) {
-            vipWhatsappUrl = settings[0].vipWhatsappUrl;
-          }
-        } catch (e) {
-          console.error("[TRPC Platinador] Error fetching status:", e);
-        }
-      }
-
       return {
-        isSubscribed,
-        subscription,
         psnId: ctx.user.psnId || null,
         forteCoins: ctx.user.forteCoins || 0,
-        vipWhatsappUrl,
       };
     }),
 
@@ -1036,52 +999,6 @@ export const appRouter = router({
         }
         return { success: true, psnId: input.psnId.trim() };
       }),
-
-    subscribe: protectedProcedure.mutation(async ({ ctx }) => {
-      const database = await getDb();
-      const now = new Date();
-      const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-
-      if (database) {
-        try {
-          const existing = await database
-            .select()
-            .from(platinadorSubscriptions)
-            .where(eq(platinadorSubscriptions.userId, ctx.user.id))
-            .limit(1);
-
-          if (existing.length > 0) {
-            await database
-              .update(platinadorSubscriptions)
-              .set({
-                status: "ativa",
-                startsAt: now,
-                expiresAt,
-                paymentId: "PIX_SIMULATED_" + Date.now(),
-              })
-              .where(eq(platinadorSubscriptions.id, existing[0].id));
-          } else {
-            await database.insert(platinadorSubscriptions).values({
-              userId: ctx.user.id,
-              status: "ativa",
-              planName: "Clube Platinador VIP",
-              price: "15.00",
-              startsAt: now,
-              expiresAt,
-              paymentId: "PIX_SIMULATED_" + Date.now(),
-            });
-          }
-        } catch (e) {
-          console.error("[TRPC Platinador] Subscribe DB error:", e);
-        }
-      }
-
-      return {
-        success: true,
-        expiresAt,
-        message: "Assinatura do Clube Platinador ativada com sucesso por 30 dias!",
-      };
-    }),
 
     listChallenges: publicProcedure.query(async () => {
       const database = await getDb();
