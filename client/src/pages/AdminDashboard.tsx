@@ -6652,7 +6652,7 @@ export default function AdminDashboard() {
 
       {/* Modal de Gerenciar Contas em Estoque (pool de email+senha, entrega automática) */}
       <Dialog open={!!accountsModalGame} onOpenChange={(open) => !open && setAccountsModalGame(null)}>
-        <DialogContent className="bg-slate-900 border-amber-600/30 text-white max-w-lg card-neon max-h-[85dvh] overflow-y-auto">
+        <DialogContent className={`bg-slate-900 border-amber-600/30 text-white card-neon max-h-[85dvh] overflow-y-auto ${accountsModalGame?.hasSecondary ? "max-w-2xl" : "max-w-lg"}`}>
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-neon flex items-center gap-2">
               <Lock className="w-5 h-5 text-amber-400" /> Contas em Estoque
@@ -6675,7 +6675,7 @@ export default function AdminDashboard() {
             {accountsModalGame?.hasSecondary ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label className="text-xs text-blue-300 font-bold uppercase">👤 Adicionar — Conta Primária</Label>
+                  <Label className="text-xs text-blue-300 font-bold uppercase whitespace-nowrap">👤 Conta Primária</Label>
                   <textarea
                     value={accountsRawTextPrimary}
                     onChange={(e) => setAccountsRawTextPrimary(e.target.value)}
@@ -6693,7 +6693,7 @@ export default function AdminDashboard() {
                   </Button>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs text-purple-300 font-bold uppercase">👥 Adicionar — Conta Secundária</Label>
+                  <Label className="text-xs text-purple-300 font-bold uppercase whitespace-nowrap">👥 Conta Secundária</Label>
                   <textarea
                     value={accountsRawTextSecondary}
                     onChange={(e) => setAccountsRawTextSecondary(e.target.value)}
