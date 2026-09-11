@@ -1154,13 +1154,14 @@ export async function confirmOrderAndReview(orderId: number, buyerId: number, ra
     throw new Error("Pedido não está em um estado válido para confirmação");
   }
 
-  if (!order.sellerId) {
-    throw new Error("Pedido não possui um vendedor associado");
-  }
+  // Compras diretas do catálogo próprio da Eforte não têm vendedor terceiro nem escrow
+  // pra liberar — só registram a avaliação e fecham o pedido como entregue.
+  const sellerUserId: number | null = order.sellerId;
 
   // Get seller profile to update their rating stats
-  const sellerProfileResult = await db.select().from(sellers).where(eq(sellers.userId, order.sellerId)).limit(1);
-  const sellerProfile = sellerProfileResult[0];
+  const sellerProfile = sellerUserId !== null
+    ? (await db.select().from(sellers).where(eq(sellers.userId, sellerUserId)).limit(1))[0]
+    : undefined;
 
   // Update order status — condicionado ao status que acabamos de ler (compare-and-swap).
   // Sem essa trava, duas requisições concorrentes (clique duplo, retry de rede) passavam
@@ -1179,11 +1180,15 @@ export async function confirmOrderAndReview(orderId: number, buyerId: number, ra
   // Insert Review
   await db.insert(reviews).values({
     orderId: order.id,
-    sellerId: sellerProfile?.id ?? order.sellerId,
+    sellerId: sellerUserId !== null ? (sellerProfile?.id ?? sellerUserId) : null,
     buyerId: buyerId,
     rating: rating,
     comment: comment || null,
   });
+
+  if (sellerUserId === null) {
+    return { success: true };
+  }
 
   // Update Seller Rating if profile exists
   if (sellerProfile) {
@@ -1191,21 +1196,21 @@ export async function confirmOrderAndReview(orderId: number, buyerId: number, ra
     const currentRating = parseFloat(sellerProfile.rating || "0");
     const newTotalReviews = currentTotalReviews + 1;
     const newRating = ((currentRating * currentTotalReviews) + rating) / newTotalReviews;
-    
+
     await db.update(sellers)
-      .set({ 
-        totalReviews: newTotalReviews, 
-        rating: newRating.toFixed(2) 
+      .set({
+        totalReviews: newTotalReviews,
+        rating: newRating.toFixed(2)
       })
       .where(eq(sellers.id, sellerProfile.id));
   }
 
   // Add funds to seller balance (Escrow Release)
-  const sellerUserResult = await db.select().from(users).where(eq(users.id, order.sellerId)).limit(1);
+  const sellerUserResult = await db.select().from(users).where(eq(users.id, sellerUserId)).limit(1);
   const sellerUser = sellerUserResult[0];
   if (sellerUser) {
     const newBalance = (parseFloat(sellerUser.balance) + parseFloat(order.sellerAmount)).toString();
-    await db.update(users).set({ balance: newBalance }).where(eq(users.id, order.sellerId));
+    await db.update(users).set({ balance: newBalance }).where(eq(users.id, sellerUserId));
   }
 
   return { success: true };

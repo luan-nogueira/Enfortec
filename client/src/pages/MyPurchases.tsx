@@ -70,9 +70,21 @@ export default function MyPurchases() {
     }
   }, [user, orders]);
 
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
+  const [rating, setRating] = useState<number>(5);
+  const [comment, setComment] = useState("");
+
+  const selectedOrder = (orders as any[] | undefined)?.find((o: any) => o.id === selectedOrderId);
+  const selectedOrderHasSeller = !!selectedOrder?.sellerId;
+
   const confirmMutation = trpc.orders.confirmAndReview.useMutation({
     onSuccess: () => {
-      toast.success("Recebimento confirmado! O vendedor foi avaliado e o pagamento foi liberado com sucesso.");
+      toast.success(
+        selectedOrderHasSeller
+          ? "Recebimento confirmado! O vendedor foi avaliado e o pagamento foi liberado com sucesso."
+          : "Obrigado pela avaliação!"
+      );
       refetch();
       setReviewModalOpen(false);
       setSelectedOrderId(null);
@@ -83,11 +95,6 @@ export default function MyPurchases() {
       toast.error(error.message || "Erro ao confirmar recebimento");
     },
   });
-
-  const [reviewModalOpen, setReviewModalOpen] = useState(false);
-  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
-  const [rating, setRating] = useState<number>(5);
-  const [comment, setComment] = useState("");
 
   if (loading) {
     return (
@@ -249,17 +256,21 @@ export default function MyPurchases() {
                     buttonClassName="w-full md:w-auto bg-slate-900 border border-green-600/40 hover:border-green-500 text-green-400 font-bold text-xs py-2.5 px-4 rounded-xl flex items-center justify-center gap-1.5"
                   />
                   
-                  {order.sellerId && (order.status === 'pago' || order.status === 'enviado') ? (
+                  {(order.status === 'pago' || order.status === 'enviado') ? (
                     <Button
                       className="bg-green-600 hover:bg-green-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow-lg shadow-green-600/20 w-full md:w-auto"
                       onClick={() => handleOpenReview(order.id)}
                       disabled={confirmMutation.isPending}
                     >
-                      ⭐ Avaliar Vendedor & Liberar Pagamento
+                      {order.sellerId ? "⭐ Avaliar Vendedor & Liberar Pagamento" : "⭐ Avaliar Compra"}
                     </Button>
-                  ) : order.sellerId && order.status === 'entregue' ? (
+                  ) : order.status === 'entregue' && order.sellerId ? (
                     <div className="flex items-center text-green-500 text-sm font-bold bg-green-950/40 border border-green-800/40 px-3 py-1.5 rounded-lg">
                       <Star className="w-4 h-4 mr-1.5 fill-current" /> Recebido & Valor Liberado
+                    </div>
+                  ) : order.status === 'entregue' ? (
+                    <div className="flex items-center text-green-500 text-sm font-bold bg-green-950/40 border border-green-800/40 px-3 py-1.5 rounded-lg">
+                      <Star className="w-4 h-4 mr-1.5 fill-current" /> Avaliado, obrigado!
                     </div>
                   ) : null}
                 </div>
@@ -292,13 +303,15 @@ export default function MyPurchases() {
                 Confirmar e Avaliar
               </DialogTitle>
               <DialogDescription className="text-slate-400">
-                O pagamento só será liberado ao vendedor após você confirmar o recebimento e avaliar a compra.
+                {selectedOrderHasSeller
+                  ? "O pagamento só será liberado ao vendedor após você confirmar o recebimento e avaliar a compra."
+                  : "Conta pra gente como foi a sua experiência — sua avaliação aparece na página pública de Avaliações."}
               </DialogDescription>
             </DialogHeader>
 
             <div className="py-6 space-y-6">
               <div className="space-y-3">
-                <label className="text-sm font-medium text-slate-300">Sua Nota para o Vendedor</label>
+                <label className="text-sm font-medium text-slate-300">{selectedOrderHasSeller ? "Sua Nota para o Vendedor" : "Sua Nota"}</label>
                 <div className="flex gap-2 justify-center">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
@@ -340,7 +353,7 @@ export default function MyPurchases() {
                 disabled={confirmMutation.isPending}
                 className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto"
               >
-                {confirmMutation.isPending ? "Confirmando..." : "Confirmar e Liberar Pagamento"}
+                {confirmMutation.isPending ? "Confirmando..." : selectedOrderHasSeller ? "Confirmar e Liberar Pagamento" : "Enviar Avaliação"}
               </Button>
             </DialogFooter>
           </DialogContent>

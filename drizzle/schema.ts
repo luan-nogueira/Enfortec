@@ -233,7 +233,9 @@ export type InsertCoupon = typeof coupons.$inferInsert;
 export const reviews = pgTable("reviews", {
   id: serial("id").primaryKey(),
   orderId: integer("orderId").notNull(),
-  sellerId: integer("sellerId").notNull(),
+  // Nulo pra avaliação de compra direta do catálogo próprio da Eforte (sem vendedor
+  // terceiro/escrow envolvido) — ver confirmOrderAndReview em server/db.ts.
+  sellerId: integer("sellerId"),
   buyerId: integer("buyerId").notNull(),
   rating: integer("rating").notNull(),
   comment: text("comment"),

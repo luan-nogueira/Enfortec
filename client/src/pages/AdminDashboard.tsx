@@ -1318,6 +1318,11 @@ export default function AdminDashboard() {
     enabled: isAuthenticated && isAdmin,
     // Otimização Neon: Só atualiza automaticamente a cada 60s se a aba estiver visível/em foco
     refetchInterval: () => (typeof document !== "undefined" && !document.hidden ? 60000 : false),
+    // refetchOnWindowFocus é desligado globalmente (client/src/main.tsx) pra não reconsultar
+    // o banco toda hora que o admin troca de aba — mas aqui é justamente o feed de "novo
+    // pedido" que ele fica de olho, então reativamos só pra essa query: sem isso, ele podia
+    // voltar de outra aba e só ver o pedido novo depois de esperar o próximo tick de 60s.
+    refetchOnWindowFocus: true,
   });
 
   const deliverOrderMutation = trpc.orders.deliverOrder.useMutation({
