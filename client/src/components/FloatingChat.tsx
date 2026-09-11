@@ -461,11 +461,9 @@ export default function FloatingChat() {
             {/* Quick Topic Chips Bar */}
             <div className="px-3 py-2 bg-slate-950 border-b border-slate-800 flex gap-2 overflow-x-auto scrollbar-none shrink-0">
               {[
-                { label: "⚡ Economia", query: "Jogue com Economia" },
-                { label: "🏆 Platinador", query: "Clube do Platinador" },
                 { label: "💼 Revender", query: "Vender minha conta" },
                 { label: "📦 Entregas", query: "como recebo meu jogo" },
-                { label: "🆘 Ajuda", query: "problema pra acessar minha conta" },
+                { label: "🆘 Suporte Técnico", query: "problema pra acessar minha conta" },
                 { label: "💳 Pagamentos", query: "quais formas de pagamento" },
               ].map(topic => (
                 <button
@@ -503,9 +501,8 @@ export default function FloatingChat() {
                 <div className="flex flex-col gap-1.5 pl-1 pr-2 mt-2">
                   <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Atalhos Frequentes:</span>
                   {[
-                    { emoji: "⚡", label: "Ver Jogos Secundários (Jogue com Economia)", query: "Jogue com Economia" },
-                    { emoji: "🏆", label: "Ver Clube do Platinador (Ranking)", query: "Clube do Platinador" },
                     { emoji: "💼", label: "Como Vender / Anunciar minha conta", query: "Vender minha conta" },
+                    { emoji: "🆘", label: "Suporte Técnico (problema pra acessar)", query: "problema pra acessar minha conta" },
                     { emoji: "💬", label: "Falar com Atendente no WhatsApp", query: "contato" },
                   ].map(chip => (
                     <button
