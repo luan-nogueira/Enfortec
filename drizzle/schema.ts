@@ -152,6 +152,10 @@ export const digitalProductAccounts = pgTable("digitalProductAccounts", {
   email: varchar("email", { length: 255 }).notNull(),
   password: varchar("password", { length: 255 }).notNull(),
   status: varchar("status", { length: 20 }).default("disponivel").notNull(),
+  // "primaria" | "secundaria" | null — jogos com as duas modalidades usam pools separados
+  // (emails diferentes) pra nunca entregar a conta errada; null = pool único (jogo sem
+  // divisão primária/secundária, ou conta cadastrada antes dessa coluna existir).
+  accountType: varchar("accountType", { length: 20 }),
   orderId: integer("orderId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   deliveredAt: timestamp("deliveredAt"),

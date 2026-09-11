@@ -10,3 +10,5 @@ query_*.json
 check_*.ts
 payload.json
 
+
+.env*

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -13,15 +13,15 @@ import {
   onSnapshot,
   serverTimestamp,
   setDoc,
-  doc,
-  getDocs
+  doc
 } from "firebase/firestore";
 import { MessageCircle, X, Send, Bot, ShieldCheck, Zap, Trophy, ShoppingBag, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { containsLink, LINK_BLOCKED_MESSAGE } from "@/lib/textFilters";
 import { trpc } from "@/lib/trpc";
 
-// Catalog is now fetched dynamically from Firestore
+// Catalog is fetched from the same tRPC query the storefront uses (Postgres), so the
+// bot never quotes a game that's out of stock or was removed from the real catalog.
 
 const WA_NUMBER = "554384253691";
 const WA_BASE = `https://wa.me/${WA_NUMBER}`;
@@ -73,7 +73,9 @@ function aiAnswer(q: string, catalog: any[], waBase: string = WA_BASE): string {
     return "Olá! 👋 Sou o assistente inteligente da **Eforte Games**.\n\nComo posso te ajudar hoje? Escolha um atalho abaixo ou digite o nome do jogo!";
 
   const isListMode = /quais|lista|todos|tem algum|voces tem|disponivel/.test(nq);
-  const keywords = nq.split(" ").filter(w => w.length > 2 && !STOP.has(w));
+  // Mantém números isolados (ex.: o "4" de "resident evil 4") — sem isso, títulos numerados
+  // da mesma franquia ficam indistinguíveis entre si na pontuação por palavra-chave.
+  const keywords = nq.split(" ").filter(w => (w.length > 2 || /^\d+$/.test(w)) && !STOP.has(w));
 
   const scored = catalog.map(g => {
     const nn = norm(g.name);
@@ -94,7 +96,11 @@ function aiAnswer(q: string, catalog: any[], waBase: string = WA_BASE): string {
   if (scored.length === 0)
     return `Não encontrei esse jogo exatamente no catálogo padrão. 😕\n\nTente outro nome ou [fale com o atendimento no WhatsApp](${waBase})!`;
 
-  if (scored[0].score >= 80 && scored.length === 1 && !isListMode) {
+  // Só responde com um único jogo "confiante" se ele bater a franquia claramente na frente
+  // do segundo colocado — evita escolher um título arbitrário quando vários empatam
+  // (ex.: "resident evil 4" batendo igual em todos os Resident Evil do catálogo).
+  const runnerUpScore = scored[1]?.score ?? 0;
+  if (scored[0].score >= 80 && (scored.length === 1 || scored[0].score - runnerUpScore >= 30) && !isListMode) {
     const g = scored[0].g;
     return `✅ Temos **${g.name}** disponível!\n\n💰 Valor: **${fmt(g.price)}**\n🎁 Ganhe +7 ForteCoins de Cashback nesta compra!\n\n[👉 Ver Mídias Digitais](/digital)`;
   }
@@ -178,10 +184,21 @@ export default function FloatingChat() {
   const [thinking, setThinking] = useState(false);
   const [showWaSelector, setShowWaSelector] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [catalog, setCatalog] = useState<{name: string; price: number}[]>([]);
   const [isPageScrolling, setIsPageScrolling] = useState(false);
   const { data: platformSettings } = trpc.settings.get.useQuery();
   const waBase = `https://wa.me/${platformSettings?.supportWhatsapp || WA_NUMBER}`;
+
+  // Mesma fonte (Postgres, via tRPC) usada pela loja — garante que o bot nunca ofereça
+  // um jogo removido/esgotado nem deixe de conhecer um jogo recém-cadastrado.
+  const { data: digitalProductsData } = trpc.digitalProducts.list.useQuery();
+  const catalog = useMemo(() => {
+    return (digitalProductsData ?? [])
+      .filter((p: any) => Number(p.stock) > 0)
+      .map((p: any) => ({
+        name: p.name as string,
+        price: Number(p.pricePrimary ?? p.price) || 0,
+      }));
+  }, [digitalProductsData]);
 
   // Reduz opacidade do botão flutuante enquanto a página é rolada
   useEffect(() => {
@@ -198,22 +215,6 @@ export default function FloatingChat() {
       clearTimeout(timeout);
     };
   }, [isOpen]);
-
-  useEffect(() => {
-    const fetchCatalog = async () => {
-      try {
-        const snap = await getDocs(collection(db, "digital_products"));
-        const products = snap.docs.map(doc => {
-          const data = doc.data();
-          return { name: data.name, price: Number(data.price) || 0 };
-        });
-        setCatalog(products);
-      } catch (err) {
-        console.error("Error fetching catalog for chat:", err);
-      }
-    };
-    fetchCatalog();
-  }, []);
 
   const DEFAULT_WELCOME: Msg[] = [
     {

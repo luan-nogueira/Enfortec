@@ -354,6 +354,7 @@ export function registerPaymentRoute(app: Express) {
               digitalProductId: insertValues.digitalProductId,
               buyerId,
               productName: productNameStr,
+              accountType,
             });
           } catch (autoDeliverErr) {
             console.error("[Checkout] Erro na entrega automática de conta:", autoDeliverErr);
@@ -702,6 +703,7 @@ export function registerPaymentRoute(app: Express) {
               digitalProductId: insertValues.digitalProductId,
               buyerId,
               productName,
+              accountType,
             });
           } catch (autoDeliverErr) {
             console.error("[Mercado Pago Webhook] Erro na entrega automática de conta:", autoDeliverErr);

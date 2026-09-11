@@ -686,20 +686,40 @@ export async function deliverOrder(orderId: number, deliveryDetails: string) {
 export async function claimDigitalProductAccount(
   database: any,
   digitalProductId: number,
-  orderId: number
+  orderId: number,
+  accountType?: string | null
 ): Promise<{ email: string; password: string } | null> {
-  const claimResult: any = await database.execute(sql`
-    UPDATE "digitalProductAccounts"
-    SET status = 'entregue', "orderId" = ${orderId}, "deliveredAt" = now()
-    WHERE id = (
-      SELECT id FROM "digitalProductAccounts"
-      WHERE "digitalProductId" = ${digitalProductId} AND status = 'disponivel'
-      ORDER BY id
-      LIMIT 1
-      FOR UPDATE SKIP LOCKED
-    )
-    RETURNING id, email, password
-  `);
+  // Quando o pedido tem tipo (primária/secundária), prioriza uma conta cadastrada com
+  // esse mesmo tipo e só recorre a uma conta sem tipo (pool antigo, de antes dessa
+  // distinção existir) se não houver nenhuma da modalidade certa — nunca entrega uma
+  // conta marcada com o tipo OPOSTO. Sem tipo no pedido (jogo sem divisão), só pega
+  // contas igualmente sem tipo, pra não invadir o pool reservado de um tipo específico.
+  const claimResult: any = accountType
+    ? await database.execute(sql`
+        UPDATE "digitalProductAccounts"
+        SET status = 'entregue', "orderId" = ${orderId}, "deliveredAt" = now()
+        WHERE id = (
+          SELECT id FROM "digitalProductAccounts"
+          WHERE "digitalProductId" = ${digitalProductId} AND status = 'disponivel'
+            AND ("accountType" = ${accountType} OR "accountType" IS NULL)
+          ORDER BY ("accountType" IS NULL) ASC, id ASC
+          LIMIT 1
+          FOR UPDATE SKIP LOCKED
+        )
+        RETURNING id, email, password
+      `)
+    : await database.execute(sql`
+        UPDATE "digitalProductAccounts"
+        SET status = 'entregue', "orderId" = ${orderId}, "deliveredAt" = now()
+        WHERE id = (
+          SELECT id FROM "digitalProductAccounts"
+          WHERE "digitalProductId" = ${digitalProductId} AND status = 'disponivel' AND "accountType" IS NULL
+          ORDER BY id ASC
+          LIMIT 1
+          FOR UPDATE SKIP LOCKED
+        )
+        RETURNING id, email, password
+      `);
   const claimedRows: any[] = Array.isArray(claimResult) ? claimResult : (claimResult?.rows ?? []);
   const claimed = claimedRows[0];
   if (!claimed) return null;
@@ -718,11 +738,11 @@ export async function claimDigitalProductAccount(
  */
 export async function attemptAutoDeliverDigitalOrder(
   database: any,
-  params: { orderId: number; digitalProductId: number; buyerId: number; productName: string }
+  params: { orderId: number; digitalProductId: number; buyerId: number; productName: string; accountType?: string | null }
 ) {
-  const { orderId, digitalProductId, buyerId, productName } = params;
+  const { orderId, digitalProductId, buyerId, productName, accountType } = params;
 
-  const account = await claimDigitalProductAccount(database, digitalProductId, orderId);
+  const account = await claimDigitalProductAccount(database, digitalProductId, orderId, accountType);
   if (!account) {
     console.log(`[AutoDeliver] Pedido #${orderId}: sem conta disponível no pool do jogo #${digitalProductId} — segue pro fluxo manual.`);
     return { delivered: false as const };
@@ -805,7 +825,12 @@ export async function listDigitalProductAccounts(digitalProductId: number) {
   if (!database) throw new Error("Database not available");
 
   const available = await database
-    .select({ id: digitalProductAccounts.id, email: digitalProductAccounts.email, password: digitalProductAccounts.password })
+    .select({
+      id: digitalProductAccounts.id,
+      email: digitalProductAccounts.email,
+      password: digitalProductAccounts.password,
+      accountType: digitalProductAccounts.accountType,
+    })
     .from(digitalProductAccounts)
     .where(and(eq(digitalProductAccounts.digitalProductId, digitalProductId), eq(digitalProductAccounts.status, "disponivel")))
     .orderBy(digitalProductAccounts.id);
@@ -819,7 +844,7 @@ export async function listDigitalProductAccounts(digitalProductId: number) {
 }
 
 /** Adiciona várias contas de uma vez (uma por linha, "email:senha" ou "email;senha"). */
-export async function addDigitalProductAccountsBulk(digitalProductId: number, rawText: string) {
+export async function addDigitalProductAccountsBulk(digitalProductId: number, rawText: string, accountType?: string | null) {
   const database = getDb();
   if (!database) throw new Error("Database not available");
 
@@ -838,7 +863,7 @@ export async function addDigitalProductAccountsBulk(digitalProductId: number, ra
   if (rows.length === 0) return { inserted: 0, available: 0 };
 
   await database.insert(digitalProductAccounts).values(
-    rows.map((r) => ({ digitalProductId, email: r.email, password: r.password }))
+    rows.map((r) => ({ digitalProductId, email: r.email, password: r.password, accountType: accountType || null }))
   );
 
   const remaining = await syncDigitalProductAccountStock(database, digitalProductId);

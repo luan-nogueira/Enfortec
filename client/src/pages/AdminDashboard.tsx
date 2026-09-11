@@ -1491,17 +1491,19 @@ export default function AdminDashboard() {
   });
 
   // Pool de contas (email+senha) em estoque por jogo — entrega automática na compra
-  const [accountsModalGame, setAccountsModalGame] = useState<{ id: number; name: string } | null>(null);
-  const [accountsRawText, setAccountsRawText] = useState("");
+  const [accountsModalGame, setAccountsModalGame] = useState<{ id: number; name: string; hasSecondary: boolean } | null>(null);
+  const [accountsRawTextPrimary, setAccountsRawTextPrimary] = useState("");
+  const [accountsRawTextSecondary, setAccountsRawTextSecondary] = useState("");
   const accountsSummaryQuery = trpc.digitalProducts.accounts.summary.useQuery(undefined, { enabled: !!(isAuthenticated && isAdmin) });
   const accountsListQuery = trpc.digitalProducts.accounts.list.useQuery(
     { digitalProductId: accountsModalGame?.id ?? 0 },
     { enabled: !!accountsModalGame }
   );
   const addAccountsMutation = trpc.digitalProducts.accounts.addBulk.useMutation({
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       toast.success(`${data.inserted} conta${data.inserted !== 1 ? "s" : ""} adicionada${data.inserted !== 1 ? "s" : ""} ao estoque!`);
-      setAccountsRawText("");
+      if (variables.accountType === "secundaria") setAccountsRawTextSecondary("");
+      else setAccountsRawTextPrimary("");
       accountsListQuery.refetch();
       accountsSummaryQuery.refetch();
       adminDigitalProductsQuery.refetch();
@@ -1527,8 +1529,11 @@ export default function AdminDashboard() {
   });
 
   const openAccountsModal = (game: any) => {
-    setAccountsRawText("");
-    setAccountsModalGame({ id: game.id, name: game.name });
+    setAccountsRawTextPrimary("");
+    setAccountsRawTextSecondary("");
+    const sec = game.priceSecondary ?? game.price_secondary;
+    const hasSecondary = sec !== undefined && sec !== null && sec !== "" && parseFloat(sec) > 0;
+    setAccountsModalGame({ id: game.id, name: game.name, hasSecondary });
   };
 
   // Modal "Ver Loja" — detalhe de um vendedor da comunidade (contato, anúncios, vendas)
@@ -6634,25 +6639,67 @@ export default function AdminDashboard() {
               </span>
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-xs text-slate-300 font-bold uppercase">Adicionar Contas</Label>
-              <textarea
-                value={accountsRawText}
-                onChange={(e) => setAccountsRawText(e.target.value)}
-                placeholder={"email1@exemplo.com:senha123\nemail2@exemplo.com:senha456"}
-                rows={4}
-                className="w-full bg-slate-950 border border-red-600/20 rounded-md p-3 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-red-500/50"
-              />
-              <p className="text-[10px] text-slate-500">Uma conta por linha, no formato email:senha (ou email;senha).</p>
-              <Button
-                type="button"
-                disabled={!accountsRawText.trim() || addAccountsMutation.isPending}
-                onClick={() => accountsModalGame && addAccountsMutation.mutate({ digitalProductId: accountsModalGame.id, rawText: accountsRawText })}
-                className="bg-amber-600 hover:bg-amber-700 text-white font-bold btn-neon"
-              >
-                {addAccountsMutation.isPending ? "Adicionando..." : "Adicionar ao Estoque"}
-              </Button>
-            </div>
+            {accountsModalGame?.hasSecondary ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-xs text-blue-300 font-bold uppercase">👤 Adicionar — Conta Primária</Label>
+                  <textarea
+                    value={accountsRawTextPrimary}
+                    onChange={(e) => setAccountsRawTextPrimary(e.target.value)}
+                    placeholder={"email1@exemplo.com:senha123\nemail2@exemplo.com:senha456"}
+                    rows={4}
+                    className="w-full bg-slate-950 border border-blue-600/20 rounded-md p-3 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                  />
+                  <Button
+                    type="button"
+                    disabled={!accountsRawTextPrimary.trim() || addAccountsMutation.isPending}
+                    onClick={() => accountsModalGame && addAccountsMutation.mutate({ digitalProductId: accountsModalGame.id, rawText: accountsRawTextPrimary, accountType: "primaria" })}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold btn-neon"
+                  >
+                    {addAccountsMutation.isPending ? "Adicionando..." : "Adicionar Primárias"}
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-purple-300 font-bold uppercase">👥 Adicionar — Conta Secundária</Label>
+                  <textarea
+                    value={accountsRawTextSecondary}
+                    onChange={(e) => setAccountsRawTextSecondary(e.target.value)}
+                    placeholder={"email3@exemplo.com:senha789\nemail4@exemplo.com:senha000"}
+                    rows={4}
+                    className="w-full bg-slate-950 border border-purple-600/20 rounded-md p-3 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                  />
+                  <Button
+                    type="button"
+                    disabled={!accountsRawTextSecondary.trim() || addAccountsMutation.isPending}
+                    onClick={() => accountsModalGame && addAccountsMutation.mutate({ digitalProductId: accountsModalGame.id, rawText: accountsRawTextSecondary, accountType: "secundaria" })}
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold btn-neon"
+                  >
+                    {addAccountsMutation.isPending ? "Adicionando..." : "Adicionar Secundárias"}
+                  </Button>
+                </div>
+                <p className="text-[10px] text-slate-500 col-span-full -mt-1">Uma conta por linha, no formato email:senha (ou email;senha). Esse jogo tem preço de conta secundária configurado, então primária e secundária usam pools de e-mail separados — na compra, o cliente só recebe a credencial do tipo que ele pagou.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label className="text-xs text-slate-300 font-bold uppercase">Adicionar Contas</Label>
+                <textarea
+                  value={accountsRawTextPrimary}
+                  onChange={(e) => setAccountsRawTextPrimary(e.target.value)}
+                  placeholder={"email1@exemplo.com:senha123\nemail2@exemplo.com:senha456"}
+                  rows={4}
+                  className="w-full bg-slate-950 border border-red-600/20 rounded-md p-3 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-red-500/50"
+                />
+                <p className="text-[10px] text-slate-500">Uma conta por linha, no formato email:senha (ou email;senha).</p>
+                <Button
+                  type="button"
+                  disabled={!accountsRawTextPrimary.trim() || addAccountsMutation.isPending}
+                  onClick={() => accountsModalGame && addAccountsMutation.mutate({ digitalProductId: accountsModalGame.id, rawText: accountsRawTextPrimary })}
+                  className="bg-amber-600 hover:bg-amber-700 text-white font-bold btn-neon"
+                >
+                  {addAccountsMutation.isPending ? "Adicionando..." : "Adicionar ao Estoque"}
+                </Button>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label className="text-xs text-slate-300 font-bold uppercase">Disponíveis</Label>
@@ -6664,7 +6711,18 @@ export default function AdminDashboard() {
                 <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
                   {accountsListQuery.data?.available.map((acc: any) => (
                     <div key={acc.id} className="flex items-center justify-between gap-2 bg-slate-950/60 border border-slate-800 rounded-lg px-3 py-1.5">
-                      <span className="text-xs font-mono text-slate-300 truncate">{acc.email}</span>
+                      <span className="flex items-center gap-2 min-w-0">
+                        {accountsModalGame?.hasSecondary && (
+                          <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${
+                            acc.accountType === "secundaria" ? "bg-purple-950/60 text-purple-300" :
+                            acc.accountType === "primaria" ? "bg-blue-950/60 text-blue-300" :
+                            "bg-slate-800 text-slate-400"
+                          }`}>
+                            {acc.accountType === "secundaria" ? "Sec" : acc.accountType === "primaria" ? "Prim" : "—"}
+                          </span>
+                        )}
+                        <span className="text-xs font-mono text-slate-300 truncate">{acc.email}</span>
+                      </span>
                       <Button
                         variant="ghost"
                         size="icon"
