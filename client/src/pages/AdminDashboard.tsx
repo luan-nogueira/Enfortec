@@ -1532,7 +1532,12 @@ export default function AdminDashboard() {
     setAccountsRawTextPrimary("");
     setAccountsRawTextSecondary("");
     const sec = game.priceSecondary ?? game.price_secondary;
-    const hasSecondary = sec !== undefined && sec !== null && sec !== "" && parseFloat(sec) > 0;
+    const hasSecondaryPrice = sec !== undefined && sec !== null && sec !== "" && parseFloat(sec) > 0;
+    // Jogos e assinaturas sempre mandam um accountType ("primaria" por padrão) no checkout,
+    // mesmo sem preço de secundária configurado (ver server/_core/payment.ts computeDigitalPrice) —
+    // então o cadastro de contas já mostra os dois blocos pra esses tipos, não só quando o
+    // preço secundário existe.
+    const hasSecondary = game.type === "jogo" || game.type === "assinatura" || hasSecondaryPrice;
     setAccountsModalGame({ id: game.id, name: game.name, hasSecondary });
   };
 
@@ -1580,21 +1585,37 @@ export default function AdminDashboard() {
   // de jogo — qualquer linha que não pareça um email:senha começa um novo bloco de jogo.
   const bulkAccountLineRegex = /^([^\s:;]+@[^\s:;]+)[:;](.+)$/;
 
-  // Agrupa o texto colado em blocos por jogo (nome + linhas de conta), casando cada nome
-  // com um jogo já cadastrado. Uma linha em branco também encerra o bloco atual.
+  // Reconhece uma linha "Primária" ou "Secundária" (com ou sem dois-pontos no final) dentro
+  // do bloco de um jogo — as contas que vierem depois dela ficam marcadas com esse tipo, até
+  // a próxima linha de tipo, linha em branco ou próximo jogo.
+  const bulkAccountTypeLineRegex = /^(prim[aá]ria|secund[aá]ria)\s*:?\s*$/i;
+
+  // Agrupa o texto colado em blocos por jogo (nome + linhas de conta, opcionalmente
+  // divididas em sub-blocos "Primária"/"Secundária"), casando cada nome com um jogo já
+  // cadastrado. Uma linha em branco também encerra o bloco atual.
   const bulkAccountsGroups = useMemo(() => {
-    const groups: { gameName: string; gameId: number | null; accounts: { email: string; password: string }[] }[] = [];
+    const groups: { gameName: string; gameId: number | null; accounts: { email: string; password: string; accountType?: "primaria" | "secundaria" }[] }[] = [];
     let current: (typeof groups)[number] | null = null;
+    let currentType: "primaria" | "secundaria" | undefined;
 
     for (const rawLine of bulkAccountsRawText.split("\n")) {
       const line = rawLine.trim();
       if (!line) {
         current = null;
+        currentType = undefined;
         continue;
+      }
+      const typeMatch = line.match(bulkAccountTypeLineRegex);
+      if (typeMatch && current) {
+        currentType = typeMatch[1].toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").startsWith("sec") ? "secundaria" : "primaria";
+        continue;
+      }
+      if (typeMatch && !current) {
+        continue; // linha de tipo órfã, sem nome de jogo antes — ignora
       }
       const match = line.match(bulkAccountLineRegex);
       if (match && current) {
-        current.accounts.push({ email: match[1].trim(), password: match[2].trim() });
+        current.accounts.push({ email: match[1].trim(), password: match[2].trim(), accountType: currentType });
         continue;
       }
       if (match && !current) {
@@ -1603,6 +1624,7 @@ export default function AdminDashboard() {
       const norm = normalizeGameNameForMatch(line);
       const found = gamesList.find((g: any) => normalizeGameNameForMatch(g.name) === norm);
       current = { gameName: line, gameId: found?.id ?? null, accounts: [] };
+      currentType = undefined;
       groups.push(current);
     }
 
@@ -1621,10 +1643,21 @@ export default function AdminDashboard() {
     const failed: string[] = [];
 
     for (const group of matched) {
+      // Separa em até 3 lotes por jogo: contas sem tipo (formato antigo, pool único),
+      // primárias e secundárias — só envia os lotes que tiverem pelo menos 1 conta.
+      const allBuckets: { accountType?: "primaria" | "secundaria"; accounts: typeof group.accounts }[] = [
+        { accountType: undefined, accounts: group.accounts.filter((a) => !a.accountType) },
+        { accountType: "primaria" as const, accounts: group.accounts.filter((a) => a.accountType === "primaria") },
+        { accountType: "secundaria" as const, accounts: group.accounts.filter((a) => a.accountType === "secundaria") },
+      ];
+      const buckets = allBuckets.filter((b) => b.accounts.length > 0);
+
       try {
-        const rawText = group.accounts.map((a) => `${a.email}:${a.password}`).join("\n");
-        const result = await bulkAddAccountsMutation.mutateAsync({ digitalProductId: group.gameId as number, rawText });
-        totalInserted += result.inserted;
+        for (const bucket of buckets) {
+          const rawText = bucket.accounts.map((a) => `${a.email}:${a.password}`).join("\n");
+          const result = await bulkAddAccountsMutation.mutateAsync({ digitalProductId: group.gameId as number, rawText, accountType: bucket.accountType });
+          totalInserted += result.inserted;
+        }
       } catch (err: any) {
         failed.push(group.gameName);
       }
@@ -6867,7 +6900,7 @@ export default function AdminDashboard() {
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-neon flex items-center gap-2">📦 Cadastrar Contas em Lote</DialogTitle>
             <DialogDescription className="text-slate-400 text-xs">
-              Cole o nome de cada jogo (igual aparece no site), seguido das contas dele (email:senha, uma por linha). Deixe uma linha em branco entre jogos diferentes.
+              Cole o nome de cada jogo (igual aparece no site), seguido das contas dele (email:senha, uma por linha). Deixe uma linha em branco entre jogos diferentes. Pra jogos com conta primária e secundária, coloque "Primária" e "Secundária" como sub-título antes das contas de cada tipo.
             </DialogDescription>
           </DialogHeader>
 
@@ -6875,7 +6908,7 @@ export default function AdminDashboard() {
             <textarea
               value={bulkAccountsRawText}
               onChange={(e) => setBulkAccountsRawText(e.target.value)}
-              placeholder={"Resident Evil Requiem\nconta1@exemplo.com:senha123\nconta2@exemplo.com:senha456\n\nPragmata\ncontaA@exemplo.com:senhaA"}
+              placeholder={"Resident Evil Requiem\nPrimária\nconta1@exemplo.com:senha123\nconta2@exemplo.com:senha456\nSecundária\nconta3@exemplo.com:senha789\n\nPragmata\ncontaA@exemplo.com:senhaA"}
               rows={10}
               className="w-full bg-slate-950 border border-red-600/20 rounded-md p-3 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-red-500/50"
             />
@@ -6884,22 +6917,30 @@ export default function AdminDashboard() {
               <div className="space-y-1.5">
                 <Label className="text-xs text-slate-300 font-bold uppercase">Prévia ({bulkAccountsGroups.length} jogo{bulkAccountsGroups.length !== 1 ? "s" : ""} reconhecido{bulkAccountsGroups.length !== 1 ? "s" : ""} no texto)</Label>
                 <div className="max-h-56 overflow-y-auto space-y-1 pr-1">
-                  {bulkAccountsGroups.map((group, idx) => (
-                    <div
-                      key={idx}
-                      className={`flex items-center justify-between gap-2 rounded-lg px-3 py-1.5 border text-xs ${
-                        group.gameId
-                          ? "bg-green-950/30 border-green-800/40"
-                          : "bg-red-950/30 border-red-800/40"
-                      }`}
-                    >
-                      <span className={`truncate ${group.gameId ? "text-slate-200" : "text-red-400 font-bold"}`}>
-                        {group.gameName}
-                        {!group.gameId && " — jogo não encontrado no catálogo"}
-                      </span>
-                      <span className="text-slate-400 shrink-0">{group.accounts.length} conta{group.accounts.length !== 1 ? "s" : ""}</span>
-                    </div>
-                  ))}
+                  {bulkAccountsGroups.map((group, idx) => {
+                    const primCount = group.accounts.filter((a) => a.accountType === "primaria").length;
+                    const secCount = group.accounts.filter((a) => a.accountType === "secundaria").length;
+                    return (
+                      <div
+                        key={idx}
+                        className={`flex items-center justify-between gap-2 rounded-lg px-3 py-1.5 border text-xs ${
+                          group.gameId
+                            ? "bg-green-950/30 border-green-800/40"
+                            : "bg-red-950/30 border-red-800/40"
+                        }`}
+                      >
+                        <span className={`truncate ${group.gameId ? "text-slate-200" : "text-red-400 font-bold"}`}>
+                          {group.gameName}
+                          {!group.gameId && " — jogo não encontrado no catálogo"}
+                        </span>
+                        <span className="text-slate-400 shrink-0">
+                          {primCount > 0 || secCount > 0
+                            ? `👤 ${primCount} · 👥 ${secCount}`
+                            : `${group.accounts.length} conta${group.accounts.length !== 1 ? "s" : ""}`}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
