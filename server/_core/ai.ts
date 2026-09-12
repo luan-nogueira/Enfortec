@@ -115,7 +115,7 @@ export function registerAiRoute(app: Express) {
       return res.json({ answer: "Aceitamos Pix, Cartão de Crédito e Boleto. Todo pagamento é processado com segurança via Mercado Pago." });
     }
     if (/entrega|envio|prazo|frete|como recebo/.test(nq)) {
-      return res.json({ answer: "As mídias digitais (PS4/PS5) são enviadas via WhatsApp ou e-mail logo após a aprovação do pagamento. Para usados físicos o envio é pelos Correios com rastreio." });
+      return res.json({ answer: "As mídias digitais (PS4/PS5) ficam disponíveis em \"Minhas Compras\", dentro do próprio site, logo após a aprovação do pagamento. Para usados físicos o envio é pelos Correios com rastreio." });
     }
     if (/contato|whatsapp|telefone|suporte|falar com|atendimento|adm/.test(nq)) {
       return res.json({ answer: `Fale com a gente direto no WhatsApp! [Clique aqui para abrir o WhatsApp](${WA})` });

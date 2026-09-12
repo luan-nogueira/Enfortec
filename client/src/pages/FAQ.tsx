@@ -27,7 +27,7 @@ const faqs = [
     items: [
       {
         q: "Como recebo minha mídia digital?",
-        a: "Após a confirmação do pagamento, você recebe o código de ativação diretamente no WhatsApp ou e-mail cadastrado. A entrega é quase instantânea — em média em até 30 minutos no horário comercial."
+        a: "Após a confirmação do pagamento, os dados de acesso (email e senha) ficam disponíveis na página \"Minhas Compras\", dentro do próprio site. A entrega é quase instantânea — em média em até 30 minutos no horário comercial."
       },
       {
         q: "Comprei um produto físico. Como funciona o envio?",

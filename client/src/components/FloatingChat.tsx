@@ -74,7 +74,7 @@ function aiAnswer(q: string, catalog: any[], waBase: string = WA_BASE, helpVideo
     return "As **ForteCoins** são nossa moeda virtual! 🪙\n\nA cada compra você acumula pontos e pode usar como desconto em qualquer produto.\n\n**10 ForteCoins = R$ 1,00 de desconto**";
 
   if (/entrega|envio|prazo|frete|como recebo/.test(nq))
-    return "Mídias digitais são enviadas via **WhatsApp ou e-mail** logo após a confirmação do pagamento. 📦\n\nProdutos físicos vão pelos Correios com rastreio.";
+    return "Mídias digitais ficam disponíveis em **Minhas Compras**, dentro do próprio site, logo após a confirmação do pagamento. 📦\n\n[👉 Ver Minhas Compras](/minhas-compras)\n\nProdutos físicos vão pelos Correios com rastreio.";
 
   if (/contato|whatsapp|telefone|suporte|falar com|atendimento|adm/.test(nq))
     return `Fale diretamente com a nossa equipe no WhatsApp:\n[👉 Abrir Suporte no WhatsApp](${waBase})`;
