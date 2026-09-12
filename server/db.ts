@@ -1155,7 +1155,14 @@ export async function confirmOrderAndReview(orderId: number, buyerId: number, ra
   }
 
   // Compras diretas do catálogo próprio da Eforte não têm vendedor terceiro nem escrow
-  // pra liberar — só registram a avaliação e fecham o pedido como entregue.
+  // pra liberar — só registram a avaliação e fecham o pedido como entregue. Mas, sem
+  // vendedor, so existe uma entrega de verdade quando o sistema/admin ja marcou o pedido
+  // "enviado" (com deliveryDetails preenchido) - confirmar em "pago" deixaria o comprador
+  // fechar o proprio pedido como entregue ANTES de qualquer credencial existir.
+  if (!order.sellerId && order.status !== 'enviado') {
+    throw new Error("Esse pedido ainda não foi entregue — aguarde a entrega antes de avaliar.");
+  }
+
   const sellerUserId: number | null = order.sellerId;
 
   // Get seller profile to update their rating stats

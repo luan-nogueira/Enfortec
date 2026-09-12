@@ -256,7 +256,7 @@ export default function MyPurchases() {
                     buttonClassName="w-full md:w-auto bg-slate-900 border border-green-600/40 hover:border-green-500 text-green-400 font-bold text-xs py-2.5 px-4 rounded-xl flex items-center justify-center gap-1.5"
                   />
                   
-                  {(order.status === 'pago' || order.status === 'enviado') ? (
+                  {(order.sellerId ? (order.status === 'pago' || order.status === 'enviado') : order.status === 'enviado') ? (
                     <Button
                       className="bg-green-600 hover:bg-green-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow-lg shadow-green-600/20 w-full md:w-auto"
                       onClick={() => handleOpenReview(order.id)}
