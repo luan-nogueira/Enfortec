@@ -1070,8 +1070,14 @@ export async function listDigitalProductAccounts(digitalProductId: number) {
  * primárias"); senão cai no cálculo automático de computeAccountCaps a partir da
  * plataforma cadastrada do jogo. Em qualquer um dos casos, a mesma conta poderá ser
  * vendida mais de uma vez, até estourar a cota.
+ *
+ * `consoleOverride` deixa o admin dizer que ESSE lote específico só serve pra um console
+ * (PS4 ou PS5), mesmo que o catálogo do jogo esteja marcado como "PS4/PS5" combinado —
+ * útil quando só tem estoque real de um dos dois mas quer manter o jogo anunciado pros
+ * dois. Sem isso, um pedido do console sem estoque real já é recusado (ver
+ * getConsoleAvailabilityForProduct), sem precisar mudar a plataforma cadastrada do jogo.
  */
-export async function addDigitalProductAccountsBulk(digitalProductId: number, rawText: string, accountType?: string | null, quantity?: number) {
+export async function addDigitalProductAccountsBulk(digitalProductId: number, rawText: string, accountType?: string | null, quantity?: number, consoleOverride?: "PS4" | "PS5" | null) {
   const database = getDb();
   if (!database) throw new Error("Database not available");
 
@@ -1121,7 +1127,17 @@ export async function addDigitalProductAccountsBulk(digitalProductId: number, ra
   }
 
   let caps = { capPrimariaPs4: 0, capPrimariaPs5: 0, capPrimariaTotal: 0, capSecundaria: 0 };
-  if (accountType === "primaria" && quantity && quantity > 0) {
+  if (accountType === "primaria" && quantity && quantity > 0 && (consoleOverride === "PS4" || consoleOverride === "PS5")) {
+    // Admin escolheu explicitamente que ESSE lote é só de um console — vale por cima
+    // da plataforma cadastrada do jogo (é exatamente pra quando o catálogo anuncia
+    // "PS4/PS5" mas só existe estoque real de um dos dois).
+    caps = {
+      capPrimariaPs4: consoleOverride === "PS4" ? quantity : 0,
+      capPrimariaPs5: consoleOverride === "PS5" ? quantity : 0,
+      capPrimariaTotal: quantity,
+      capSecundaria: 0,
+    };
+  } else if (accountType === "primaria" && quantity && quantity > 0) {
     // Quantidade escolhida manualmente pelo admin, mas SEMPRE travada pela plataforma
     // real do jogo — uma conta de um jogo só-PS5 nunca pode virar vaga de PS4, nem que
     // o admin digite um número maior, senão o sistema aprova entrega pro console errado.

@@ -1497,7 +1497,7 @@ export default function AdminDashboard() {
   });
 
   // Pool de contas (email+senha) em estoque por jogo — entrega automática na compra
-  const [accountsModalGame, setAccountsModalGame] = useState<{ id: number; name: string; hasSecondary: boolean } | null>(null);
+  const [accountsModalGame, setAccountsModalGame] = useState<{ id: number; name: string; hasSecondary: boolean; isCombinedPlatform: boolean } | null>(null);
   const [accountsRawTextPrimary, setAccountsRawTextPrimary] = useState("");
   const [accountsRawTextSecondary, setAccountsRawTextSecondary] = useState("");
   // Quantidade que cada conta cadastrada vai aguentar vender — o admin escolhe direto
@@ -1506,6 +1506,10 @@ export default function AdminDashboard() {
   // pré-preenchida — e o botão de adicionar só libera com um número maior que 0.
   const [primariaQty, setPrimariaQty] = useState<number | "">("");
   const [secundariaQty, setSecundariaQty] = useState<number | "">("");
+  // Pra jogo cadastrado como PS4/PS5 combinado, mas que só tem estoque real de um dos
+  // dois consoles — deixa o admin dizer "esse lote é só PS5" sem precisar mudar a
+  // plataforma anunciada do jogo (Andre/Sandro pediram isso).
+  const [primariaConsole, setPrimariaConsole] = useState<"ambos" | "PS4" | "PS5">("ambos");
   const accountsSummaryQuery = trpc.digitalProducts.accounts.summary.useQuery(undefined, { enabled: !!(isAuthenticated && isAdmin) });
   const accountsListQuery = trpc.digitalProducts.accounts.list.useQuery(
     { digitalProductId: accountsModalGame?.id ?? 0 },
@@ -1523,7 +1527,7 @@ export default function AdminDashboard() {
         toast.warning(`Nenhuma conta nova — ${skipped === 1 ? "esse e-mail já está" : "esses e-mails já estão"} cadastrado${skipped !== 1 ? "s" : ""} nesse tipo pra esse jogo.`);
       }
       if (variables.accountType === "secundaria") { setAccountsRawTextSecondary(""); setSecundariaQty(""); }
-      else { setAccountsRawTextPrimary(""); setPrimariaQty(""); }
+      else { setAccountsRawTextPrimary(""); setPrimariaQty(""); setPrimariaConsole("ambos"); }
       accountsListQuery.refetch();
       accountsSummaryQuery.refetch();
       adminDigitalProductsQuery.refetch();
@@ -1560,7 +1564,13 @@ export default function AdminDashboard() {
     // então o cadastro de contas já mostra os dois blocos pra esses tipos, não só quando o
     // preço secundário existe.
     const hasSecondary = game.type === "jogo" || game.type === "assinatura" || hasSecondaryPrice;
-    setAccountsModalGame({ id: game.id, name: game.name, hasSecondary });
+    // Jogo "combinado" (PS4/PS5, ou sem plataforma definida) é o único caso onde faz
+    // sentido escolher "esse lote é só de um console" — jogo já cadastrado como um
+    // console só não precisa dessa escolha extra.
+    const plat = (game.platform || "").toUpperCase();
+    const isCombinedPlatform = !((plat.includes("PS4") && !plat.includes("PS5")) || (plat.includes("PS5") && !plat.includes("PS4")));
+    setAccountsModalGame({ id: game.id, name: game.name, hasSecondary, isCombinedPlatform });
+    setPrimariaConsole("ambos");
   };
 
   // Modal "Ver Loja" — detalhe de um vendedor da comunidade (contato, anúncios, vendas)
@@ -6729,10 +6739,24 @@ export default function AdminDashboard() {
                       className="bg-slate-950 border-blue-600/20 text-white h-8 text-xs w-20"
                     />
                   </div>
+                  {accountsModalGame?.isCombinedPlatform && (
+                    <div className="flex items-center gap-2">
+                      <Label className="text-[10px] text-slate-400 font-bold uppercase whitespace-nowrap">Esse lote é de</Label>
+                      <select
+                        value={primariaConsole}
+                        onChange={(e) => setPrimariaConsole(e.target.value as "ambos" | "PS4" | "PS5")}
+                        className="bg-slate-950 border border-blue-600/20 text-white h-8 text-xs rounded-md px-2"
+                      >
+                        <option value="ambos">Ambos (PS4/PS5)</option>
+                        <option value="PS4">Só PS4</option>
+                        <option value="PS5">Só PS5</option>
+                      </select>
+                    </div>
+                  )}
                   <Button
                     type="button"
                     disabled={!accountsRawTextPrimary.trim() || !primariaQty || primariaQty < 1 || addAccountsMutation.isPending}
-                    onClick={() => accountsModalGame && addAccountsMutation.mutate({ digitalProductId: accountsModalGame.id, rawText: accountsRawTextPrimary, accountType: "primaria", quantity: primariaQty || undefined })}
+                    onClick={() => accountsModalGame && addAccountsMutation.mutate({ digitalProductId: accountsModalGame.id, rawText: accountsRawTextPrimary, accountType: "primaria", quantity: primariaQty || undefined, consoleOverride: primariaConsole !== "ambos" ? primariaConsole : undefined })}
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold btn-neon"
                   >
                     {addAccountsMutation.isPending ? "Adicionando..." : "Adicionar Primárias"}
