@@ -132,6 +132,11 @@ export const digitalProducts = pgTable("digitalProducts", {
   expiresAt: timestamp("expiresAt"),
   showInEconomia: boolean("showInEconomia").default(false),
   economiaLicenseType: varchar("economiaLicenseType", { length: 50 }),
+  // Quando true, o checkout NUNCA recusa por falta de estoque de um console/tipo
+  // específico (ver getConsoleAvailabilityForProduct em server/db.ts) — deixa vender
+  // mesmo sem conta cadastrada daquele console, pra entrega manual depois (ex.: jogo em
+  // promoção onde o admin topa correr atrás de conseguir a conta se vender por sorte).
+  allowManualWithoutStock: boolean("allowManualWithoutStock").default(false),
   // "pendente" | "aprovado" | "rejeitado" — contas cadastradas por vendedores da comunidade
   // (SellDigitalProduct) entram como "pendente" e só ficam públicas após aprovação do gestor;
   // cadastros feitos pelo próprio admin (adminCreate) já entram "aprovado".

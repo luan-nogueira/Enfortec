@@ -533,6 +533,17 @@ export const appRouter = router({
       if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
       return db.getAllDigitalProductsWithSeller();
     }),
+    // Liga/desliga a venda mesmo sem estoque cadastrado de um console/tipo específico
+    // pra esse jogo (ex.: promoção — topa vender na sorte e resolver manual depois).
+    setAllowManualWithoutStock: protectedProcedure
+      .input(z.object({ id: z.number(), allow: z.boolean() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        await database.update(digitalProducts).set({ allowManualWithoutStock: input.allow }).where(eq(digitalProducts.id, input.id));
+        return { success: true };
+      }),
     adminCreate: protectedProcedure
       .input(z.object({
         name: z.string().min(3),

@@ -1497,7 +1497,7 @@ export default function AdminDashboard() {
   });
 
   // Pool de contas (email+senha) em estoque por jogo — entrega automática na compra
-  const [accountsModalGame, setAccountsModalGame] = useState<{ id: number; name: string; hasSecondary: boolean; isCombinedPlatform: boolean } | null>(null);
+  const [accountsModalGame, setAccountsModalGame] = useState<{ id: number; name: string; hasSecondary: boolean; isCombinedPlatform: boolean; allowManualWithoutStock: boolean } | null>(null);
   const [accountsRawTextPrimary, setAccountsRawTextPrimary] = useState("");
   const [accountsRawTextSecondary, setAccountsRawTextSecondary] = useState("");
   // Quantidade que cada conta cadastrada vai aguentar vender — o admin escolhe direto
@@ -1510,6 +1510,14 @@ export default function AdminDashboard() {
   // dois consoles — deixa o admin dizer "esse lote é só PS5" sem precisar mudar a
   // plataforma anunciada do jogo (Andre/Sandro pediram isso).
   const [primariaConsole, setPrimariaConsole] = useState<"ambos" | "PS4" | "PS5">("ambos");
+  const setAllowManualWithoutStockMutation = trpc.digitalProducts.setAllowManualWithoutStock.useMutation({
+    onSuccess: (_data, variables) => {
+      toast.success(variables.allow ? "Venda sem estoque liberada pra esse jogo — cai pra entrega manual." : "Venda sem estoque desligada pra esse jogo.");
+      setAccountsModalGame((g) => g ? { ...g, allowManualWithoutStock: variables.allow } : g);
+      adminDigitalProductsQuery.refetch();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao atualizar."),
+  });
   const accountsSummaryQuery = trpc.digitalProducts.accounts.summary.useQuery(undefined, { enabled: !!(isAuthenticated && isAdmin) });
   const accountsListQuery = trpc.digitalProducts.accounts.list.useQuery(
     { digitalProductId: accountsModalGame?.id ?? 0 },
@@ -1569,7 +1577,7 @@ export default function AdminDashboard() {
     // console só não precisa dessa escolha extra.
     const plat = (game.platform || "").toUpperCase();
     const isCombinedPlatform = !((plat.includes("PS4") && !plat.includes("PS5")) || (plat.includes("PS5") && !plat.includes("PS4")));
-    setAccountsModalGame({ id: game.id, name: game.name, hasSecondary, isCombinedPlatform });
+    setAccountsModalGame({ id: game.id, name: game.name, hasSecondary, isCombinedPlatform, allowManualWithoutStock: !!game.allowManualWithoutStock });
     setPrimariaConsole("ambos");
   };
 
@@ -6716,6 +6724,20 @@ export default function AdminDashboard() {
                 {accountsListQuery.data?.deliveredCount ?? 0} já vendidas
               </span>
             </div>
+
+            <label className="flex items-start gap-2.5 bg-amber-950/20 border border-amber-700/30 rounded-lg p-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={accountsModalGame?.allowManualWithoutStock ?? false}
+                onChange={(e) => accountsModalGame && setAllowManualWithoutStockMutation.mutate({ id: accountsModalGame.id, allow: e.target.checked })}
+                disabled={setAllowManualWithoutStockMutation.isPending}
+                className="w-4 h-4 mt-0.5 rounded border-amber-600/40 bg-slate-950 text-amber-500 focus:ring-amber-500 shrink-0"
+              />
+              <span className="text-xs text-amber-200">
+                <strong className="block">Vender mesmo sem estoque cadastrado de um console/tipo</strong>
+                Liga isso só se topar vender na sorte (ex.: promoção) e conseguir a conta depois pra entregar manual — nunca manda a conta errada, só deixa de recusar a compra quando falta estoque daquele tipo específico.
+              </span>
+            </label>
 
             {accountsModalGame?.hasSecondary ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

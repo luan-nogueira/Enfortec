@@ -388,6 +388,16 @@ async function getConsoleAvailabilityMap(database: any): Promise<Record<number, 
 export async function getConsoleAvailabilityForProduct(digitalProductId: number): Promise<{ ps4Primaria: boolean; ps5Primaria: boolean; secundaria: boolean }> {
   const database = getDb();
   if (!database) return { ps4Primaria: true, ps5Primaria: true, secundaria: true };
+
+  const prodRows = await database.select({ allowManualWithoutStock: digitalProducts.allowManualWithoutStock }).from(digitalProducts).where(eq(digitalProducts.id, digitalProductId)).limit(1);
+  // Admin topou vender mesmo sem estoque cadastrado daquele console (ex.: jogo em
+  // promoção, resolve manual se vender por sorte) — nunca bloqueia o checkout aqui;
+  // quem decide se entrega automático ou cai pro manual continua sendo o pool real de
+  // contas (claimDigitalProductAccount), sem risco de mandar a conta errada.
+  if (prodRows[0]?.allowManualWithoutStock) {
+    return { ps4Primaria: true, ps5Primaria: true, secundaria: true };
+  }
+
   const result: any = await database.execute(sql`
     SELECT
       BOOL_OR("capPrimariaTotal" > 0 AND "usedPrimariaPs4" < "capPrimariaPs4" AND ("usedPrimariaPs4" + "usedPrimariaPs5") < "capPrimariaTotal") AS ps4_primaria,
@@ -436,6 +446,11 @@ export async function getActiveDigitalProducts() {
       ? p.pricePrimary
       : (!p.priceSecondary && p.price ? p.price : null);
     const availability = availabilityMap[p.id];
+    // Admin ligou "vender mesmo sem estoque" pra esse jogo (ex.: promoção, resolve na
+    // mão se vender por sorte) — a tela nunca trava nenhuma opção nesse caso.
+    if (p.allowManualWithoutStock) {
+      return { ...p, pricePrimary, sellerName: r.sellerName, sellerOpenId: r.sellerOpenId, ps4PrimariaAvailable: true, ps5PrimariaAvailable: true, secundariaAvailable: true };
+    }
     return {
       ...p,
       pricePrimary,
