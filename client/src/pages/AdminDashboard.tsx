@@ -1500,6 +1500,12 @@ export default function AdminDashboard() {
   const [accountsModalGame, setAccountsModalGame] = useState<{ id: number; name: string; hasSecondary: boolean } | null>(null);
   const [accountsRawTextPrimary, setAccountsRawTextPrimary] = useState("");
   const [accountsRawTextSecondary, setAccountsRawTextSecondary] = useState("");
+  // Quantidade que cada conta cadastrada vai aguentar vender — o admin escolhe direto
+  // (Sandro pediu isso: antes a cota era calculada sozinha e parecia "número aleatório"
+  // aparecendo). Começa zerado de propósito — precisa escolher toda vez, sem sugestão
+  // pré-preenchida — e o botão de adicionar só libera com um número maior que 0.
+  const [primariaQty, setPrimariaQty] = useState<number | "">("");
+  const [secundariaQty, setSecundariaQty] = useState<number | "">("");
   const accountsSummaryQuery = trpc.digitalProducts.accounts.summary.useQuery(undefined, { enabled: !!(isAuthenticated && isAdmin) });
   const accountsListQuery = trpc.digitalProducts.accounts.list.useQuery(
     { digitalProductId: accountsModalGame?.id ?? 0 },
@@ -1516,8 +1522,8 @@ export default function AdminDashboard() {
       } else if (skipped > 0) {
         toast.warning(`Nenhuma conta nova — ${skipped === 1 ? "esse e-mail já está" : "esses e-mails já estão"} cadastrado${skipped !== 1 ? "s" : ""} nesse tipo pra esse jogo.`);
       }
-      if (variables.accountType === "secundaria") setAccountsRawTextSecondary("");
-      else setAccountsRawTextPrimary("");
+      if (variables.accountType === "secundaria") { setAccountsRawTextSecondary(""); setSecundariaQty(""); }
+      else { setAccountsRawTextPrimary(""); setPrimariaQty(""); }
       accountsListQuery.refetch();
       accountsSummaryQuery.refetch();
       adminDigitalProductsQuery.refetch();
@@ -1545,6 +1551,8 @@ export default function AdminDashboard() {
   const openAccountsModal = (game: any) => {
     setAccountsRawTextPrimary("");
     setAccountsRawTextSecondary("");
+    setPrimariaQty("");
+    setSecundariaQty("");
     const sec = game.priceSecondary ?? game.price_secondary;
     const hasSecondaryPrice = sec !== undefined && sec !== null && sec !== "" && parseFloat(sec) > 0;
     // Jogos e assinaturas sempre mandam um accountType ("primaria" por padrão) no checkout,
@@ -6710,10 +6718,21 @@ export default function AdminDashboard() {
                     rows={4}
                     className="w-full bg-slate-950 border border-blue-600/20 rounded-md p-3 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-blue-500/50"
                   />
+                  <div className="flex items-center gap-2">
+                    <Label className="text-[10px] text-slate-400 font-bold uppercase whitespace-nowrap">Quantidade por conta</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={primariaQty}
+                      onChange={(e) => setPrimariaQty(e.target.value === "" ? "" : Math.max(1, parseInt(e.target.value) || 1))}
+                      placeholder="Ex: 2"
+                      className="bg-slate-950 border-blue-600/20 text-white h-8 text-xs w-20"
+                    />
+                  </div>
                   <Button
                     type="button"
-                    disabled={!accountsRawTextPrimary.trim() || addAccountsMutation.isPending}
-                    onClick={() => accountsModalGame && addAccountsMutation.mutate({ digitalProductId: accountsModalGame.id, rawText: accountsRawTextPrimary, accountType: "primaria" })}
+                    disabled={!accountsRawTextPrimary.trim() || !primariaQty || primariaQty < 1 || addAccountsMutation.isPending}
+                    onClick={() => accountsModalGame && addAccountsMutation.mutate({ digitalProductId: accountsModalGame.id, rawText: accountsRawTextPrimary, accountType: "primaria", quantity: primariaQty || undefined })}
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold btn-neon"
                   >
                     {addAccountsMutation.isPending ? "Adicionando..." : "Adicionar Primárias"}
@@ -6728,16 +6747,27 @@ export default function AdminDashboard() {
                     rows={4}
                     className="w-full bg-slate-950 border border-purple-600/20 rounded-md p-3 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-purple-500/50"
                   />
+                  <div className="flex items-center gap-2">
+                    <Label className="text-[10px] text-slate-400 font-bold uppercase whitespace-nowrap">Quantidade por conta</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={secundariaQty}
+                      onChange={(e) => setSecundariaQty(e.target.value === "" ? "" : Math.max(1, parseInt(e.target.value) || 1))}
+                      placeholder="Ex: 1"
+                      className="bg-slate-950 border-purple-600/20 text-white h-8 text-xs w-20"
+                    />
+                  </div>
                   <Button
                     type="button"
-                    disabled={!accountsRawTextSecondary.trim() || addAccountsMutation.isPending}
-                    onClick={() => accountsModalGame && addAccountsMutation.mutate({ digitalProductId: accountsModalGame.id, rawText: accountsRawTextSecondary, accountType: "secundaria" })}
+                    disabled={!accountsRawTextSecondary.trim() || !secundariaQty || secundariaQty < 1 || addAccountsMutation.isPending}
+                    onClick={() => accountsModalGame && addAccountsMutation.mutate({ digitalProductId: accountsModalGame.id, rawText: accountsRawTextSecondary, accountType: "secundaria", quantity: secundariaQty || undefined })}
                     className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold btn-neon"
                   >
                     {addAccountsMutation.isPending ? "Adicionando..." : "Adicionar Secundárias"}
                   </Button>
                 </div>
-                <p className="text-[10px] text-slate-500 col-span-full -mt-1">Uma conta por linha, no formato email:senha (ou email;senha) — <strong className="text-amber-400">direto, sem escrever a palavra "senha" antes</strong> (ex.: email@site.com:MinhaSenha123, não email@site.com:senha:MinhaSenha123). Cada conta cadastrada é revendida automaticamente várias vezes até estourar a cota (2 primárias por console + 1 secundária, ou 3 primárias no total se o jogo for PS4/PS5 combinado) — o cliente sempre recebe a credencial do tipo certo que ele pagou, sem misturar plataforma.</p>
+                <p className="text-[10px] text-slate-500 col-span-full -mt-1">Uma conta por linha, no formato email:senha (ou email;senha) — <strong className="text-amber-400">direto, sem escrever a palavra "senha" antes</strong> (ex.: email@site.com:MinhaSenha123, não email@site.com:senha:MinhaSenha123). Escolha em "Quantidade por conta" quantas vendas cada conta cadastrada aguenta daquele tipo (ex.: 2 primárias, 1 secundária) — o cliente sempre recebe a credencial do tipo certo que ele pagou, sem misturar plataforma.</p>
               </div>
             ) : (
               <div className="space-y-2">

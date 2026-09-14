@@ -984,11 +984,13 @@ export async function listDigitalProductAccounts(digitalProductId: number) {
 
 /**
  * Adiciona várias contas de uma vez (uma por linha, "email:senha" ou "email;senha").
- * Quando accountType é informado, cada conta nasce com a cota fixa correspondente
- * (ver computeAccountCaps) calculada a partir da plataforma cadastrada do jogo — uma
- * mesma conta poderá então ser vendida mais de uma vez, até estourar essa cota.
+ * Quando accountType é informado, cada conta nasce com uma cota: se `quantity` for
+ * passado, usa esse número direto (decisão do admin, ex.: "essa conta aguenta 2
+ * primárias"); senão cai no cálculo automático de computeAccountCaps a partir da
+ * plataforma cadastrada do jogo. Em qualquer um dos casos, a mesma conta poderá ser
+ * vendida mais de uma vez, até estourar a cota.
  */
-export async function addDigitalProductAccountsBulk(digitalProductId: number, rawText: string, accountType?: string | null) {
+export async function addDigitalProductAccountsBulk(digitalProductId: number, rawText: string, accountType?: string | null, quantity?: number) {
   const database = getDb();
   if (!database) throw new Error("Database not available");
 
@@ -1038,7 +1040,14 @@ export async function addDigitalProductAccountsBulk(digitalProductId: number, ra
   }
 
   let caps = { capPrimariaPs4: 0, capPrimariaPs5: 0, capPrimariaTotal: 0, capSecundaria: 0 };
-  if (accountType === "primaria" || accountType === "secundaria") {
+  if (accountType === "primaria" && quantity && quantity > 0) {
+    // Quantidade escolhida manualmente pelo admin — não aplica o sub-limite automático
+    // de "no máximo 2 por console", já que quem decidiu o número foi o admin, não a
+    // regra fixa de plataforma.
+    caps = { capPrimariaPs4: quantity, capPrimariaPs5: quantity, capPrimariaTotal: quantity, capSecundaria: 0 };
+  } else if (accountType === "secundaria" && quantity && quantity > 0) {
+    caps = { capPrimariaPs4: 0, capPrimariaPs5: 0, capPrimariaTotal: 0, capSecundaria: quantity };
+  } else if (accountType === "primaria" || accountType === "secundaria") {
     const prodRows = await database.select({ platform: digitalProducts.platform }).from(digitalProducts).where(eq(digitalProducts.id, digitalProductId)).limit(1);
     caps = computeAccountCaps(prodRows[0]?.platform, accountType);
   }

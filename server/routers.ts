@@ -671,10 +671,10 @@ export const appRouter = router({
           return db.listDigitalProductAccounts(input.digitalProductId);
         }),
       addBulk: protectedProcedure
-        .input(z.object({ digitalProductId: z.number(), rawText: z.string().min(1), accountType: z.enum(["primaria", "secundaria"]).optional() }))
+        .input(z.object({ digitalProductId: z.number(), rawText: z.string().min(1), accountType: z.enum(["primaria", "secundaria"]).optional(), quantity: z.number().int().positive().optional() }))
         .mutation(async ({ ctx, input }) => {
           if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
-          return db.addDigitalProductAccountsBulk(input.digitalProductId, input.rawText, input.accountType);
+          return db.addDigitalProductAccountsBulk(input.digitalProductId, input.rawText, input.accountType, input.quantity);
         }),
       remove: protectedProcedure
         .input(z.object({ id: z.number() }))
