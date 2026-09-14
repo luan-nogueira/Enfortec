@@ -19,6 +19,7 @@ import { MessageCircle, X, Send, Bot, ShieldCheck, Zap, Trophy, ShoppingBag, Spa
 import { toast } from "sonner";
 import { containsLink, LINK_BLOCKED_MESSAGE } from "@/lib/textFilters";
 import { trpc } from "@/lib/trpc";
+import { WA_ATTENDANTS } from "@/lib/waAttendants";
 
 // Catalog is fetched from the same tRPC query the storefront uses (Postgres), so the
 // bot never quotes a game that's out of stock or was removed from the real catalog.
@@ -170,23 +171,6 @@ const WELCOME_FLOW: { text: string; delay: number }[] = [
   { text: "🎮 Precisa de ajuda com algum jogo, conta ou pedido?", delay: 1100 },
 ];
 
-// Atendentes do WhatsApp
-const WA_ATTENDANTS = [
-  {
-    name: "Andre",
-    role: "Suporte & Vendas",
-    number: "554384253691",
-    avatar: "A",
-    color: "bg-red-600",
-  },
-  {
-    name: "Sandro",
-    role: "Suporte & Vendas",
-    number: "5571987650840",
-    avatar: "S",
-    color: "bg-blue-600",
-  },
-];
 
 export default function FloatingChat() {
   const [location] = useLocation();

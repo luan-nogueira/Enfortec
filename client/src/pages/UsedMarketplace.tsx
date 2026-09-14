@@ -12,6 +12,7 @@ import { collection, onSnapshot, query, orderBy, doc, getDoc, updateDoc, deleteD
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { isValidWhatsApp } from "@/lib/utils";
+import { WA_ATTENDANTS } from "@/lib/waAttendants";
 import {
   Dialog,
   DialogContent,
@@ -198,12 +199,11 @@ export default function UsedMarketplace() {
     setBargainOffer("");
   };
 
-  const handleFinalizeBargain = () => {
+  const handleFinalizeBargain = (attendantNumber: string) => {
     if (!selectedBargainProduct || !bargainOffer.trim()) return;
     const price = parseFloat(selectedBargainProduct.price || 0);
     const message = `Olá! Tenho interesse no produto usado: ${selectedBargainProduct.name} anunciado por ${selectedBargainProduct.sellerName || "vendedor"} (Preço original: R$ ${price.toFixed(2).replace('.', ',')}). Gostaria de pechinchar: você fecharia por R$ ${parseFloat(bargainOffer).toFixed(2).replace('.', ',')}?`;
-    const phone = "5543984253691";
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
+    window.open(`https://wa.me/${attendantNumber}?text=${encodeURIComponent(message)}`, "_blank");
     setSelectedBargainProduct(null);
   };
 
@@ -921,14 +921,21 @@ export default function UsedMarketplace() {
             </div>
           </div>
 
-          <DialogFooter className="pb-4 sm:pb-0">
-            <Button 
-              disabled={!bargainOffer.trim()}
-              onClick={handleFinalizeBargain}
-              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-12 text-lg rounded-xl shadow-lg shadow-green-600/20"
-            >
-              Enviar Proposta de Pechincha
-            </Button>
+          <DialogFooter className="pb-4 sm:pb-0 flex-col gap-2">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wide self-start">Enviar proposta para:</label>
+            <div className="grid grid-cols-2 gap-2 w-full">
+              {WA_ATTENDANTS.map(att => (
+                <Button
+                  key={att.name}
+                  disabled={!bargainOffer.trim()}
+                  onClick={() => handleFinalizeBargain(att.number)}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-12 rounded-xl shadow-lg shadow-green-600/20 flex items-center justify-center gap-2"
+                >
+                  <span className={`w-6 h-6 rounded-full ${att.color} flex items-center justify-center text-[10px] font-black shrink-0`}>{att.avatar}</span>
+                  {att.name}
+                </Button>
+              ))}
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

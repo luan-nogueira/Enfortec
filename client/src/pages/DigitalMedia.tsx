@@ -19,6 +19,7 @@ import { auth, db } from "@/lib/firebase";
 import { collection, onSnapshot, doc, getDoc, updateDoc } from "firebase/firestore";
 import { trpc } from "@/lib/trpc";
 import { isValidWhatsApp } from "@/lib/utils";
+import { WA_ATTENDANTS } from "@/lib/waAttendants";
 
 // Mapeamento de gêneros → palavras-chave nos nomes dos jogos
 const GENRE_MAP: Record<string, string[]> = {
@@ -295,11 +296,11 @@ export default function DigitalMedia() {
     setBargainOffer("");
   };
 
-  const handleFinalizeBargain = () => {
+  const handleFinalizeBargain = (attendantNumber: string) => {
     if (!selectedBargainProduct || !bargainOffer.trim()) return;
     const price = parseFloat(selectedBargainProduct.price);
     const message = `Olá! Tenho interesse no jogo digital: ${selectedBargainProduct.name} (Preço original: R$ ${price.toFixed(2).replace('.', ',')}). Gostaria de fazer uma pechincha: você fecharia por R$ ${parseFloat(bargainOffer).toFixed(2).replace('.', ',')}?`;
-    window.open(`https://wa.me/${platformSettings?.supportWhatsapp || "554384253691"}?text=${encodeURIComponent(message)}`, "_blank");
+    window.open(`https://wa.me/${attendantNumber}?text=${encodeURIComponent(message)}`, "_blank");
     setSelectedBargainProduct(null);
   };
 
@@ -1345,7 +1346,7 @@ export default function DigitalMedia() {
               Proponha sua oferta para o administrador. Se aprovado, fechamos o negócio!
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="py-6 space-y-4">
             <div className="flex gap-4 items-start mb-6">
               <div className="w-20 h-20 rounded bg-slate-800 overflow-hidden border border-red-600/20">
@@ -1370,14 +1371,21 @@ export default function DigitalMedia() {
             </div>
           </div>
 
-          <DialogFooter className="pb-4 sm:pb-0">
-            <Button 
-              disabled={!bargainOffer.trim()}
-              onClick={handleFinalizeBargain}
-              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-12 text-lg rounded-xl shadow-lg shadow-green-600/20"
-            >
-              Enviar Proposta de Pechincha
-            </Button>
+          <DialogFooter className="pb-4 sm:pb-0 flex-col gap-2">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wide self-start">Enviar proposta para:</label>
+            <div className="grid grid-cols-2 gap-2 w-full">
+              {WA_ATTENDANTS.map(att => (
+                <Button
+                  key={att.name}
+                  disabled={!bargainOffer.trim()}
+                  onClick={() => handleFinalizeBargain(att.number)}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-12 rounded-xl shadow-lg shadow-green-600/20 flex items-center justify-center gap-2"
+                >
+                  <span className={`w-6 h-6 rounded-full ${att.color} flex items-center justify-center text-[10px] font-black shrink-0`}>{att.avatar}</span>
+                  {att.name}
+                </Button>
+              ))}
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
