@@ -143,6 +143,7 @@ export function registerPaymentRoute(app: Express) {
       let verifiedPrice: number | null = null;
       let realProductName: string | null = null;
       let verifiedIsPreVenda = false;
+      let verifiedDigitalProductId: number | null = null;
       if (productId) {
         const pid = parseInt(String(productId));
         if (!isNaN(pid)) {
@@ -176,6 +177,7 @@ export function registerPaymentRoute(app: Express) {
               verifiedPrice = computeDigitalPrice(rows[0], accountType);
               realProductName = rows[0].name;
               verifiedIsPreVenda = !!rows[0].isPreVenda;
+              verifiedDigitalProductId = pid;
             }
           }
         }
@@ -204,6 +206,25 @@ export function registerPaymentRoute(app: Express) {
           productNameStr += ` (${resolvedConsoleType})`;
         }
       }
+
+      // Recusa a compra se o estoque real (contas cadastradas) não tiver vaga pro
+      // console/tipo escolhido — em vez de confiar só no texto "plataforma" do jogo
+      // (que pode estar vazio/errado) e aprovar um pedido que depois não tem como
+      // entregar certo. Sem nenhuma conta cadastrada ainda, não bloqueia (mantém o
+      // fluxo manual de sempre até o estoque existir).
+      if (verifiedDigitalProductId !== null) {
+        const availability = await db.getConsoleAvailabilityForProduct(verifiedDigitalProductId);
+        if (accountType === "secundaria" && !availability.secundaria) {
+          return res.status(400).json({ success: false, error: "Conta secundária esgotada para este jogo no momento." });
+        }
+        if (accountType === "primaria" && (resolvedConsoleType === "PS4" || resolvedConsoleType === "PS5")) {
+          const hasStock = resolvedConsoleType === "PS4" ? availability.ps4Primaria : availability.ps5Primaria;
+          if (!hasStock) {
+            return res.status(400).json({ success: false, error: `Não há estoque de conta primária para ${resolvedConsoleType} deste jogo no momento.` });
+          }
+        }
+      }
+
       if (accountType === "secundaria") {
         if (!productNameStr.toLowerCase().includes("secundária") && !productNameStr.toLowerCase().includes("secundaria")) {
           productNameStr += " (Conta Secundária)";

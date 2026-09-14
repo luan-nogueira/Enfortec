@@ -352,6 +352,64 @@ export async function getAllUsedProductsWithSeller() {
 }
 
 // Digital Products queries
+/**
+ * Disponibilidade real de cada console/tipo por jogo, direto do estoque cadastrado
+ * (digitalProductAccounts) — não do campo de texto "platform" do jogo, que pode estar
+ * vazio ou errado. É essa função que garante que o cliente só consiga escolher/comprar
+ * PS4 se existir conta com vaga de PS4 de verdade, e o mesmo pra PS5/secundária.
+ */
+async function getConsoleAvailabilityMap(database: any): Promise<Record<number, { ps4Primaria: boolean; ps5Primaria: boolean; secundaria: boolean }>> {
+  const result: any = await database.execute(sql`
+    SELECT "digitalProductId",
+      BOOL_OR("capPrimariaTotal" > 0 AND "usedPrimariaPs4" < "capPrimariaPs4" AND ("usedPrimariaPs4" + "usedPrimariaPs5") < "capPrimariaTotal") AS ps4_primaria,
+      BOOL_OR("capPrimariaTotal" > 0 AND "usedPrimariaPs5" < "capPrimariaPs5" AND ("usedPrimariaPs4" + "usedPrimariaPs5") < "capPrimariaTotal") AS ps5_primaria,
+      BOOL_OR("capSecundaria" > 0 AND "usedSecundaria" < "capSecundaria") AS secundaria,
+      BOOL_OR("capPrimariaTotal" = 0 AND "capSecundaria" = 0 AND status = 'disponivel') AS legacy
+    FROM "digitalProductAccounts"
+    GROUP BY "digitalProductId"
+  `);
+  const rows: any[] = Array.isArray(result) ? result : (result?.rows ?? []);
+  const map: Record<number, { ps4Primaria: boolean; ps5Primaria: boolean; secundaria: boolean }> = {};
+  for (const r of rows) {
+    // Conta do modelo antigo (sem tipo/plataforma definida) não discrimina console —
+    // mantém disponível pros dois, igual o fallback já usado na entrega automática.
+    map[r.digitalProductId] = {
+      ps4Primaria: !!r.ps4_primaria || !!r.legacy,
+      ps5Primaria: !!r.ps5_primaria || !!r.legacy,
+      secundaria: !!r.secundaria || !!r.legacy,
+    };
+  }
+  return map;
+}
+
+/** Mesma checagem de getConsoleAvailabilityMap, mas só pra um jogo — usada no checkout
+ * (server/_core/payment.ts) pra recusar a compra se o console escolhido não tiver
+ * estoque de verdade, em vez de aprovar o pagamento e falhar a entrega depois. */
+export async function getConsoleAvailabilityForProduct(digitalProductId: number): Promise<{ ps4Primaria: boolean; ps5Primaria: boolean; secundaria: boolean }> {
+  const database = getDb();
+  if (!database) return { ps4Primaria: true, ps5Primaria: true, secundaria: true };
+  const result: any = await database.execute(sql`
+    SELECT
+      BOOL_OR("capPrimariaTotal" > 0 AND "usedPrimariaPs4" < "capPrimariaPs4" AND ("usedPrimariaPs4" + "usedPrimariaPs5") < "capPrimariaTotal") AS ps4_primaria,
+      BOOL_OR("capPrimariaTotal" > 0 AND "usedPrimariaPs5" < "capPrimariaPs5" AND ("usedPrimariaPs4" + "usedPrimariaPs5") < "capPrimariaTotal") AS ps5_primaria,
+      BOOL_OR("capSecundaria" > 0 AND "usedSecundaria" < "capSecundaria") AS secundaria,
+      BOOL_OR("capPrimariaTotal" = 0 AND "capSecundaria" = 0 AND status = 'disponivel') AS legacy,
+      COUNT(*)::int AS total
+    FROM "digitalProductAccounts"
+    WHERE "digitalProductId" = ${digitalProductId}
+  `);
+  const rows: any[] = Array.isArray(result) ? result : (result?.rows ?? []);
+  const r = rows[0];
+  // Sem NENHUMA conta cadastrada ainda pra esse jogo: não há como saber o console real,
+  // então não bloqueia (segue pro fluxo manual de sempre, como já era antes dessa feature).
+  if (!r || r.total === 0) return { ps4Primaria: true, ps5Primaria: true, secundaria: true };
+  return {
+    ps4Primaria: !!r.ps4_primaria || !!r.legacy,
+    ps5Primaria: !!r.ps5_primaria || !!r.legacy,
+    secundaria: !!r.secundaria || !!r.legacy,
+  };
+}
+
 export async function getActiveDigitalProducts() {
   const db = getDb();
   if (!db) return [];
@@ -371,12 +429,25 @@ export async function getActiveDigitalProducts() {
       )
     )
     .orderBy(desc(digitalProducts.createdAt));
+  const availabilityMap = await getConsoleAvailabilityMap(db);
   return rows.map((r) => {
     const p = r.product;
     const pricePrimary = (p.pricePrimary !== null && p.pricePrimary !== undefined && p.pricePrimary !== "")
       ? p.pricePrimary
       : (!p.priceSecondary && p.price ? p.price : null);
-    return { ...p, pricePrimary, sellerName: r.sellerName, sellerOpenId: r.sellerOpenId };
+    const availability = availabilityMap[p.id];
+    return {
+      ...p,
+      pricePrimary,
+      sellerName: r.sellerName,
+      sellerOpenId: r.sellerOpenId,
+      // undefined quando não há NENHUMA conta cadastrada pra esse jogo ainda — nesse
+      // caso o front não deve bloquear a escolha (ainda não é possível saber o console
+      // real), só passa a restringir quando já existe estoque cadastrado.
+      ps4PrimariaAvailable: availability ? availability.ps4Primaria : undefined,
+      ps5PrimariaAvailable: availability ? availability.ps5Primaria : undefined,
+      secundariaAvailable: availability ? availability.secundaria : undefined,
+    };
   });
 }
 
@@ -1041,10 +1112,19 @@ export async function addDigitalProductAccountsBulk(digitalProductId: number, ra
 
   let caps = { capPrimariaPs4: 0, capPrimariaPs5: 0, capPrimariaTotal: 0, capSecundaria: 0 };
   if (accountType === "primaria" && quantity && quantity > 0) {
-    // Quantidade escolhida manualmente pelo admin — não aplica o sub-limite automático
-    // de "no máximo 2 por console", já que quem decidiu o número foi o admin, não a
-    // regra fixa de plataforma.
-    caps = { capPrimariaPs4: quantity, capPrimariaPs5: quantity, capPrimariaTotal: quantity, capSecundaria: 0 };
+    // Quantidade escolhida manualmente pelo admin, mas SEMPRE travada pela plataforma
+    // real do jogo — uma conta de um jogo só-PS5 nunca pode virar vaga de PS4, nem que
+    // o admin digite um número maior, senão o sistema aprova entrega pro console errado.
+    const prodRows = await database.select({ platform: digitalProducts.platform }).from(digitalProducts).where(eq(digitalProducts.id, digitalProductId)).limit(1);
+    const p = (prodRows[0]?.platform || "").toUpperCase();
+    const isPs4Only = p.includes("PS4") && !p.includes("PS5");
+    const isPs5Only = p.includes("PS5") && !p.includes("PS4");
+    caps = {
+      capPrimariaPs4: isPs5Only ? 0 : quantity,
+      capPrimariaPs5: isPs4Only ? 0 : quantity,
+      capPrimariaTotal: quantity,
+      capSecundaria: 0,
+    };
   } else if (accountType === "secundaria" && quantity && quantity > 0) {
     caps = { capPrimariaPs4: 0, capPrimariaPs5: 0, capPrimariaTotal: 0, capSecundaria: quantity };
   } else if (accountType === "primaria" || accountType === "secundaria") {

@@ -216,6 +216,23 @@ export default function DigitalMedia() {
   const [couponError, setCouponError] = useState<string | null>(null);
   const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
 
+  // Se o console padrão (PS5) não tiver estoque real pra esse jogo mas o outro tiver,
+  // já troca sozinho pro que existe — evita abrir o modal com uma opção sem estoque
+  // pré-selecionada.
+  useEffect(() => {
+    if (!selectedProduct) return;
+    const ps4Out = selectedProduct.ps4PrimariaAvailable === false;
+    const ps5Out = selectedProduct.ps5PrimariaAvailable === false;
+    if (selectedConsole === "PS5" && ps5Out && !ps4Out) setSelectedConsole("PS4");
+    else if (selectedConsole === "PS4" && ps4Out && !ps5Out) setSelectedConsole("PS5");
+    // accountType não reseta sozinho ao trocar de produto — sem isso, uma escolha
+    // "secundária" feita num jogo anterior podia continuar marcada (mesmo com o botão
+    // desabilitado na tela) e ir pro checkout de um jogo sem secundária em estoque.
+    if (accountType === "secundaria" && selectedProduct.secundariaAvailable === false) {
+      setAccountType("primaria");
+    }
+  }, [selectedProduct]);
+
   const validateCouponMutation = trpc.coupons.validate.useMutation();
 
   const handleApplyCoupon = async () => {
@@ -1017,8 +1034,13 @@ export default function DigitalMedia() {
               </div>
             </div>
 
-            {/* Seletor de Console: PS4 vs PS5 */}
-            {isConsoleSelectableProduct(selectedProduct) && (
+            {/* Seletor de Console: PS4 vs PS5 — desabilitado quando o estoque real
+                (contas cadastradas) não tem vaga daquele console, pra nunca deixar
+                escolher/comprar uma plataforma que não temos de verdade. */}
+            {isConsoleSelectableProduct(selectedProduct) && (() => {
+              const ps4Out = selectedProduct.ps4PrimariaAvailable === false;
+              const ps5Out = selectedProduct.ps5PrimariaAvailable === false;
+              return (
               <div className="bg-slate-950 border border-red-600/30 rounded-xl p-3.5 space-y-2 animate-in fade-in duration-200">
                 <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
                   Escolha o seu Console *
@@ -1026,16 +1048,21 @@ export default function DigitalMedia() {
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
+                    disabled={ps4Out}
                     onClick={() => setSelectedConsole("PS4")}
                     className={`p-2.5 rounded-lg border text-left transition-all ${
-                      selectedConsole === "PS4"
+                      ps4Out
+                        ? "bg-slate-900/50 border-slate-800 text-slate-600 cursor-not-allowed opacity-60"
+                        : selectedConsole === "PS4"
                         ? "bg-red-600/20 border-red-500 text-white shadow-[0_0_15px_rgba(220,38,38,0.3)]"
                         : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700"
                     }`}
                   >
                     <div className="font-bold text-xs flex items-center justify-between">
                       <span className="flex items-center gap-1.5">🎮 PS4</span>
-                      {selectedConsole === "PS4" && (
+                      {ps4Out ? (
+                        <span className="text-[8px] bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded font-black">SEM ESTOQUE</span>
+                      ) : selectedConsole === "PS4" && (
                         <span className="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded font-black">OK</span>
                       )}
                     </div>
@@ -1044,16 +1071,21 @@ export default function DigitalMedia() {
 
                   <button
                     type="button"
+                    disabled={ps5Out}
                     onClick={() => setSelectedConsole("PS5")}
                     className={`p-2.5 rounded-lg border text-left transition-all ${
-                      selectedConsole === "PS5"
+                      ps5Out
+                        ? "bg-slate-900/50 border-slate-800 text-slate-600 cursor-not-allowed opacity-60"
+                        : selectedConsole === "PS5"
                         ? "bg-red-600/20 border-red-500 text-white shadow-[0_0_15px_rgba(220,38,38,0.3)]"
                         : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700"
                     }`}
                   >
                     <div className="font-bold text-xs flex items-center justify-between">
                       <span className="flex items-center gap-1.5">⚡ PS5</span>
-                      {selectedConsole === "PS5" && (
+                      {ps5Out ? (
+                        <span className="text-[8px] bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded font-black">SEM ESTOQUE</span>
+                      ) : selectedConsole === "PS5" && (
                         <span className="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded font-black">OK</span>
                       )}
                     </div>
@@ -1061,7 +1093,8 @@ export default function DigitalMedia() {
                   </button>
                 </div>
               </div>
-            )}
+              );
+            })()}
 
             {/* Seletor de Licença: Conta Primária vs Conta Secundária */}
             {hasSecondaryPrice(selectedProduct) && hasPrimaryPrice(selectedProduct) && (
@@ -1091,16 +1124,21 @@ export default function DigitalMedia() {
 
                   <button
                     type="button"
+                    disabled={selectedProduct.secundariaAvailable === false}
                     onClick={() => setAccountType("secundaria")}
                     className={`p-2.5 rounded-lg border text-left transition-all ${
-                      accountType === "secundaria"
+                      selectedProduct.secundariaAvailable === false
+                        ? "bg-slate-900/50 border-slate-800 text-slate-600 cursor-not-allowed opacity-60"
+                        : accountType === "secundaria"
                         ? "bg-red-600/20 border-red-500 text-white shadow-[0_0_15px_rgba(220,38,38,0.3)]"
                         : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700"
                     }`}
                   >
                     <div className="font-bold text-xs flex items-center justify-between">
                       <span>👥 Secundária</span>
-                      {accountType === "secundaria" && <span className="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded font-black">OK</span>}
+                      {selectedProduct.secundariaAvailable === false ? (
+                        <span className="text-[8px] bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded font-black">SEM ESTOQUE</span>
+                      ) : accountType === "secundaria" && <span className="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded font-black">OK</span>}
                     </div>
                     <p className="text-[9px] text-slate-400 mt-1 leading-tight">Jogue na conta enviada com internet</p>
                     <div className="font-black text-xs text-red-500 mt-1.5">
