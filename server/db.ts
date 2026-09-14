@@ -1030,16 +1030,26 @@ export async function listDigitalProductAccounts(digitalProductId: number) {
     ORDER BY id ASC
   `);
   const availableRows: any[] = Array.isArray(availableResult) ? availableResult : (availableResult?.rows ?? []);
-  const available = availableRows.map((r) => ({
-    id: r.id,
-    email: r.email,
-    password: r.password,
-    accountType: r.accountType,
-    isQuota: r.capPrimariaTotal > 0 || r.capSecundaria > 0,
-    remainingPrimariaPs4: Math.max(0, r.capPrimariaPs4 - r.usedPrimariaPs4),
-    remainingPrimariaPs5: Math.max(0, r.capPrimariaPs5 - r.usedPrimariaPs5),
-    remainingSecundaria: Math.max(0, r.capSecundaria - r.usedSecundaria),
-  }));
+  const available = availableRows.map((r) => {
+    // capPrimariaPs4/Ps5 são o teto de CADA console, mas quem realmente limita quantas
+    // vendas de primária essa conta ainda aguenta é o capPrimariaTotal compartilhado
+    // (ex.: 1 PS4 + 1 PS5 registrados, mas total=1 — só sai UMA das duas, não as duas).
+    // Somar os dois remainings separados pra contar "quantas vendas restam" contava em
+    // dobro; por isso o total usa remainingPrimariaTotal, e os remainings por console
+    // (só pra mostrar "esse console ainda pode vender") ficam limitados a esse total.
+    const remainingPrimariaTotal = Math.max(0, r.capPrimariaTotal - (r.usedPrimariaPs4 + r.usedPrimariaPs5));
+    return {
+      id: r.id,
+      email: r.email,
+      password: r.password,
+      accountType: r.accountType,
+      isQuota: r.capPrimariaTotal > 0 || r.capSecundaria > 0,
+      remainingPrimariaPs4: Math.min(remainingPrimariaTotal, Math.max(0, r.capPrimariaPs4 - r.usedPrimariaPs4)),
+      remainingPrimariaPs5: Math.min(remainingPrimariaTotal, Math.max(0, r.capPrimariaPs5 - r.usedPrimariaPs5)),
+      remainingPrimariaTotal,
+      remainingSecundaria: Math.max(0, r.capSecundaria - r.usedSecundaria),
+    };
+  });
 
   const deliveredResult: any = await database.execute(sql`
     SELECT

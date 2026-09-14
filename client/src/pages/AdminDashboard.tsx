@@ -6700,7 +6700,7 @@ export default function AdminDashboard() {
           <div className="space-y-4 py-2">
             <div className="flex items-center gap-3 text-xs font-bold">
               <span className="bg-green-950/50 border border-green-800/50 text-green-400 px-2.5 py-1 rounded-full">
-                {(accountsListQuery.data?.available ?? []).reduce((sum: number, a: any) => sum + (a.isQuota ? a.remainingPrimariaPs4 + a.remainingPrimariaPs5 + a.remainingSecundaria : 1), 0)} vendas disponíveis
+                {(accountsListQuery.data?.available ?? []).reduce((sum: number, a: any) => sum + (a.isQuota ? a.remainingPrimariaTotal + a.remainingSecundaria : 1), 0)} vendas disponíveis
               </span>
               <span className="bg-slate-800 border border-slate-700 text-slate-300 px-2.5 py-1 rounded-full">
                 {accountsListQuery.data?.deliveredCount ?? 0} já vendidas
@@ -6803,12 +6803,17 @@ export default function AdminDashboard() {
                     <div key={acc.id} className="flex items-center justify-between gap-2 bg-slate-950/60 border border-slate-800 rounded-lg px-3 py-1.5">
                       <span className="flex items-center gap-2 min-w-0">
                         {acc.isQuota ? (
-                          <span className="flex items-center gap-1 shrink-0">
+                          <span className="flex items-center gap-1 shrink-0 flex-wrap">
                             {acc.remainingPrimariaPs4 > 0 && (
                               <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-blue-950/60 text-blue-300">👤PS4 {acc.remainingPrimariaPs4}</span>
                             )}
                             {acc.remainingPrimariaPs5 > 0 && (
                               <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-blue-950/60 text-blue-300">👤PS5 {acc.remainingPrimariaPs5}</span>
+                            )}
+                            {/* PS4 e PS5 acima dividem a MESMA cota (capPrimariaTotal) — se a soma
+                                dos dois passar do total, deixa claro que não é "os dois juntos". */}
+                            {acc.remainingPrimariaPs4 > 0 && acc.remainingPrimariaPs5 > 0 && (acc.remainingPrimariaPs4 + acc.remainingPrimariaPs5) > acc.remainingPrimariaTotal && (
+                              <span className="text-[9px] font-bold text-amber-400">(máx {acc.remainingPrimariaTotal} no total)</span>
                             )}
                             {acc.remainingSecundaria > 0 && (
                               <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-purple-950/60 text-purple-300">👥Sec {acc.remainingSecundaria}</span>
