@@ -132,7 +132,10 @@ function parseBold(text: string) {
 function renderMessageText(text: string) {
   if (!text) return null;
   return text.split("\n").map((line, lineIdx) => {
-    const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+    // Grupo da URL é guloso (".+" em vez de "[^)]+") pra não cortar no primeiro ")" —
+    // nomes de arquivo tipo "video (1).mp4" têm parênteses de verdade na URL, e um
+    // regex "preguiçoso" truncava o link bem ali, quebrando o vídeo (link virava 404).
+    const linkRegex = /\[([^\]]+)\]\((.+?)\)(?=\s|$)/g;
     const matches: { index: number; length: number; element: any }[] = [];
     let match;
     while ((match = linkRegex.exec(line)) !== null) {

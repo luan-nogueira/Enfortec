@@ -1506,8 +1506,16 @@ export default function AdminDashboard() {
     { enabled: !!accountsModalGame }
   );
   const addAccountsMutation = trpc.digitalProducts.accounts.addBulk.useMutation({
-    onSuccess: (data, variables) => {
-      toast.success(`${data.inserted} conta${data.inserted !== 1 ? "s" : ""} adicionada${data.inserted !== 1 ? "s" : ""} ao estoque!`);
+    onSuccess: (data: any, variables) => {
+      const skipped = data.skipped || 0;
+      if (data.inserted > 0) {
+        toast.success(
+          `${data.inserted} conta${data.inserted !== 1 ? "s" : ""} adicionada${data.inserted !== 1 ? "s" : ""} ao estoque!`
+          + (skipped > 0 ? ` (${skipped} ignorada${skipped !== 1 ? "s" : ""} — já cadastrada${skipped !== 1 ? "s" : ""})` : "")
+        );
+      } else if (skipped > 0) {
+        toast.warning(`Nenhuma conta nova — ${skipped === 1 ? "esse e-mail já está" : "esses e-mails já estão"} cadastrado${skipped !== 1 ? "s" : ""} nesse tipo pra esse jogo.`);
+      }
       if (variables.accountType === "secundaria") setAccountsRawTextSecondary("");
       else setAccountsRawTextPrimary("");
       accountsListQuery.refetch();
@@ -1646,6 +1654,7 @@ export default function AdminDashboard() {
 
     setIsSubmittingBulkAccounts(true);
     let totalInserted = 0;
+    let totalSkipped = 0;
     const failed: string[] = [];
 
     for (const group of matched) {
@@ -1661,8 +1670,9 @@ export default function AdminDashboard() {
       try {
         for (const bucket of buckets) {
           const rawText = bucket.accounts.map((a) => `${a.email}:${a.password}`).join("\n");
-          const result = await bulkAddAccountsMutation.mutateAsync({ digitalProductId: group.gameId as number, rawText, accountType: bucket.accountType });
+          const result: any = await bulkAddAccountsMutation.mutateAsync({ digitalProductId: group.gameId as number, rawText, accountType: bucket.accountType });
           totalInserted += result.inserted;
+          totalSkipped += result.skipped || 0;
         }
       } catch (err: any) {
         failed.push(group.gameName);
@@ -1675,7 +1685,12 @@ export default function AdminDashboard() {
 
     const unmatchedCount = bulkAccountsGroups.length - matched.length;
     if (totalInserted > 0) {
-      toast.success(`${totalInserted} conta${totalInserted !== 1 ? "s" : ""} adicionada${totalInserted !== 1 ? "s" : ""} em ${matched.length} jogo${matched.length !== 1 ? "s" : ""}!`);
+      toast.success(
+        `${totalInserted} conta${totalInserted !== 1 ? "s" : ""} adicionada${totalInserted !== 1 ? "s" : ""} em ${matched.length} jogo${matched.length !== 1 ? "s" : ""}!`
+        + (totalSkipped > 0 ? ` (${totalSkipped} ignorada${totalSkipped !== 1 ? "s" : ""} — já cadastrada${totalSkipped !== 1 ? "s" : ""})` : "")
+      );
+    } else if (totalSkipped > 0) {
+      toast.warning(`Nenhuma conta nova — todas já estavam cadastradas (${totalSkipped} ignorada${totalSkipped !== 1 ? "s" : ""}).`);
     }
     if (failed.length > 0) {
       toast.error(`Falha ao adicionar contas em: ${failed.join(", ")}`);
@@ -6722,7 +6737,7 @@ export default function AdminDashboard() {
                     {addAccountsMutation.isPending ? "Adicionando..." : "Adicionar Secundárias"}
                   </Button>
                 </div>
-                <p className="text-[10px] text-slate-500 col-span-full -mt-1">Uma conta por linha, no formato email:senha (ou email;senha). Cada conta cadastrada é revendida automaticamente várias vezes até estourar a cota (2 primárias por console + 1 secundária, ou 3 primárias no total se o jogo for PS4/PS5 combinado) — o cliente sempre recebe a credencial do tipo certo que ele pagou, sem misturar plataforma.</p>
+                <p className="text-[10px] text-slate-500 col-span-full -mt-1">Uma conta por linha, no formato email:senha (ou email;senha) — <strong className="text-amber-400">direto, sem escrever a palavra "senha" antes</strong> (ex.: email@site.com:MinhaSenha123, não email@site.com:senha:MinhaSenha123). Cada conta cadastrada é revendida automaticamente várias vezes até estourar a cota (2 primárias por console + 1 secundária, ou 3 primárias no total se o jogo for PS4/PS5 combinado) — o cliente sempre recebe a credencial do tipo certo que ele pagou, sem misturar plataforma.</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -6734,7 +6749,7 @@ export default function AdminDashboard() {
                   rows={4}
                   className="w-full bg-slate-950 border border-red-600/20 rounded-md p-3 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-red-500/50"
                 />
-                <p className="text-[10px] text-slate-500">Uma conta por linha, no formato email:senha (ou email;senha).</p>
+                <p className="text-[10px] text-slate-500">Uma conta por linha, no formato email:senha (ou email;senha) — <strong className="text-amber-400">direto, sem escrever a palavra "senha" antes</strong> (ex.: email@site.com:MinhaSenha123).</p>
                 <Button
                   type="button"
                   disabled={!accountsRawTextPrimary.trim() || addAccountsMutation.isPending}
@@ -6924,7 +6939,7 @@ export default function AdminDashboard() {
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-neon flex items-center gap-2">📦 Cadastrar Contas em Lote</DialogTitle>
             <DialogDescription className="text-slate-400 text-xs">
-              Cole o nome de cada jogo (igual aparece no site), seguido das contas dele (email:senha, uma por linha). Deixe uma linha em branco entre jogos diferentes. Pra jogos com conta primária e secundária, coloque "Primária" e "Secundária" como sub-título antes das contas de cada tipo.
+              Cole o nome de cada jogo (igual aparece no site), seguido das contas dele (email:senha, uma por linha — direto, sem escrever a palavra "senha" antes da senha). Deixe uma linha em branco entre jogos diferentes. Pra jogos com conta primária e secundária, coloque "Primária" e "Secundária" como sub-título antes das contas de cada tipo.
             </DialogDescription>
           </DialogHeader>
 

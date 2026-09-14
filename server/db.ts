@@ -998,13 +998,44 @@ export async function addDigitalProductAccountsBulk(digitalProductId: number, ra
     .filter(Boolean)
     .map((line) => {
       const parts = line.split(/[:;]/);
-      const email = parts[0]?.trim();
-      const password = parts.slice(1).join(":").trim();
+      // Tira aspas que sobram de texto colado (ex.: copiado de um json/nota) — senão
+      // viravam parte literal do email/senha guardado.
+      const stripQuotes = (s: string) => s.replace(/^["']+|["']+$/g, "");
+      const email = stripQuotes(parts[0]?.trim() ?? "");
+      // Alguns admins digitam "email:senha: minhaSenha123" (usando "senha" como rótulo,
+      // não como parte da senha) — sem isso, o rótulo virava parte da senha guardada e
+      // quebrava o login de quem recebesse essa conta.
+      const password = stripQuotes(parts.slice(1).join(":").trim()).replace(/^senha\s*:?\s*/i, "");
       return { email, password };
     })
     .filter((r) => r.email && r.password);
 
-  if (rows.length === 0) return { inserted: 0, available: 0 };
+  if (rows.length === 0) return { inserted: 0, skipped: 0, available: 0 };
+
+  // Ignora e-mail que já está cadastrado pra esse jogo nesse mesmo tipo (primária ou
+  // secundária) — evita duplicar a cota da MESMA conta por reenvio acidental do mesmo
+  // cadastro (ex.: clicou "Adicionar" de novo sem perceber que já tinha funcionado antes).
+  // Não bloqueia o mesmo e-mail em tipos diferentes: é assim que uma única conta real
+  // acumula cota de primária E secundária ao mesmo tempo (cadastrando nas duas caixas).
+  const existingResult: any = accountType
+    ? await database.execute(sql`
+        SELECT LOWER(email) AS email FROM "digitalProductAccounts"
+        WHERE "digitalProductId" = ${digitalProductId} AND "accountType" = ${accountType}
+      `)
+    : await database.execute(sql`
+        SELECT LOWER(email) AS email FROM "digitalProductAccounts"
+        WHERE "digitalProductId" = ${digitalProductId} AND "accountType" IS NULL
+      `);
+  const existingRows: any[] = Array.isArray(existingResult) ? existingResult : (existingResult?.rows ?? []);
+  const existingEmails = new Set(existingRows.map((r) => r.email as string));
+
+  const newRows = rows.filter((r) => !existingEmails.has(r.email.toLowerCase()));
+  const skipped = rows.length - newRows.length;
+
+  if (newRows.length === 0) {
+    const available = await syncDigitalProductAccountStock(database, digitalProductId);
+    return { inserted: 0, skipped, available };
+  }
 
   let caps = { capPrimariaPs4: 0, capPrimariaPs5: 0, capPrimariaTotal: 0, capSecundaria: 0 };
   if (accountType === "primaria" || accountType === "secundaria") {
@@ -1013,11 +1044,11 @@ export async function addDigitalProductAccountsBulk(digitalProductId: number, ra
   }
 
   await database.insert(digitalProductAccounts).values(
-    rows.map((r) => ({ digitalProductId, email: r.email, password: r.password, accountType: accountType || null, ...caps }))
+    newRows.map((r) => ({ digitalProductId, email: r.email, password: r.password, accountType: accountType || null, ...caps }))
   );
 
   const remaining = await syncDigitalProductAccountStock(database, digitalProductId);
-  return { inserted: rows.length, available: remaining };
+  return { inserted: newRows.length, skipped, available: remaining };
 }
 
 /** Remove uma conta ainda não entregue (contas já usadas em um pedido ficam preservadas). */
