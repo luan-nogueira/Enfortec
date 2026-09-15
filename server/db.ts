@@ -966,7 +966,7 @@ export async function attemptAutoDeliverDigitalOrder(
  * status, já que esse fica sempre 'disponivel' mesmo depois de esgotada); contas do
  * modelo antigo contam 1 se ainda não foram entregues.
  */
-async function syncDigitalProductAccountStock(database: any, digitalProductId: number) {
+export async function syncDigitalProductAccountStock(database: any, digitalProductId: number) {
   const countResult: any = await database.execute(sql`
     SELECT COALESCE(SUM(
       CASE

@@ -621,7 +621,7 @@ export const appRouter = router({
           ? input.pricePrimary.toString()
           : (!input.priceSecondary ? input.price.toString() : null);
 
-        return database.update(digitalProducts).set({
+        const result = await database.update(digitalProducts).set({
           name: input.name,
           description: input.description,
           price: input.price.toString(),
@@ -639,6 +639,19 @@ export const appRouter = router({
           economiaLicenseType: input.economiaLicenseType,
           expiresAt: input.expiresAt !== undefined ? (input.expiresAt ? new Date(input.expiresAt) : null) : undefined,
         }).where(eq(digitalProducts.id, input.id));
+
+        // O campo "Estoque" do formulário é só pra jogo sem pool de contas cadastrado.
+        // Se esse jogo JÁ tem contas reais no estoque, o número calculado a partir
+        // delas é que manda — sem isso, salvar o jogo por aqui (só pra mudar nome,
+        // preço etc.) sobrescrevia o estoque real com o número digitado no formulário,
+        // deixando "estoque" e "contas cadastradas" dessincronizados.
+        const hasAccounts = await database.execute(sql`SELECT 1 FROM "digitalProductAccounts" WHERE "digitalProductId" = ${input.id} LIMIT 1`);
+        const hasAccountsRows: any[] = Array.isArray(hasAccounts) ? hasAccounts : (hasAccounts?.rows ?? []);
+        if (hasAccountsRows.length > 0) {
+          await db.syncDigitalProductAccountStock(database, input.id);
+        }
+
+        return result;
       }),
     adminDelete: protectedProcedure
       .input(z.number())
