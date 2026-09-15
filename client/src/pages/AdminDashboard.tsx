@@ -6762,18 +6762,23 @@ export default function AdminDashboard() {
                     />
                   </div>
                   {accountsModalGame?.isCombinedPlatform && (
-                    <div className="flex items-center gap-2">
-                      <Label className="text-[10px] text-slate-400 font-bold uppercase whitespace-nowrap">Esse lote é de</Label>
-                      <select
-                        value={primariaConsole}
-                        onChange={(e) => setPrimariaConsole(e.target.value as "ambos" | "PS4" | "PS5")}
-                        className="bg-slate-950 border border-blue-600/20 text-white h-8 text-xs rounded-md px-2"
-                      >
-                        <option value="ambos">Ambos (PS4/PS5)</option>
-                        <option value="PS4">Só PS4</option>
-                        <option value="PS5">Só PS5</option>
-                      </select>
-                    </div>
+                    <>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-[10px] text-slate-400 font-bold uppercase whitespace-nowrap">Esse lote é de</Label>
+                        <select
+                          value={primariaConsole}
+                          onChange={(e) => setPrimariaConsole(e.target.value as "ambos" | "PS4" | "PS5")}
+                          className="bg-slate-950 border border-blue-600/20 text-white h-8 text-xs rounded-md px-2"
+                        >
+                          <option value="ambos">Ambos (PS4/PS5)</option>
+                          <option value="PS4">Só PS4</option>
+                          <option value="PS5">Só PS5</option>
+                        </select>
+                      </div>
+                      {primariaConsole === "ambos" && (
+                        <p className="text-[10px] text-amber-400/90">Conta pra "Ambos": a cota é sempre fixa (2 de cada console, 3 no total) — a quantidade digitada acima não altera isso.</p>
+                      )}
+                    </>
                   )}
                   <Button
                     type="button"

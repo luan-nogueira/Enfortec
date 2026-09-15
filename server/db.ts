@@ -1153,19 +1153,27 @@ export async function addDigitalProductAccountsBulk(digitalProductId: number, ra
       capSecundaria: 0,
     };
   } else if (accountType === "primaria" && quantity && quantity > 0) {
-    // Quantidade escolhida manualmente pelo admin, mas SEMPRE travada pela plataforma
-    // real do jogo — uma conta de um jogo só-PS5 nunca pode virar vaga de PS4, nem que
-    // o admin digite um número maior, senão o sistema aprova entrega pro console errado.
+    // Sem escolher "Só PS4"/"Só PS5": se o jogo é de plataforma única de verdade, a
+    // quantidade digitada vale direto pra aquele console (Sandro pediu isso). Mas se o
+    // jogo é combinado (PS4/PS5), a regra é FIXA e não muda com o número digitado: 2 de
+    // cada console, 3 no total — a conta aguenta 2 do mesmo console, e a 3ª só sai pro
+    // console que ainda não vendeu nenhuma (confirmado com Andre). Nesse caso a
+    // "quantidade" cadastrada é ignorada pra cota — só serve pra saber quantas contas
+    // tem no lote, o limite de cada uma continua sendo o fixo.
     const prodRows = await database.select({ platform: digitalProducts.platform }).from(digitalProducts).where(eq(digitalProducts.id, digitalProductId)).limit(1);
     const p = (prodRows[0]?.platform || "").toUpperCase();
     const isPs4Only = p.includes("PS4") && !p.includes("PS5");
     const isPs5Only = p.includes("PS5") && !p.includes("PS4");
-    caps = {
-      capPrimariaPs4: isPs5Only ? 0 : quantity,
-      capPrimariaPs5: isPs4Only ? 0 : quantity,
-      capPrimariaTotal: quantity,
-      capSecundaria: 0,
-    };
+    if (isPs4Only || isPs5Only) {
+      caps = {
+        capPrimariaPs4: isPs5Only ? 0 : quantity,
+        capPrimariaPs5: isPs4Only ? 0 : quantity,
+        capPrimariaTotal: quantity,
+        capSecundaria: 0,
+      };
+    } else {
+      caps = { capPrimariaPs4: 2, capPrimariaPs5: 2, capPrimariaTotal: 3, capSecundaria: 0 };
+    }
   } else if (accountType === "secundaria" && quantity && quantity > 0) {
     caps = { capPrimariaPs4: 0, capPrimariaPs5: 0, capPrimariaTotal: 0, capSecundaria: quantity };
   } else if (accountType === "primaria" || accountType === "secundaria") {
