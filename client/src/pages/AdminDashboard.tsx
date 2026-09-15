@@ -1506,10 +1506,16 @@ export default function AdminDashboard() {
   // pré-preenchida — e o botão de adicionar só libera com um número maior que 0.
   const [primariaQty, setPrimariaQty] = useState<number | "">("");
   const [secundariaQty, setSecundariaQty] = useState<number | "">("");
-  // Pra jogo cadastrado como PS4/PS5 combinado, mas que só tem estoque real de um dos
-  // dois consoles — deixa o admin dizer "esse lote é só PS5" sem precisar mudar a
-  // plataforma anunciada do jogo (Andre/Sandro pediram isso).
-  const [primariaConsole, setPrimariaConsole] = useState<"ambos" | "PS4" | "PS5">("ambos");
+  // Jogo combinado (PS4/PS5): pra deixar bem claro em qual estoque cada lote está
+  // entrando (André pediu isso, depois de um lote ter ido pro console errado sem querer
+  // com o seletor único de antes), a caixa de Primária vira 3 abas independentes — cada
+  // uma com seu próprio texto colado, sem seletor compartilhado que dá pra esquecer de trocar.
+  const [primariaTab, setPrimariaTab] = useState<"PS4" | "PS5" | "ambos">("PS4");
+  const [primariaTextPS4, setPrimariaTextPS4] = useState("");
+  const [primariaTextPS5, setPrimariaTextPS5] = useState("");
+  const [primariaTextAmbos, setPrimariaTextAmbos] = useState("");
+  const [primariaQtyPS4, setPrimariaQtyPS4] = useState<number | "">("");
+  const [primariaQtyPS5, setPrimariaQtyPS5] = useState<number | "">("");
   const setAllowManualWithoutStockMutation = trpc.digitalProducts.setAllowManualWithoutStock.useMutation({
     onSuccess: (_data, variables) => {
       toast.success(variables.allow ? "Venda sem estoque liberada pra esse jogo — cai pra entrega manual." : "Venda sem estoque desligada pra esse jogo.");
@@ -1534,8 +1540,6 @@ export default function AdminDashboard() {
       } else if (skipped > 0) {
         toast.warning(`Nenhuma conta nova — ${skipped === 1 ? "esse e-mail já está" : "esses e-mails já estão"} cadastrado${skipped !== 1 ? "s" : ""} nesse tipo pra esse jogo.`);
       }
-      if (variables.accountType === "secundaria") { setAccountsRawTextSecondary(""); setSecundariaQty(""); }
-      else { setAccountsRawTextPrimary(""); setPrimariaQty(""); setPrimariaConsole("ambos"); }
       accountsListQuery.refetch();
       accountsSummaryQuery.refetch();
       adminDigitalProductsQuery.refetch();
@@ -1565,6 +1569,12 @@ export default function AdminDashboard() {
     setAccountsRawTextSecondary("");
     setPrimariaQty("");
     setSecundariaQty("");
+    setPrimariaTextPS4("");
+    setPrimariaTextPS5("");
+    setPrimariaTextAmbos("");
+    setPrimariaQtyPS4("");
+    setPrimariaQtyPS5("");
+    setPrimariaTab("PS4");
     const sec = game.priceSecondary ?? game.price_secondary;
     const hasSecondaryPrice = sec !== undefined && sec !== null && sec !== "" && parseFloat(sec) > 0;
     // Jogos e assinaturas sempre mandam um accountType ("primaria" por padrão) no checkout,
@@ -1578,7 +1588,6 @@ export default function AdminDashboard() {
     const plat = (game.platform || "").toUpperCase();
     const isCombinedPlatform = !((plat.includes("PS4") && !plat.includes("PS5")) || (plat.includes("PS5") && !plat.includes("PS4")));
     setAccountsModalGame({ id: game.id, name: game.name, hasSecondary, isCombinedPlatform, allowManualWithoutStock: !!game.allowManualWithoutStock });
-    setPrimariaConsole("ambos");
   };
 
   // Modal "Ver Loja" — detalhe de um vendedor da comunidade (contato, anúncios, vendas)
@@ -6741,56 +6750,138 @@ export default function AdminDashboard() {
 
             {accountsModalGame?.hasSecondary ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label className="text-xs text-blue-300 font-bold uppercase whitespace-nowrap">👤 Conta Primária</Label>
-                  <textarea
-                    value={accountsRawTextPrimary}
-                    onChange={(e) => setAccountsRawTextPrimary(e.target.value)}
-                    placeholder={"email1@exemplo.com:senha123\nemail2@exemplo.com:senha456"}
-                    rows={4}
-                    className="w-full bg-slate-950 border border-blue-600/20 rounded-md p-3 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-blue-500/50"
-                  />
-                  <div className="flex items-center gap-2">
-                    <Label className="text-[10px] text-slate-400 font-bold uppercase whitespace-nowrap">Quantidade por conta</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={primariaQty}
-                      onChange={(e) => setPrimariaQty(e.target.value === "" ? "" : Math.max(1, parseInt(e.target.value) || 1))}
-                      placeholder="Ex: 2"
-                      className="bg-slate-950 border-blue-600/20 text-white h-8 text-xs w-20"
-                    />
-                  </div>
-                  {accountsModalGame?.isCombinedPlatform && (
-                    <>
-                      <div className="flex items-center gap-2">
-                        <Label className="text-[10px] text-slate-400 font-bold uppercase whitespace-nowrap">Esse lote é de</Label>
-                        <select
-                          value={primariaConsole}
-                          onChange={(e) => setPrimariaConsole(e.target.value as "ambos" | "PS4" | "PS5")}
-                          className="bg-slate-950 border border-blue-600/20 text-white h-8 text-xs rounded-md px-2"
+                {accountsModalGame?.isCombinedPlatform ? (
+                  <div className="space-y-2">
+                    <Label className="text-xs text-blue-300 font-bold uppercase whitespace-nowrap">👤 Conta Primária</Label>
+                    <Tabs value={primariaTab} onValueChange={(v) => setPrimariaTab(v as "PS4" | "PS5" | "ambos")}>
+                      <TabsList className="grid grid-cols-3 h-8 bg-slate-950 border border-blue-600/20">
+                        <TabsTrigger value="PS4" className="text-[11px] font-bold">PS4</TabsTrigger>
+                        <TabsTrigger value="PS5" className="text-[11px] font-bold">PS5</TabsTrigger>
+                        <TabsTrigger value="ambos" className="text-[11px] font-bold">Ambos</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="PS4" className="space-y-2 mt-2">
+                        <textarea
+                          value={primariaTextPS4}
+                          onChange={(e) => setPrimariaTextPS4(e.target.value)}
+                          placeholder={"email1@exemplo.com:senha123\nemail2@exemplo.com:senha456"}
+                          rows={4}
+                          className="w-full bg-slate-950 border border-blue-600/20 rounded-md p-3 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                        />
+                        <div className="flex items-center gap-2">
+                          <Label className="text-[10px] text-slate-400 font-bold uppercase whitespace-nowrap">Quantidade por conta</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            value={primariaQtyPS4}
+                            onChange={(e) => setPrimariaQtyPS4(e.target.value === "" ? "" : Math.max(1, parseInt(e.target.value) || 1))}
+                            placeholder="Ex: 2"
+                            className="bg-slate-950 border-blue-600/20 text-white h-8 text-xs w-20"
+                          />
+                        </div>
+                        <p className="text-[10px] text-blue-400/90">Essas contas entram só no estoque de <strong>PS4</strong>.</p>
+                        <Button
+                          type="button"
+                          disabled={!primariaTextPS4.trim() || !primariaQtyPS4 || primariaQtyPS4 < 1 || addAccountsMutation.isPending}
+                          onClick={() => accountsModalGame && addAccountsMutation.mutate(
+                            { digitalProductId: accountsModalGame.id, rawText: primariaTextPS4, accountType: "primaria", quantity: primariaQtyPS4 || undefined, consoleOverride: "PS4" },
+                            { onSuccess: () => { setPrimariaTextPS4(""); setPrimariaQtyPS4(""); } }
+                          )}
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold btn-neon"
                         >
-                          <option value="ambos">Ambos (PS4/PS5)</option>
-                          <option value="PS4">Só PS4</option>
-                          <option value="PS5">Só PS5</option>
-                        </select>
-                      </div>
-                      {primariaConsole === "ambos" && (
-                        <p className="text-[10px] text-amber-400/90">Conta pra "Ambos": a cota é sempre fixa (2 de cada console, 3 no total) — a quantidade digitada acima não altera isso.</p>
+                          {addAccountsMutation.isPending ? "Adicionando..." : "Adicionar Primárias PS4"}
+                        </Button>
+                      </TabsContent>
+                      <TabsContent value="PS5" className="space-y-2 mt-2">
+                        <textarea
+                          value={primariaTextPS5}
+                          onChange={(e) => setPrimariaTextPS5(e.target.value)}
+                          placeholder={"email1@exemplo.com:senha123\nemail2@exemplo.com:senha456"}
+                          rows={4}
+                          className="w-full bg-slate-950 border border-blue-600/20 rounded-md p-3 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                        />
+                        <div className="flex items-center gap-2">
+                          <Label className="text-[10px] text-slate-400 font-bold uppercase whitespace-nowrap">Quantidade por conta</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            value={primariaQtyPS5}
+                            onChange={(e) => setPrimariaQtyPS5(e.target.value === "" ? "" : Math.max(1, parseInt(e.target.value) || 1))}
+                            placeholder="Ex: 2"
+                            className="bg-slate-950 border-blue-600/20 text-white h-8 text-xs w-20"
+                          />
+                        </div>
+                        <p className="text-[10px] text-blue-400/90">Essas contas entram só no estoque de <strong>PS5</strong>.</p>
+                        <Button
+                          type="button"
+                          disabled={!primariaTextPS5.trim() || !primariaQtyPS5 || primariaQtyPS5 < 1 || addAccountsMutation.isPending}
+                          onClick={() => accountsModalGame && addAccountsMutation.mutate(
+                            { digitalProductId: accountsModalGame.id, rawText: primariaTextPS5, accountType: "primaria", quantity: primariaQtyPS5 || undefined, consoleOverride: "PS5" },
+                            { onSuccess: () => { setPrimariaTextPS5(""); setPrimariaQtyPS5(""); } }
+                          )}
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold btn-neon"
+                        >
+                          {addAccountsMutation.isPending ? "Adicionando..." : "Adicionar Primárias PS5"}
+                        </Button>
+                      </TabsContent>
+                      <TabsContent value="ambos" className="space-y-2 mt-2">
+                        <textarea
+                          value={primariaTextAmbos}
+                          onChange={(e) => setPrimariaTextAmbos(e.target.value)}
+                          placeholder={"email1@exemplo.com:senha123\nemail2@exemplo.com:senha456"}
+                          rows={4}
+                          className="w-full bg-slate-950 border border-blue-600/20 rounded-md p-3 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                        />
+                        <p className="text-[10px] text-amber-400/90">Essas contas valem pros dois consoles com cota sempre fixa (2 de cada console, 3 no total por conta) — não precisa digitar quantidade.</p>
+                        <Button
+                          type="button"
+                          disabled={!primariaTextAmbos.trim() || addAccountsMutation.isPending}
+                          onClick={() => accountsModalGame && addAccountsMutation.mutate(
+                            { digitalProductId: accountsModalGame.id, rawText: primariaTextAmbos, accountType: "primaria" },
+                            { onSuccess: () => setPrimariaTextAmbos("") }
+                          )}
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold btn-neon"
+                        >
+                          {addAccountsMutation.isPending ? "Adicionando..." : "Adicionar Primárias (Ambos)"}
+                        </Button>
+                      </TabsContent>
+                    </Tabs>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label className="text-xs text-blue-300 font-bold uppercase whitespace-nowrap">👤 Conta Primária</Label>
+                    <textarea
+                      value={accountsRawTextPrimary}
+                      onChange={(e) => setAccountsRawTextPrimary(e.target.value)}
+                      placeholder={"email1@exemplo.com:senha123\nemail2@exemplo.com:senha456"}
+                      rows={4}
+                      className="w-full bg-slate-950 border border-blue-600/20 rounded-md p-3 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                    />
+                    <div className="flex items-center gap-2">
+                      <Label className="text-[10px] text-slate-400 font-bold uppercase whitespace-nowrap">Quantidade por conta</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={primariaQty}
+                        onChange={(e) => setPrimariaQty(e.target.value === "" ? "" : Math.max(1, parseInt(e.target.value) || 1))}
+                        placeholder="Ex: 2"
+                        className="bg-slate-950 border-blue-600/20 text-white h-8 text-xs w-20"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      disabled={!accountsRawTextPrimary.trim() || !primariaQty || primariaQty < 1 || addAccountsMutation.isPending}
+                      onClick={() => accountsModalGame && addAccountsMutation.mutate(
+                        { digitalProductId: accountsModalGame.id, rawText: accountsRawTextPrimary, accountType: "primaria", quantity: primariaQty || undefined },
+                        { onSuccess: () => { setAccountsRawTextPrimary(""); setPrimariaQty(""); } }
                       )}
-                    </>
-                  )}
-                  <Button
-                    type="button"
-                    disabled={!accountsRawTextPrimary.trim() || !primariaQty || primariaQty < 1 || addAccountsMutation.isPending}
-                    onClick={() => accountsModalGame && addAccountsMutation.mutate({ digitalProductId: accountsModalGame.id, rawText: accountsRawTextPrimary, accountType: "primaria", quantity: primariaQty || undefined, consoleOverride: primariaConsole !== "ambos" ? primariaConsole : undefined })}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold btn-neon"
-                  >
-                    {addAccountsMutation.isPending ? "Adicionando..." : "Adicionar Primárias"}
-                  </Button>
-                </div>
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold btn-neon"
+                    >
+                      {addAccountsMutation.isPending ? "Adicionando..." : "Adicionar Primárias"}
+                    </Button>
+                  </div>
+                )}
                 <div className="space-y-2">
-                  <Label className="text-xs text-purple-300 font-bold uppercase whitespace-nowrap">👥 Conta Secundária</Label>
+                  <Label className="text-xs text-purple-300 font-bold uppercase whitespace-nowrap">👥 Conta Secundária{accountsModalGame?.isCombinedPlatform ? " (PS4 + PS5)" : ""}</Label>
                   <textarea
                     value={accountsRawTextSecondary}
                     onChange={(e) => setAccountsRawTextSecondary(e.target.value)}
@@ -6809,10 +6900,16 @@ export default function AdminDashboard() {
                       className="bg-slate-950 border-purple-600/20 text-white h-8 text-xs w-20"
                     />
                   </div>
+                  {accountsModalGame?.isCombinedPlatform && (
+                    <p className="text-[10px] text-purple-400/90">Não separa por console — a mesma cota secundária vale pra quem comprar de PS4 ou de PS5.</p>
+                  )}
                   <Button
                     type="button"
                     disabled={!accountsRawTextSecondary.trim() || !secundariaQty || secundariaQty < 1 || addAccountsMutation.isPending}
-                    onClick={() => accountsModalGame && addAccountsMutation.mutate({ digitalProductId: accountsModalGame.id, rawText: accountsRawTextSecondary, accountType: "secundaria", quantity: secundariaQty || undefined })}
+                    onClick={() => accountsModalGame && addAccountsMutation.mutate(
+                      { digitalProductId: accountsModalGame.id, rawText: accountsRawTextSecondary, accountType: "secundaria", quantity: secundariaQty || undefined },
+                      { onSuccess: () => { setAccountsRawTextSecondary(""); setSecundariaQty(""); } }
+                    )}
                     className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold btn-neon"
                   >
                     {addAccountsMutation.isPending ? "Adicionando..." : "Adicionar Secundárias"}
@@ -6834,7 +6931,10 @@ export default function AdminDashboard() {
                 <Button
                   type="button"
                   disabled={!accountsRawTextPrimary.trim() || addAccountsMutation.isPending}
-                  onClick={() => accountsModalGame && addAccountsMutation.mutate({ digitalProductId: accountsModalGame.id, rawText: accountsRawTextPrimary })}
+                  onClick={() => accountsModalGame && addAccountsMutation.mutate(
+                    { digitalProductId: accountsModalGame.id, rawText: accountsRawTextPrimary },
+                    { onSuccess: () => setAccountsRawTextPrimary("") }
+                  )}
                   className="bg-amber-600 hover:bg-amber-700 text-white font-bold btn-neon"
                 >
                   {addAccountsMutation.isPending ? "Adicionando..." : "Adicionar ao Estoque"}
