@@ -1189,12 +1189,12 @@ export async function addDigitalProductAccountsBulk(digitalProductId: number, ra
       };
     } else if (accountType === "primaria" && qty && qty > 0) {
       // Sem escolher "Só PS4"/"Só PS5": se o jogo é de plataforma única de verdade, a
-      // quantidade digitada vale direto pra aquele console (Sandro pediu isso). Mas se o
-      // jogo é combinado (PS4/PS5), a regra é FIXA e não muda com o número digitado: 2 de
-      // cada console, 3 no total — a conta aguenta 2 do mesmo console, e a 3ª só sai pro
-      // console que ainda não vendeu nenhuma (confirmado com Andre). Nesse caso a
-      // "quantidade" cadastrada é ignorada pra cota — só serve pra saber quantas contas
-      // tem no lote, o limite de cada uma continua sendo o fixo.
+      // quantidade digitada vale direto pra aquele console (Sandro pediu isso). Se o jogo
+      // é combinado (PS4/PS5) e a quantidade foi digitada na aba "Ambos", ela vira o
+      // limite simétrico pros dois lados: N vendas no total, em qualquer combinação de
+      // PS4/PS5 (Sandro pediu isso — cobre o caso de só ter 1 conta em estoque que pode
+      // ser vendida pra PS4 OU PS5, o que vender primeiro). Quando não digita nada (cai no
+      // fallback de computeAccountCaps abaixo), continua a regra fixa antiga de 2+2/3.
       const p = (platform || "").toUpperCase();
       const isPs4Only = p.includes("PS4") && !p.includes("PS5");
       const isPs5Only = p.includes("PS5") && !p.includes("PS4");
@@ -1206,7 +1206,7 @@ export async function addDigitalProductAccountsBulk(digitalProductId: number, ra
           capSecundaria: 0,
         };
       } else {
-        caps = { capPrimariaPs4: 2, capPrimariaPs5: 2, capPrimariaTotal: 3, capSecundaria: 0 };
+        caps = { capPrimariaPs4: qty, capPrimariaPs5: qty, capPrimariaTotal: qty, capSecundaria: 0 };
       }
     } else if (accountType === "secundaria" && qty && qty > 0) {
       caps = { capPrimariaPs4: 0, capPrimariaPs5: 0, capPrimariaTotal: 0, capSecundaria: qty };

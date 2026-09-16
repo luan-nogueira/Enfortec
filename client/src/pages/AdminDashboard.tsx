@@ -1588,11 +1588,16 @@ export default function AdminDashboard() {
   const [primariaTextAmbos, setPrimariaTextAmbos] = useState("");
   const [primariaQtyPS4, setPrimariaQtyPS4] = useState<number | "">("");
   const [primariaQtyPS5, setPrimariaQtyPS5] = useState<number | "">("");
+  // Quantidade da aba "Ambos" agora é simétrica pros dois lados (Sandro pediu isso): N
+  // vira o limite de PS4, de PS5 E o total, cobrindo o caso de só ter 1 conta em estoque
+  // vendível pra qualquer um dos dois consoles.
+  const [primariaQtyAmbos, setPrimariaQtyAmbos] = useState<number | "">("");
   // Quantidade por conta acima é só o valor padrão pra linha nova — cada email pode ter
   // sua própria quantidade ajustada no campinho que aparece do lado dele na prévia da
   // lista (chave = email exatamente como digitado na linha).
   const [primariaQtyOverridesPS4, setPrimariaQtyOverridesPS4] = useState<Record<string, number>>({});
   const [primariaQtyOverridesPS5, setPrimariaQtyOverridesPS5] = useState<Record<string, number>>({});
+  const [primariaQtyOverridesAmbos, setPrimariaQtyOverridesAmbos] = useState<Record<string, number>>({});
   const [primariaQtyOverrides, setPrimariaQtyOverrides] = useState<Record<string, number>>({});
   const [secundariaQtyOverrides, setSecundariaQtyOverrides] = useState<Record<string, number>>({});
   const setAllowManualWithoutStockMutation = trpc.digitalProducts.setAllowManualWithoutStock.useMutation({
@@ -1657,8 +1662,10 @@ export default function AdminDashboard() {
     setPrimariaTextAmbos("");
     setPrimariaQtyPS4("");
     setPrimariaQtyPS5("");
+    setPrimariaQtyAmbos("");
     setPrimariaQtyOverridesPS4({});
     setPrimariaQtyOverridesPS5({});
+    setPrimariaQtyOverridesAmbos({});
     setPrimariaQtyOverrides({});
     setSecundariaQtyOverrides({});
     setPrimariaTab("PS4");
@@ -6920,13 +6927,25 @@ export default function AdminDashboard() {
                           rows={4}
                           className="w-full bg-slate-950 border border-blue-600/20 rounded-md p-3 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-blue-500/50"
                         />
-                        <p className="text-[10px] text-amber-400/90">Essas contas valem pros dois consoles com cota sempre fixa (2 de cada console, 3 no total por conta) — não precisa digitar quantidade.</p>
+                        <div className="flex items-center gap-2">
+                          <Label className="text-[10px] text-slate-400 font-bold uppercase whitespace-nowrap">Quantidade padrão</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            value={primariaQtyAmbos}
+                            onChange={(e) => setPrimariaQtyAmbos(e.target.value === "" ? "" : Math.max(1, parseInt(e.target.value) || 1))}
+                            placeholder="Ex: 1"
+                            className="bg-slate-950 border-blue-600/20 text-white h-8 text-xs w-20"
+                          />
+                        </div>
+                        <AccountQtyRows raw={primariaTextAmbos} defaultQty={primariaQtyAmbos} overrides={primariaQtyOverridesAmbos} setOverrides={setPrimariaQtyOverridesAmbos} textColorClass="text-blue-200" />
+                        <p className="text-[10px] text-amber-400/90">Essas contas valem pros dois consoles — a quantidade é o limite total combinado (ex.: 1 = vende só 1 vez, pra PS4 ou PS5, o que vender primeiro).</p>
                         <Button
                           type="button"
-                          disabled={!primariaTextAmbos.trim() || addAccountsMutation.isPending}
+                          disabled={!primariaTextAmbos.trim() || !primariaQtyAmbos || primariaQtyAmbos < 1 || addAccountsMutation.isPending}
                           onClick={() => accountsModalGame && addAccountsMutation.mutate(
-                            { digitalProductId: accountsModalGame.id, rawText: primariaTextAmbos, accountType: "primaria" },
-                            { onSuccess: () => setPrimariaTextAmbos("") }
+                            { digitalProductId: accountsModalGame.id, rawText: buildRawTextWithQuantities(primariaTextAmbos, primariaQtyOverridesAmbos, primariaQtyAmbos || 1), accountType: "primaria" },
+                            { onSuccess: () => { setPrimariaTextAmbos(""); setPrimariaQtyAmbos(""); setPrimariaQtyOverridesAmbos({}); } }
                           )}
                           className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold btn-neon"
                         >
@@ -7006,7 +7025,7 @@ export default function AdminDashboard() {
                     {addAccountsMutation.isPending ? "Adicionando..." : "Adicionar Secundárias"}
                   </Button>
                 </div>
-                <p className="text-[10px] text-slate-500 col-span-full -mt-1">Uma conta por linha, no formato email:senha (ou email;senha) — <strong className="text-amber-400">direto, sem escrever a palavra "senha" antes</strong> (ex.: email@site.com:MinhaSenha123, não email@site.com:senha:MinhaSenha123). A "Quantidade padrão" vale pra toda a lista, mas assim que você cola as contas aparece uma prévia com um campo do lado de cada email — ajuste ali pra dar uma quantidade diferente só numa conta específica (não vale pra aba "Ambos", que é sempre fixa 2+2/3). Se colar um email que já estava cadastrado, a cota nova soma em cima da que ele já tinha, em vez de ser ignorada.</p>
+                <p className="text-[10px] text-slate-500 col-span-full -mt-1">Uma conta por linha, no formato email:senha (ou email;senha) — <strong className="text-amber-400">direto, sem escrever a palavra "senha" antes</strong> (ex.: email@site.com:MinhaSenha123, não email@site.com:senha:MinhaSenha123). A "Quantidade padrão" vale pra toda a lista, mas assim que você cola as contas aparece uma prévia com um campo do lado de cada email — ajuste ali pra dar uma quantidade diferente só numa conta específica. Se colar um email que já estava cadastrado, a cota nova soma em cima da que ele já tinha, em vez de ser ignorada.</p>
               </div>
             ) : (
               <div className="space-y-2">
