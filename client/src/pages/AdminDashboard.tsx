@@ -692,29 +692,38 @@ function PlatinadorAdminTab() {
   );
 }
 
-// Quebra o texto colado (uma conta "email:senha" por linha) em linhas — usado só pra
-// pré-visualizar e dar um campo de quantidade individual por conta antes de enviar
-// (o parser "de verdade", que aceita ";", tira aspas e o rótulo "senha:", é no backend).
-function parseAccountLines(raw: string): { email: string; password: string }[] {
+// Quebra o texto colado (uma conta "email:senha" por linha, opcionalmente terminando
+// num número pra dar quantidade própria àquela linha) em linhas — espelha o parser de
+// verdade do backend (addDigitalProductAccountsBulk em server/db.ts) pra não reconstruir
+// a senha errada aqui e mandar pro servidor já corrompida. Usado pra pré-visualizar e
+// alimentar o campo de quantidade individual por conta antes de enviar.
+function parseAccountLines(raw: string): { email: string; password: string; inlineQty?: number }[] {
   return raw
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line) => {
-      const parts = line.split(/[:;]/);
+      const parts = line.split(/[:;]/).map((p) => p.trim());
       const stripQuotes = (s: string) => s.replace(/^["']+|["']+$/g, "");
-      const email = stripQuotes(parts[0]?.trim() ?? "");
-      const password = stripQuotes(parts.slice(1).join(":").trim()).replace(/^senha\s*:?\s*/i, "");
-      return { email, password };
+      const email = stripQuotes(parts[0] ?? "");
+      let passwordParts = parts.slice(1);
+      let inlineQty: number | undefined;
+      if (passwordParts.length >= 2 && /^\d+$/.test(passwordParts[passwordParts.length - 1])) {
+        inlineQty = parseInt(passwordParts[passwordParts.length - 1], 10);
+        passwordParts = passwordParts.slice(0, -1);
+      }
+      const password = stripQuotes(passwordParts.join(":").trim()).replace(/^senha\s*:?\s*/i, "");
+      return { email, password, inlineQty };
     })
     .filter((r) => r.email && r.password);
 }
 
 // Reconstrói o texto pra enviar ao backend com a quantidade de cada linha já embutida
 // (formato "email:senha:quantidade" que addDigitalProductAccountsBulk sabe interpretar).
+// Prioridade: ajuste manual no campinho > número já digitado na própria linha > padrão da caixa.
 function buildRawTextWithQuantities(raw: string, overrides: Record<string, number>, defaultQty: number): string {
   return parseAccountLines(raw)
-    .map((r) => `${r.email}:${r.password}:${overrides[r.email] ?? defaultQty}`)
+    .map((r) => `${r.email}:${r.password}:${overrides[r.email] ?? r.inlineQty ?? defaultQty}`)
     .join("\n");
 }
 
@@ -745,7 +754,7 @@ function AccountQtyRows({
           <Input
             type="number"
             min={1}
-            value={overrides[r.email] ?? defaultQty}
+            value={overrides[r.email] ?? r.inlineQty ?? defaultQty}
             onChange={(e) => setOverrides((prev) => ({ ...prev, [r.email]: Math.max(1, parseInt(e.target.value) || 1) }))}
             className="bg-slate-950 border-slate-700 text-white h-6 text-[11px] w-14 shrink-0"
           />
