@@ -692,6 +692,69 @@ function PlatinadorAdminTab() {
   );
 }
 
+// Quebra o texto colado (uma conta "email:senha" por linha) em linhas — usado só pra
+// pré-visualizar e dar um campo de quantidade individual por conta antes de enviar
+// (o parser "de verdade", que aceita ";", tira aspas e o rótulo "senha:", é no backend).
+function parseAccountLines(raw: string): { email: string; password: string }[] {
+  return raw
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const parts = line.split(/[:;]/);
+      const stripQuotes = (s: string) => s.replace(/^["']+|["']+$/g, "");
+      const email = stripQuotes(parts[0]?.trim() ?? "");
+      const password = stripQuotes(parts.slice(1).join(":").trim()).replace(/^senha\s*:?\s*/i, "");
+      return { email, password };
+    })
+    .filter((r) => r.email && r.password);
+}
+
+// Reconstrói o texto pra enviar ao backend com a quantidade de cada linha já embutida
+// (formato "email:senha:quantidade" que addDigitalProductAccountsBulk sabe interpretar).
+function buildRawTextWithQuantities(raw: string, overrides: Record<string, number>, defaultQty: number): string {
+  return parseAccountLines(raw)
+    .map((r) => `${r.email}:${r.password}:${overrides[r.email] ?? defaultQty}`)
+    .join("\n");
+}
+
+// Lista de prévia abaixo da caixa de colar: cada email cadastrado ganha um campinho
+// numérico do lado pra ajustar SÓ a quantidade daquela conta específica, sem afetar as
+// outras do mesmo lote (André pediu isso — "quadrado do lado do email" pra controlar
+// quantas vezes cada um vai ser liberado).
+function AccountQtyRows({
+  raw,
+  defaultQty,
+  overrides,
+  setOverrides,
+  textColorClass,
+}: {
+  raw: string;
+  defaultQty: number | "";
+  overrides: Record<string, number>;
+  setOverrides: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+  textColorClass: string;
+}) {
+  const rows = useMemo(() => parseAccountLines(raw), [raw]);
+  if (rows.length === 0) return null;
+  return (
+    <div className="max-h-32 overflow-y-auto space-y-1 border border-slate-800 rounded-md p-1.5 bg-slate-950/40">
+      {rows.map((r) => (
+        <div key={r.email} className="flex items-center justify-between gap-2">
+          <span className={`text-[11px] font-mono truncate ${textColorClass}`}>{r.email}</span>
+          <Input
+            type="number"
+            min={1}
+            value={overrides[r.email] ?? defaultQty}
+            onChange={(e) => setOverrides((prev) => ({ ...prev, [r.email]: Math.max(1, parseInt(e.target.value) || 1) }))}
+            className="bg-slate-950 border-slate-700 text-white h-6 text-[11px] w-14 shrink-0"
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
 
   const { user, isAuthenticated, isAdmin, isCollaborator, loading: authLoading, logout } = useAuth();
@@ -1516,6 +1579,13 @@ export default function AdminDashboard() {
   const [primariaTextAmbos, setPrimariaTextAmbos] = useState("");
   const [primariaQtyPS4, setPrimariaQtyPS4] = useState<number | "">("");
   const [primariaQtyPS5, setPrimariaQtyPS5] = useState<number | "">("");
+  // Quantidade por conta acima é só o valor padrão pra linha nova — cada email pode ter
+  // sua própria quantidade ajustada no campinho que aparece do lado dele na prévia da
+  // lista (chave = email exatamente como digitado na linha).
+  const [primariaQtyOverridesPS4, setPrimariaQtyOverridesPS4] = useState<Record<string, number>>({});
+  const [primariaQtyOverridesPS5, setPrimariaQtyOverridesPS5] = useState<Record<string, number>>({});
+  const [primariaQtyOverrides, setPrimariaQtyOverrides] = useState<Record<string, number>>({});
+  const [secundariaQtyOverrides, setSecundariaQtyOverrides] = useState<Record<string, number>>({});
   const setAllowManualWithoutStockMutation = trpc.digitalProducts.setAllowManualWithoutStock.useMutation({
     onSuccess: (_data, variables) => {
       toast.success(variables.allow ? "Venda sem estoque liberada pra esse jogo — cai pra entrega manual." : "Venda sem estoque desligada pra esse jogo.");
@@ -1532,10 +1602,14 @@ export default function AdminDashboard() {
   const addAccountsMutation = trpc.digitalProducts.accounts.addBulk.useMutation({
     onSuccess: (data: any, variables) => {
       const skipped = data.skipped || 0;
-      if (data.inserted > 0) {
+      const updated = data.updated || 0;
+      const parts: string[] = [];
+      if (data.inserted > 0) parts.push(`${data.inserted} conta${data.inserted !== 1 ? "s" : ""} nova${data.inserted !== 1 ? "s" : ""}`);
+      if (updated > 0) parts.push(`${updated} conta${updated !== 1 ? "s" : ""} já cadastrada${updated !== 1 ? "s" : ""} ${updated !== 1 ? "ganharam" : "ganhou"} cota extra`);
+      if (parts.length > 0) {
         toast.success(
-          `${data.inserted} conta${data.inserted !== 1 ? "s" : ""} adicionada${data.inserted !== 1 ? "s" : ""} ao estoque!`
-          + (skipped > 0 ? ` (${skipped} ignorada${skipped !== 1 ? "s" : ""} — já cadastrada${skipped !== 1 ? "s" : ""})` : "")
+          `${parts.join(" e ")} no estoque!`
+          + (skipped > 0 ? ` (${skipped} ignorada${skipped !== 1 ? "s" : ""})` : "")
         );
       } else if (skipped > 0) {
         toast.warning(`Nenhuma conta nova — ${skipped === 1 ? "esse e-mail já está" : "esses e-mails já estão"} cadastrado${skipped !== 1 ? "s" : ""} nesse tipo pra esse jogo.`);
@@ -1574,6 +1648,10 @@ export default function AdminDashboard() {
     setPrimariaTextAmbos("");
     setPrimariaQtyPS4("");
     setPrimariaQtyPS5("");
+    setPrimariaQtyOverridesPS4({});
+    setPrimariaQtyOverridesPS5({});
+    setPrimariaQtyOverrides({});
+    setSecundariaQtyOverrides({});
     setPrimariaTab("PS4");
     const sec = game.priceSecondary ?? game.price_secondary;
     const hasSecondaryPrice = sec !== undefined && sec !== null && sec !== "" && parseFloat(sec) > 0;
@@ -4830,7 +4908,7 @@ export default function AdminDashboard() {
               <div>
                 <h2 className="text-xl font-bold text-white uppercase tracking-widest text-sm italic">Estoque</h2>
                 <p className="text-xs text-slate-500 mt-1">
-                  Visão geral do estoque de todos os jogos. "Pool de contas" é o estoque de email+senha usado pra entrega automática — jogos sem contas cadastradas continuam com entrega manual normalmente.
+                  Visão geral do estoque de todos os jogos. "Contas cadastradas" é o estoque de email+senha usado pra entrega automática — jogos sem contas cadastradas continuam com entrega manual normalmente.
                 </p>
               </div>
               <Button
@@ -4853,7 +4931,7 @@ export default function AdminDashboard() {
               <div className="flex gap-1.5 bg-slate-950 border border-slate-800 rounded-lg p-1 w-fit">
                 {([
                   ["todos", "Todos"],
-                  ["com_pool", "Com Pool"],
+                  ["com_pool", "Com Conta"],
                   ["manual", "Manual"],
                 ] as const).map(([mode, label]) => (
                   <button
@@ -4881,7 +4959,7 @@ export default function AdminDashboard() {
                       Estoque {stockSortBy === "estoque" && (stockSortDir === "asc" ? "▲" : "▼")}
                     </th>
                     <th className="p-3 cursor-pointer select-none hover:text-white" onClick={() => toggleStockSort("pool")}>
-                      Pool de Contas {stockSortBy === "pool" && (stockSortDir === "asc" ? "▲" : "▼")}
+                      Contas Cadastradas {stockSortBy === "pool" && (stockSortDir === "asc" ? "▲" : "▼")}
                     </th>
                     <th className="p-3"></th>
                   </tr>
@@ -4932,7 +5010,7 @@ export default function AdminDashboard() {
                               )}
                             </span>
                           ) : (
-                            <span className="text-xs text-slate-600">Entrega manual (sem pool)</span>
+                            <span className="text-xs text-slate-600">Entrega manual (sem contas)</span>
                           )}
                         </td>
                         <td className="p-3 text-right">
@@ -6768,7 +6846,7 @@ export default function AdminDashboard() {
                           className="w-full bg-slate-950 border border-blue-600/20 rounded-md p-3 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-blue-500/50"
                         />
                         <div className="flex items-center gap-2">
-                          <Label className="text-[10px] text-slate-400 font-bold uppercase whitespace-nowrap">Quantidade por conta</Label>
+                          <Label className="text-[10px] text-slate-400 font-bold uppercase whitespace-nowrap">Quantidade padrão</Label>
                           <Input
                             type="number"
                             min={1}
@@ -6778,13 +6856,14 @@ export default function AdminDashboard() {
                             className="bg-slate-950 border-blue-600/20 text-white h-8 text-xs w-20"
                           />
                         </div>
-                        <p className="text-[10px] text-blue-400/90">Essas contas entram só no estoque de <strong>PS4</strong>.</p>
+                        <AccountQtyRows raw={primariaTextPS4} defaultQty={primariaQtyPS4} overrides={primariaQtyOverridesPS4} setOverrides={setPrimariaQtyOverridesPS4} textColorClass="text-blue-200" />
+                        <p className="text-[10px] text-blue-400/90">Essas contas entram só no estoque de <strong>PS4</strong>. Quer uma quantidade diferente só numa conta? Ajusta o número do lado dela acima.</p>
                         <Button
                           type="button"
                           disabled={!primariaTextPS4.trim() || !primariaQtyPS4 || primariaQtyPS4 < 1 || addAccountsMutation.isPending}
                           onClick={() => accountsModalGame && addAccountsMutation.mutate(
-                            { digitalProductId: accountsModalGame.id, rawText: primariaTextPS4, accountType: "primaria", quantity: primariaQtyPS4 || undefined, consoleOverride: "PS4" },
-                            { onSuccess: () => { setPrimariaTextPS4(""); setPrimariaQtyPS4(""); } }
+                            { digitalProductId: accountsModalGame.id, rawText: buildRawTextWithQuantities(primariaTextPS4, primariaQtyOverridesPS4, primariaQtyPS4 || 1), accountType: "primaria", consoleOverride: "PS4" },
+                            { onSuccess: () => { setPrimariaTextPS4(""); setPrimariaQtyPS4(""); setPrimariaQtyOverridesPS4({}); } }
                           )}
                           className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold btn-neon"
                         >
@@ -6800,7 +6879,7 @@ export default function AdminDashboard() {
                           className="w-full bg-slate-950 border border-blue-600/20 rounded-md p-3 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-blue-500/50"
                         />
                         <div className="flex items-center gap-2">
-                          <Label className="text-[10px] text-slate-400 font-bold uppercase whitespace-nowrap">Quantidade por conta</Label>
+                          <Label className="text-[10px] text-slate-400 font-bold uppercase whitespace-nowrap">Quantidade padrão</Label>
                           <Input
                             type="number"
                             min={1}
@@ -6810,13 +6889,14 @@ export default function AdminDashboard() {
                             className="bg-slate-950 border-blue-600/20 text-white h-8 text-xs w-20"
                           />
                         </div>
-                        <p className="text-[10px] text-blue-400/90">Essas contas entram só no estoque de <strong>PS5</strong>.</p>
+                        <AccountQtyRows raw={primariaTextPS5} defaultQty={primariaQtyPS5} overrides={primariaQtyOverridesPS5} setOverrides={setPrimariaQtyOverridesPS5} textColorClass="text-blue-200" />
+                        <p className="text-[10px] text-blue-400/90">Essas contas entram só no estoque de <strong>PS5</strong>. Quer uma quantidade diferente só numa conta? Ajusta o número do lado dela acima.</p>
                         <Button
                           type="button"
                           disabled={!primariaTextPS5.trim() || !primariaQtyPS5 || primariaQtyPS5 < 1 || addAccountsMutation.isPending}
                           onClick={() => accountsModalGame && addAccountsMutation.mutate(
-                            { digitalProductId: accountsModalGame.id, rawText: primariaTextPS5, accountType: "primaria", quantity: primariaQtyPS5 || undefined, consoleOverride: "PS5" },
-                            { onSuccess: () => { setPrimariaTextPS5(""); setPrimariaQtyPS5(""); } }
+                            { digitalProductId: accountsModalGame.id, rawText: buildRawTextWithQuantities(primariaTextPS5, primariaQtyOverridesPS5, primariaQtyPS5 || 1), accountType: "primaria", consoleOverride: "PS5" },
+                            { onSuccess: () => { setPrimariaTextPS5(""); setPrimariaQtyPS5(""); setPrimariaQtyOverridesPS5({}); } }
                           )}
                           className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold btn-neon"
                         >
@@ -6857,7 +6937,7 @@ export default function AdminDashboard() {
                       className="w-full bg-slate-950 border border-blue-600/20 rounded-md p-3 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-blue-500/50"
                     />
                     <div className="flex items-center gap-2">
-                      <Label className="text-[10px] text-slate-400 font-bold uppercase whitespace-nowrap">Quantidade por conta</Label>
+                      <Label className="text-[10px] text-slate-400 font-bold uppercase whitespace-nowrap">Quantidade padrão</Label>
                       <Input
                         type="number"
                         min={1}
@@ -6867,12 +6947,13 @@ export default function AdminDashboard() {
                         className="bg-slate-950 border-blue-600/20 text-white h-8 text-xs w-20"
                       />
                     </div>
+                    <AccountQtyRows raw={accountsRawTextPrimary} defaultQty={primariaQty} overrides={primariaQtyOverrides} setOverrides={setPrimariaQtyOverrides} textColorClass="text-blue-200" />
                     <Button
                       type="button"
                       disabled={!accountsRawTextPrimary.trim() || !primariaQty || primariaQty < 1 || addAccountsMutation.isPending}
                       onClick={() => accountsModalGame && addAccountsMutation.mutate(
-                        { digitalProductId: accountsModalGame.id, rawText: accountsRawTextPrimary, accountType: "primaria", quantity: primariaQty || undefined },
-                        { onSuccess: () => { setAccountsRawTextPrimary(""); setPrimariaQty(""); } }
+                        { digitalProductId: accountsModalGame.id, rawText: buildRawTextWithQuantities(accountsRawTextPrimary, primariaQtyOverrides, primariaQty || 1), accountType: "primaria" },
+                        { onSuccess: () => { setAccountsRawTextPrimary(""); setPrimariaQty(""); setPrimariaQtyOverrides({}); } }
                       )}
                       className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold btn-neon"
                     >
@@ -6890,7 +6971,7 @@ export default function AdminDashboard() {
                     className="w-full bg-slate-950 border border-purple-600/20 rounded-md p-3 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-purple-500/50"
                   />
                   <div className="flex items-center gap-2">
-                    <Label className="text-[10px] text-slate-400 font-bold uppercase whitespace-nowrap">Quantidade por conta</Label>
+                    <Label className="text-[10px] text-slate-400 font-bold uppercase whitespace-nowrap">Quantidade padrão</Label>
                     <Input
                       type="number"
                       min={1}
@@ -6900,6 +6981,7 @@ export default function AdminDashboard() {
                       className="bg-slate-950 border-purple-600/20 text-white h-8 text-xs w-20"
                     />
                   </div>
+                  <AccountQtyRows raw={accountsRawTextSecondary} defaultQty={secundariaQty} overrides={secundariaQtyOverrides} setOverrides={setSecundariaQtyOverrides} textColorClass="text-purple-200" />
                   {accountsModalGame?.isCombinedPlatform && (
                     <p className="text-[10px] text-purple-400/90">Não separa por console — a mesma cota secundária vale pra quem comprar de PS4 ou de PS5.</p>
                   )}
@@ -6907,15 +6989,15 @@ export default function AdminDashboard() {
                     type="button"
                     disabled={!accountsRawTextSecondary.trim() || !secundariaQty || secundariaQty < 1 || addAccountsMutation.isPending}
                     onClick={() => accountsModalGame && addAccountsMutation.mutate(
-                      { digitalProductId: accountsModalGame.id, rawText: accountsRawTextSecondary, accountType: "secundaria", quantity: secundariaQty || undefined },
-                      { onSuccess: () => { setAccountsRawTextSecondary(""); setSecundariaQty(""); } }
+                      { digitalProductId: accountsModalGame.id, rawText: buildRawTextWithQuantities(accountsRawTextSecondary, secundariaQtyOverrides, secundariaQty || 1), accountType: "secundaria" },
+                      { onSuccess: () => { setAccountsRawTextSecondary(""); setSecundariaQty(""); setSecundariaQtyOverrides({}); } }
                     )}
                     className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold btn-neon"
                   >
                     {addAccountsMutation.isPending ? "Adicionando..." : "Adicionar Secundárias"}
                   </Button>
                 </div>
-                <p className="text-[10px] text-slate-500 col-span-full -mt-1">Uma conta por linha, no formato email:senha (ou email;senha) — <strong className="text-amber-400">direto, sem escrever a palavra "senha" antes</strong> (ex.: email@site.com:MinhaSenha123, não email@site.com:senha:MinhaSenha123). Escolha em "Quantidade por conta" quantas vendas cada conta cadastrada aguenta daquele tipo (ex.: 2 primárias, 1 secundária) — o cliente sempre recebe a credencial do tipo certo que ele pagou, sem misturar plataforma.</p>
+                <p className="text-[10px] text-slate-500 col-span-full -mt-1">Uma conta por linha, no formato email:senha (ou email;senha) — <strong className="text-amber-400">direto, sem escrever a palavra "senha" antes</strong> (ex.: email@site.com:MinhaSenha123, não email@site.com:senha:MinhaSenha123). A "Quantidade padrão" vale pra toda a lista, mas assim que você cola as contas aparece uma prévia com um campo do lado de cada email — ajuste ali pra dar uma quantidade diferente só numa conta específica (não vale pra aba "Ambos", que é sempre fixa 2+2/3). Se colar um email que já estava cadastrado, a cota nova soma em cima da que ele já tinha, em vez de ser ignorada.</p>
               </div>
             ) : (
               <div className="space-y-2">

@@ -1101,92 +1101,143 @@ export async function addDigitalProductAccountsBulk(digitalProductId: number, ra
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line) => {
-      const parts = line.split(/[:;]/);
+      const parts = line.split(/[:;]/).map((p) => p.trim());
       // Tira aspas que sobram de texto colado (ex.: copiado de um json/nota) — senão
       // viravam parte literal do email/senha guardado.
       const stripQuotes = (s: string) => s.replace(/^["']+|["']+$/g, "");
-      const email = stripQuotes(parts[0]?.trim() ?? "");
+      const email = stripQuotes(parts[0] ?? "");
+      let passwordParts = parts.slice(1);
+      // Linha pode terminar com um número pra sobrescrever a quantidade padrão da caixa
+      // só NESSA conta (ex.: "email@site.com:senha123:3") — só conta como quantidade se
+      // sobrar pelo menos um pedaço antes dela pra ser a senha (André pediu isso, pra dar
+      // cota diferente conta a conta dentro do mesmo lote colado).
+      let lineQuantity: number | undefined;
+      if (passwordParts.length >= 2 && /^\d+$/.test(passwordParts[passwordParts.length - 1])) {
+        lineQuantity = parseInt(passwordParts[passwordParts.length - 1], 10);
+        passwordParts = passwordParts.slice(0, -1);
+      }
       // Alguns admins digitam "email:senha: minhaSenha123" (usando "senha" como rótulo,
       // não como parte da senha) — sem isso, o rótulo virava parte da senha guardada e
       // quebrava o login de quem recebesse essa conta.
-      const password = stripQuotes(parts.slice(1).join(":").trim()).replace(/^senha\s*:?\s*/i, "");
-      return { email, password };
+      const password = stripQuotes(passwordParts.join(":").trim()).replace(/^senha\s*:?\s*/i, "");
+      return { email, password, quantity: lineQuantity };
     })
     .filter((r) => r.email && r.password);
 
-  if (rows.length === 0) return { inserted: 0, skipped: 0, available: 0 };
+  if (rows.length === 0) return { inserted: 0, updated: 0, skipped: 0, available: 0 };
 
-  // Ignora e-mail que já está cadastrado pra esse jogo nesse mesmo tipo (primária ou
-  // secundária) — evita duplicar a cota da MESMA conta por reenvio acidental do mesmo
-  // cadastro (ex.: clicou "Adicionar" de novo sem perceber que já tinha funcionado antes).
+  // E-mail que já está cadastrado pra esse jogo nesse mesmo tipo (primária ou secundária)
+  // não vira mais linha duplicada nem é ignorado — soma cota EXTRA na conta que já existe
+  // (André pediu isso, pra dar cota adicional numa conta específica sem duplicar a linha
+  // nem mexer na senha já entregue pra quem comprou antes). Só o modelo antigo sem tipo
+  // (accountType null, uso único) continua ignorando duplicata, por não ter cota pra somar.
   // Não bloqueia o mesmo e-mail em tipos diferentes: é assim que uma única conta real
   // acumula cota de primária E secundária ao mesmo tempo (cadastrando nas duas caixas).
   const existingResult: any = accountType
     ? await database.execute(sql`
-        SELECT LOWER(email) AS email FROM "digitalProductAccounts"
+        SELECT id, LOWER(email) AS email FROM "digitalProductAccounts"
         WHERE "digitalProductId" = ${digitalProductId} AND "accountType" = ${accountType}
       `)
     : await database.execute(sql`
-        SELECT LOWER(email) AS email FROM "digitalProductAccounts"
+        SELECT id, LOWER(email) AS email FROM "digitalProductAccounts"
         WHERE "digitalProductId" = ${digitalProductId} AND "accountType" IS NULL
       `);
   const existingRows: any[] = Array.isArray(existingResult) ? existingResult : (existingResult?.rows ?? []);
-  const existingEmails = new Set(existingRows.map((r) => r.email as string));
+  const existingIdByEmail = new Map<string, number>(existingRows.map((r) => [r.email as string, r.id as number]));
 
-  const newRows = rows.filter((r) => !existingEmails.has(r.email.toLowerCase()));
-  const skipped = rows.length - newRows.length;
+  const newRows: typeof rows = [];
+  const updateRows: { id: number; row: (typeof rows)[number] }[] = [];
+  for (const r of rows) {
+    const existingId = existingIdByEmail.get(r.email.toLowerCase());
+    if (existingId === undefined) {
+      newRows.push(r);
+    } else if (accountType === "primaria" || accountType === "secundaria") {
+      updateRows.push({ id: existingId, row: r });
+    }
+    // accountType null (legado) com e-mail já existente: nem novo nem update, cai fora —
+    // continua sendo "ignorada" no resumo, igual ao comportamento antigo.
+  }
+  const skipped = rows.length - newRows.length - updateRows.length;
 
-  if (newRows.length === 0) {
+  if (newRows.length === 0 && updateRows.length === 0) {
     const available = await syncDigitalProductAccountStock(database, digitalProductId);
-    return { inserted: 0, skipped, available };
+    return { inserted: 0, updated: 0, skipped, available };
   }
 
-  let caps = { capPrimariaPs4: 0, capPrimariaPs5: 0, capPrimariaTotal: 0, capSecundaria: 0 };
-  if (accountType === "primaria" && quantity && quantity > 0 && (consoleOverride === "PS4" || consoleOverride === "PS5")) {
-    // Admin escolheu explicitamente que ESSE lote é só de um console — vale por cima
-    // da plataforma cadastrada do jogo (é exatamente pra quando o catálogo anuncia
-    // "PS4/PS5" mas só existe estoque real de um dos dois).
-    caps = {
-      capPrimariaPs4: consoleOverride === "PS4" ? quantity : 0,
-      capPrimariaPs5: consoleOverride === "PS5" ? quantity : 0,
-      capPrimariaTotal: quantity,
-      capSecundaria: 0,
-    };
-  } else if (accountType === "primaria" && quantity && quantity > 0) {
-    // Sem escolher "Só PS4"/"Só PS5": se o jogo é de plataforma única de verdade, a
-    // quantidade digitada vale direto pra aquele console (Sandro pediu isso). Mas se o
-    // jogo é combinado (PS4/PS5), a regra é FIXA e não muda com o número digitado: 2 de
-    // cada console, 3 no total — a conta aguenta 2 do mesmo console, e a 3ª só sai pro
-    // console que ainda não vendeu nenhuma (confirmado com Andre). Nesse caso a
-    // "quantidade" cadastrada é ignorada pra cota — só serve pra saber quantas contas
-    // tem no lote, o limite de cada uma continua sendo o fixo.
+  // Plataforma do jogo só é buscada uma vez (não por linha) — usada abaixo pra jogo de
+  // plataforma única e pro fallback fixo do jogo combinado.
+  let platform: string | null | undefined;
+  if (accountType === "primaria" || accountType === "secundaria") {
     const prodRows = await database.select({ platform: digitalProducts.platform }).from(digitalProducts).where(eq(digitalProducts.id, digitalProductId)).limit(1);
-    const p = (prodRows[0]?.platform || "").toUpperCase();
-    const isPs4Only = p.includes("PS4") && !p.includes("PS5");
-    const isPs5Only = p.includes("PS5") && !p.includes("PS4");
-    if (isPs4Only || isPs5Only) {
+    platform = prodRows[0]?.platform;
+  }
+
+  // Calcula a cota conta a conta: cada linha usa a própria quantidade (se digitou um
+  // número no final dela) ou cai pra quantidade padrão da caixa — André pediu poder dar
+  // uma cota diferente só numa conta específica dentro do mesmo lote colado.
+  const capsForQuantity = (qty?: number) => {
+    let caps = { capPrimariaPs4: 0, capPrimariaPs5: 0, capPrimariaTotal: 0, capSecundaria: 0 };
+    if (accountType === "primaria" && qty && qty > 0 && (consoleOverride === "PS4" || consoleOverride === "PS5")) {
+      // Admin escolheu explicitamente que ESSE lote é só de um console — vale por cima
+      // da plataforma cadastrada do jogo (é exatamente pra quando o catálogo anuncia
+      // "PS4/PS5" mas só existe estoque real de um dos dois).
       caps = {
-        capPrimariaPs4: isPs5Only ? 0 : quantity,
-        capPrimariaPs5: isPs4Only ? 0 : quantity,
-        capPrimariaTotal: quantity,
+        capPrimariaPs4: consoleOverride === "PS4" ? qty : 0,
+        capPrimariaPs5: consoleOverride === "PS5" ? qty : 0,
+        capPrimariaTotal: qty,
         capSecundaria: 0,
       };
-    } else {
-      caps = { capPrimariaPs4: 2, capPrimariaPs5: 2, capPrimariaTotal: 3, capSecundaria: 0 };
+    } else if (accountType === "primaria" && qty && qty > 0) {
+      // Sem escolher "Só PS4"/"Só PS5": se o jogo é de plataforma única de verdade, a
+      // quantidade digitada vale direto pra aquele console (Sandro pediu isso). Mas se o
+      // jogo é combinado (PS4/PS5), a regra é FIXA e não muda com o número digitado: 2 de
+      // cada console, 3 no total — a conta aguenta 2 do mesmo console, e a 3ª só sai pro
+      // console que ainda não vendeu nenhuma (confirmado com Andre). Nesse caso a
+      // "quantidade" cadastrada é ignorada pra cota — só serve pra saber quantas contas
+      // tem no lote, o limite de cada uma continua sendo o fixo.
+      const p = (platform || "").toUpperCase();
+      const isPs4Only = p.includes("PS4") && !p.includes("PS5");
+      const isPs5Only = p.includes("PS5") && !p.includes("PS4");
+      if (isPs4Only || isPs5Only) {
+        caps = {
+          capPrimariaPs4: isPs5Only ? 0 : qty,
+          capPrimariaPs5: isPs4Only ? 0 : qty,
+          capPrimariaTotal: qty,
+          capSecundaria: 0,
+        };
+      } else {
+        caps = { capPrimariaPs4: 2, capPrimariaPs5: 2, capPrimariaTotal: 3, capSecundaria: 0 };
+      }
+    } else if (accountType === "secundaria" && qty && qty > 0) {
+      caps = { capPrimariaPs4: 0, capPrimariaPs5: 0, capPrimariaTotal: 0, capSecundaria: qty };
+    } else if (accountType === "primaria" || accountType === "secundaria") {
+      caps = computeAccountCaps(platform, accountType);
     }
-  } else if (accountType === "secundaria" && quantity && quantity > 0) {
-    caps = { capPrimariaPs4: 0, capPrimariaPs5: 0, capPrimariaTotal: 0, capSecundaria: quantity };
-  } else if (accountType === "primaria" || accountType === "secundaria") {
-    const prodRows = await database.select({ platform: digitalProducts.platform }).from(digitalProducts).where(eq(digitalProducts.id, digitalProductId)).limit(1);
-    caps = computeAccountCaps(prodRows[0]?.platform, accountType);
+    return caps;
+  };
+
+  if (newRows.length > 0) {
+    await database.insert(digitalProductAccounts).values(
+      newRows.map((r) => ({ digitalProductId, email: r.email, password: r.password, accountType: accountType || null, ...capsForQuantity(r.quantity ?? quantity) }))
+    );
   }
 
-  await database.insert(digitalProductAccounts).values(
-    newRows.map((r) => ({ digitalProductId, email: r.email, password: r.password, accountType: accountType || null, ...caps }))
-  );
+  // E-mail já cadastrado: soma a cota extra em cima da que a conta já tinha, sem tocar
+  // no email/senha (que já pode ter sido entregue pra um cliente anterior).
+  for (const { id, row } of updateRows) {
+    const delta = capsForQuantity(row.quantity ?? quantity);
+    await database.execute(sql`
+      UPDATE "digitalProductAccounts"
+      SET "capPrimariaPs4" = "capPrimariaPs4" + ${delta.capPrimariaPs4},
+          "capPrimariaPs5" = "capPrimariaPs5" + ${delta.capPrimariaPs5},
+          "capPrimariaTotal" = "capPrimariaTotal" + ${delta.capPrimariaTotal},
+          "capSecundaria" = "capSecundaria" + ${delta.capSecundaria}
+      WHERE id = ${id}
+    `);
+  }
 
   const remaining = await syncDigitalProductAccountStock(database, digitalProductId);
-  return { inserted: newRows.length, skipped, available: remaining };
+  return { inserted: newRows.length, updated: updateRows.length, skipped, available: remaining };
 }
 
 /** Remove uma conta ainda não entregue (contas já usadas em um pedido ficam preservadas). */
