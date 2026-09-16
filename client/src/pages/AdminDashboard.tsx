@@ -1737,7 +1737,7 @@ export default function AdminDashboard() {
   // divididas em sub-blocos "Primária"/"Secundária"), casando cada nome com um jogo já
   // cadastrado. Uma linha em branco também encerra o bloco atual.
   const bulkAccountsGroups = useMemo(() => {
-    const groups: { gameName: string; gameId: number | null; accounts: { email: string; password: string; accountType?: "primaria" | "secundaria" }[] }[] = [];
+    const groups: { gameName: string; gameId: number | null; accounts: { email: string; password: string; accountType?: "primaria" | "secundaria"; quantity?: number }[] }[] = [];
     let current: (typeof groups)[number] | null = null;
     let currentType: "primaria" | "secundaria" | undefined;
 
@@ -1758,7 +1758,18 @@ export default function AdminDashboard() {
       }
       const match = line.match(bulkAccountLineRegex);
       if (match && current) {
-        current.accounts.push({ email: match[1].trim(), password: match[2].trim(), accountType: currentType });
+        const email = match[1].trim();
+        // A linha pode terminar com um número pra dar quantidade própria àquela conta
+        // (ex.: "conta1@exemplo.com:senha123:2") — precisa tirar isso ANTES de guardar
+        // como senha, senão o número vira parte literal da senha guardada (André pediu
+        // controle de quantidade também nessa tela de cadastro em lote de vários jogos).
+        const pwParts = match[2].trim().split(/[:;]/).map((p) => p.trim());
+        let quantity: number | undefined;
+        if (pwParts.length >= 2 && /^\d+$/.test(pwParts[pwParts.length - 1])) {
+          quantity = parseInt(pwParts[pwParts.length - 1], 10);
+          pwParts.pop();
+        }
+        current.accounts.push({ email, password: pwParts.join(":"), accountType: currentType, quantity });
         continue;
       }
       if (match && !current) {
@@ -1798,7 +1809,10 @@ export default function AdminDashboard() {
 
       try {
         for (const bucket of buckets) {
-          const rawText = bucket.accounts.map((a) => `${a.email}:${a.password}`).join("\n");
+          // Quantidade digitada no fim da linha (se tiver) vai embutida no texto — o
+          // backend já sabe interpretar "email:senha:quantidade" por linha. Sem número
+          // na linha, cai no padrão de sempre (computeAccountCaps), sem mudar nada.
+          const rawText = bucket.accounts.map((a) => a.quantity ? `${a.email}:${a.password}:${a.quantity}` : `${a.email}:${a.password}`).join("\n");
           const result: any = await bulkAddAccountsMutation.mutateAsync({ digitalProductId: group.gameId as number, rawText, accountType: bucket.accountType });
           totalInserted += result.inserted;
           totalSkipped += result.skipped || 0;
@@ -7235,7 +7249,7 @@ export default function AdminDashboard() {
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-neon flex items-center gap-2">📦 Cadastrar Contas em Lote</DialogTitle>
             <DialogDescription className="text-slate-400 text-xs">
-              Cole o nome de cada jogo (igual aparece no site), seguido das contas dele (email:senha, uma por linha — direto, sem escrever a palavra "senha" antes da senha). Deixe uma linha em branco entre jogos diferentes. Pra jogos com conta primária e secundária, coloque "Primária" e "Secundária" como sub-título antes das contas de cada tipo.
+              Cole o nome de cada jogo (igual aparece no site), seguido das contas dele (email:senha, uma por linha — direto, sem escrever a palavra "senha" antes da senha). Deixe uma linha em branco entre jogos diferentes. Pra jogos com conta primária e secundária, coloque "Primária" e "Secundária" como sub-título antes das contas de cada tipo. Quer controlar quantas vendas cada conta aguenta? Põe o número no final da linha: <strong className="text-amber-400">conta1@exemplo.com:senha123:2</strong>. Sem número, usa o padrão de sempre (2 primárias/1 secundária, ou 2+2 por console/3 no total pra jogo PS4+PS5 combinado).
             </DialogDescription>
           </DialogHeader>
 
@@ -7243,7 +7257,7 @@ export default function AdminDashboard() {
             <textarea
               value={bulkAccountsRawText}
               onChange={(e) => setBulkAccountsRawText(e.target.value)}
-              placeholder={"Resident Evil Requiem\nPrimária\nconta1@exemplo.com:senha123\nconta2@exemplo.com:senha456\nSecundária\nconta3@exemplo.com:senha789\n\nPragmata\ncontaA@exemplo.com:senhaA"}
+              placeholder={"Resident Evil Requiem\nPrimária\nconta1@exemplo.com:senha123:2\nconta2@exemplo.com:senha456\nSecundária\nconta3@exemplo.com:senha789\n\nPragmata\ncontaA@exemplo.com:senhaA"}
               rows={10}
               className="w-full bg-slate-950 border border-red-600/20 rounded-md p-3 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-red-500/50"
             />
