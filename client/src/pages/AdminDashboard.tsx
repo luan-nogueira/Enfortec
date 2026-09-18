@@ -1651,6 +1651,21 @@ export default function AdminDashboard() {
     },
     onError: (err: any) => toast.error(err.message || "Erro ao remover conta."),
   });
+  // Editar quanto uma conta já cadastrada ainda pode vender — pra quando ela já teve
+  // pelo menos 1 venda e por isso não pode mais ser removida (só corrige a cota, sem
+  // apagar a linha nem mexer no que já foi entregue).
+  const [editingAccountId, setEditingAccountId] = useState<number | null>(null);
+  const [editRemaining, setEditRemaining] = useState<{ ps4: number | ""; ps5: number | ""; total: number | ""; secundaria: number | "" }>({ ps4: "", ps5: "", total: "", secundaria: "" });
+  const updateRemainingMutation = trpc.digitalProducts.accounts.updateRemaining.useMutation({
+    onSuccess: () => {
+      toast.success("Cota da conta atualizada.");
+      setEditingAccountId(null);
+      accountsListQuery.refetch();
+      accountsSummaryQuery.refetch();
+      adminDigitalProductsQuery.refetch();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao atualizar cota da conta."),
+  });
 
   const openAccountsModal = (game: any) => {
     setAccountsRawTextPrimary("");
@@ -1669,6 +1684,7 @@ export default function AdminDashboard() {
     setPrimariaQtyOverrides({});
     setSecundariaQtyOverrides({});
     setPrimariaTab("PS4");
+    setEditingAccountId(null);
     const sec = game.priceSecondary ?? game.price_secondary;
     const hasSecondaryPrice = sec !== undefined && sec !== null && sec !== "" && parseFloat(sec) > 0;
     // Jogos e assinaturas sempre mandam um accountType ("primaria" por padrão) no checkout,
@@ -7075,45 +7091,116 @@ export default function AdminDashboard() {
               ) : (
                 <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
                   {accountsListQuery.data?.available.map((acc: any) => (
-                    <div key={acc.id} className="flex items-center justify-between gap-2 bg-slate-950/60 border border-slate-800 rounded-lg px-3 py-1.5">
-                      <span className="flex items-center gap-2 min-w-0">
-                        {acc.isQuota ? (
-                          <span className="flex items-center gap-1 shrink-0 flex-wrap">
-                            {acc.remainingPrimariaPs4 > 0 && (
-                              <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-blue-950/60 text-blue-300">👤PS4 {acc.remainingPrimariaPs4}</span>
-                            )}
-                            {acc.remainingPrimariaPs5 > 0 && (
-                              <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-blue-950/60 text-blue-300">👤PS5 {acc.remainingPrimariaPs5}</span>
-                            )}
-                            {/* PS4 e PS5 acima dividem a MESMA cota (capPrimariaTotal) — se a soma
-                                dos dois passar do total, deixa claro que não é "os dois juntos". */}
-                            {acc.remainingPrimariaPs4 > 0 && acc.remainingPrimariaPs5 > 0 && (acc.remainingPrimariaPs4 + acc.remainingPrimariaPs5) > acc.remainingPrimariaTotal && (
-                              <span className="text-[9px] font-bold text-amber-400">(máx {acc.remainingPrimariaTotal} no total)</span>
-                            )}
-                            {acc.remainingSecundaria > 0 && (
-                              <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-purple-950/60 text-purple-300">👥Sec {acc.remainingSecundaria}</span>
-                            )}
-                          </span>
-                        ) : accountsModalGame?.hasSecondary && (
-                          <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${
-                            acc.accountType === "secundaria" ? "bg-purple-950/60 text-purple-300" :
-                            acc.accountType === "primaria" ? "bg-blue-950/60 text-blue-300" :
-                            "bg-slate-800 text-slate-400"
-                          }`}>
-                            {acc.accountType === "secundaria" ? "Sec" : acc.accountType === "primaria" ? "Prim" : "—"}
-                          </span>
-                        )}
-                        <span className="text-xs font-mono text-slate-300 truncate">{acc.email}</span>
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeAccountMutation.mutate({ id: acc.id })}
-                        disabled={removeAccountMutation.isPending}
-                        className="h-6 w-6 text-red-500 hover:text-red-400 hover:bg-red-500/10 shrink-0"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
+                    <div key={acc.id} className="flex flex-col gap-1.5 bg-slate-950/60 border border-slate-800 rounded-lg px-3 py-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="flex items-center gap-2 min-w-0">
+                          {acc.isQuota ? (
+                            <span className="flex items-center gap-1 shrink-0 flex-wrap">
+                              {acc.remainingPrimariaPs4 > 0 && (
+                                <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-blue-950/60 text-blue-300">👤PS4 {acc.remainingPrimariaPs4}</span>
+                              )}
+                              {acc.remainingPrimariaPs5 > 0 && (
+                                <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-blue-950/60 text-blue-300">👤PS5 {acc.remainingPrimariaPs5}</span>
+                              )}
+                              {/* PS4 e PS5 acima dividem a MESMA cota (capPrimariaTotal) — se a soma
+                                  dos dois passar do total, deixa claro que não é "os dois juntos". */}
+                              {acc.remainingPrimariaPs4 > 0 && acc.remainingPrimariaPs5 > 0 && (acc.remainingPrimariaPs4 + acc.remainingPrimariaPs5) > acc.remainingPrimariaTotal && (
+                                <span className="text-[9px] font-bold text-amber-400">(máx {acc.remainingPrimariaTotal} no total)</span>
+                              )}
+                              {acc.remainingSecundaria > 0 && (
+                                <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-purple-950/60 text-purple-300">👥Sec {acc.remainingSecundaria}</span>
+                              )}
+                            </span>
+                          ) : accountsModalGame?.hasSecondary && (
+                            <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${
+                              acc.accountType === "secundaria" ? "bg-purple-950/60 text-purple-300" :
+                              acc.accountType === "primaria" ? "bg-blue-950/60 text-blue-300" :
+                              "bg-slate-800 text-slate-400"
+                            }`}>
+                              {acc.accountType === "secundaria" ? "Sec" : acc.accountType === "primaria" ? "Prim" : "—"}
+                            </span>
+                          )}
+                          <span className="text-xs font-mono text-slate-300 truncate">{acc.email}</span>
+                        </span>
+                        <span className="flex items-center gap-1 shrink-0">
+                          {acc.isQuota && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                if (editingAccountId === acc.id) {
+                                  setEditingAccountId(null);
+                                } else {
+                                  setEditingAccountId(acc.id);
+                                  setEditRemaining({
+                                    ps4: acc.remainingPrimariaPs4,
+                                    ps5: acc.remainingPrimariaPs5,
+                                    total: acc.remainingPrimariaTotal,
+                                    secundaria: acc.remainingSecundaria,
+                                  });
+                                }
+                              }}
+                              className="h-6 w-6 text-slate-400 hover:text-white hover:bg-slate-700/40 shrink-0"
+                            >
+                              <Edit className="w-3 h-3" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeAccountMutation.mutate({ id: acc.id })}
+                            disabled={removeAccountMutation.isPending}
+                            className="h-6 w-6 text-red-500 hover:text-red-400 hover:bg-red-500/10 shrink-0"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </span>
+                      </div>
+                      {editingAccountId === acc.id && (
+                        <div className="flex flex-wrap items-end gap-2 pt-1 border-t border-slate-800">
+                          {acc.accountType !== "secundaria" && (
+                            <>
+                              <label className="flex flex-col gap-0.5">
+                                <span className="text-[9px] text-slate-500 uppercase font-bold">PS4</span>
+                                <Input type="number" min={0} value={editRemaining.ps4} onChange={(e) => setEditRemaining((p) => ({ ...p, ps4: e.target.value === "" ? "" : Math.max(0, parseInt(e.target.value) || 0) }))} className="bg-slate-950 border-slate-700 text-white h-6 text-[11px] w-14" />
+                              </label>
+                              <label className="flex flex-col gap-0.5">
+                                <span className="text-[9px] text-slate-500 uppercase font-bold">PS5</span>
+                                <Input type="number" min={0} value={editRemaining.ps5} onChange={(e) => setEditRemaining((p) => ({ ...p, ps5: e.target.value === "" ? "" : Math.max(0, parseInt(e.target.value) || 0) }))} className="bg-slate-950 border-slate-700 text-white h-6 text-[11px] w-14" />
+                              </label>
+                              <label className="flex flex-col gap-0.5">
+                                <span className="text-[9px] text-slate-500 uppercase font-bold">Total</span>
+                                <Input type="number" min={0} value={editRemaining.total} onChange={(e) => setEditRemaining((p) => ({ ...p, total: e.target.value === "" ? "" : Math.max(0, parseInt(e.target.value) || 0) }))} className="bg-slate-950 border-slate-700 text-white h-6 text-[11px] w-14" />
+                              </label>
+                            </>
+                          )}
+                          {acc.accountType === "secundaria" && (
+                            <label className="flex flex-col gap-0.5">
+                              <span className="text-[9px] text-slate-500 uppercase font-bold">Sec</span>
+                              <Input type="number" min={0} value={editRemaining.secundaria} onChange={(e) => setEditRemaining((p) => ({ ...p, secundaria: e.target.value === "" ? "" : Math.max(0, parseInt(e.target.value) || 0) }))} className="bg-slate-950 border-slate-700 text-white h-6 text-[11px] w-14" />
+                            </label>
+                          )}
+                          <Button
+                            size="icon"
+                            disabled={updateRemainingMutation.isPending}
+                            onClick={() => updateRemainingMutation.mutate({
+                              id: acc.id,
+                              ...(acc.accountType !== "secundaria" ? {
+                                remainingPs4: editRemaining.ps4 === "" ? 0 : editRemaining.ps4,
+                                remainingPs5: editRemaining.ps5 === "" ? 0 : editRemaining.ps5,
+                                remainingTotal: editRemaining.total === "" ? 0 : editRemaining.total,
+                              } : {}),
+                              ...(acc.accountType === "secundaria" ? { remainingSecundaria: editRemaining.secundaria === "" ? 0 : editRemaining.secundaria } : {}),
+                            })}
+                            className="h-6 w-6 bg-green-600 hover:bg-green-700 text-white shrink-0"
+                          >
+                            <Check className="w-3 h-3" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => setEditingAccountId(null)} className="h-6 w-6 text-slate-400 hover:text-white shrink-0">
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

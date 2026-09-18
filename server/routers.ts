@@ -706,6 +706,19 @@ export const appRouter = router({
           if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
           return db.removeDigitalProductAccount(input.id);
         }),
+      updateRemaining: protectedProcedure
+        .input(z.object({
+          id: z.number(),
+          remainingPs4: z.number().int().min(0).optional(),
+          remainingPs5: z.number().int().min(0).optional(),
+          remainingTotal: z.number().int().min(0).optional(),
+          remainingSecundaria: z.number().int().min(0).optional(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+          const { id, ...updates } = input;
+          return db.updateDigitalProductAccountRemaining(id, updates);
+        }),
     }),
   }),
 

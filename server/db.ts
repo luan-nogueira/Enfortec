@@ -1259,6 +1259,36 @@ export async function removeDigitalProductAccount(id: number) {
   return { available: remaining };
 }
 
+/**
+ * Ajusta quanto uma conta já cadastrada AINDA pode vender, sem apagar a linha nem mexer
+ * no que já foi vendido — resolve o caso de uma conta já usada uma vez que não pode ser
+ * removida (André pediu isso: queria corrigir a cota de uma conta que já tinha 1 venda,
+ * mas o botão de remover trava contas com histórico de uso, e com razão).
+ * Cada campo recebido é "quanto ainda falta vender" daquele tipo — a função soma o que já
+ * foi usado por baixo dos panos e grava o total (cap) resultante, então o admin edita
+ * pensando exatamente nos mesmos números que a tela já mostra (os "remaining").
+ */
+export async function updateDigitalProductAccountRemaining(id: number, updates: { remainingPs4?: number; remainingPs5?: number; remainingTotal?: number; remainingSecundaria?: number }) {
+  const database = getDb();
+  if (!database) throw new Error("Database not available");
+
+  const existing = await database.select().from(digitalProductAccounts).where(eq(digitalProductAccounts.id, id)).limit(1);
+  const account = existing[0];
+  if (!account) throw new Error("Conta não encontrada");
+
+  const sets: Record<string, number> = {};
+  if (updates.remainingPs4 !== undefined) sets.capPrimariaPs4 = account.usedPrimariaPs4 + Math.max(0, updates.remainingPs4);
+  if (updates.remainingPs5 !== undefined) sets.capPrimariaPs5 = account.usedPrimariaPs5 + Math.max(0, updates.remainingPs5);
+  if (updates.remainingTotal !== undefined) sets.capPrimariaTotal = account.usedPrimariaPs4 + account.usedPrimariaPs5 + Math.max(0, updates.remainingTotal);
+  if (updates.remainingSecundaria !== undefined) sets.capSecundaria = account.usedSecundaria + Math.max(0, updates.remainingSecundaria);
+
+  if (Object.keys(sets).length > 0) {
+    await database.update(digitalProductAccounts).set(sets).where(eq(digitalProductAccounts.id, id));
+  }
+  const remaining = await syncDigitalProductAccountStock(database, account.digitalProductId);
+  return { available: remaining };
+}
+
 // Coupons queries
 export async function getCouponByCode(code: string) {
   const db = getDb();
