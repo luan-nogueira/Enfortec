@@ -320,7 +320,7 @@ export default function DigitalMedia() {
       return;
     }
 
-    if (product.isActive === false || Number(product.stock ?? 0) <= 0) {
+    if (product.isActive === false || (Number(product.stock ?? 0) <= 0 && !product.allowManualWithoutStock)) {
       toast.error("Este jogo está esgotado no momento.");
       return;
     }
@@ -836,7 +836,7 @@ export default function DigitalMedia() {
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-4">
               {filteredProducts.map((product: any) => {
-                const isOutOfStock = product.isActive === false || Number(product.stock ?? 0) <= 0;
+                const isOutOfStock = product.isActive === false || (Number(product.stock ?? 0) <= 0 && !product.allowManualWithoutStock);
                 const isExpired = !!product.expiresAt && new Date(product.expiresAt) < new Date();
                 const isUnavailable = isOutOfStock || isExpired;
                 return (

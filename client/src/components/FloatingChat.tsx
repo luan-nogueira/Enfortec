@@ -190,7 +190,7 @@ export default function FloatingChat() {
   const { data: digitalProductsData } = trpc.digitalProducts.list.useQuery();
   const catalog = useMemo(() => {
     return (digitalProductsData ?? [])
-      .filter((p: any) => Number(p.stock) > 0)
+      .filter((p: any) => Number(p.stock) > 0 || p.allowManualWithoutStock)
       .map((p: any) => ({
         name: p.name as string,
         price: Number(p.pricePrimary ?? p.price) || 0,

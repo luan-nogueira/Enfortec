@@ -204,7 +204,7 @@ export default function Home() {
   // Mix dynamic games from the database into the slides as requested by the user
   const dbGameBanners = digitalProducts.filter(game => {
     if (game.showInEconomia === true) return false;
-    const isOutOfStock = game.isActive === false || Number(game.stock ?? 0) <= 0;
+    const isOutOfStock = game.isActive === false || (Number(game.stock ?? 0) <= 0 && !game.allowManualWithoutStock);
     const isExpired = !!game.expiresAt && new Date(game.expiresAt) < new Date();
     return !isOutOfStock && !isExpired;
   }).map(game => {
@@ -867,7 +867,7 @@ export default function Home() {
               // assinaturas — usar "isDigital" aqui (que exclui assinatura de propósito, só pra
               // rótulo/badge) fazia assinatura esgotada nunca mostrar "Indisponível" na Home.
               const isAnyDigital = listing._type === 'digital';
-              const isOutOfStock = isAnyDigital && (listing.isActive === false || Number(listing.stock ?? 0) <= 0);
+              const isOutOfStock = isAnyDigital && (listing.isActive === false || (Number(listing.stock ?? 0) <= 0 && !listing.allowManualWithoutStock));
               const isExpired = isAnyDigital && !!listing.expiresAt && new Date(listing.expiresAt) < new Date();
               const isUnavailable = isOutOfStock || isExpired;
 
