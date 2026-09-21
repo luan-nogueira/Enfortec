@@ -276,6 +276,37 @@ export async function getActiveSellers() {
 }
 
 // Used Products queries
+
+// Anúncios antigos guardaram a foto como base64 (data:image/...) DENTRO da coluna "images" —
+// até ~370 KB por foto. Como toda listagem (Home, /usados, painéis) devolvia isso junto,
+// cada visita baixava ~1,6 MB do Neon e estourava a cota mensal de transferência de rede.
+// Aqui a listagem troca o base64 por um endereço leve (/api/used-product-image/:id/:index),
+// servido com cache por getUsedProductInlineImage. Fotos que já são URL (Firebase Storage)
+// passam direto, sem mudança.
+const isInlineImage = (img: unknown): img is string => typeof img === "string" && img.startsWith("data:");
+
+function withLightImages<T extends { id: number; images?: string[] | null }>(product: T): T {
+  const images = product.images;
+  if (!Array.isArray(images) || !images.some(isInlineImage)) return product;
+  return {
+    ...product,
+    images: images.map((img, index) => (isInlineImage(img) ? `/api/used-product-image/${product.id}/${index}` : img)),
+  };
+}
+
+/** Foto base64 de um anúncio (data URI completo) ou null. Lê só a coluna "images" da linha. */
+export async function getUsedProductInlineImage(productId: number, index: number): Promise<string | null> {
+  const db = getDb();
+  if (!db) return null;
+  const rows = await db
+    .select({ images: usedProducts.images })
+    .from(usedProducts)
+    .where(eq(usedProducts.id, productId))
+    .limit(1);
+  const image = rows[0]?.images?.[index];
+  return isInlineImage(image) ? image : null;
+}
+
 export async function getApprovedUsedProducts() {
   const db = getDb();
   if (!db) return [];
@@ -294,13 +325,14 @@ export async function getApprovedUsedProducts() {
     .leftJoin(users, eq(sellers.userId, users.id))
     .where(eq(usedProducts.status, 'aprovado'))
     .orderBy(desc(usedProducts.createdAt));
-  return rows.map((r) => ({ ...r.product, sellerName: r.sellerName, sellerOpenId: r.sellerOpenId }));
+  return rows.map((r) => ({ ...withLightImages(r.product), sellerName: r.sellerName, sellerOpenId: r.sellerOpenId }));
 }
 
 export async function getUsedProductsBySellerId(sellerId: number) {
   const db = getDb();
   if (!db) return [];
-  return db.select().from(usedProducts).where(eq(usedProducts.sellerId, sellerId)).orderBy(desc(usedProducts.createdAt));
+  const rows = await db.select().from(usedProducts).where(eq(usedProducts.sellerId, sellerId)).orderBy(desc(usedProducts.createdAt));
+  return rows.map(withLightImages);
 }
 
 /**
@@ -320,7 +352,7 @@ export async function getUsedProductsForAccount(userId: number, isAdminAccount: 
       .innerJoin(users, eq(sellers.userId, users.id))
       .where(eq(users.role, "admin"))
       .orderBy(desc(usedProducts.createdAt));
-    return rows.map((r) => r.product);
+    return rows.map((r) => withLightImages(r.product));
   }
   const seller = await getSellerByUserId(userId);
   if (!seller) return [];
@@ -344,7 +376,7 @@ export async function getAllUsedProductsWithSeller() {
     .leftJoin(users, eq(sellers.userId, users.id))
     .orderBy(desc(usedProducts.createdAt));
   return rows.map(r => ({
-    ...r.product,
+    ...withLightImages(r.product),
     sellerStoreName: r.sellerStoreName || undefined,
     sellerEmail: r.sellerEmail || r.directUserEmail || undefined,
     sellerName: r.sellerName || r.directUserName || undefined,

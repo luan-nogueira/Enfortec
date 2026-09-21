@@ -16,6 +16,7 @@ import { registerAiRoute } from "./ai";
 import { registerPaymentRoute } from "./payment";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
+import { getUsedProductInlineImage } from "../db";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -234,6 +235,32 @@ app.get("/api/inspect-db-url", (req, res) => {
     });
   } catch (e: any) {
     return res.json({ error: "Invalid URL", message: e.message, length: url.length });
+  }
+});
+
+// Foto de anúncio usado que foi gravada como base64 no banco (ver withLightImages em db.ts).
+// A listagem devolve só este endereço; a imagem em si é buscada no Neon uma vez e depois
+// fica no cache do navegador e da CDN — sem cache, cada visita voltaria a baixar tudo do banco.
+app.get("/api/used-product-image/:id/:index", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const index = Number(req.params.index);
+    if (!Number.isInteger(id) || !Number.isInteger(index) || id < 1 || index < 0) {
+      return res.status(400).end();
+    }
+    const dataUri = await getUsedProductInlineImage(id, index);
+    // Só formatos raster: SVG servido direto deste domínio poderia executar script.
+    const match = dataUri && /^data:(image\/(?:png|jpe?g|webp|gif));base64,([\s\S]+)$/i.exec(dataUri);
+    if (!match) return res.status(404).end();
+    res.set({
+      "Content-Type": match[1].toLowerCase(),
+      "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400",
+      "X-Content-Type-Options": "nosniff",
+    });
+    return res.send(Buffer.from(match[2], "base64"));
+  } catch (err) {
+    console.error("[used-product-image] erro:", err);
+    return res.status(500).end();
   }
 });
 
