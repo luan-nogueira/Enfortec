@@ -375,7 +375,7 @@ export default function Home() {
                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider px-2">⭐ Clube & Benefícios</h4>
                     <div className="space-y-1">
                       <a href="/platinador" className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-900 text-xs font-bold text-amber-400 hover:text-amber-300 transition-colors border border-amber-950/40">
-                        <span className="flex items-center gap-2.5"><Trophy className="w-4 h-4 text-amber-400" /> Clube do Platinador (R$ 35/mês)</span>
+                        <span className="flex items-center gap-2.5"><Trophy className="w-4 h-4 text-amber-400" /> Clube do Platinador (grátis)</span>
                         <ArrowRight className="w-3.5 h-3.5" />
                       </a>
                       <a href="/virar-vendedor" className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-slate-900 text-xs font-semibold text-slate-300 hover:text-white transition-colors">

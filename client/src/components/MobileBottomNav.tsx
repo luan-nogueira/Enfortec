@@ -104,11 +104,11 @@ export default function MobileBottomNav() {
       title: "Clube & Benefícios",
       items: [
         {
-          label: "Área do Platinador (R$ 35/mês)",
+          label: "Área do Platinador (grátis)",
           icon: Trophy,
           path: "/platinador",
           color: "text-[#dc143c]",
-          badge: "VIP",
+          badge: "GRÁTIS",
         },
         {
           label: "ForteCoins & Fidelidade",

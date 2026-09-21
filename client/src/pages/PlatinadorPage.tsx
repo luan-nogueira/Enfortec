@@ -5,14 +5,42 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { getLoginUrl } from "@/const";
 import UserProfileButton from "@/components/UserProfileButton";
-import { storage } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
+import { collection, onSnapshot } from "firebase/firestore";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
-import { Trophy, Flame, Coins, ExternalLink, Zap, Star, Gamepad2, ArrowLeft, Clock, Sparkles, Check, AlertCircle, Award, Upload, Image as ImageIcon, Medal, Users } from "lucide-react";
+import { Trophy, Flame, Coins, ExternalLink, Zap, Star, Gamepad2, ArrowLeft, Clock, Sparkles, Check, AlertCircle, Award, Upload, Image as ImageIcon, Medal, Users, Gift, Tag } from "lucide-react";
+
+// Valor de cada ForteCoin no pagamento: 10 moedas = R$ 1,00 (mesma conta do checkout,
+// server/_core/payment.ts). Se um dia isso mudar lá, muda aqui também.
+const COIN_VALUE_BRL = 0.1;
+const formatBRL = (value: number) =>
+  value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+/** Prêmios da loja de resgate (mesma coleção da página de ForteCoins). */
+function usePrizes() {
+  const [prizes, setPrizes] = useState<any[]>([]);
+  useEffect(() => {
+    const unsub = onSnapshot(
+      collection(db, "prizes"),
+      (snap) => {
+        setPrizes(
+          snap.docs
+            .map((d) => ({ id: d.id, ...d.data() }))
+            .filter((p: any) => p.isActive !== false)
+            .sort((a: any, b: any) => (a.cost || 0) - (b.cost || 0))
+        );
+      },
+      () => setPrizes([])
+    );
+    return () => unsub();
+  }, []);
+  return prizes;
+}
 
 function useApprovedSubmissions() {
   const query = trpc.platinador.getApprovedSubmissions.useQuery();
@@ -77,6 +105,19 @@ export default function PlatinadorPage() {
     enabled: !!user,
   });
   const { byChallenge: completersByChallenge, ranking: platinadorRanking } = useApprovedSubmissions();
+  const settingsQuery = trpc.settings.get.useQuery();
+  const prizes = usePrizes();
+
+  // Recompensa por platina, calculada a partir dos desafios que estão no ar — assim o texto
+  // "o que você ganha" nunca fica diferente do que o admin cadastrou.
+  const rewardValues = (challengesQuery.data || [])
+    .map((c: any) => Number(c.rewardCoins) || 0)
+    .filter((n: number) => n > 0);
+  const minReward = rewardValues.length ? Math.min(...rewardValues) : 0;
+  const maxReward = rewardValues.length ? Math.max(...rewardValues) : 0;
+  // Teto de moedas por compra vem do servidor (configurável no admin), não é número fixo aqui.
+  const maxCoinsPerPurchase: number | undefined = settingsQuery.data?.maxCoinsPerPurchase ?? undefined;
+  const maxCoinsPreVenda: number | undefined = settingsQuery.data?.maxCoinsPreVenda ?? undefined;
 
   // Mutations
   const updatePsnMutation = trpc.platinador.updatePsnId.useMutation({
@@ -201,6 +242,20 @@ export default function PlatinadorPage() {
               <p className="text-gray-200 text-sm sm:text-lg leading-relaxed">
                 Participe dos <strong className="text-amber-400">Desafios de Platina abertos para todos</strong>, <strong className="text-white">de graça</strong>! Cumpra desafios na PSN, envie a comprovação, acumule <strong className="text-amber-400">ForteCoins</strong> para abater nas suas compras e entre no ranking de platinadores.
               </p>
+              {/* O que se ganha, em uma olhada */}
+              <div className="flex flex-wrap gap-2 text-xs font-bold">
+                <span className="inline-flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 px-3 py-1.5 rounded-full">
+                  <Check className="w-3.5 h-3.5" /> 100% grátis, sem mensalidade
+                </span>
+                {maxReward > 0 && (
+                  <span className="inline-flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-300 px-3 py-1.5 rounded-full">
+                    <Coins className="w-3.5 h-3.5" /> {minReward === maxReward ? `+${maxReward}` : `+${minReward} a ${maxReward}`} ForteCoins por platina
+                  </span>
+                )}
+                <span className="inline-flex items-center gap-1.5 bg-[#dc143c]/10 border border-[#dc143c]/30 text-[#ff4d6d] px-3 py-1.5 rounded-full">
+                  <Gift className="w-3.5 h-3.5" /> Troque por descontos e prêmios
+                </span>
+              </div>
             </div>
 
             {/* STATUS / PSN ID CARD */}
@@ -255,7 +310,138 @@ export default function PlatinadorPage() {
           </div>
         </section>
 
-        {/* BENEFÍCIOS DO CLUBE */}
+        {/* O QUE VOCÊ GANHA */}
+        <section className="space-y-6">
+          <div className="text-center space-y-2">
+            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+              O que você <span className="text-[#dc143c]">ganha</span> no Clube
+            </h2>
+            <p className="text-gray-400 text-sm max-w-2xl mx-auto">
+              Participar é grátis. Cada platina aprovada vira ForteCoins — e as ForteCoins viram desconto ou prêmio.
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* 1. ForteCoins por platina */}
+            <div className="bg-[#121212] border border-amber-500/30 p-5 rounded-2xl space-y-2">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
+                <Coins className="w-5 h-5" />
+              </div>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Por cada platina aprovada</p>
+              {maxReward > 0 ? (
+                <>
+                  <p className="text-2xl font-black text-amber-400">
+                    +{minReward === maxReward ? maxReward : `${minReward} a ${maxReward}`} <span className="text-sm font-bold">ForteCoins</span>
+                  </p>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    {minReward === maxReward
+                      ? `Equivale a ${formatBRL(maxReward * COIN_VALUE_BRL)} em desconto.`
+                      : `De ${formatBRL(minReward * COIN_VALUE_BRL)} a ${formatBRL(maxReward * COIN_VALUE_BRL)} em desconto, conforme o desafio.`}
+                  </p>
+                </>
+              ) : (
+                <p className="text-xs text-gray-400 leading-relaxed">
+                  Cada desafio mostra quantas ForteCoins você recebe ao ter a platina aprovada.
+                </p>
+              )}
+            </div>
+
+            {/* 2. Desconto nas compras */}
+            <div className="bg-[#121212] border border-emerald-500/30 p-5 rounded-2xl space-y-2">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                <Tag className="w-5 h-5" />
+              </div>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Desconto nas suas compras</p>
+              <p className="text-2xl font-black text-emerald-400">
+                10 FC = {formatBRL(10 * COIN_VALUE_BRL)}
+              </p>
+              <p className="text-xs text-gray-400 leading-relaxed">
+                Use suas moedas na hora de pagar.
+                {maxCoinsPerPurchase !== undefined
+                  ? ` Você pode usar até ${maxCoinsPerPurchase} ForteCoins por compra (${formatBRL(maxCoinsPerPurchase * COIN_VALUE_BRL)} de desconto)${maxCoinsPreVenda ? `, e até ${maxCoinsPreVenda} em pré-venda` : ""}.`
+                  : " Há um limite de moedas por compra."}
+              </p>
+            </div>
+
+            {/* 3. Prêmios */}
+            <div className="bg-[#121212] border border-purple-500/30 p-5 rounded-2xl space-y-2 flex flex-col">
+              <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center">
+                <Gift className="w-5 h-5" />
+              </div>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Prêmios de verdade</p>
+              <p className="text-2xl font-black text-purple-300">Loja de resgate</p>
+              <p className="text-xs text-gray-400 leading-relaxed">
+                Troque suas ForteCoins por prêmios, como gift card, jogo e PS Plus. O resgate exige login com a conta Google.
+              </p>
+              <button
+                type="button"
+                onClick={() => setLocation("/fortecoins")}
+                className="mt-auto pt-1 text-left text-xs font-bold text-purple-300 hover:text-white transition-colors"
+              >
+                Ver loja de resgate →
+              </button>
+            </div>
+
+            {/* 4. Ranking */}
+            <div className="bg-[#121212] border border-[#dc143c]/30 p-5 rounded-2xl space-y-2">
+              <div className="w-10 h-10 rounded-xl bg-[#dc143c]/10 text-[#dc143c] flex items-center justify-center">
+                <Medal className="w-5 h-5" />
+              </div>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Reconhecimento</p>
+              <p className="text-2xl font-black text-[#ff4d6d]">Ranking</p>
+              <p className="text-xs text-gray-400 leading-relaxed">
+                Sua PSN ID entra no Ranking dos Platinadores e aparece no mural de quem já conquistou cada desafio.
+              </p>
+            </div>
+          </div>
+
+          {/* Prévia dos prêmios: mostra quanto falta, em platinas, para cada um */}
+          {prizes.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <Gift className="w-4 h-4 text-purple-400" /> O que dá pra resgatar com suas ForteCoins
+              </h3>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {prizes.slice(0, 6).map((prize: any) => {
+                  const cost = Number(prize.cost) || 0;
+                  const soldOut = typeof prize.stock === "number" && prize.stock <= 0;
+                  const platinumsNeeded = minReward > 0 ? Math.ceil(cost / minReward) : 0;
+                  const missing = user ? Math.max(0, cost - forteCoins) : cost;
+                  return (
+                    <div
+                      key={prize.id}
+                      className={`bg-[#121212] border border-gray-800 rounded-xl p-4 flex items-center justify-between gap-3 ${soldOut ? "opacity-50" : ""}`}
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-white truncate">{prize.name}</p>
+                        <p className="text-[11px] text-gray-500">
+                          {soldOut
+                            ? "Esgotado no momento"
+                            : user && missing === 0
+                            ? "Você já tem moedas para resgatar!"
+                            : user
+                            ? `Faltam ${missing} ForteCoins`
+                            : platinumsNeeded > 0
+                            ? `≈ ${platinumsNeeded} platina${platinumsNeeded !== 1 ? "s" : ""}`
+                            : ""}
+                        </p>
+                      </div>
+                      <span className="shrink-0 flex items-center gap-1 text-amber-400 font-black text-sm">
+                        <Coins className="w-4 h-4" /> {cost}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <p className="text-center text-[11px] text-gray-500 max-w-2xl mx-auto">
+            A platina é conferida pela nossa equipe antes de as ForteCoins entrarem na sua carteira. As ForteCoins expiram 90 dias depois de ganhas.
+          </p>
+        </section>
+
+        {/* COMO FUNCIONA */}
         <section className="space-y-6">
           <div className="text-center space-y-2">
             <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
@@ -293,7 +479,7 @@ export default function PlatinadorPage() {
               </div>
               <h3 className="font-bold text-white text-base">Aprovação, Coins & Ranking</h3>
               <p className="text-gray-400 text-xs leading-relaxed">
-                Após aprovação, você recebe ForteCoins e entra no ranking de platinadores do clube!
+                Depois que a equipe confere, as ForteCoins caem na sua carteira e você entra no ranking. Aí é só usar no pagamento das compras ou trocar por prêmios!
               </p>
             </div>
           </div>
@@ -346,6 +532,18 @@ export default function PlatinadorPage() {
                     <CardDescription className="text-gray-400 text-xs line-clamp-2">
                       {challenge.description}
                     </CardDescription>
+                    {/* O que o cliente leva ao platinar este jogo */}
+                    <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-amber-500/10 border border-amber-500/30 px-3 py-2 text-xs">
+                      <span className="text-amber-300 font-bold flex items-center gap-1.5">
+                        <Coins className="w-3.5 h-3.5" /> Você ganha +{challenge.rewardCoins} ForteCoins
+                      </span>
+                      <span className="text-gray-400 shrink-0">≈ {formatBRL((Number(challenge.rewardCoins) || 0) * COIN_VALUE_BRL)}</span>
+                    </div>
+                    {challenge.deadline && (
+                      <p className="text-[11px] text-gray-500 flex items-center gap-1.5 pt-1">
+                        <Clock className="w-3 h-3" /> Prazo: {new Date(challenge.deadline).toLocaleDateString("pt-BR")}
+                      </p>
+                    )}
                     {(() => {
                       const completers = completersByChallenge.get(challenge.id) || [];
                       if (completers.length === 0) return null;
