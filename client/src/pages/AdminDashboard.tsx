@@ -1,7 +1,9 @@
 ﻿import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { firebaseConfig } from "@/lib/firebase";
-import { useAuth } from "@/_core/hooks/useAuth";
+import { useAuth, isAdminEmail } from "@/_core/hooks/useAuth";
+import AdminTeamChat from "@/components/AdminTeamChat";
+import { isTeamAdmin, isThreadUnread, useTeamChatThreads } from "@/lib/teamChat";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { db, storage } from "@/lib/firebase";
@@ -2771,6 +2773,44 @@ export default function AdminDashboard() {
     seenNotifIdsRef.current = new Set(pendingIds);
   }, [notificationFeed, notifSoundEnabled]);
 
+  // Chat interno entre gestores: conversas, contagem de não lidas e aviso de mensagem nova.
+  const teamThreads = useTeamChatThreads(isAuthenticated && isAdmin);
+  const teamUnreadCount = useMemo(
+    () => Object.values(teamThreads).filter((t) => isThreadUnread(t, user?.id || "")).length,
+    [teamThreads, user?.id]
+  );
+  const teamMembers = useMemo(
+    () =>
+      users
+        .filter((u) => isTeamAdmin(u))
+        .map((u) => ({ id: u.id as string, name: (u.name || u.email || "Gestor") as string, email: (u.email || "") as string })),
+    [users]
+  );
+
+  // Avisa (som + pop-up) quando um colega manda mensagem e o gestor não está com o chat aberto.
+  // Só avisa mensagem recente (último minuto): ao abrir o painel, o que já estava não lido não
+  // vira uma rajada de pop-ups — aparece só como selo na aba.
+  const notifiedTeamMsgRef = useRef<Record<string, number>>({});
+  useEffect(() => {
+    const myId = user?.id;
+    if (!myId) return;
+    Object.values(teamThreads).forEach((t) => {
+      const sentAt = t.updatedAt?.toMillis?.() ?? 0;
+      if (!isThreadUnread(t, myId) || sentAt <= (notifiedTeamMsgRef.current[t.id] ?? 0)) return;
+      notifiedTeamMsgRef.current[t.id] = sentAt;
+      if (Date.now() - sentAt > 60_000 || activeTab === "equipe_chat") return;
+      notifyAdmin({
+        title: `💬 ${t.lastSenderName || "Colega"} (Chat da Equipe)`,
+        body: t.lastMessage,
+        tag: `team_${t.id}`,
+        onClickUrl: `/admin?tab=equipe_chat`,
+        actionLabel: "Abrir",
+        onAction: () => setActiveTab("equipe_chat"),
+        playSound: notifSoundEnabled,
+      });
+    });
+  }, [teamThreads, user?.id, activeTab, notifSoundEnabled]);
+
   const menuItems = useMemo(() => [
     { value: "visao-geral", label: "Visão Geral", icon: BarChart3 },
     {
@@ -2794,6 +2834,10 @@ export default function AdminDashboard() {
       badge: allChats.some(c => c.unreadByAdmin),
       section: "Atendimento",
     },
+    // Chat interno: só gestores (admin) enxergam — colaboradores não entram.
+    ...(isAdmin
+      ? [{ value: "equipe_chat", label: "💬 Chat da Equipe", icon: MessageCircle, badge: teamUnreadCount > 0, section: "Atendimento" }]
+      : []),
     {
       value: "aprovar_contas",
       label: "✅ Aprovar Contas",
@@ -2820,7 +2864,7 @@ export default function AdminDashboard() {
     { value: "cupons", label: "Cupons", icon: Percent, section: "Marketing" },
     { value: "manutencao", label: "Bloqueio do Site", icon: ShieldAlert, section: "Sistema" },
     { value: "config_fortecoins", label: "📲 Link WhatsApp & ForteCoins", icon: Settings, section: "Sistema" },
-  ], [allRedemptions, allReferrals, allChats, pendingNotifCount, sales, gamesList]);
+  ], [allRedemptions, allReferrals, allChats, pendingNotifCount, sales, gamesList, isAdmin, teamUnreadCount]);
 
   // Delivery Orders State (modal de "Entregar Dados de Acesso" da aba Compras Pendentes)
   const [showDeliverModal, setShowDeliverModal] = useState(false);
@@ -4546,7 +4590,9 @@ export default function AdminDashboard() {
           <TabsContent value="usuarios">
             <h2 className="text-xl font-bold text-white mb-8 border-l-4 border-red-600 pl-4 uppercase tracking-widest text-sm italic">Gestão de Equipe</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {users.filter(u => u.role === 'admin' || u.role === 'collaborator' || u.email === 'luanmnogueira@gmail.com').map((u) => (
+              {/* Gestores fixos por e-mail (lista do código) podem ter role "user" gravado no Firestore
+                  — filtrar só por role deixava o Sandro e o André de fora desta lista. */}
+              {users.filter(u => isTeamAdmin(u) || u.role === 'collaborator').map((u) => (
                 <Card key={u.id} className="bg-slate-900/40 backdrop-blur-md border-red-600/10 p-6 hover:border-red-600/40 hover:shadow-[0_8px_30px_rgb(0,0,0,0.5)] transition-all duration-500 card-neon relative overflow-hidden group">
                   <div className="absolute top-0 right-0 w-24 h-24 bg-red-600/5 rounded-full blur-2xl group-hover:bg-red-600/10 transition-all duration-500" />
                   <div className="flex items-start justify-between mb-4 relative z-10">
@@ -4560,14 +4606,14 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                     {(() => {
-                      const displayRole = u.email === 'luanmnogueira@gmail.com' ? 'admin' : u.role;
+                      const displayRole = isTeamAdmin(u) ? 'admin' : u.role;
                       return (
                         <div className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all duration-300 ${displayRole === 'admin' ? 'bg-red-500/10 text-red-400 border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.15)]' : displayRole === 'collaborator' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.15)]' : 'bg-slate-800/80 text-slate-400 border-slate-700/50'}`}>
                           {displayRole}
                         </div>
                       );
                     })()}
-                    {u.email !== 'luanmnogueira@gmail.com' && (
+                    {!isAdminEmail(u.email) && (
                       <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(u.id, u.email)} className="text-slate-600 hover:text-red-500 -mt-2 -mr-2 relative z-20">
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -4619,9 +4665,9 @@ export default function AdminDashboard() {
                   </div>
 
                   <div className="space-y-3 mt-6">
-                    {u.email !== 'luanmnogueira@gmail.com' && (
+                    {!isAdminEmail(u.email) && (
                       <>
-                        <Button 
+                        <Button
                           onClick={() => handleToggleCollaborator(u.id, u.role)}
                           className={`w-full flex items-center justify-center gap-2 font-bold h-10 ${u.role === 'collaborator' ? "bg-blue-600/20 hover:bg-blue-600/30 text-blue-400" : "bg-slate-800 hover:bg-slate-700 text-white"}`}
                         >
@@ -4641,11 +4687,30 @@ export default function AdminDashboard() {
                     {u.email === 'luanmnogueira@gmail.com' && (
                       <p className="text-center text-xs text-red-500 font-bold bg-red-500/10 py-2 rounded">Gestor Principal</p>
                     )}
+                    {isAdminEmail(u.email) && u.email !== 'luanmnogueira@gmail.com' && (
+                      <p className="text-center text-xs text-red-400 font-bold bg-red-500/10 py-2 rounded">Gestor fixo (definido por e-mail)</p>
+                    )}
                   </div>
                 </Card>
               ))}
             </div>
           </TabsContent>
+
+          {isAdmin && user && (
+            <TabsContent value="equipe_chat" className="space-y-6">
+              <div className="border-l-4 border-red-600 pl-4">
+                <h2 className="text-lg sm:text-xl font-bold text-white uppercase tracking-widest sm:text-sm italic">Chat da Equipe</h2>
+                <p className="text-slate-400 text-xs mt-1">
+                  Conversa interna entre os gestores — só quem é admin vê. Use a Sala da Equipe para falar com todos ou escolha um gestor para uma conversa direta.
+                </p>
+              </div>
+              <AdminTeamChat
+                me={{ id: user.id, name: user.name || user.email || "Gestor" }}
+                members={teamMembers}
+                threads={teamThreads}
+              />
+            </TabsContent>
+          )}
 
           <TabsContent value="aprovar_contas" className="space-y-6 pb-16">
             <div className="border-l-4 border-red-600 pl-4">
