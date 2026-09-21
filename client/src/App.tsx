@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Router as WouterRouter, Route, Switch } from "wouter";
+import { Router as WouterRouter, Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
@@ -47,6 +47,16 @@ function RouteFallback() {
       <div className="w-10 h-10 border-2 border-red-600/30 border-t-red-600 rounded-full animate-spin" />
     </div>
   );
+}
+
+// O wouter não reseta o scroll ao trocar de rota: quem clicava num banner no meio da Home
+// caía na página de destino "parado" no meio dela. Volta ao topo a cada mudança de rota.
+function ScrollToTop() {
+  const [location] = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location]);
+  return null;
 }
 
 function Router() {
@@ -132,6 +142,7 @@ function App() {
         <TooltipProvider>
           <WouterRouter>
             <Toaster />
+            <ScrollToTop />
             <Router />
             <FloatingChat />
             <GlobalChatNotifier />

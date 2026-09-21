@@ -65,6 +65,13 @@ const DEFAULT_SIDEBAR_PLATINADOR = {
 };
 
 
+// Banners sem descrição (ou com descrição igual ao título) repetiam o mesmo texto duas vezes
+// em cima da imagem. Só mostra a descrição quando ela realmente acrescenta algo.
+function bannerDescription(banner: { title?: string; description?: string }) {
+  const description = banner.description?.trim();
+  return description && description !== banner.title?.trim() ? description : null;
+}
+
 function BannerCountdown({ expiresAt }: { expiresAt: string }) {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
@@ -153,6 +160,17 @@ export default function Home() {
   const { user, isAuthenticated, isAdmin, isCollaborator, logout } = useAuth();
   const [, navigate] = useLocation();
 
+  // O admin aceita "Rota ou URL" no link do banner, mas o navigate do wouter só entende rotas
+  // internas — um link https:// (ex.: banner "JÁ DISPONÍVEL") não abria direito.
+  const openBannerLink = (link: string | null | undefined, fallback = "/") => {
+    const target = link?.trim() || fallback;
+    if (/^https?:\/\//i.test(target)) {
+      window.location.assign(target);
+    } else {
+      navigate(target);
+    }
+  };
+
   const { data: usedProducts = [], isLoading: isUsedLoading } = trpc.usedProducts.list.useQuery();
   const { data: digitalProducts = [], isLoading: isDigitalLoading } = trpc.digitalProducts.list.useQuery();
   const isLoading = isUsedLoading || isDigitalLoading;
@@ -223,7 +241,10 @@ export default function Home() {
     ...mainPromos,
     ...dbGameBanners.slice(0, 5) // Mostra apenas os 5 primeiros jogos para não poluir o banner
   ];
-  const finalBanners = isLoadingPromos 
+  // Só monta o carrossel quando promos E jogos já chegaram. Antes, os jogos chegavam depois dos
+  // promos, a lista de slides mudava de tamanho no meio do carregamento e o carrossel "pulava".
+  const isCarouselReady = !isLoadingPromos && !isDigitalLoading;
+  const finalBanners = !isCarouselReady
     ? [] // Retorna vazio enquanto carrega para não piscar os banners padrão
     : (activeBanners.length > 0 ? activeBanners : DEFAULT_MAIN_BANNERS);
 
@@ -239,8 +260,10 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [finalBanners.length]);
 
+  // Só volta ao primeiro slide se o atual deixou de existir (ex.: banner desativado no admin);
+  // qualquer outra mudança na lista não deve arrancar o visitante do slide que ele está vendo.
   useEffect(() => {
-    setCurrentSlide(0);
+    setCurrentSlide(prev => (prev >= finalBanners.length ? 0 : prev));
   }, [finalBanners.length]);
 
   const nextSlide = () => {
@@ -440,7 +463,7 @@ export default function Home() {
             <div className="lg:col-span-2 relative w-full h-[240px] sm:h-[380px] md:h-[420px] bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-[0_0_30px_rgba(0,0,0,0.5)] group/carousel">
               
               {/* Loading Skeleton */}
-              {isLoadingPromos && (
+              {!isCarouselReady && (
                 <div className="absolute inset-0 flex items-center justify-center bg-slate-900 z-20">
                    <div className="w-8 h-8 border-4 border-red-500 border-t-transparent rounded-full animate-spin"></div>
                 </div>
@@ -450,7 +473,7 @@ export default function Home() {
               {finalBanners.map((banner, index) => (
                 <div
                   key={banner.id}
-                  onClick={() => navigate(banner.link || "/")}
+                  onClick={() => openBannerLink(banner.link)}
                   className={`absolute inset-0 w-full h-full cursor-pointer transition-all duration-700 ease-in-out ${
                     index === currentSlide ? "opacity-100 scale-100 z-10" : "opacity-0 scale-95 pointer-events-none z-0"
                   }`}
@@ -479,9 +502,11 @@ export default function Home() {
                       <h2 className="text-lg sm:text-2xl md:text-4xl font-black text-white leading-tight tracking-tight drop-shadow-[0_2px_8px_rgba(0,0,0,1)] [text-shadow:0_2px_12px_rgba(0,0,0,0.9)]">
                         {banner.title}
                       </h2>
-                      <p className="text-[10px] sm:text-xs md:text-sm text-slate-200 line-clamp-2 drop-shadow-[0_1px_4px_rgba(0,0,0,1)] max-w-xl">
-                        {banner.description || banner.title}
-                      </p>
+                      {bannerDescription(banner) && (
+                        <p className="text-[10px] sm:text-xs md:text-sm text-slate-200 line-clamp-2 drop-shadow-[0_1px_4px_rgba(0,0,0,1)] max-w-xl">
+                          {bannerDescription(banner)}
+                        </p>
+                      )}
                       
                       <div className="pt-1">
                         <Button className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-1.5 sm:px-5 sm:py-2.5 text-[10px] sm:text-xs rounded-xl shadow-[0_0_15px_rgba(220,38,38,0.4)] transition-all hover:scale-105">
@@ -543,7 +568,7 @@ export default function Home() {
                 <div className="relative h-[110px] sm:h-[130px] lg:h-full bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 animate-pulse" />
               ) : (
               <div
-                onClick={() => navigate(sidebarTopBanner.link || "/")}
+                onClick={() => openBannerLink(sidebarTopBanner.link)}
                 className="relative h-[110px] sm:h-[130px] lg:h-full bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-lg hover:border-red-500/30 hover:shadow-[0_0_20px_rgba(220,38,38,0.1)] transition-all duration-300 group/sidebar cursor-pointer flex flex-col justify-end p-4 sm:p-5"
               >
                 {sidebarTopBanner.imageUrl ? (
@@ -564,9 +589,11 @@ export default function Home() {
                   <h3 className="text-xs sm:text-sm lg:text-base font-black text-white leading-tight drop-shadow-[0_2px_6px_rgba(0,0,0,1)]">
                     {sidebarTopBanner.title}
                   </h3>
-                  <p className="text-[9px] sm:text-[10px] lg:text-xs text-slate-200 line-clamp-2 drop-shadow-[0_1px_4px_rgba(0,0,0,1)] max-w-md">
-                    {sidebarTopBanner.description || sidebarTopBanner.title}
-                  </p>
+                  {bannerDescription(sidebarTopBanner) && (
+                    <p className="text-[9px] sm:text-[10px] lg:text-xs text-slate-200 line-clamp-2 drop-shadow-[0_1px_4px_rgba(0,0,0,1)] max-w-md">
+                      {bannerDescription(sidebarTopBanner)}
+                    </p>
+                  )}
                 </div>
               </div>
               )}
@@ -576,7 +603,7 @@ export default function Home() {
                 <div className="relative h-[110px] sm:h-[130px] lg:h-full bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 animate-pulse" />
               ) : (
               <div
-                onClick={() => navigate(sidebarBottomBanner.link || "/")}
+                onClick={() => openBannerLink(sidebarBottomBanner.link)}
                 className="relative h-[110px] sm:h-[130px] lg:h-full bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-lg hover:border-red-500/30 hover:shadow-[0_0_20px_rgba(220,38,38,0.1)] transition-all duration-300 group/sidebar cursor-pointer flex flex-col justify-end p-4 sm:p-5"
               >
                 {sidebarBottomBanner.imageUrl ? (
@@ -597,9 +624,11 @@ export default function Home() {
                   <h3 className="text-xs sm:text-sm lg:text-base font-black text-white leading-tight drop-shadow-[0_2px_6px_rgba(0,0,0,1)]">
                     {sidebarBottomBanner.title}
                   </h3>
-                  <p className="text-[9px] sm:text-[10px] lg:text-xs text-slate-200 line-clamp-2 drop-shadow-[0_1px_4px_rgba(0,0,0,1)] max-w-md">
-                    {sidebarBottomBanner.description || sidebarBottomBanner.title}
-                  </p>
+                  {bannerDescription(sidebarBottomBanner) && (
+                    <p className="text-[9px] sm:text-[10px] lg:text-xs text-slate-200 line-clamp-2 drop-shadow-[0_1px_4px_rgba(0,0,0,1)] max-w-md">
+                      {bannerDescription(sidebarBottomBanner)}
+                    </p>
+                  )}
                 </div>
               </div>
               )}
@@ -609,7 +638,7 @@ export default function Home() {
                 <div className="relative h-[110px] sm:h-[130px] lg:h-full bg-slate-900 rounded-2xl overflow-hidden border border-amber-500/30 animate-pulse" />
               ) : (
               <div
-                onClick={() => navigate(sidebarPlatinadorBanner.link || "/platinador")}
+                onClick={() => openBannerLink(sidebarPlatinadorBanner.link, "/platinador")}
                 className="relative h-[110px] sm:h-[130px] lg:h-full bg-slate-900 rounded-2xl overflow-hidden border border-amber-500/30 shadow-lg hover:border-amber-400/50 hover:shadow-[0_0_20px_rgba(251,191,36,0.15)] transition-all duration-300 group/sidebar cursor-pointer flex flex-col justify-end p-4 sm:p-5"
               >
                 {sidebarPlatinadorBanner.imageUrl ? (
@@ -630,9 +659,11 @@ export default function Home() {
                   <h3 className="text-xs sm:text-sm lg:text-base font-black text-amber-400 leading-tight drop-shadow-[0_2px_6px_rgba(0,0,0,1)]">
                     {sidebarPlatinadorBanner.title}
                   </h3>
-                  <p className="text-[9px] sm:text-[10px] lg:text-xs text-slate-200 line-clamp-2 drop-shadow-[0_1px_4px_rgba(0,0,0,1)] max-w-md">
-                    {sidebarPlatinadorBanner.description || sidebarPlatinadorBanner.title}
-                  </p>
+                  {bannerDescription(sidebarPlatinadorBanner) && (
+                    <p className="text-[9px] sm:text-[10px] lg:text-xs text-slate-200 line-clamp-2 drop-shadow-[0_1px_4px_rgba(0,0,0,1)] max-w-md">
+                      {bannerDescription(sidebarPlatinadorBanner)}
+                    </p>
+                  )}
                 </div>
               </div>
               )}
