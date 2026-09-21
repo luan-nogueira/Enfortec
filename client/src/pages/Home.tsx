@@ -1227,6 +1227,19 @@ export default function Home() {
             <span className="hidden sm:inline text-slate-800">|</span>
             <a href="/termos" className="text-slate-500 hover:text-red-500 transition-all font-medium">Termos de Uso e Regulamentos</a>
           </div>
+
+          {/* Crédito de quem desenvolveu o site */}
+          <p className="text-slate-600 text-xs mt-5">
+            Desenvolvido por{" "}
+            <a
+              href="https://www.instagram.com/lmtech_br/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-slate-500 hover:text-red-500 transition-colors font-semibold align-middle"
+            >
+              <Instagram className="w-3.5 h-3.5" /> @lmtech_br
+            </a>
+          </p>
         </div>
       </footer>
     </div>
