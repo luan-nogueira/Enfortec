@@ -6,7 +6,7 @@ import { Zap, Gamepad2, Search, Shield, Package, LayoutGrid, Tag, Coins, LogOut,
 import { getLoginUrl } from "@/const";
 import UserProfileButton from "@/components/UserProfileButton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, query, orderBy, limit } from "firebase/firestore";
 import { trpc } from "@/lib/trpc";
@@ -179,7 +179,12 @@ export default function Home() {
 
   const [promos, setPromos] = useState<any[]>([]);
   const [isLoadingPromos, setIsLoadingPromos] = useState(true);
-  const [currentSlide, setCurrentSlide] = useState(0);
+  // Guarda QUAL banner está em exibição (pelo id), não a posição dele na lista. A lista de
+  // promoções é ao vivo (Firestore) e pode reordenar em segundo plano sem avisar — se
+  // guardássemos só a posição (0, 1, 2...), a mesma posição passaria a mostrar um banner
+  // diferente assim que a lista reordenasse, e pra quem está olhando parece que o banner
+  // "pulou" sozinho sem ninguém ter clicado em nada.
+  const [currentSlideId, setCurrentSlideId] = useState<string | null>(null);
 
   useEffect(() => {
     const qPromos = collection(db, "promos");
@@ -252,27 +257,42 @@ export default function Home() {
   const sidebarBottomBanner = sidebarBottomPromo || DEFAULT_SIDEBAR_BOTTOM;
   const sidebarPlatinadorBanner = sidebarPlatinadorPromo || DEFAULT_SIDEBAR_PLATINADOR;
 
+  // Sempre aponta pra lista mais atual dentro do intervalo abaixo, sem precisar recriar o
+  // timer toda vez que a lista reordena (só quando o TAMANHO muda — daí sim vale reiniciar
+  // a contagem de 6s do zero).
+  const finalBannersRef = useRef(finalBanners);
+  finalBannersRef.current = finalBanners;
+
+  const goToRelativeSlide = (step: 1 | -1) => {
+    const list = finalBannersRef.current;
+    if (list.length === 0) return;
+    setCurrentSlideId(prevId => {
+      const idx = list.findIndex(b => b.id === prevId);
+      const base = idx === -1 ? 0 : idx;
+      const nextIdx = (base + step + list.length) % list.length;
+      return list[nextIdx].id;
+    });
+  };
+
   useEffect(() => {
     if (finalBanners.length <= 1) return;
-    const interval = setInterval(() => {
-      setCurrentSlide(prev => (prev + 1) % finalBanners.length);
-    }, 6000);
+    const interval = setInterval(() => goToRelativeSlide(1), 6000);
     return () => clearInterval(interval);
   }, [finalBanners.length]);
 
-  // Só volta ao primeiro slide se o atual deixou de existir (ex.: banner desativado no admin);
-  // qualquer outra mudança na lista não deve arrancar o visitante do slide que ele está vendo.
+  // Garante que sempre haja um slide selecionado assim que a lista carrega, e corrige só se
+  // o banner atual sumiu de vez (ex.: desativado no admin) — qualquer outra mudança na lista
+  // não deve arrancar o visitante do banner que ele está vendo.
   useEffect(() => {
-    setCurrentSlide(prev => (prev >= finalBanners.length ? 0 : prev));
-  }, [finalBanners.length]);
+    if (finalBanners.length === 0) return;
+    setCurrentSlideId(prevId => {
+      if (prevId !== null && finalBanners.some(b => b.id === prevId)) return prevId;
+      return finalBanners[0].id;
+    });
+  }, [finalBanners]);
 
-  const nextSlide = () => {
-    setCurrentSlide(prev => (prev + 1) % finalBanners.length);
-  };
-
-  const prevSlide = () => {
-    setCurrentSlide(prev => (prev - 1 + finalBanners.length) % finalBanners.length);
-  };
+  const nextSlide = () => goToRelativeSlide(1);
+  const prevSlide = () => goToRelativeSlide(-1);
 
   // As buscas de usedProducts e digitalProducts agora são feitas via TRPC.
 
@@ -470,12 +490,12 @@ export default function Home() {
               )}
 
               {/* Slides */}
-              {finalBanners.map((banner, index) => (
+              {finalBanners.map((banner) => (
                 <div
                   key={banner.id}
                   onClick={() => openBannerLink(banner.link)}
                   className={`absolute inset-0 w-full h-full cursor-pointer transition-all duration-700 ease-in-out ${
-                    index === currentSlide ? "opacity-100 scale-100 z-10" : "opacity-0 scale-95 pointer-events-none z-0"
+                    banner.id === currentSlideId ? "opacity-100 scale-100 z-10" : "opacity-0 scale-95 pointer-events-none z-0"
                   }`}
                 >
                   {/* Background Image */}
@@ -545,15 +565,15 @@ export default function Home() {
               {/* Slide Indicators */}
               {finalBanners.length > 1 && (
                 <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-20 px-2.5 py-1 rounded-full bg-slate-950/60 backdrop-blur-sm border border-slate-800/80">
-                  {finalBanners.map((_, i) => (
+                  {finalBanners.map((banner) => (
                     <button
-                      key={i}
+                      key={banner.id}
                       onClick={(e) => {
                         e.stopPropagation();
-                        setCurrentSlide(i);
+                        setCurrentSlideId(banner.id);
                       }}
                       className={`h-1.5 rounded-full transition-all duration-300 ${
-                        i === currentSlide ? "bg-red-500 w-5 shadow-[0_0_8px_rgba(220,38,38,0.8)]" : "bg-slate-500/60 hover:bg-slate-400 w-1.5"
+                        banner.id === currentSlideId ? "bg-red-500 w-5 shadow-[0_0_8px_rgba(220,38,38,0.8)]" : "bg-slate-500/60 hover:bg-slate-400 w-1.5"
                       }`}
                     />
                   ))}

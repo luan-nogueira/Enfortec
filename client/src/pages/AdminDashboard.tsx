@@ -2716,15 +2716,21 @@ export default function AdminDashboard() {
       });
     });
 
-    // 4. Vendas / Pedidos
+    // 4. Vendas / Pedidos — o pedido nasce com status "pago" assim que o pagamento é
+    // aprovado (nunca "pendente", ver server/_core/payment.ts). Só que TODO o resto deste
+    // feed — sino de notificações, pop-up/som de novidade e os contadores desta tela —
+    // decide "precisa de atenção do gestor" comparando com o texto literal "pendente".
+    // Sem essa tradução, pedido novo nunca contava nem tocava som: o admin só ficava
+    // sabendo de uma venda nova quando abria a aba Compras Pendentes por conta própria.
     (sales || []).forEach((sale: any) => {
+      const awaitingDelivery = sale.status === "pago";
       feed.push({
         id: `sale_${sale.id}`,
         rawId: sale.id,
         category: "pedido",
         title: `🛒 Pedido de Jogo #${sale.id}: ${sale.gameTitle || sale.productName || 'Jogo'}`,
         subtitle: `Cliente: ${sale.customerName || sale.customerEmail} • R$ ${sale.totalPrice || '0'}`,
-        status: sale.status || "pendente",
+        status: awaitingDelivery ? "pendente" : (sale.status || "pendente"),
         timestamp: sale.createdAt ? new Date(sale.createdAt).getTime() : Date.now(),
         createdAtStr: sale.createdAt ? new Date(sale.createdAt).toLocaleString("pt-BR") : "Recente",
         data: sale
