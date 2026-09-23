@@ -168,7 +168,12 @@ export function registerPaymentRoute(app: Express) {
           } else if (productType === "digital") {
             const rows = await database.select().from(digitalProducts).where(eq(digitalProducts.id, pid)).limit(1);
             if (rows[0]) {
-              if (rows[0].isActive === false || (rows[0].stock !== undefined && rows[0].stock <= 0)) {
+              // "Vender mesmo sem estoque cadastrado" (ligado em Admin > Gerenciar Contas em
+              // Estoque) já liberava a loja a MOSTRAR o jogo como comprável (client-side, ver
+              // commit 10d0873), mas essa checagem final do checkout nunca soube da flag e
+              // recusava a compra de qualquer jeito — o cliente conseguia abrir o checkout e
+              // só descobria que "está esgotado" na hora de confirmar o pagamento.
+              if (rows[0].isActive === false || (rows[0].stock !== undefined && rows[0].stock <= 0 && !rows[0].allowManualWithoutStock)) {
                 return res.status(400).json({ success: false, error: "Este jogo está esgotado no momento." });
               }
               if (rows[0].expiresAt && new Date(rows[0].expiresAt) < new Date()) {
