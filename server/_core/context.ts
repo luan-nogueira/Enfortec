@@ -90,21 +90,14 @@ export async function createContext(
         }
         
         if (!user) {
-          user = {
-            id: 999999,
-            openId: uid,
-            name: name,
-            email: email || null,
-            loginMethod: "firebase_fallback",
-            cpf: null,
-            psnId: null,
-            forteCoins: 0,
-            role: "user",
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            lastSignedIn: new Date(),
-            balance: "0.00",
-          };
+          // Não inventa um usuário fantasma aqui: um objeto fake antigo usava sempre o MESMO
+          // id fixo (999999) pra qualquer pessoa que caísse nesse caminho (erro passageiro no
+          // Postgres, ou upsert que falhou), o que misturava dados de gente diferente sob o
+          // mesmo id E pulava a checagem de "conta banida" (esse objeto fake nunca tinha
+          // isBanned=true, então um banido escapava do bloqueio nesse cenário). Deixando
+          // `user` null, a requisição autenticada cai como UNAUTHORIZED (ver requireUser em
+          // trpc.ts) e a pessoa só tenta de novo — chato, mas seguro.
+          console.error(`[TRPC Server] Não foi possível carregar/criar o usuário do Postgres (uid: ${uid}). Tratando esta requisição como não autenticada.`);
         }
       }
     }

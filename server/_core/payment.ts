@@ -388,6 +388,11 @@ export function registerPaymentRoute(app: Express) {
             const newStock = Math.max(0, (prod[0].stock || 1) - 1);
             await database.update(products).set({ stock: newStock, isActive: newStock > 0 }).where(eq(products.id, insertValues.productId));
           }
+        } else if (productType === "used" && insertValues.usedProductId) {
+          // Sem isso, o anúncio de mídia física/usado continuava "aprovado" pra sempre depois
+          // de vendido — ficava visível e comprável de novo por outra pessoa, que pagaria por
+          // um item que o vendedor já não tem mais pra entregar.
+          await database.update(usedProducts).set({ status: "vendido" }).where(eq(usedProducts.id, insertValues.usedProductId));
         }
 
         console.log("[Checkout] Compra 100% paga com moedas/cupom registrada com sucesso.");
@@ -715,6 +720,10 @@ export function registerPaymentRoute(app: Express) {
             const newStock = Math.max(0, (prod[0].stock || 1) - 1);
             await database.update(products).set({ stock: newStock, isActive: newStock > 0 }).where(eq(products.id, insertValues.productId));
           }
+        } else if (productType === "used" && insertValues.usedProductId) {
+          // Mesmo motivo do bloco de checkout 100% em ForteCoins acima: sem isso o anúncio
+          // ficava visível e comprável de novo depois de já vendido.
+          await database.update(usedProducts).set({ status: "vendido" }).where(eq(usedProducts.id, insertValues.usedProductId));
         }
 
         console.log(`[Mercado Pago Webhook] Pedido registrado no banco com sucesso (Pagamento #${paymentId}).`);
