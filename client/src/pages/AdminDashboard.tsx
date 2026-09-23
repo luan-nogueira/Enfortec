@@ -1921,6 +1921,12 @@ export default function AdminDashboard() {
   const [gameCoverFit, setGameCoverFit] = useState<"cover" | "contain">("cover");
   const [addingGame, setAddingGame] = useState(false);
   const [editingGameId, setEditingGameId] = useState<number | null>(null);
+  // Se o jogo em edição tem contas cadastradas (pool de entrega automática), o campo
+  // "Estoque" do formulário é sobrescrito no servidor pelo saldo real do pool assim que
+  // salva — ver comentário em server/routers.ts (digitalProducts.adminUpdate). Guardamos
+  // aqui pra avisar isso na tela em vez de deixar o gestor digitar um número que nunca vai
+  // pegar, sem explicação nenhuma.
+  const [editingGamePool, setEditingGamePool] = useState<{ available: number; delivered: number } | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [isSearchingCover, setIsSearchingCover] = useState(false);
 
@@ -3107,6 +3113,7 @@ export default function AdminDashboard() {
     setGameShowInEconomia(false);
     setGameEconomiaLicenseType("secundaria");
     setEditingGameId(null);
+    setEditingGamePool(null);
   };
 
   // Converte um timestamp do banco (ISO string ou Date) para o formato aceito pelo
@@ -3121,6 +3128,7 @@ export default function AdminDashboard() {
 
   const openEditGame = (game: any) => {
     setEditingGameId(game.id);
+    setEditingGamePool((accountsSummaryQuery.data?.[game.id] as { available: number; delivered: number } | undefined) ?? null);
     setGameName(game.name || "");
     setGamePrice(game.price || 0);
 
@@ -6846,14 +6854,41 @@ export default function AdminDashboard() {
             <div className="grid grid-cols-3 gap-2">
               <div className="space-y-2 col-span-1">
                 <Label className="text-xs text-slate-300 font-bold uppercase">Estoque</Label>
-                <Input
-                  type="number"
-                  value={gameStock}
-                  onChange={(e) => setGameStock(Number(e.target.value))}
-                  placeholder="Ex: 999"
-                  className="bg-slate-950 border-red-600/20 text-white"
-                  min={0}
-                />
+                {editingGamePool ? (
+                  <>
+                    <Input
+                      type="number"
+                      value={editingGamePool.available}
+                      disabled
+                      className="bg-slate-950 border-amber-600/30 text-amber-400 font-bold opacity-80 cursor-not-allowed"
+                    />
+                    <p className="text-[9px] text-amber-400/90 leading-tight">
+                      🔒 Calculado das contas cadastradas ({editingGamePool.available} disponíveis) — mudar aqui não tem efeito.{" "}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const fullGame = gamesList.find((g: any) => g.id === editingGameId);
+                          if (fullGame) {
+                            setShowGameModal(false);
+                            openAccountsModal(fullGame);
+                          }
+                        }}
+                        className="underline hover:text-amber-300"
+                      >
+                        Gerenciar Contas em Estoque →
+                      </button>
+                    </p>
+                  </>
+                ) : (
+                  <Input
+                    type="number"
+                    value={gameStock}
+                    onChange={(e) => setGameStock(Number(e.target.value))}
+                    placeholder="Ex: 999"
+                    className="bg-slate-950 border-red-600/20 text-white"
+                    min={0}
+                  />
+                )}
               </div>
               <div className="space-y-2 col-span-1 flex flex-col justify-end pb-2">
                 <label className="flex items-center gap-2 cursor-pointer">
