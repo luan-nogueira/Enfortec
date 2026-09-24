@@ -20,6 +20,7 @@ import { collection, onSnapshot, doc, getDoc, updateDoc } from "firebase/firesto
 import { trpc } from "@/lib/trpc";
 import { isValidWhatsApp } from "@/lib/utils";
 import { WA_ATTENDANTS } from "@/lib/waAttendants";
+import { isConsoleUnavailable, isLicenseUnavailable, platformSupportsConsole } from "@/lib/consoleAvailability";
 
 // Mapeamento de gêneros → palavras-chave nos nomes dos jogos
 const GENRE_MAP: Record<string, string[]> = {
@@ -222,8 +223,9 @@ export default function DigitalMedia() {
   // pré-selecionada.
   useEffect(() => {
     if (!selectedProduct) return;
-    const ps4Out = selectedProduct.ps4PrimariaAvailable === false;
-    const ps5Out = selectedProduct.ps5PrimariaAvailable === false;
+    const platform = getGamePlatform(selectedProduct);
+    const ps4Out = isConsoleUnavailable(selectedProduct, "PS4", accountType, platform);
+    const ps5Out = isConsoleUnavailable(selectedProduct, "PS5", accountType, platform);
     if (selectedConsole === "PS5" && ps5Out && !ps4Out) setSelectedConsole("PS4");
     else if (selectedConsole === "PS4" && ps4Out && !ps5Out) setSelectedConsole("PS5");
     // accountType não reseta sozinho ao trocar de produto — sem isso, uma escolha
@@ -231,8 +233,17 @@ export default function DigitalMedia() {
     // desabilitado na tela) e ir pro checkout de um jogo sem secundária em estoque.
     if (accountType === "secundaria" && selectedProduct.secundariaAvailable === false) {
       setAccountType("primaria");
+    } else if (
+      accountType === "primaria" &&
+      hasSecondaryPrice(selectedProduct) &&
+      isLicenseUnavailable(selectedProduct, "primaria", platform) &&
+      !isLicenseUnavailable(selectedProduct, "secundaria", platform)
+    ) {
+      // Só tem conta secundária em estoque: já seleciona ela em vez de deixar a primária
+      // (sem vaga em nenhum console) marcada e o cliente sem opção nenhuma.
+      setAccountType("secundaria");
     }
-  }, [selectedProduct]);
+  }, [selectedProduct, accountType, selectedConsole]);
 
   const validateCouponMutation = trpc.coupons.validate.useMutation();
 
@@ -1039,8 +1050,11 @@ export default function DigitalMedia() {
                 (contas cadastradas) não tem vaga daquele console, pra nunca deixar
                 escolher/comprar uma plataforma que não temos de verdade. */}
             {isConsoleSelectableProduct(selectedProduct) && (() => {
-              const ps4Out = selectedProduct.ps4PrimariaAvailable === false;
-              const ps5Out = selectedProduct.ps5PrimariaAvailable === false;
+              const platform = getGamePlatform(selectedProduct);
+              const ps4Out = isConsoleUnavailable(selectedProduct, "PS4", accountType, platform);
+              const ps5Out = isConsoleUnavailable(selectedProduct, "PS5", accountType, platform);
+              const ps4Label = platformSupportsConsole(platform, "PS4") ? "SEM ESTOQUE" : "INDISPONÍVEL";
+              const ps5Label = platformSupportsConsole(platform, "PS5") ? "SEM ESTOQUE" : "INDISPONÍVEL";
               return (
               <div className="bg-slate-950 border border-red-600/30 rounded-xl p-3.5 space-y-2 animate-in fade-in duration-200">
                 <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
@@ -1062,7 +1076,7 @@ export default function DigitalMedia() {
                     <div className="font-bold text-xs flex items-center justify-between">
                       <span className="flex items-center gap-1.5">🎮 PS4</span>
                       {ps4Out ? (
-                        <span className="text-[8px] bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded font-black">SEM ESTOQUE</span>
+                        <span className="text-[8px] bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded font-black">{ps4Label}</span>
                       ) : selectedConsole === "PS4" && (
                         <span className="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded font-black">OK</span>
                       )}
@@ -1085,7 +1099,7 @@ export default function DigitalMedia() {
                     <div className="font-bold text-xs flex items-center justify-between">
                       <span className="flex items-center gap-1.5">⚡ PS5</span>
                       {ps5Out ? (
-                        <span className="text-[8px] bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded font-black">SEM ESTOQUE</span>
+                        <span className="text-[8px] bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded font-black">{ps5Label}</span>
                       ) : selectedConsole === "PS5" && (
                         <span className="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded font-black">OK</span>
                       )}
@@ -1106,16 +1120,21 @@ export default function DigitalMedia() {
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
+                    disabled={isLicenseUnavailable(selectedProduct, "primaria", getGamePlatform(selectedProduct))}
                     onClick={() => setAccountType("primaria")}
                     className={`p-2.5 rounded-lg border text-left transition-all ${
-                      accountType === "primaria"
+                      isLicenseUnavailable(selectedProduct, "primaria", getGamePlatform(selectedProduct))
+                        ? "bg-slate-900/50 border-slate-800 text-slate-600 cursor-not-allowed opacity-60"
+                        : accountType === "primaria"
                         ? "bg-red-600/20 border-red-500 text-white shadow-[0_0_15px_rgba(220,38,38,0.3)]"
                         : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700"
                     }`}
                   >
                     <div className="font-bold text-xs flex items-center justify-between">
                       <span>👤 Primária</span>
-                      {accountType === "primaria" && <span className="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded font-black">OK</span>}
+                      {isLicenseUnavailable(selectedProduct, "primaria", getGamePlatform(selectedProduct)) ? (
+                        <span className="text-[8px] bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded font-black">SEM ESTOQUE</span>
+                      ) : accountType === "primaria" && <span className="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded font-black">OK</span>}
                     </div>
                     <p className="text-[9px] text-slate-400 mt-1 leading-tight">Jogue no seu perfil pessoal com conquistas</p>
                     <div className="font-black text-xs text-red-500 mt-1.5">

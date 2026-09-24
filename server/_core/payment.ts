@@ -144,6 +144,7 @@ export function registerPaymentRoute(app: Express) {
       let realProductName: string | null = null;
       let verifiedIsPreVenda = false;
       let verifiedDigitalProductId: number | null = null;
+      let verifiedDigitalPlatform: string | null = null;
       if (productId) {
         const pid = parseInt(String(productId));
         if (!isNaN(pid)) {
@@ -183,6 +184,7 @@ export function registerPaymentRoute(app: Express) {
               realProductName = rows[0].name;
               verifiedIsPreVenda = !!rows[0].isPreVenda;
               verifiedDigitalProductId = pid;
+              verifiedDigitalPlatform = rows[0].platform || null;
             }
           }
         }
@@ -218,6 +220,17 @@ export function registerPaymentRoute(app: Express) {
       // entregar certo. Sem nenhuma conta cadastrada ainda, não bloqueia (mantém o
       // fluxo manual de sempre até o estoque existir).
       if (verifiedDigitalProductId !== null) {
+        // Jogo cadastrado só pra um console (ex.: "PS5") não pode ser comprado pro outro,
+        // mesmo que a tela mande esse console — só vale pra console enviado de forma
+        // explícita (o detectado pelo nome do produto é só um palpite).
+        if (consoleType === "PS4" || consoleType === "PS5") {
+          const plat = (verifiedDigitalPlatform || "").toUpperCase();
+          const has4 = plat.includes("PS4");
+          const has5 = plat.includes("PS5");
+          if ((has4 || has5) && !(consoleType === "PS4" ? has4 : has5)) {
+            return res.status(400).json({ success: false, error: `Este jogo está disponível apenas para ${has5 ? "PS5" : "PS4"}.` });
+          }
+        }
         const availability = await db.getConsoleAvailabilityForProduct(verifiedDigitalProductId);
         if (accountType === "secundaria" && !availability.secundaria) {
           return res.status(400).json({ success: false, error: "Conta secundária esgotada para este jogo no momento." });

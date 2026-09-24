@@ -3,13 +3,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import UserProfileButton from "@/components/UserProfileButton";
 import { Search, Gamepad2, Sparkles, Shield, Coins, Tag, Flame, Star, ShoppingCart, ArrowLeft, ArrowRight, ShieldCheck, Zap } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { auth } from "@/lib/firebase";
 import { trpc } from "@/lib/trpc";
 import { isValidWhatsApp } from "@/lib/utils";
+import { isConsoleUnavailable, isLicenseUnavailable, platformSupportsConsole } from "@/lib/consoleAvailability";
 
 export default function JogueComEconomia() {
   const { user, isAuthenticated } = useAuth();
@@ -59,6 +60,28 @@ export default function JogueComEconomia() {
     const pSec = Number(prod.priceSecondary ?? prod.price_secondary);
     return pSec > 0 || !isPrimaryAvailable(prod);
   };
+
+  // Console / licença sem vaga de verdade (estoque cadastrado, ou jogo de outra plataforma)
+  // ficam travados — o cliente só consegue escolher e pagar o que existe.
+  const consoleOut = (c: "PS4" | "PS5", acc: "primaria" | "secundaria" = selectedAccountType) =>
+    !!selectedProduct && isConsoleUnavailable(selectedProduct, c, acc);
+  const licenseOut = (acc: "primaria" | "secundaria") =>
+    !!selectedProduct && isLicenseUnavailable(selectedProduct, acc);
+
+  useEffect(() => {
+    if (!selectedProduct) return;
+    const ps4Out = consoleOut("PS4");
+    const ps5Out = consoleOut("PS5");
+    if (selectedConsole === "PS5" && ps5Out && !ps4Out) setSelectedConsole("PS4");
+    else if (selectedConsole === "PS4" && ps4Out && !ps5Out) setSelectedConsole("PS5");
+
+    // Licença escolhida sem vaga mas a outra tem (e o jogo oferece as duas): troca sozinho.
+    if (licenseOut(selectedAccountType)) {
+      const other = selectedAccountType === "primaria" ? "secundaria" : "primaria";
+      const otherOffered = other === "primaria" ? isPrimaryAvailable(selectedProduct) : isSecondaryAvailable(selectedProduct);
+      if (otherOffered && !licenseOut(other)) setSelectedAccountType(other);
+    }
+  }, [selectedProduct, selectedAccountType, selectedConsole]);
 
   const handleOpenBuyModal = (product: any) => {
     // Sem login, o pedido não fica vinculado a nenhuma conta e nunca aparece em
@@ -113,6 +136,15 @@ export default function JogueComEconomia() {
     if (!isValidWhatsApp(customerPhone)) {
       setCheckoutError("Por favor, informe um número de WhatsApp válido com DDD (ex: 11 99999-8888).");
       toast.error("Por favor, informe um número de WhatsApp válido com DDD.");
+      return;
+    }
+
+    if (consoleOut(selectedConsole)) {
+      const msg = !platformSupportsConsole(selectedProduct.platform, selectedConsole)
+        ? `Este jogo não está disponível para ${selectedConsole}.`
+        : `Sem estoque para ${selectedConsole} neste jogo no momento.`;
+      setCheckoutError(msg);
+      toast.error(msg);
       return;
     }
 
@@ -448,31 +480,41 @@ export default function JogueComEconomia() {
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => setSelectedConsole("PS4")}
+                    disabled={consoleOut("PS4")}
+                    onClick={() => !consoleOut("PS4") && setSelectedConsole("PS4")}
                     className={`p-2.5 rounded-lg border text-left transition-all ${
-                      selectedConsole === "PS4"
+                      consoleOut("PS4")
+                        ? "bg-slate-950 border-slate-900 text-slate-600 opacity-50 cursor-not-allowed"
+                        : selectedConsole === "PS4"
                         ? "bg-red-600/20 border-red-500 text-white shadow-md font-bold"
                         : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700"
                     }`}
                   >
                     <div className="text-xs font-bold flex justify-between items-center">
                       <span>🎮 PS4</span>
-                      {selectedConsole === "PS4" && <span className="text-[8px] bg-red-600 text-white px-1 rounded">OK</span>}
+                      {consoleOut("PS4") ? (
+                        <span className="text-[8px] bg-slate-700 text-slate-300 px-1 rounded">{platformSupportsConsole(selectedProduct.platform, "PS4") ? "SEM ESTOQUE" : "INDISPONÍVEL"}</span>
+                      ) : selectedConsole === "PS4" && <span className="text-[8px] bg-red-600 text-white px-1 rounded">OK</span>}
                     </div>
                     <p className="text-[9px] text-slate-400 mt-1 leading-tight">PlayStation 4</p>
                   </button>
                   <button
                     type="button"
-                    onClick={() => setSelectedConsole("PS5")}
+                    disabled={consoleOut("PS5")}
+                    onClick={() => !consoleOut("PS5") && setSelectedConsole("PS5")}
                     className={`p-2.5 rounded-lg border text-left transition-all ${
-                      selectedConsole === "PS5"
+                      consoleOut("PS5")
+                        ? "bg-slate-950 border-slate-900 text-slate-600 opacity-50 cursor-not-allowed"
+                        : selectedConsole === "PS5"
                         ? "bg-red-600/20 border-red-500 text-white shadow-md font-bold"
                         : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700"
                     }`}
                   >
                     <div className="text-xs font-bold flex justify-between items-center">
                       <span>⚡ PS5</span>
-                      {selectedConsole === "PS5" && <span className="text-[8px] bg-red-600 text-white px-1 rounded">OK</span>}
+                      {consoleOut("PS5") ? (
+                        <span className="text-[8px] bg-slate-700 text-slate-300 px-1 rounded">{platformSupportsConsole(selectedProduct.platform, "PS5") ? "SEM ESTOQUE" : "INDISPONÍVEL"}</span>
+                      ) : selectedConsole === "PS5" && <span className="text-[8px] bg-red-600 text-white px-1 rounded">OK</span>}
                     </div>
                     <p className="text-[9px] text-slate-400 mt-1 leading-tight">PlayStation 5</p>
                   </button>
@@ -485,8 +527,8 @@ export default function JogueComEconomia() {
                   Escolha o Tipo de Licença *
                 </label>
                 {(() => {
-                  const primAllowed = isPrimaryAvailable(selectedProduct);
-                  const secAllowed = isSecondaryAvailable(selectedProduct);
+                  const primAllowed = isPrimaryAvailable(selectedProduct) && !licenseOut("primaria");
+                  const secAllowed = isSecondaryAvailable(selectedProduct) && !licenseOut("secundaria");
 
                   return (
                     <div className="grid grid-cols-2 gap-2">

@@ -1,0 +1,1 @@
+function s(a,e){const i=(a||"").toUpperCase(),n=i.includes("PS4"),r=i.includes("PS5");return!n&&!r?!0:e==="PS4"?n:r}function l(a,e,i,n){return s(n??a?.platform,e)?i==="secundaria"?a?.secundariaAvailable===!1:e==="PS4"?a?.ps4PrimariaAvailable===!1:a?.ps5PrimariaAvailable===!1:!0}function t(a,e,i){return["PS4","PS5"].every(n=>l(a,n,e,i))}export{t as a,l as i,s as p};

@@ -49,7 +49,7 @@ var roleEnum, conditionEnum, usedStatusEnum, digitalTypeEnum, productTypeEnum, o
 var init_schema = __esm({
   "drizzle/schema.ts"() {
     "use strict";
-    roleEnum = pgEnum("role", ["user", "admin", "vendedor", "collaborator"]);
+    roleEnum = pgEnum("role", ["user", "admin", "vendedor", "collaborator", "suporte"]);
     conditionEnum = pgEnum("condition", ["novo", "como_novo", "bom", "aceitavel"]);
     usedStatusEnum = pgEnum("used_status", ["pendente", "aprovado", "rejeitado", "vendido"]);
     digitalTypeEnum = pgEnum("digital_type", ["jogo", "gift_card", "licenca", "assinatura", "outro"]);
@@ -151,6 +151,11 @@ var init_schema = __esm({
       expiresAt: timestamp("expiresAt"),
       showInEconomia: boolean("showInEconomia").default(false),
       economiaLicenseType: varchar("economiaLicenseType", { length: 50 }),
+      // Quando true, o checkout NUNCA recusa por falta de estoque de um console/tipo
+      // específico (ver getConsoleAvailabilityForProduct em server/db.ts) — deixa vender
+      // mesmo sem conta cadastrada daquele console, pra entrega manual depois (ex.: jogo em
+      // promoção onde o admin topa correr atrás de conseguir a conta se vender por sorte).
+      allowManualWithoutStock: boolean("allowManualWithoutStock").default(false),
       // "pendente" | "aprovado" | "rejeitado" — contas cadastradas por vendedores da comunidade
       // (SellDigitalProduct) entram como "pendente" e só ficam públicas após aprovação do gestor;
       // cadastros feitos pelo próprio admin (adminCreate) já entram "aprovado".
@@ -164,9 +169,26 @@ var init_schema = __esm({
       email: varchar("email", { length: 255 }).notNull(),
       password: varchar("password", { length: 255 }).notNull(),
       status: varchar("status", { length: 20 }).default("disponivel").notNull(),
+      // "primaria" | "secundaria" | null — legado: contas cadastradas antes do modelo de cota
+      // abaixo, que só suportam 1 venda cada (ver fallback em claimDigitalProductAccount).
+      accountType: varchar("accountType", { length: 20 }),
       orderId: integer("orderId"),
       createdAt: timestamp("createdAt").defaultNow().notNull(),
-      deliveredAt: timestamp("deliveredAt")
+      deliveredAt: timestamp("deliveredAt"),
+      // Modelo de cota: uma mesma conta (email/senha) pode ser revendida várias vezes até
+      // estourar o limite de ativações que ela realmente aguenta, sem misturar plataforma.
+      // Preenchido automaticamente no cadastro com base na plataforma do jogo (ver
+      // computeAccountCaps em server/db.ts) — regra fixa: jogo de 1 plataforma = 2 primárias
+      // (daquela plataforma) + 1 secundária; jogo PS4/PS5 combinado = até 2 primárias por
+      // console, 3 no total combinado, + 1 secundária que vale pra qualquer uma das duas.
+      // cap = quanto a conta aguenta vender daquele tipo; used = quanto já foi vendido.
+      capPrimariaPs4: integer("capPrimariaPs4").default(0).notNull(),
+      capPrimariaPs5: integer("capPrimariaPs5").default(0).notNull(),
+      capPrimariaTotal: integer("capPrimariaTotal").default(0).notNull(),
+      capSecundaria: integer("capSecundaria").default(0).notNull(),
+      usedPrimariaPs4: integer("usedPrimariaPs4").default(0).notNull(),
+      usedPrimariaPs5: integer("usedPrimariaPs5").default(0).notNull(),
+      usedSecundaria: integer("usedSecundaria").default(0).notNull()
     });
     orders = pgTable("orders", {
       id: serial("id").primaryKey(),
@@ -192,6 +214,9 @@ var init_schema = __esm({
       deliveryDetails: text("deliveryDetails"),
       coinsUsed: integer("coinsUsed").default(0).notNull(),
       buyerPhone: varchar("buyerPhone", { length: 30 }),
+      // Quando o Suporte marcou que já falou com o comprador (Painel do Suporte). Null = ainda
+      // não contatado. Serve pra ninguém ligar duas vezes pro mesmo cliente.
+      supportContactedAt: timestamp("supportContactedAt"),
       createdAt: timestamp("createdAt").defaultNow().notNull(),
       updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => /* @__PURE__ */ new Date())
     });
@@ -213,7 +238,9 @@ var init_schema = __esm({
     reviews = pgTable("reviews", {
       id: serial("id").primaryKey(),
       orderId: integer("orderId").notNull(),
-      sellerId: integer("sellerId").notNull(),
+      // Nulo pra avaliação de compra direta do catálogo próprio da Eforte (sem vendedor
+      // terceiro/escrow envolvido) — ver confirmOrderAndReview em server/db.ts.
+      sellerId: integer("sellerId"),
       buyerId: integer("buyerId").notNull(),
       rating: integer("rating").notNull(),
       comment: text("comment"),
@@ -386,7 +413,8 @@ var init_schema = __esm({
 // server/email.ts
 var email_exports = {};
 __export(email_exports, {
-  sendDeliveryEmail: () => sendDeliveryEmail
+  sendDeliveryEmail: () => sendDeliveryEmail,
+  sendOrderRegisteredEmail: () => sendOrderRegisteredEmail
 });
 import nodemailer from "nodemailer";
 async function sendDeliveryEmail({
@@ -462,6 +490,71 @@ Equipe Eforte Games`;
     throw error;
   }
 }
+async function sendOrderRegisteredEmail({
+  to,
+  buyerName,
+  orderId,
+  productName,
+  supportWhatsapp
+}) {
+  if (!smtpHost || !smtpUser || !smtpPass) {
+    console.warn("[Email] SMTP is not configured. Skipping order-registered email to:", to);
+    return false;
+  }
+  const transporter = nodemailer.createTransport({
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpPort === 465,
+    auth: { user: smtpUser, pass: smtpPass },
+    // Sem isso o padrão do nodemailer espera até 2 minutos por um servidor SMTP lento.
+    connectionTimeout: 8e3,
+    greetingTimeout: 8e3,
+    socketTimeout: 1e4
+  });
+  const supportDigits = (supportWhatsapp || "").replace(/\D/g, "");
+  const supportLink = supportDigits ? `https://wa.me/${supportDigits}?text=${encodeURIComponent(`Ol\xE1! Fiz o pedido #${orderId} (${productName}) e gostaria de ajuda.`)}` : null;
+  const messageText = `Ol\xE1, ${buyerName}!
+
+Recebemos o pagamento do seu pedido #${orderId} (${productName}).
+
+Seu pedido j\xE1 foi registrado automaticamente \u2014 voc\xEA N\xC3O precisa enviar comprovante.
+Nossa equipe vai preparar a entrega e entrar em contato com voc\xEA pelo WhatsApp em breve.
+Voc\xEA tamb\xE9m acompanha tudo em "Minhas Compras", no site.
+${supportLink ? `
+Prefere falar agora com o suporte? ${supportLink}
+` : ""}
+Atenciosamente,
+Equipe Eforte Games`;
+  const messageHtml = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+      <h2 style="color: #dc143c; margin-top: 0;">\u2705 Pedido registrado!</h2>
+      <p>Ol\xE1, <strong>${buyerName}</strong>,</p>
+      <p>Recebemos o pagamento do seu pedido <strong>#${orderId}</strong> (${productName}).</p>
+      <div style="background-color: #f9f9f9; border-left: 4px solid #dc143c; padding: 15px; margin: 20px 0;">
+        Seu pedido j\xE1 foi registrado automaticamente \u2014 <strong>voc\xEA n\xE3o precisa enviar comprovante</strong>.<br><br>
+        Nossa equipe vai preparar a entrega e entrar em contato com voc\xEA pelo WhatsApp em breve.
+        Voc\xEA tamb\xE9m acompanha tudo em <strong>Minhas Compras</strong>, no site.
+      </div>
+      ${supportLink ? `<p style="text-align:center;"><a href="${supportLink}" style="background:#25d366;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block;">Falar com o suporte no WhatsApp</a></p>` : ""}
+      <hr style="border: 0; border-top: 1px solid #eeeeee; margin: 30px 0;">
+      <p style="font-size: 12px; color: #777777; text-align: center;">Eforte Games \u2014 Divers\xE3o garantida no seu console</p>
+    </div>
+  `;
+  try {
+    const info = await transporter.sendMail({
+      from: smtpFrom,
+      to,
+      subject: `\u2705 Pedido #${orderId} registrado - Eforte Games`,
+      text: messageText,
+      html: messageHtml
+    });
+    console.log("[Email] Email de pedido registrado enviado:", info.messageId);
+    return true;
+  } catch (error) {
+    console.error("[Email] Erro ao enviar email de pedido registrado:", error);
+    throw error;
+  }
+}
 var smtpHost, smtpPort, smtpUser, smtpPass, smtpFrom;
 var init_email = __esm({
   "server/email.ts"() {
@@ -492,7 +585,7 @@ var NOT_ADMIN_ERR_MSG = "You do not have required permission (10002)";
 
 // server/db.ts
 init_schema();
-import { eq, and, or, lte, desc, sql, inArray, lt } from "drizzle-orm";
+import { eq, and, or, lte, desc, asc, gt, sql, inArray, lt } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
@@ -728,27 +821,50 @@ async function getActiveSellers() {
   if (!db) return [];
   return db.select().from(sellers).where(eq(sellers.isActive, true)).orderBy(desc(sellers.rating));
 }
+var isInlineImage = (img) => typeof img === "string" && img.startsWith("data:");
+function withLightImages(product) {
+  const images = product.images;
+  if (!Array.isArray(images) || !images.some(isInlineImage)) return product;
+  return {
+    ...product,
+    images: images.map((img, index) => isInlineImage(img) ? `/api/used-product-image/${product.id}/${index}` : img)
+  };
+}
+async function getUsedProductInlineImage(productId, index) {
+  const db = getDb();
+  if (!db) return null;
+  const rows = await db.select({ images: usedProducts.images }).from(usedProducts).where(eq(usedProducts.id, productId)).limit(1);
+  const image = rows[0]?.images?.[index];
+  return isInlineImage(image) ? image : null;
+}
 async function getApprovedUsedProducts() {
   const db = getDb();
   if (!db) return [];
   const rows = await db.select({
     product: usedProducts,
     sellerName: users.name,
-    sellerOpenId: users.openId
+    sellerOpenId: users.openId,
+    sellerRole: users.role
   }).from(usedProducts).leftJoin(sellers, eq(usedProducts.sellerId, sellers.id)).leftJoin(users, eq(sellers.userId, users.id)).where(eq(usedProducts.status, "aprovado")).orderBy(desc(usedProducts.createdAt));
-  return rows.map((r) => ({ ...r.product, sellerName: r.sellerName, sellerOpenId: r.sellerOpenId }));
+  return rows.map((r) => ({
+    ...withLightImages(r.product),
+    sellerName: r.sellerName,
+    sellerOpenId: r.sellerOpenId,
+    sellerIsAdmin: r.sellerRole === "admin"
+  }));
 }
 async function getUsedProductsBySellerId(sellerId) {
   const db = getDb();
   if (!db) return [];
-  return db.select().from(usedProducts).where(eq(usedProducts.sellerId, sellerId)).orderBy(desc(usedProducts.createdAt));
+  const rows = await db.select().from(usedProducts).where(eq(usedProducts.sellerId, sellerId)).orderBy(desc(usedProducts.createdAt));
+  return rows.map(withLightImages);
 }
 async function getUsedProductsForAccount(userId, isAdminAccount) {
   const db = getDb();
   if (!db) return [];
   if (isAdminAccount) {
     const rows = await db.select({ product: usedProducts }).from(usedProducts).innerJoin(sellers, eq(usedProducts.sellerId, sellers.id)).innerJoin(users, eq(sellers.userId, users.id)).where(eq(users.role, "admin")).orderBy(desc(usedProducts.createdAt));
-    return rows.map((r) => r.product);
+    return rows.map((r) => withLightImages(r.product));
   }
   const seller = await getSellerByUserId(userId);
   if (!seller) return [];
@@ -766,11 +882,58 @@ async function getAllUsedProductsWithSeller() {
     directUserName: sql`(SELECT name FROM users WHERE id = ${usedProducts.sellerId} LIMIT 1)`
   }).from(usedProducts).leftJoin(sellers, eq(usedProducts.sellerId, sellers.id)).leftJoin(users, eq(sellers.userId, users.id)).orderBy(desc(usedProducts.createdAt));
   return rows.map((r) => ({
-    ...r.product,
+    ...withLightImages(r.product),
     sellerStoreName: r.sellerStoreName || void 0,
     sellerEmail: r.sellerEmail || r.directUserEmail || void 0,
     sellerName: r.sellerName || r.directUserName || void 0
   }));
+}
+async function getConsoleAvailabilityMap(database) {
+  const result = await database.execute(sql`
+    SELECT "digitalProductId",
+      BOOL_OR("capPrimariaTotal" > 0 AND "usedPrimariaPs4" < "capPrimariaPs4" AND ("usedPrimariaPs4" + "usedPrimariaPs5") < "capPrimariaTotal") AS ps4_primaria,
+      BOOL_OR("capPrimariaTotal" > 0 AND "usedPrimariaPs5" < "capPrimariaPs5" AND ("usedPrimariaPs4" + "usedPrimariaPs5") < "capPrimariaTotal") AS ps5_primaria,
+      BOOL_OR("capSecundaria" > 0 AND "usedSecundaria" < "capSecundaria") AS secundaria,
+      BOOL_OR("capPrimariaTotal" = 0 AND "capSecundaria" = 0 AND status = 'disponivel') AS legacy
+    FROM "digitalProductAccounts"
+    GROUP BY "digitalProductId"
+  `);
+  const rows = Array.isArray(result) ? result : result?.rows ?? [];
+  const map = {};
+  for (const r of rows) {
+    map[r.digitalProductId] = {
+      ps4Primaria: !!r.ps4_primaria || !!r.legacy,
+      ps5Primaria: !!r.ps5_primaria || !!r.legacy,
+      secundaria: !!r.secundaria || !!r.legacy
+    };
+  }
+  return map;
+}
+async function getConsoleAvailabilityForProduct(digitalProductId) {
+  const database = getDb();
+  if (!database) return { ps4Primaria: true, ps5Primaria: true, secundaria: true };
+  const prodRows = await database.select({ allowManualWithoutStock: digitalProducts.allowManualWithoutStock }).from(digitalProducts).where(eq(digitalProducts.id, digitalProductId)).limit(1);
+  if (prodRows[0]?.allowManualWithoutStock) {
+    return { ps4Primaria: true, ps5Primaria: true, secundaria: true };
+  }
+  const result = await database.execute(sql`
+    SELECT
+      BOOL_OR("capPrimariaTotal" > 0 AND "usedPrimariaPs4" < "capPrimariaPs4" AND ("usedPrimariaPs4" + "usedPrimariaPs5") < "capPrimariaTotal") AS ps4_primaria,
+      BOOL_OR("capPrimariaTotal" > 0 AND "usedPrimariaPs5" < "capPrimariaPs5" AND ("usedPrimariaPs4" + "usedPrimariaPs5") < "capPrimariaTotal") AS ps5_primaria,
+      BOOL_OR("capSecundaria" > 0 AND "usedSecundaria" < "capSecundaria") AS secundaria,
+      BOOL_OR("capPrimariaTotal" = 0 AND "capSecundaria" = 0 AND status = 'disponivel') AS legacy,
+      COUNT(*)::int AS total
+    FROM "digitalProductAccounts"
+    WHERE "digitalProductId" = ${digitalProductId}
+  `);
+  const rows = Array.isArray(result) ? result : result?.rows ?? [];
+  const r = rows[0];
+  if (!r || r.total === 0) return { ps4Primaria: true, ps5Primaria: true, secundaria: true };
+  return {
+    ps4Primaria: !!r.ps4_primaria || !!r.legacy,
+    ps5Primaria: !!r.ps5_primaria || !!r.legacy,
+    secundaria: !!r.secundaria || !!r.legacy
+  };
 }
 async function getActiveDigitalProducts() {
   const db = getDb();
@@ -785,10 +948,26 @@ async function getActiveDigitalProducts() {
       eq(digitalProducts.status, "aprovado")
     )
   ).orderBy(desc(digitalProducts.createdAt));
+  const availabilityMap = await getConsoleAvailabilityMap(db);
   return rows.map((r) => {
     const p = r.product;
     const pricePrimary = p.pricePrimary !== null && p.pricePrimary !== void 0 && p.pricePrimary !== "" ? p.pricePrimary : !p.priceSecondary && p.price ? p.price : null;
-    return { ...p, pricePrimary, sellerName: r.sellerName, sellerOpenId: r.sellerOpenId };
+    const availability = availabilityMap[p.id];
+    if (p.allowManualWithoutStock) {
+      return { ...p, pricePrimary, sellerName: r.sellerName, sellerOpenId: r.sellerOpenId, ps4PrimariaAvailable: true, ps5PrimariaAvailable: true, secundariaAvailable: true };
+    }
+    return {
+      ...p,
+      pricePrimary,
+      sellerName: r.sellerName,
+      sellerOpenId: r.sellerOpenId,
+      // undefined quando não há NENHUMA conta cadastrada pra esse jogo ainda — nesse
+      // caso o front não deve bloquear a escolha (ainda não é possível saber o console
+      // real), só passa a restringir quando já existe estoque cadastrado.
+      ps4PrimariaAvailable: availability ? availability.ps4Primaria : void 0,
+      ps5PrimariaAvailable: availability ? availability.ps5Primaria : void 0,
+      secundariaAvailable: availability ? availability.secundaria : void 0
+    };
   });
 }
 async function getAllDigitalProductsWithSeller() {
@@ -947,6 +1126,57 @@ async function getAllOrdersWithDetails() {
   });
   return deduplicateOrders(mapped);
 }
+async function getSupportSales(limit = 80) {
+  const db = getDb();
+  if (!db) return [];
+  const rows = await db.select({
+    id: orders.id,
+    createdAt: orders.createdAt,
+    status: orders.status,
+    productName: orders.productName,
+    productType: orders.productType,
+    accountType: orders.accountType,
+    buyerPhone: orders.buyerPhone,
+    deliveryDetails: orders.deliveryDetails,
+    supportContactedAt: orders.supportContactedAt,
+    buyerName: users.name,
+    buyerEmail: users.email
+  }).from(orders).leftJoin(users, eq(orders.buyerId, users.id)).where(inArray(orders.status, ["pago", "enviado", "entregue"])).orderBy(desc(orders.createdAt)).limit(limit);
+  return rows.map((r) => ({
+    ...r,
+    productName: r.productName && r.productName.trim() !== "" ? r.productName : "Produto",
+    buyerName: r.buyerName || "Sem Nome"
+  }));
+}
+async function getSaleAlerts(afterId) {
+  const db = getDb();
+  if (!db) return { latestId: 0, sales: [] };
+  const statuses = ["pago", "enviado", "entregue"];
+  const latestRows = await db.select({ id: orders.id }).from(orders).where(inArray(orders.status, [...statuses])).orderBy(desc(orders.id)).limit(1);
+  const latestId = latestRows[0]?.id ?? 0;
+  if (afterId === void 0 || latestId <= afterId) return { latestId, sales: [] };
+  const rows = await db.select({
+    id: orders.id,
+    createdAt: orders.createdAt,
+    status: orders.status,
+    productName: orders.productName,
+    buyerName: users.name
+  }).from(orders).leftJoin(users, eq(orders.buyerId, users.id)).where(and(inArray(orders.status, [...statuses]), gt(orders.id, afterId))).orderBy(asc(orders.id)).limit(20);
+  return {
+    latestId,
+    sales: rows.map((r) => ({
+      ...r,
+      productName: r.productName && r.productName.trim() !== "" ? r.productName : "Produto",
+      buyerName: r.buyerName || "Cliente"
+    }))
+  };
+}
+async function setOrderSupportContacted(orderId, contacted) {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+  const updated = await db.update(orders).set({ supportContactedAt: contacted ? /* @__PURE__ */ new Date() : null }).where(eq(orders.id, orderId)).returning({ id: orders.id });
+  if (updated.length === 0) throw new Error("Pedido n\xE3o encontrado");
+}
 async function deliverOrder(orderId, deliveryDetails) {
   const db = getDb();
   if (!db) throw new Error("Database not available");
@@ -987,28 +1217,110 @@ async function deliverOrder(orderId, deliveryDetails) {
   }
   return { success: true };
 }
-async function claimDigitalProductAccount(database, digitalProductId, orderId) {
-  const claimResult = await database.execute(sql`
-    UPDATE "digitalProductAccounts"
-    SET status = 'entregue', "orderId" = ${orderId}, "deliveredAt" = now()
-    WHERE id = (
-      SELECT id FROM "digitalProductAccounts"
-      WHERE "digitalProductId" = ${digitalProductId} AND status = 'disponivel'
-      ORDER BY id
-      LIMIT 1
-      FOR UPDATE SKIP LOCKED
-    )
-    RETURNING id, email, password
-  `);
-  const claimedRows = Array.isArray(claimResult) ? claimResult : claimResult?.rows ?? [];
-  const claimed = claimedRows[0];
+function computeAccountCaps(platform, accountType) {
+  if (accountType === "secundaria") {
+    return { capPrimariaPs4: 0, capPrimariaPs5: 0, capPrimariaTotal: 0, capSecundaria: 1 };
+  }
+  const p = (platform || "").toUpperCase();
+  const isPs4Only = p.includes("PS4") && !p.includes("PS5");
+  const isPs5Only = p.includes("PS5") && !p.includes("PS4");
+  if (isPs4Only) return { capPrimariaPs4: 2, capPrimariaPs5: 0, capPrimariaTotal: 2, capSecundaria: 0 };
+  if (isPs5Only) return { capPrimariaPs4: 0, capPrimariaPs5: 2, capPrimariaTotal: 2, capSecundaria: 0 };
+  return { capPrimariaPs4: 2, capPrimariaPs5: 2, capPrimariaTotal: 3, capSecundaria: 0 };
+}
+async function claimDigitalProductAccount(database, digitalProductId, orderId, accountType, consoleType) {
+  let claimResult = null;
+  if (accountType === "secundaria") {
+    claimResult = await database.execute(sql`
+      UPDATE "digitalProductAccounts"
+      SET "usedSecundaria" = "usedSecundaria" + 1
+      WHERE id = (
+        SELECT id FROM "digitalProductAccounts"
+        WHERE "digitalProductId" = ${digitalProductId}
+          AND "capSecundaria" > 0 AND "usedSecundaria" < "capSecundaria"
+        ORDER BY id ASC
+        LIMIT 1
+        FOR UPDATE SKIP LOCKED
+      )
+      RETURNING id, email, password
+    `);
+  } else if (accountType === "primaria" && (consoleType === "PS4" || consoleType === "PS5")) {
+    claimResult = consoleType === "PS4" ? await database.execute(sql`
+          UPDATE "digitalProductAccounts"
+          SET "usedPrimariaPs4" = "usedPrimariaPs4" + 1
+          WHERE id = (
+            SELECT id FROM "digitalProductAccounts"
+            WHERE "digitalProductId" = ${digitalProductId}
+              AND "capPrimariaTotal" > 0
+              AND ("usedPrimariaPs4" + "usedPrimariaPs5") < "capPrimariaTotal"
+              AND "usedPrimariaPs4" < "capPrimariaPs4"
+            ORDER BY id ASC
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
+          )
+          RETURNING id, email, password
+        `) : await database.execute(sql`
+          UPDATE "digitalProductAccounts"
+          SET "usedPrimariaPs5" = "usedPrimariaPs5" + 1
+          WHERE id = (
+            SELECT id FROM "digitalProductAccounts"
+            WHERE "digitalProductId" = ${digitalProductId}
+              AND "capPrimariaTotal" > 0
+              AND ("usedPrimariaPs4" + "usedPrimariaPs5") < "capPrimariaTotal"
+              AND "usedPrimariaPs5" < "capPrimariaPs5"
+            ORDER BY id ASC
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
+          )
+          RETURNING id, email, password
+        `);
+  }
+  let claimedRows = claimResult ? Array.isArray(claimResult) ? claimResult : claimResult?.rows ?? [] : [];
+  let claimed = claimedRows[0];
+  if (!claimed) {
+    const legacyResult = accountType ? await database.execute(sql`
+          UPDATE "digitalProductAccounts"
+          SET status = 'entregue', "orderId" = ${orderId}, "deliveredAt" = now()
+          WHERE id = (
+            SELECT id FROM "digitalProductAccounts"
+            WHERE "digitalProductId" = ${digitalProductId} AND status = 'disponivel'
+              AND "capPrimariaTotal" = 0 AND "capSecundaria" = 0
+              AND ("accountType" = ${accountType} OR "accountType" IS NULL)
+            ORDER BY ("accountType" IS NULL) ASC, id ASC
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
+          )
+          RETURNING id, email, password
+        `) : await database.execute(sql`
+          UPDATE "digitalProductAccounts"
+          SET status = 'entregue', "orderId" = ${orderId}, "deliveredAt" = now()
+          WHERE id = (
+            SELECT id FROM "digitalProductAccounts"
+            WHERE "digitalProductId" = ${digitalProductId} AND status = 'disponivel' AND "accountType" IS NULL
+              AND "capPrimariaTotal" = 0 AND "capSecundaria" = 0
+            ORDER BY id ASC
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
+          )
+          RETURNING id, email, password
+        `);
+    const legacyRows = Array.isArray(legacyResult) ? legacyResult : legacyResult?.rows ?? [];
+    claimed = legacyRows[0];
+  }
   if (!claimed) return null;
   await syncDigitalProductAccountStock(database, digitalProductId);
   return { email: claimed.email, password: claimed.password };
 }
 async function attemptAutoDeliverDigitalOrder(database, params) {
-  const { orderId, digitalProductId, buyerId, productName } = params;
-  const account = await claimDigitalProductAccount(database, digitalProductId, orderId);
+  const { orderId, digitalProductId, buyerId, productName, accountType } = params;
+  let { consoleType } = params;
+  if (accountType === "primaria" && consoleType !== "PS4" && consoleType !== "PS5") {
+    const prodRows = await database.select({ platform: digitalProducts.platform }).from(digitalProducts).where(eq(digitalProducts.id, digitalProductId)).limit(1);
+    const platform = (prodRows[0]?.platform || "").toUpperCase();
+    if (platform.includes("PS4") && !platform.includes("PS5")) consoleType = "PS4";
+    else if (platform.includes("PS5") && !platform.includes("PS4")) consoleType = "PS5";
+  }
+  const account = await claimDigitalProductAccount(database, digitalProductId, orderId, accountType, consoleType);
   if (!account) {
     console.log(`[AutoDeliver] Pedido #${orderId}: sem conta dispon\xEDvel no pool do jogo #${digitalProductId} \u2014 segue pro fluxo manual.`);
     return { delivered: false };
@@ -1047,11 +1359,20 @@ Qualquer d\xFAvida ou problema pra acessar, voc\xEA encontra v\xEDdeos de ajuda 
 }
 async function syncDigitalProductAccountStock(database, digitalProductId) {
   const countResult = await database.execute(sql`
-    SELECT COUNT(*)::int AS count FROM "digitalProductAccounts"
-    WHERE "digitalProductId" = ${digitalProductId} AND status = 'disponivel'
+    SELECT COALESCE(SUM(
+      CASE
+        WHEN "capPrimariaTotal" > 0 OR "capSecundaria" > 0 THEN
+          GREATEST(0, "capPrimariaTotal" - ("usedPrimariaPs4" + "usedPrimariaPs5"))
+          + GREATEST(0, "capSecundaria" - "usedSecundaria")
+        WHEN status = 'disponivel' THEN 1
+        ELSE 0
+      END
+    ), 0)::int AS remaining
+    FROM "digitalProductAccounts"
+    WHERE "digitalProductId" = ${digitalProductId}
   `);
   const countRows = Array.isArray(countResult) ? countResult : countResult?.rows ?? [];
-  const remaining = countRows[0]?.count ?? 0;
+  const remaining = countRows[0]?.remaining ?? 0;
   await database.update(digitalProducts).set({ stock: remaining }).where(eq(digitalProducts.id, digitalProductId));
   return remaining;
 }
@@ -1060,8 +1381,17 @@ async function listDigitalProductAccountsSummary() {
   if (!database) throw new Error("Database not available");
   const result = await database.execute(sql`
     SELECT "digitalProductId" AS "digitalProductId",
-      COUNT(*) FILTER (WHERE status = 'disponivel')::int AS available,
-      COUNT(*) FILTER (WHERE status = 'entregue')::int AS delivered
+      COALESCE(SUM(
+        CASE
+          WHEN "capPrimariaTotal" > 0 OR "capSecundaria" > 0 THEN
+            GREATEST(0, "capPrimariaTotal" - ("usedPrimariaPs4" + "usedPrimariaPs5"))
+            + GREATEST(0, "capSecundaria" - "usedSecundaria")
+          WHEN status = 'disponivel' THEN 1
+          ELSE 0
+        END
+      ), 0)::int AS available,
+      COALESCE(SUM("usedPrimariaPs4" + "usedPrimariaPs5" + "usedSecundaria"), 0)::int
+        + COUNT(*) FILTER (WHERE status = 'entregue' AND "capPrimariaTotal" = 0 AND "capSecundaria" = 0)::int AS delivered
     FROM "digitalProductAccounts"
     GROUP BY "digitalProductId"
   `);
@@ -1075,25 +1405,138 @@ async function listDigitalProductAccountsSummary() {
 async function listDigitalProductAccounts(digitalProductId) {
   const database = getDb();
   if (!database) throw new Error("Database not available");
-  const available = await database.select({ id: digitalProductAccounts.id, email: digitalProductAccounts.email, password: digitalProductAccounts.password }).from(digitalProductAccounts).where(and(eq(digitalProductAccounts.digitalProductId, digitalProductId), eq(digitalProductAccounts.status, "disponivel"))).orderBy(digitalProductAccounts.id);
-  const deliveredCountResult = await database.select({ count: sql`count(*)::int` }).from(digitalProductAccounts).where(and(eq(digitalProductAccounts.digitalProductId, digitalProductId), eq(digitalProductAccounts.status, "entregue")));
-  return { available, deliveredCount: deliveredCountResult[0]?.count ?? 0 };
+  const availableResult = await database.execute(sql`
+    SELECT id, email, password, "accountType",
+      "capPrimariaPs4", "capPrimariaPs5", "capPrimariaTotal", "capSecundaria",
+      "usedPrimariaPs4", "usedPrimariaPs5", "usedSecundaria"
+    FROM "digitalProductAccounts"
+    WHERE "digitalProductId" = ${digitalProductId}
+      AND (
+        ("capPrimariaTotal" > 0 AND ("usedPrimariaPs4" + "usedPrimariaPs5") < "capPrimariaTotal")
+        OR ("capSecundaria" > 0 AND "usedSecundaria" < "capSecundaria")
+        OR ("capPrimariaTotal" = 0 AND "capSecundaria" = 0 AND status = 'disponivel')
+      )
+    ORDER BY id ASC
+  `);
+  const availableRows = Array.isArray(availableResult) ? availableResult : availableResult?.rows ?? [];
+  const available = availableRows.map((r) => {
+    const remainingPrimariaTotal = Math.max(0, r.capPrimariaTotal - (r.usedPrimariaPs4 + r.usedPrimariaPs5));
+    return {
+      id: r.id,
+      email: r.email,
+      password: r.password,
+      accountType: r.accountType,
+      isQuota: r.capPrimariaTotal > 0 || r.capSecundaria > 0,
+      remainingPrimariaPs4: Math.min(remainingPrimariaTotal, Math.max(0, r.capPrimariaPs4 - r.usedPrimariaPs4)),
+      remainingPrimariaPs5: Math.min(remainingPrimariaTotal, Math.max(0, r.capPrimariaPs5 - r.usedPrimariaPs5)),
+      remainingPrimariaTotal,
+      remainingSecundaria: Math.max(0, r.capSecundaria - r.usedSecundaria)
+    };
+  });
+  const deliveredResult = await database.execute(sql`
+    SELECT
+      COALESCE(SUM("usedPrimariaPs4" + "usedPrimariaPs5" + "usedSecundaria"), 0)::int
+        + COUNT(*) FILTER (WHERE status = 'entregue' AND "capPrimariaTotal" = 0 AND "capSecundaria" = 0)::int AS delivered
+    FROM "digitalProductAccounts"
+    WHERE "digitalProductId" = ${digitalProductId}
+  `);
+  const deliveredRows = Array.isArray(deliveredResult) ? deliveredResult : deliveredResult?.rows ?? [];
+  return { available, deliveredCount: deliveredRows[0]?.delivered ?? 0 };
 }
-async function addDigitalProductAccountsBulk(digitalProductId, rawText) {
+async function addDigitalProductAccountsBulk(digitalProductId, rawText, accountType, quantity, consoleOverride) {
   const database = getDb();
   if (!database) throw new Error("Database not available");
   const rows = rawText.split("\n").map((line) => line.trim()).filter(Boolean).map((line) => {
-    const parts = line.split(/[:;]/);
-    const email = parts[0]?.trim();
-    const password = parts.slice(1).join(":").trim();
-    return { email, password };
+    const parts = line.split(/[:;]/).map((p) => p.trim());
+    const stripQuotes = (s) => s.replace(/^["']+|["']+$/g, "");
+    const email = stripQuotes(parts[0] ?? "");
+    let passwordParts = parts.slice(1);
+    let lineQuantity;
+    if (passwordParts.length >= 2 && /^\d+$/.test(passwordParts[passwordParts.length - 1])) {
+      lineQuantity = parseInt(passwordParts[passwordParts.length - 1], 10);
+      passwordParts = passwordParts.slice(0, -1);
+    }
+    const password = stripQuotes(passwordParts.join(":").trim()).replace(/^senha\s*:?\s*/i, "");
+    return { email, password, quantity: lineQuantity };
   }).filter((r) => r.email && r.password);
-  if (rows.length === 0) return { inserted: 0, available: 0 };
-  await database.insert(digitalProductAccounts).values(
-    rows.map((r) => ({ digitalProductId, email: r.email, password: r.password }))
-  );
+  if (rows.length === 0) return { inserted: 0, updated: 0, skipped: 0, available: 0 };
+  const existingResult = accountType ? await database.execute(sql`
+        SELECT id, LOWER(email) AS email FROM "digitalProductAccounts"
+        WHERE "digitalProductId" = ${digitalProductId} AND "accountType" = ${accountType}
+      `) : await database.execute(sql`
+        SELECT id, LOWER(email) AS email FROM "digitalProductAccounts"
+        WHERE "digitalProductId" = ${digitalProductId} AND "accountType" IS NULL
+      `);
+  const existingRows = Array.isArray(existingResult) ? existingResult : existingResult?.rows ?? [];
+  const existingIdByEmail = new Map(existingRows.map((r) => [r.email, r.id]));
+  const newRows = [];
+  const updateRows = [];
+  for (const r of rows) {
+    const existingId = existingIdByEmail.get(r.email.toLowerCase());
+    if (existingId === void 0) {
+      newRows.push(r);
+    } else if (accountType === "primaria" || accountType === "secundaria") {
+      updateRows.push({ id: existingId, row: r });
+    }
+  }
+  const skipped = rows.length - newRows.length - updateRows.length;
+  if (newRows.length === 0 && updateRows.length === 0) {
+    const available = await syncDigitalProductAccountStock(database, digitalProductId);
+    return { inserted: 0, updated: 0, skipped, available };
+  }
+  let platform;
+  if (accountType === "primaria" || accountType === "secundaria") {
+    const prodRows = await database.select({ platform: digitalProducts.platform }).from(digitalProducts).where(eq(digitalProducts.id, digitalProductId)).limit(1);
+    platform = prodRows[0]?.platform;
+  }
+  const capsForQuantity = (qty) => {
+    let caps = { capPrimariaPs4: 0, capPrimariaPs5: 0, capPrimariaTotal: 0, capSecundaria: 0 };
+    if (accountType === "primaria" && qty && qty > 0 && (consoleOverride === "PS4" || consoleOverride === "PS5")) {
+      caps = {
+        capPrimariaPs4: consoleOverride === "PS4" ? qty : 0,
+        capPrimariaPs5: consoleOverride === "PS5" ? qty : 0,
+        capPrimariaTotal: qty,
+        capSecundaria: 0
+      };
+    } else if (accountType === "primaria" && qty && qty > 0) {
+      const p = (platform || "").toUpperCase();
+      const isPs4Only = p.includes("PS4") && !p.includes("PS5");
+      const isPs5Only = p.includes("PS5") && !p.includes("PS4");
+      if (isPs4Only || isPs5Only) {
+        caps = {
+          capPrimariaPs4: isPs5Only ? 0 : qty,
+          capPrimariaPs5: isPs4Only ? 0 : qty,
+          capPrimariaTotal: qty,
+          capSecundaria: 0
+        };
+      } else {
+        caps = { capPrimariaPs4: qty, capPrimariaPs5: qty, capPrimariaTotal: qty, capSecundaria: 0 };
+      }
+    } else if (accountType === "secundaria" && qty && qty > 0) {
+      caps = { capPrimariaPs4: 0, capPrimariaPs5: 0, capPrimariaTotal: 0, capSecundaria: qty };
+    } else if (accountType === "primaria" || accountType === "secundaria") {
+      caps = computeAccountCaps(platform, accountType);
+    }
+    return caps;
+  };
+  if (newRows.length > 0) {
+    await database.insert(digitalProductAccounts).values(
+      newRows.map((r) => ({ digitalProductId, email: r.email, password: r.password, accountType: accountType || null, ...capsForQuantity(r.quantity ?? quantity) }))
+    );
+  }
+  for (const { id, row } of updateRows) {
+    const delta = capsForQuantity(row.quantity ?? quantity);
+    await database.execute(sql`
+      UPDATE "digitalProductAccounts"
+      SET "capPrimariaPs4" = "capPrimariaPs4" + ${delta.capPrimariaPs4},
+          "capPrimariaPs5" = "capPrimariaPs5" + ${delta.capPrimariaPs5},
+          "capPrimariaTotal" = "capPrimariaTotal" + ${delta.capPrimariaTotal},
+          "capSecundaria" = "capSecundaria" + ${delta.capSecundaria}
+      WHERE id = ${id}
+    `);
+  }
   const remaining = await syncDigitalProductAccountStock(database, digitalProductId);
-  return { inserted: rows.length, available: remaining };
+  return { inserted: newRows.length, updated: updateRows.length, skipped, available: remaining };
 }
 async function removeDigitalProductAccount(id) {
   const database = getDb();
@@ -1101,8 +1544,29 @@ async function removeDigitalProductAccount(id) {
   const existing = await database.select().from(digitalProductAccounts).where(eq(digitalProductAccounts.id, id)).limit(1);
   const account = existing[0];
   if (!account) throw new Error("Conta n\xE3o encontrada");
-  if (account.status !== "disponivel") throw new Error("Essa conta j\xE1 foi entregue em um pedido e n\xE3o pode ser removida");
+  const isQuota = account.capPrimariaTotal > 0 || account.capSecundaria > 0;
+  const usedUnits = account.usedPrimariaPs4 + account.usedPrimariaPs5 + account.usedSecundaria;
+  if (isQuota ? usedUnits > 0 : account.status !== "disponivel") {
+    throw new Error("Essa conta j\xE1 foi entregue em um pedido e n\xE3o pode ser removida");
+  }
   await database.delete(digitalProductAccounts).where(eq(digitalProductAccounts.id, id));
+  const remaining = await syncDigitalProductAccountStock(database, account.digitalProductId);
+  return { available: remaining };
+}
+async function updateDigitalProductAccountRemaining(id, updates) {
+  const database = getDb();
+  if (!database) throw new Error("Database not available");
+  const existing = await database.select().from(digitalProductAccounts).where(eq(digitalProductAccounts.id, id)).limit(1);
+  const account = existing[0];
+  if (!account) throw new Error("Conta n\xE3o encontrada");
+  const sets = {};
+  if (updates.remainingPs4 !== void 0) sets.capPrimariaPs4 = account.usedPrimariaPs4 + Math.max(0, updates.remainingPs4);
+  if (updates.remainingPs5 !== void 0) sets.capPrimariaPs5 = account.usedPrimariaPs5 + Math.max(0, updates.remainingPs5);
+  if (updates.remainingTotal !== void 0) sets.capPrimariaTotal = account.usedPrimariaPs4 + account.usedPrimariaPs5 + Math.max(0, updates.remainingTotal);
+  if (updates.remainingSecundaria !== void 0) sets.capSecundaria = account.usedSecundaria + Math.max(0, updates.remainingSecundaria);
+  if (Object.keys(sets).length > 0) {
+    await database.update(digitalProductAccounts).set(sets).where(eq(digitalProductAccounts.id, id));
+  }
   const remaining = await syncDigitalProductAccountStock(database, account.digitalProductId);
   return { available: remaining };
 }
@@ -1191,22 +1655,25 @@ async function confirmOrderAndReview(orderId, buyerId, rating, comment) {
   if (order.status !== "pago" && order.status !== "enviado") {
     throw new Error("Pedido n\xE3o est\xE1 em um estado v\xE1lido para confirma\xE7\xE3o");
   }
-  if (!order.sellerId) {
-    throw new Error("Pedido n\xE3o possui um vendedor associado");
+  if (!order.sellerId && order.status !== "enviado") {
+    throw new Error("Esse pedido ainda n\xE3o foi entregue \u2014 aguarde a entrega antes de avaliar.");
   }
-  const sellerProfileResult = await db.select().from(sellers).where(eq(sellers.userId, order.sellerId)).limit(1);
-  const sellerProfile = sellerProfileResult[0];
+  const sellerUserId = order.sellerId;
+  const sellerProfile = sellerUserId !== null ? (await db.select().from(sellers).where(eq(sellers.userId, sellerUserId)).limit(1))[0] : void 0;
   const updateResult = await db.update(orders).set({ status: "entregue" }).where(and(eq(orders.id, orderId), eq(orders.status, order.status))).returning({ id: orders.id });
   if (updateResult.length === 0) {
     throw new Error("Este pedido j\xE1 foi confirmado em outra requisi\xE7\xE3o.");
   }
   await db.insert(reviews).values({
     orderId: order.id,
-    sellerId: sellerProfile?.id ?? order.sellerId,
+    sellerId: sellerUserId !== null ? sellerProfile?.id ?? sellerUserId : null,
     buyerId,
     rating,
     comment: comment || null
   });
+  if (sellerUserId === null) {
+    return { success: true };
+  }
   if (sellerProfile) {
     const currentTotalReviews = sellerProfile.totalReviews || 0;
     const currentRating = parseFloat(sellerProfile.rating || "0");
@@ -1217,11 +1684,11 @@ async function confirmOrderAndReview(orderId, buyerId, rating, comment) {
       rating: newRating.toFixed(2)
     }).where(eq(sellers.id, sellerProfile.id));
   }
-  const sellerUserResult = await db.select().from(users).where(eq(users.id, order.sellerId)).limit(1);
+  const sellerUserResult = await db.select().from(users).where(eq(users.id, sellerUserId)).limit(1);
   const sellerUser = sellerUserResult[0];
   if (sellerUser) {
     const newBalance = (parseFloat(sellerUser.balance) + parseFloat(order.sellerAmount)).toString();
-    await db.update(users).set({ balance: newBalance }).where(eq(users.id, order.sellerId));
+    await db.update(users).set({ balance: newBalance }).where(eq(users.id, sellerUserId));
   }
   return { success: true };
 }
@@ -1322,6 +1789,31 @@ async function getDatabaseStorageStats() {
   } catch (error) {
     console.warn("[Database Stats] Erro ao buscar m\xE9tricas de armazenamento:", error.message);
     return null;
+  }
+}
+async function sendOrderRegisteredNotice(database, params) {
+  try {
+    const { orderId, buyerId, productName } = params;
+    if (!(buyerId > 0)) return;
+    const orderRows = await database.select({ status: orders.status }).from(orders).where(eq(orders.id, orderId)).limit(1);
+    if (orderRows[0]?.status !== "pago") return;
+    const buyerRows = await database.select().from(users).where(eq(users.id, buyerId)).limit(1);
+    const buyer = buyerRows[0];
+    if (!buyer?.email) return;
+    const settings = await getPlatformSettings();
+    const { sendOrderRegisteredEmail: sendOrderRegisteredEmail2 } = await Promise.resolve().then(() => (init_email(), email_exports));
+    await Promise.race([
+      sendOrderRegisteredEmail2({
+        to: buyer.email,
+        buyerName: buyer.name || "Cliente",
+        orderId,
+        productName,
+        supportWhatsapp: settings?.supportWhatsapp ?? null
+      }),
+      new Promise((resolve) => setTimeout(resolve, 12e3))
+    ]);
+  } catch (err) {
+    console.error("[Email] Falha ao avisar pedido registrado (ignorada):", err);
   }
 }
 
@@ -1869,7 +2361,7 @@ function registerAiRoute(app2) {
       return res.json({ answer: "Aceitamos Pix, Cart\xE3o de Cr\xE9dito e Boleto. Todo pagamento \xE9 processado com seguran\xE7a via Mercado Pago." });
     }
     if (/entrega|envio|prazo|frete|como recebo/.test(nq)) {
-      return res.json({ answer: "As m\xEDdias digitais (PS4/PS5) s\xE3o enviadas via WhatsApp ou e-mail logo ap\xF3s a aprova\xE7\xE3o do pagamento. Para usados f\xEDsicos o envio \xE9 pelos Correios com rastreio." });
+      return res.json({ answer: 'As m\xEDdias digitais (PS4/PS5) ficam dispon\xEDveis em "Minhas Compras", dentro do pr\xF3prio site, logo ap\xF3s a aprova\xE7\xE3o do pagamento. Para usados f\xEDsicos o envio \xE9 pelos Correios com rastreio.' });
     }
     if (/contato|whatsapp|telefone|suporte|falar com|atendimento|adm/.test(nq)) {
       return res.json({ answer: `Fale com a gente direto no WhatsApp! [Clique aqui para abrir o WhatsApp](${WA})` });
@@ -1999,21 +2491,7 @@ async function createContext(opts) {
           console.error("[TRPC Server] User auth processing error:", dbErr);
         }
         if (!user) {
-          user = {
-            id: 999999,
-            openId: uid,
-            name,
-            email: email || null,
-            loginMethod: "firebase_fallback",
-            cpf: null,
-            psnId: null,
-            forteCoins: 0,
-            role: "user",
-            createdAt: /* @__PURE__ */ new Date(),
-            updatedAt: /* @__PURE__ */ new Date(),
-            lastSignedIn: /* @__PURE__ */ new Date(),
-            balance: "0.00"
-          };
+          console.error(`[TRPC Server] N\xE3o foi poss\xEDvel carregar/criar o usu\xE1rio do Postgres (uid: ${uid}). Tratando esta requisi\xE7\xE3o como n\xE3o autenticada.`);
         }
       }
     }
@@ -2036,7 +2514,6 @@ async function createContext(opts) {
 
 // server/_core/payment.ts
 import { eq as eq3 } from "drizzle-orm";
-var PLATINADOR_SUBSCRIPTION_PRICE = 35;
 function computeDigitalPrice(p, accountType) {
   const basePrice = parseFloat(p.price || "0");
   const secondaryPrice = p.priceSecondary ? parseFloat(p.priceSecondary) : 0;
@@ -2143,9 +2620,9 @@ function registerPaymentRoute(app2) {
       let verifiedPrice = null;
       let realProductName = null;
       let verifiedIsPreVenda = false;
-      if (productType === "platinador") {
-        verifiedPrice = PLATINADOR_SUBSCRIPTION_PRICE;
-      } else if (productId) {
+      let verifiedDigitalProductId = null;
+      let verifiedDigitalPlatform = null;
+      if (productId) {
         const pid = parseInt(String(productId));
         if (!isNaN(pid)) {
           if (productType === "store") {
@@ -2169,7 +2646,7 @@ function registerPaymentRoute(app2) {
           } else if (productType === "digital") {
             const rows = await database.select().from(digitalProducts).where(eq3(digitalProducts.id, pid)).limit(1);
             if (rows[0]) {
-              if (rows[0].isActive === false || rows[0].stock !== void 0 && rows[0].stock <= 0) {
+              if (rows[0].isActive === false || rows[0].stock !== void 0 && rows[0].stock <= 0 && !rows[0].allowManualWithoutStock) {
                 return res.status(400).json({ success: false, error: "Este jogo est\xE1 esgotado no momento." });
               }
               if (rows[0].expiresAt && new Date(rows[0].expiresAt) < /* @__PURE__ */ new Date()) {
@@ -2178,6 +2655,8 @@ function registerPaymentRoute(app2) {
               verifiedPrice = computeDigitalPrice(rows[0], accountType);
               realProductName = rows[0].name;
               verifiedIsPreVenda = !!rows[0].isPreVenda;
+              verifiedDigitalProductId = pid;
+              verifiedDigitalPlatform = rows[0].platform || null;
             }
           }
         }
@@ -2199,6 +2678,26 @@ function registerPaymentRoute(app2) {
       if (resolvedConsoleType && (resolvedConsoleType === "PS4" || resolvedConsoleType === "PS5")) {
         if (!productNameStr.toUpperCase().includes(`(${resolvedConsoleType})`) && !productNameStr.toUpperCase().includes(`- ${resolvedConsoleType}`)) {
           productNameStr += ` (${resolvedConsoleType})`;
+        }
+      }
+      if (verifiedDigitalProductId !== null) {
+        if (consoleType === "PS4" || consoleType === "PS5") {
+          const plat = (verifiedDigitalPlatform || "").toUpperCase();
+          const has4 = plat.includes("PS4");
+          const has5 = plat.includes("PS5");
+          if ((has4 || has5) && !(consoleType === "PS4" ? has4 : has5)) {
+            return res.status(400).json({ success: false, error: `Este jogo est\xE1 dispon\xEDvel apenas para ${has5 ? "PS5" : "PS4"}.` });
+          }
+        }
+        const availability = await getConsoleAvailabilityForProduct(verifiedDigitalProductId);
+        if (accountType === "secundaria" && !availability.secundaria) {
+          return res.status(400).json({ success: false, error: "Conta secund\xE1ria esgotada para este jogo no momento." });
+        }
+        if (accountType === "primaria" && (resolvedConsoleType === "PS4" || resolvedConsoleType === "PS5")) {
+          const hasStock = resolvedConsoleType === "PS4" ? availability.ps4Primaria : availability.ps5Primaria;
+          if (!hasStock) {
+            return res.status(400).json({ success: false, error: `N\xE3o h\xE1 estoque de conta prim\xE1ria para ${resolvedConsoleType} deste jogo no momento.` });
+          }
         }
       }
       if (accountType === "secundaria") {
@@ -2316,7 +2815,9 @@ function registerPaymentRoute(app2) {
               orderId: insertedOrder.id,
               digitalProductId: insertValues.digitalProductId,
               buyerId,
-              productName: productNameStr
+              productName: productNameStr,
+              accountType,
+              consoleType: resolvedConsoleType || null
             });
           } catch (autoDeliverErr) {
             console.error("[Checkout] Erro na entrega autom\xE1tica de conta:", autoDeliverErr);
@@ -2327,7 +2828,10 @@ function registerPaymentRoute(app2) {
             const newStock = Math.max(0, (prod[0].stock || 1) - 1);
             await database.update(products).set({ stock: newStock, isActive: newStock > 0 }).where(eq3(products.id, insertValues.productId));
           }
+        } else if (productType === "used" && insertValues.usedProductId) {
+          await database.update(usedProducts).set({ status: "vendido" }).where(eq3(usedProducts.id, insertValues.usedProductId));
         }
+        await sendOrderRegisteredNotice(database, { orderId: insertedOrder.id, buyerId, productName: productNameStr });
         console.log("[Checkout] Compra 100% paga com moedas/cupom registrada com sucesso.");
         return res.json({ success: true, url: null, paidWithCoins: true });
       }
@@ -2371,6 +2875,7 @@ function registerPaymentRoute(app2) {
           product_name: productNameStr,
           buyer_phone: customerPhone || null,
           account_type: accountType || null,
+          console_type: resolvedConsoleType || null,
           quantity: Number(quantity) || 1
         },
         statement_descriptor: "ENFORTEC GAMES"
@@ -2472,6 +2977,7 @@ function registerPaymentRoute(app2) {
       const productName = metadata.product_name || paymentData.description || "Produto Enfortec Games";
       const phone = metadata.buyer_phone || null;
       const accountType = metadata.account_type || null;
+      const consoleType = metadata.console_type || null;
       const quantity = Number(metadata.quantity) || 1;
       const database = await getDb();
       if (!database) {
@@ -2484,36 +2990,10 @@ function registerPaymentRoute(app2) {
         return res.status(200).json({ received: true, duplicate: true });
       }
       if (productType === "platinador") {
-        const existingSub = await database.select().from(platinadorSubscriptions).where(eq3(platinadorSubscriptions.paymentId, String(paymentId))).limit(1);
-        if (existingSub.length > 0) {
-          console.log(`[Mercado Pago Webhook] Assinatura do Platinador pra pagamento #${paymentId} j\xE1 processada.`);
-          return res.status(200).json({ received: true, duplicate: true });
-        }
-        if (buyerId > 0) {
-          const now = /* @__PURE__ */ new Date();
-          const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1e3);
-          const existing = await database.select().from(platinadorSubscriptions).where(eq3(platinadorSubscriptions.userId, buyerId)).limit(1);
-          if (existing.length > 0) {
-            await database.update(platinadorSubscriptions).set({
-              status: "ativa",
-              startsAt: now,
-              expiresAt,
-              paymentId: String(paymentId)
-            }).where(eq3(platinadorSubscriptions.id, existing[0].id));
-          } else {
-            await database.insert(platinadorSubscriptions).values({
-              userId: buyerId,
-              status: "ativa",
-              planName: "Clube Platinador VIP",
-              price: totalPrice,
-              startsAt: now,
-              expiresAt,
-              paymentId: String(paymentId)
-            });
-          }
-          console.log(`[Mercado Pago Webhook] Assinatura Platinador ativada para usu\xE1rio #${buyerId} at\xE9 ${expiresAt.toISOString()}`);
-        }
-      } else {
+        console.warn(`[Mercado Pago Webhook] Pagamento #${paymentId} com productType "platinador" recebido \u2014 assinatura paga foi descontinuada, ignorando.`);
+        return res.status(200).json({ received: true });
+      }
+      {
         let commissionPct = "6.00";
         try {
           const settings = await getPlatformSettings();
@@ -2593,7 +3073,9 @@ function registerPaymentRoute(app2) {
               orderId: insertedOrder.id,
               digitalProductId: insertValues.digitalProductId,
               buyerId,
-              productName
+              productName,
+              accountType,
+              consoleType
             });
           } catch (autoDeliverErr) {
             console.error("[Mercado Pago Webhook] Erro na entrega autom\xE1tica de conta:", autoDeliverErr);
@@ -2604,7 +3086,10 @@ function registerPaymentRoute(app2) {
             const newStock = Math.max(0, (prod[0].stock || 1) - 1);
             await database.update(products).set({ stock: newStock, isActive: newStock > 0 }).where(eq3(products.id, insertValues.productId));
           }
+        } else if (productType === "used" && insertValues.usedProductId) {
+          await database.update(usedProducts).set({ status: "vendido" }).where(eq3(usedProducts.id, insertValues.usedProductId));
         }
+        await sendOrderRegisteredNotice(database, { orderId: insertedOrder.id, buyerId, productName });
         console.log(`[Mercado Pago Webhook] Pedido registrado no banco com sucesso (Pagamento #${paymentId}).`);
       }
       const adminPhone = "554384253691";
@@ -2740,6 +3225,15 @@ var requireUser = t.middleware(async (opts) => {
   });
 });
 var protectedProcedure = t.procedure.use(requireUser);
+var supportProcedure = protectedProcedure.use(
+  t.middleware(async (opts) => {
+    const { ctx, next } = opts;
+    if (!ctx.user || ctx.user.role !== "admin" && ctx.user.role !== "suporte") {
+      throw new TRPCError2({ code: "FORBIDDEN", message: "Apenas suporte ou administradores." });
+    }
+    return next({ ctx });
+  })
+);
 var adminProcedure = t.procedure.use(
   t.middleware(async (opts) => {
     const { ctx, next } = opts;
@@ -2882,12 +3376,27 @@ var appRouter = router({
     }),
     adminUpdateRole: protectedProcedure.input(z2.object({
       openId: z2.string(),
-      role: z2.enum(["user", "admin", "vendedor", "collaborator"])
+      role: z2.enum(["user", "admin", "vendedor", "collaborator", "suporte"]),
+      // Só usados quando a conta acabou de ser criada no Firebase e ainda não entrou no site
+      // (logo, ainda não existe linha dela no Postgres): permite já nascer com o cargo certo.
+      email: z2.string().email().optional(),
+      name: z2.string().optional()
     })).mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Apenas administradores podem alterar permiss\xF5es." });
       const database = await getDb();
       if (!database) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indispon\xEDvel." });
-      const targetUser = await getUserByOpenId(input.openId);
+      let targetUser = await getUserByOpenId(input.openId);
+      if (!targetUser && input.email) {
+        await upsertUser({
+          openId: input.openId,
+          email: input.email.toLowerCase().trim(),
+          name: input.name?.trim() || input.email.split("@")[0],
+          loginMethod: "firebase",
+          role: input.role,
+          lastSignedIn: /* @__PURE__ */ new Date()
+        });
+        targetUser = await getUserByOpenId(input.openId);
+      }
       if (!targetUser) throw new TRPCError3({ code: "NOT_FOUND", message: "Usu\xE1rio n\xE3o encontrado no banco de dados." });
       await database.update(users).set({ role: input.role }).where(eq4(users.id, targetUser.id));
       return { success: true };
@@ -3207,6 +3716,15 @@ var appRouter = router({
       if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
       return getAllDigitalProductsWithSeller();
     }),
+    // Liga/desliga a venda mesmo sem estoque cadastrado de um console/tipo específico
+    // pra esse jogo (ex.: promoção — topa vender na sorte e resolver manual depois).
+    setAllowManualWithoutStock: protectedProcedure.input(z2.object({ id: z2.number(), allow: z2.boolean() })).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
+      const database = await getDb();
+      if (!database) throw new Error("Database not available");
+      await database.update(digitalProducts).set({ allowManualWithoutStock: input.allow }).where(eq4(digitalProducts.id, input.id));
+      return { success: true };
+    }),
     adminCreate: protectedProcedure.input(z2.object({
       name: z2.string().min(3),
       description: z2.string().optional(),
@@ -3272,7 +3790,7 @@ var appRouter = router({
       const database = await getDb();
       if (!database) throw new Error("Database not available");
       const effectivePrimary = input.pricePrimary !== void 0 && input.pricePrimary !== null ? input.pricePrimary.toString() : !input.priceSecondary ? input.price.toString() : null;
-      return database.update(digitalProducts).set({
+      const result = await database.update(digitalProducts).set({
         name: input.name,
         description: input.description,
         price: input.price.toString(),
@@ -3290,6 +3808,12 @@ var appRouter = router({
         economiaLicenseType: input.economiaLicenseType,
         expiresAt: input.expiresAt !== void 0 ? input.expiresAt ? new Date(input.expiresAt) : null : void 0
       }).where(eq4(digitalProducts.id, input.id));
+      const hasAccounts = await database.execute(sql2`SELECT 1 FROM "digitalProductAccounts" WHERE "digitalProductId" = ${input.id} LIMIT 1`);
+      const hasAccountsRows = Array.isArray(hasAccounts) ? hasAccounts : hasAccounts?.rows ?? [];
+      if (hasAccountsRows.length > 0) {
+        await syncDigitalProductAccountStock(database, input.id);
+      }
+      return result;
     }),
     adminDelete: protectedProcedure.input(z2.number()).mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
@@ -3322,13 +3846,24 @@ var appRouter = router({
         if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
         return listDigitalProductAccounts(input.digitalProductId);
       }),
-      addBulk: protectedProcedure.input(z2.object({ digitalProductId: z2.number(), rawText: z2.string().min(1) })).mutation(async ({ ctx, input }) => {
+      addBulk: protectedProcedure.input(z2.object({ digitalProductId: z2.number(), rawText: z2.string().min(1), accountType: z2.enum(["primaria", "secundaria"]).optional(), quantity: z2.number().int().positive().optional(), consoleOverride: z2.enum(["PS4", "PS5"]).optional() })).mutation(async ({ ctx, input }) => {
         if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
-        return addDigitalProductAccountsBulk(input.digitalProductId, input.rawText);
+        return addDigitalProductAccountsBulk(input.digitalProductId, input.rawText, input.accountType, input.quantity, input.consoleOverride);
       }),
       remove: protectedProcedure.input(z2.object({ id: z2.number() })).mutation(async ({ ctx, input }) => {
         if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
         return removeDigitalProductAccount(input.id);
+      }),
+      updateRemaining: protectedProcedure.input(z2.object({
+        id: z2.number(),
+        remainingPs4: z2.number().int().min(0).optional(),
+        remainingPs5: z2.number().int().min(0).optional(),
+        remainingTotal: z2.number().int().min(0).optional(),
+        remainingSecundaria: z2.number().int().min(0).optional()
+      })).mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
+        const { id, ...updates } = input;
+        return updateDigitalProductAccountRemaining(id, updates);
       })
     })
   }),
@@ -3571,37 +4106,26 @@ var appRouter = router({
       };
     })
   }),
-  // Platinador Club Router
+  // Platinador Club Router — gratuito: comprova platina, admin aprova, entra no ranking.
+  // Sem assinatura/cobrança (removida — ver histórico de commits pra assinatura antiga).
+  // Painel do Suporte: vendas recentes pra quem faz o contato pós-compra. Mostra só o que o
+  // suporte precisa (comprador, telefone, jogo, dados de acesso entregues ao cliente) — nada
+  // de valores, comissão, CPF, pagamento nem códigos de segurança das contas.
+  support: router({
+    listSales: supportProcedure.query(() => getSupportSales()),
+    // Usado pelos painéis (admin e suporte, ambos passam em supportProcedure) pra saber de
+    // venda nova. Ver getSaleAlerts em db.ts.
+    saleAlerts: supportProcedure.input(z2.object({ afterId: z2.number().int().nonnegative().optional() })).query(({ input }) => getSaleAlerts(input.afterId)),
+    markContacted: supportProcedure.input(z2.object({ orderId: z2.number(), contacted: z2.boolean() })).mutation(async ({ input }) => {
+      await setOrderSupportContacted(input.orderId, input.contacted);
+      return { success: true };
+    })
+  }),
   platinador: router({
     getStatus: protectedProcedure.query(async ({ ctx }) => {
-      const database = await getDb();
-      let isSubscribed = false;
-      let subscription = null;
-      let vipWhatsappUrl = "https://chat.whatsapp.com/Gkx7EforteGamesVipClub";
-      if (database) {
-        try {
-          const subs = await database.select().from(platinadorSubscriptions).where(eq4(platinadorSubscriptions.userId, ctx.user.id)).limit(1);
-          if (subs.length > 0 && subs[0].status === "ativa") {
-            const now = /* @__PURE__ */ new Date();
-            if (subs[0].expiresAt && new Date(subs[0].expiresAt) > now) {
-              isSubscribed = true;
-              subscription = subs[0];
-            }
-          }
-          const settings = await database.select().from(platformSettings).where(eq4(platformSettings.id, 1)).limit(1);
-          if (settings.length > 0 && settings[0].vipWhatsappUrl) {
-            vipWhatsappUrl = settings[0].vipWhatsappUrl;
-          }
-        } catch (e) {
-          console.error("[TRPC Platinador] Error fetching status:", e);
-        }
-      }
       return {
-        isSubscribed,
-        subscription,
         psnId: ctx.user.psnId || null,
-        forteCoins: ctx.user.forteCoins || 0,
-        vipWhatsappUrl
+        forteCoins: ctx.user.forteCoins || 0
       };
     }),
     updatePsnId: protectedProcedure.input(z2.object({ psnId: z2.string().min(2) })).mutation(async ({ ctx, input }) => {
@@ -3610,41 +4134,6 @@ var appRouter = router({
         await database.update(users).set({ psnId: input.psnId.trim() }).where(eq4(users.id, ctx.user.id));
       }
       return { success: true, psnId: input.psnId.trim() };
-    }),
-    subscribe: protectedProcedure.mutation(async ({ ctx }) => {
-      const database = await getDb();
-      const now = /* @__PURE__ */ new Date();
-      const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1e3);
-      if (database) {
-        try {
-          const existing = await database.select().from(platinadorSubscriptions).where(eq4(platinadorSubscriptions.userId, ctx.user.id)).limit(1);
-          if (existing.length > 0) {
-            await database.update(platinadorSubscriptions).set({
-              status: "ativa",
-              startsAt: now,
-              expiresAt,
-              paymentId: "PIX_SIMULATED_" + Date.now()
-            }).where(eq4(platinadorSubscriptions.id, existing[0].id));
-          } else {
-            await database.insert(platinadorSubscriptions).values({
-              userId: ctx.user.id,
-              status: "ativa",
-              planName: "Clube Platinador VIP",
-              price: "15.00",
-              startsAt: now,
-              expiresAt,
-              paymentId: "PIX_SIMULATED_" + Date.now()
-            });
-          }
-        } catch (e) {
-          console.error("[TRPC Platinador] Subscribe DB error:", e);
-        }
-      }
-      return {
-        success: true,
-        expiresAt,
-        message: "Assinatura do Clube Platinador ativada com sucesso por 30 dias!"
-      };
     }),
     listChallenges: publicProcedure.query(async () => {
       const database = await getDb();
@@ -4071,6 +4560,27 @@ app.get("/api/inspect-db-url", (req, res) => {
     });
   } catch (e) {
     return res.json({ error: "Invalid URL", message: e.message, length: url.length });
+  }
+});
+app.get("/api/used-product-image/:id/:index", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const index = Number(req.params.index);
+    if (!Number.isInteger(id) || !Number.isInteger(index) || id < 1 || index < 0) {
+      return res.status(400).end();
+    }
+    const dataUri = await getUsedProductInlineImage(id, index);
+    const match = dataUri && /^data:(image\/(?:png|jpe?g|webp|gif));base64,([\s\S]+)$/i.exec(dataUri);
+    if (!match) return res.status(404).end();
+    res.set({
+      "Content-Type": match[1].toLowerCase(),
+      "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400",
+      "X-Content-Type-Options": "nosniff"
+    });
+    return res.send(Buffer.from(match[2], "base64"));
+  } catch (err) {
+    console.error("[used-product-image] erro:", err);
+    return res.status(500).end();
   }
 });
 app.use(
