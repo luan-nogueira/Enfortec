@@ -132,7 +132,7 @@ export default function OrderDeliveredNotifier() {
             </h4>
 
             <p className="text-[11px] text-slate-300 mt-1 leading-snug">
-              Seus dados de acesso já estão disponíveis. Acesse para testar e avaliar o atendimento!
+              Seu jogo está pronto! Seus dados de acesso já estão disponíveis. Nossa equipe de suporte entra em contato em breve pelo WhatsApp para ajudar com o jogo.
             </p>
           </div>
         </div>

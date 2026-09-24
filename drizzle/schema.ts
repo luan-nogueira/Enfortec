@@ -7,7 +7,7 @@ import { relations } from "drizzle-orm";
  */
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
-export const roleEnum = pgEnum("role", ["user", "admin", "vendedor", "collaborator"]);
+export const roleEnum = pgEnum("role", ["user", "admin", "vendedor", "collaborator", "suporte"]);
 export const conditionEnum = pgEnum("condition", ["novo", "como_novo", "bom", "aceitavel"]);
 export const usedStatusEnum = pgEnum("used_status", ["pendente", "aprovado", "rejeitado", "vendido"]);
 export const digitalTypeEnum = pgEnum("digital_type", ["jogo", "gift_card", "licenca", "assinatura", "outro"]);
@@ -207,6 +207,9 @@ export const orders = pgTable("orders", {
   deliveryDetails: text("deliveryDetails"),
   coinsUsed: integer("coinsUsed").default(0).notNull(),
   buyerPhone: varchar("buyerPhone", { length: 30 }),
+  // Quando o Suporte marcou que já falou com o comprador (Painel do Suporte). Null = ainda
+  // não contatado. Serve pra ninguém ligar duas vezes pro mesmo cliente.
+  supportContactedAt: timestamp("supportContactedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => new Date()),
 });

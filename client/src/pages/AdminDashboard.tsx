@@ -3184,6 +3184,24 @@ export default function AdminDashboard() {
     }
   };
 
+  // Cargo "Suporte": vê só o Painel do Suporte (/suporte) — vendas, telefone do cliente e dados
+  // de acesso entregues. Não vê estoque de contas, valores nem consegue mexer em nada do admin.
+  const handleToggleSupport = async (userId: string, currentRole: string) => {
+    const newRole = currentRole === "suporte" ? "user" : "suporte";
+    try {
+      await adminUpdateRoleMutation.mutateAsync({ openId: userId, role: newRole });
+      await updateDoc(doc(db, "users", userId), { role: newRole });
+      toast.success(
+        newRole === "user"
+          ? "Suporte removido. A conta continua ativa normalmente."
+          : "Cargo de Suporte concedido! A pessoa acessa o painel em /suporte (também aparece no menu do perfil dela)."
+      );
+    } catch (error: any) {
+      console.error("Erro ao atualizar papel:", error);
+      toast.error(error?.message || "Erro ao atualizar permissão.");
+    }
+  };
+
   const handleToggleAdmin = async (userId: string, currentRole: string) => {
     if (users.find(u => u.id === userId)?.email === "luanmnogueira@gmail.com") {
       toast.warning("Não é possível alterar o cargo do gestor principal.");
@@ -3222,7 +3240,7 @@ export default function AdminDashboard() {
       
       if (existingUser) {
         // Usuário já existe, apenas promove ele para o novo cargo
-        if (newUserRole === "admin" || newUserRole === "user" || newUserRole === "collaborator") {
+        if (newUserRole === "admin" || newUserRole === "user" || newUserRole === "collaborator" || newUserRole === "suporte") {
           await adminUpdateRoleMutation.mutateAsync({ openId: existingUser.id, role: newUserRole });
         }
         await updateDoc(doc(db, "users", existingUser.id), {
@@ -3253,6 +3271,18 @@ export default function AdminDashboard() {
           role: newUserRole,
           createdAt: new Date().toISOString()
         });
+
+        // O servidor decide o acesso ao Painel do Suporte pelo cargo no Postgres, e a conta
+        // recém-criada ainda não tem linha lá — cria já com o cargo, senão a pessoa entraria
+        // no site e receberia "sem acesso" no painel.
+        if (newUserRole === "suporte") {
+          try {
+            await adminUpdateRoleMutation.mutateAsync({ openId: uid, role: "suporte", email: newUserEmail, name: newUserName });
+          } catch (roleErr) {
+            console.error("Erro ao gravar cargo de suporte no servidor:", roleErr);
+            toast.warning("Conta criada, mas o cargo de Suporte não foi gravado no servidor. Depois que a pessoa entrar, use o botão \"Tornar Suporte\" na lista.");
+          }
+        }
 
         toast.success(`Usuário ${newUserName} criado com sucesso como ${newUserRole}!`);
         setShowCreateModal(false);
@@ -4606,7 +4636,7 @@ export default function AdminDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* Gestores fixos por e-mail (lista do código) podem ter role "user" gravado no Firestore
                   — filtrar só por role deixava o Sandro e o André de fora desta lista. */}
-              {users.filter(u => isTeamAdmin(u) || u.role === 'collaborator').map((u) => (
+              {users.filter(u => isTeamAdmin(u) || u.role === 'collaborator' || u.role === 'suporte').map((u) => (
                 <Card key={u.id} className="bg-slate-900/40 backdrop-blur-md border-red-600/10 p-6 hover:border-red-600/40 hover:shadow-[0_8px_30px_rgb(0,0,0,0.5)] transition-all duration-500 card-neon relative overflow-hidden group">
                   <div className="absolute top-0 right-0 w-24 h-24 bg-red-600/5 rounded-full blur-2xl group-hover:bg-red-600/10 transition-all duration-500" />
                   <div className="flex items-start justify-between mb-4 relative z-10">
@@ -4622,7 +4652,7 @@ export default function AdminDashboard() {
                     {(() => {
                       const displayRole = isTeamAdmin(u) ? 'admin' : u.role;
                       return (
-                        <div className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all duration-300 ${displayRole === 'admin' ? 'bg-red-500/10 text-red-400 border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.15)]' : displayRole === 'collaborator' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.15)]' : 'bg-slate-800/80 text-slate-400 border-slate-700/50'}`}>
+                        <div className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all duration-300 ${displayRole === 'admin' ? 'bg-red-500/10 text-red-400 border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.15)]' : displayRole === 'collaborator' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.15)]' : displayRole === 'suporte' ? 'bg-green-500/10 text-green-400 border-green-500/20 shadow-[0_0_10px_rgba(34,197,94,0.15)]' : 'bg-slate-800/80 text-slate-400 border-slate-700/50'}`}>
                           {displayRole}
                         </div>
                       );
@@ -4688,7 +4718,15 @@ export default function AdminDashboard() {
                           {u.role === 'collaborator' ? <UserCheck className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
                           {u.role === 'collaborator' ? "Remover Colaborador" : "Tornar Colaborador"}
                         </Button>
-                        
+
+                        <Button
+                          onClick={() => handleToggleSupport(u.id, u.role)}
+                          className={`w-full flex items-center justify-center gap-2 font-bold h-10 ${u.role === 'suporte' ? "bg-green-600/20 hover:bg-green-600/30 text-green-400" : "bg-slate-800 hover:bg-slate-700 text-white"}`}
+                        >
+                          {u.role === 'suporte' ? <UserCheck className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
+                          {u.role === 'suporte' ? "Remover Suporte" : "Tornar Suporte"}
+                        </Button>
+
                         <Button 
                           onClick={() => handleToggleAdmin(u.id, u.role)}
                           className={`w-full flex items-center justify-center gap-2 font-bold h-10 ${u.role === 'admin' ? "bg-red-600 hover:bg-red-700 text-white" : "bg-slate-800 hover:bg-slate-700 text-slate-300"}`}
@@ -6521,6 +6559,7 @@ export default function AdminDashboard() {
                 className="w-full bg-slate-950 border border-red-600/20 rounded-md h-10 px-3 text-sm"
               >
                 <option value="collaborator">Colaborador (Gerencia Produtos)</option>
+                <option value="suporte">Suporte (só vê as vendas para contato)</option>
                 <option value="admin">Gestor (Acesso Total)</option>
                 <option value="user">Usuário Comum</option>
               </select>

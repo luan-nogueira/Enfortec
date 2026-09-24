@@ -88,3 +88,87 @@ Equipe Eforte Games`;
     throw error;
   }
 }
+
+/**
+ * E-mail logo após o pagamento confirmado: diz ao cliente que o pedido já foi registrado
+ * sozinho (não precisa mandar comprovante) e que o suporte vai falar com ele. Só é enviado
+ * quando a entrega ainda NÃO aconteceu — na entrega automática o cliente já recebe o e-mail
+ * de dados de acesso, e mandar os dois em sequência seria repetição.
+ */
+export async function sendOrderRegisteredEmail({
+  to,
+  buyerName,
+  orderId,
+  productName,
+  supportWhatsapp,
+}: {
+  to: string;
+  buyerName: string;
+  orderId: number;
+  productName: string;
+  /** Número de suporte (só dígitos, com DDI) configurado no admin. Opcional. */
+  supportWhatsapp?: string | null;
+}) {
+  if (!smtpHost || !smtpUser || !smtpPass) {
+    console.warn("[Email] SMTP is not configured. Skipping order-registered email to:", to);
+    return false;
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpPort === 465,
+    auth: { user: smtpUser, pass: smtpPass },
+    // Sem isso o padrão do nodemailer espera até 2 minutos por um servidor SMTP lento.
+    connectionTimeout: 8000,
+    greetingTimeout: 8000,
+    socketTimeout: 10000,
+  });
+
+  const supportDigits = (supportWhatsapp || "").replace(/\D/g, "");
+  const supportLink = supportDigits
+    ? `https://wa.me/${supportDigits}?text=${encodeURIComponent(`Olá! Fiz o pedido #${orderId} (${productName}) e gostaria de ajuda.`)}`
+    : null;
+
+  const messageText = `Olá, ${buyerName}!
+
+Recebemos o pagamento do seu pedido #${orderId} (${productName}).
+
+Seu pedido já foi registrado automaticamente — você NÃO precisa enviar comprovante.
+Nossa equipe vai preparar a entrega e entrar em contato com você pelo WhatsApp em breve.
+Você também acompanha tudo em "Minhas Compras", no site.
+${supportLink ? `\nPrefere falar agora com o suporte? ${supportLink}\n` : ""}
+Atenciosamente,
+Equipe Eforte Games`;
+
+  const messageHtml = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+      <h2 style="color: #dc143c; margin-top: 0;">✅ Pedido registrado!</h2>
+      <p>Olá, <strong>${buyerName}</strong>,</p>
+      <p>Recebemos o pagamento do seu pedido <strong>#${orderId}</strong> (${productName}).</p>
+      <div style="background-color: #f9f9f9; border-left: 4px solid #dc143c; padding: 15px; margin: 20px 0;">
+        Seu pedido já foi registrado automaticamente — <strong>você não precisa enviar comprovante</strong>.<br><br>
+        Nossa equipe vai preparar a entrega e entrar em contato com você pelo WhatsApp em breve.
+        Você também acompanha tudo em <strong>Minhas Compras</strong>, no site.
+      </div>
+      ${supportLink ? `<p style="text-align:center;"><a href="${supportLink}" style="background:#25d366;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block;">Falar com o suporte no WhatsApp</a></p>` : ""}
+      <hr style="border: 0; border-top: 1px solid #eeeeee; margin: 30px 0;">
+      <p style="font-size: 12px; color: #777777; text-align: center;">Eforte Games — Diversão garantida no seu console</p>
+    </div>
+  `;
+
+  try {
+    const info = await transporter.sendMail({
+      from: smtpFrom,
+      to,
+      subject: `✅ Pedido #${orderId} registrado - Eforte Games`,
+      text: messageText,
+      html: messageHtml,
+    });
+    console.log("[Email] Email de pedido registrado enviado:", info.messageId);
+    return true;
+  } catch (error) {
+    console.error("[Email] Erro ao enviar email de pedido registrado:", error);
+    throw error;
+  }
+}

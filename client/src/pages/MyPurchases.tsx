@@ -13,7 +13,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { getLoginUrl } from "@/const";
-import { Package, Star, AlertCircle, MessageCircle, Clock, Zap } from "lucide-react";
+import { Package, Star, AlertCircle, MessageCircle, Clock, Zap, CheckCircle2 } from "lucide-react";
 import { getStoreStatus } from "@/lib/storeHours";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -152,6 +152,47 @@ export default function MyPurchases() {
                   As mídias digitais compradas fora do horário serão entregues {storeStatus.nextOpeningText} assim que a loja abrir!
                 </p>
               </div>
+            </div>
+          );
+        })()}
+
+        {/* Confirmação pós-compra: o cliente vê na hora que o pedido já foi registrado (e não
+            precisa mandar comprovante), e quem vai falar com ele. */}
+        {(() => {
+          const DAY = 24 * 60 * 60 * 1000;
+          const recent = ((orders as any[]) || [])
+            .filter((o: any) => (o.status === "pago" || o.status === "enviado") && Date.now() - new Date(o.createdAt).getTime() < DAY)
+            .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          if (recent.length === 0) return null;
+          const latest = recent[0];
+          const supportDigits = String(platformSettings?.supportWhatsapp || "").replace(/\D/g, "");
+          const supportLink = supportDigits
+            ? `https://wa.me/${supportDigits}?text=${encodeURIComponent(`Olá! Fiz o pedido #${latest.id} (${latest.productName || "meu pedido"}) e gostaria de ajuda.`)}`
+            : null;
+          return (
+            <div className="mb-6 p-4 bg-emerald-950/30 border border-emerald-500/30 rounded-2xl flex flex-col sm:flex-row sm:items-center gap-3 shadow-lg">
+              <div className="flex items-start gap-3 flex-1">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="text-sm font-black text-emerald-400">Pedido #{latest.id} registrado automaticamente!</h4>
+                  <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                    <strong>Você não precisa enviar comprovante.</strong>{" "}
+                    {latest.status === "pago"
+                      ? "Estamos preparando a sua entrega, ela aparece aqui assim que ficar pronta. Nossa equipe de suporte entra em contato pelo WhatsApp em breve."
+                      : "Seu jogo já está pronto! Nossa equipe de suporte entra em contato pelo WhatsApp em breve para ajudar com o jogo."}
+                  </p>
+                </div>
+              </div>
+              {supportLink && (
+                <a
+                  href={supportLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 inline-flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold text-xs h-10 px-4 rounded-xl"
+                >
+                  <MessageCircle className="w-4 h-4" /> Falar com o suporte
+                </a>
+              )}
             </div>
           );
         })()}

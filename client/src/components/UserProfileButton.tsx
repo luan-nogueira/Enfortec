@@ -14,12 +14,12 @@ import {
 import { auth } from "@/lib/firebase";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { toast } from "sonner";
-import { User, Mail, Lock, KeyRound, LogOut, Loader2, ShieldCheck, Coins, Package, Star, Sparkles } from "lucide-react";
+import { User, Mail, Lock, KeyRound, LogOut, Loader2, ShieldCheck, Coins, Package, Star, Sparkles, Headset } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
 
 export default function UserProfileButton() {
-  const { user, isAuthenticated, logout, isAdmin, isCollaborator } = useAuth();
+  const { user, isAuthenticated, logout, isAdmin, isCollaborator, role } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [, navigate] = useLocation();
@@ -212,6 +212,25 @@ export default function UserProfileButton() {
                 >
                   <ShieldCheck className="w-4 h-4" />
                   Acessar Painel de Controle
+                </Button>
+              </div>
+            )}
+
+            {/* Acesso ao Painel do Suporte (cargo "suporte") */}
+            {role === "suporte" && (
+              <div className="bg-green-950/20 border border-green-500/20 rounded-xl p-3.5 space-y-2 mt-4">
+                <span className="text-[10px] text-green-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                  <Headset className="w-3.5 h-3.5" /> Suporte
+                </span>
+                <Button
+                  onClick={() => {
+                    setIsOpen(false);
+                    navigate("/suporte");
+                  }}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-10 text-xs flex items-center justify-center gap-2"
+                >
+                  <Headset className="w-4 h-4" />
+                  Abrir Painel do Suporte
                 </Button>
               </div>
             )}

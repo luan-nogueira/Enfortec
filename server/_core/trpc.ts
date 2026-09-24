@@ -33,6 +33,20 @@ const requireUser = t.middleware(async opts => {
 
 export const protectedProcedure = t.procedure.use(requireUser);
 
+// Painel do Suporte: cargo "suporte" (uma pessoa que fala com o cliente depois da compra) ou
+// admin. Passa antes por requireUser, então conta banida continua barrada aqui também.
+export const supportProcedure = protectedProcedure.use(
+  t.middleware(async opts => {
+    const { ctx, next } = opts;
+
+    if (!ctx.user || (ctx.user.role !== "admin" && ctx.user.role !== "suporte")) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Apenas suporte ou administradores." });
+    }
+
+    return next({ ctx });
+  }),
+);
+
 export const adminProcedure = t.procedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;

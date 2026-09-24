@@ -33,6 +33,7 @@ const AddUsedProduct = lazy(() => import("./pages/AddUsedProduct"));
 const SellDigitalProduct = lazy(() => import("./pages/SellDigitalProduct"));
 const Login = lazy(() => import("./pages/Login"));
 const CollaboratorDashboard = lazy(() => import("./pages/CollaboratorDashboard"));
+const SupportDashboard = lazy(() => import("./pages/SupportDashboard"));
 const MyPurchases = lazy(() => import("./pages/MyPurchases"));
 const FAQ = lazy(() => import("./pages/FAQ"));
 const TermsFortecoins = lazy(() => import("./pages/TermsFortecoins"));
@@ -79,6 +80,7 @@ function Router() {
         <Route path={"/digital/vender"} component={SellDigitalProduct} />
         <Route path={"/login"} component={Login} />
         <Route path={"/colaborador"} component={CollaboratorDashboard} />
+        <Route path={"/suporte"} component={SupportDashboard} />
         <Route path={"/minhas-compras"} component={MyPurchases} />
         <Route path={"/fortecoins"} component={FortecoinsPage} />
         <Route path={"/termos"} component={TermsFortecoins} />

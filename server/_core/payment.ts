@@ -395,6 +395,9 @@ export function registerPaymentRoute(app: Express) {
           await database.update(usedProducts).set({ status: "vendido" }).where(eq(usedProducts.id, insertValues.usedProductId));
         }
 
+        // Avisa o cliente por e-mail que o pedido foi registrado (só se ainda aguarda entrega).
+        await db.sendOrderRegisteredNotice(database, { orderId: insertedOrder.id, buyerId, productName: productNameStr });
+
         console.log("[Checkout] Compra 100% paga com moedas/cupom registrada com sucesso.");
         return res.json({ success: true, url: null, paidWithCoins: true });
       }
@@ -725,6 +728,9 @@ export function registerPaymentRoute(app: Express) {
           // ficava visível e comprável de novo depois de já vendido.
           await database.update(usedProducts).set({ status: "vendido" }).where(eq(usedProducts.id, insertValues.usedProductId));
         }
+
+        // Avisa o cliente por e-mail que o pedido foi registrado (só se ainda aguarda entrega).
+        await db.sendOrderRegisteredNotice(database, { orderId: insertedOrder.id, buyerId, productName });
 
         console.log(`[Mercado Pago Webhook] Pedido registrado no banco com sucesso (Pagamento #${paymentId}).`);
       }

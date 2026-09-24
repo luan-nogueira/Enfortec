@@ -736,6 +736,53 @@ export async function getAllOrdersWithDetails() {
   return deduplicateOrders(mapped);
 }
 
+/**
+ * Vendas recentes para o Painel do Suporte. Seleciona colunas explícitas de propósito (em vez
+ * de repassar a linha inteira do pedido): o suporte não precisa — e não deve receber — valor
+ * pago, comissão, id de pagamento nem CPF do comprador.
+ */
+export async function getSupportSales(limit = 80) {
+  const db = getDb();
+  if (!db) return [];
+
+  const rows = await db
+    .select({
+      id: orders.id,
+      createdAt: orders.createdAt,
+      status: orders.status,
+      productName: orders.productName,
+      productType: orders.productType,
+      accountType: orders.accountType,
+      buyerPhone: orders.buyerPhone,
+      deliveryDetails: orders.deliveryDetails,
+      supportContactedAt: orders.supportContactedAt,
+      buyerName: users.name,
+      buyerEmail: users.email,
+    })
+    .from(orders)
+    .leftJoin(users, eq(orders.buyerId, users.id))
+    .where(inArray(orders.status, ["pago", "enviado", "entregue"]))
+    .orderBy(desc(orders.createdAt))
+    .limit(limit);
+
+  return rows.map((r) => ({
+    ...r,
+    productName: r.productName && r.productName.trim() !== "" ? r.productName : "Produto",
+    buyerName: r.buyerName || "Sem Nome",
+  }));
+}
+
+export async function setOrderSupportContacted(orderId: number, contacted: boolean) {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+  const updated = await db
+    .update(orders)
+    .set({ supportContactedAt: contacted ? new Date() : null })
+    .where(eq(orders.id, orderId))
+    .returning({ id: orders.id });
+  if (updated.length === 0) throw new Error("Pedido não encontrado");
+}
+
 export async function deliverOrder(orderId: number, deliveryDetails: string) {
   const db = getDb();
   if (!db) throw new Error("Database not available");
@@ -1649,3 +1696,41 @@ export async function getDatabaseStorageStats() {
   }
 }
 
+
+/**
+ * Avisa o comprador, por e-mail, que o pedido foi registrado. Nunca lança erro (uma falha de
+ * e-mail não pode derrubar o registro de uma venda que já foi paga) e só envia se o pedido
+ * ainda está aguardando entrega — se a entrega automática já rodou, o cliente já recebeu o
+ * e-mail com os dados de acesso.
+ */
+export async function sendOrderRegisteredNotice(
+  database: any,
+  params: { orderId: number; buyerId: number; productName: string }
+) {
+  try {
+    const { orderId, buyerId, productName } = params;
+    if (!(buyerId > 0)) return;
+
+    const orderRows = await database.select({ status: orders.status }).from(orders).where(eq(orders.id, orderId)).limit(1);
+    if (orderRows[0]?.status !== "pago") return;
+
+    const buyerRows = await database.select().from(users).where(eq(users.id, buyerId)).limit(1);
+    const buyer = buyerRows[0];
+    if (!buyer?.email) return;
+
+    const settings = await getPlatformSettings();
+    const { sendOrderRegisteredEmail } = await import("./email");
+    await Promise.race([
+      sendOrderRegisteredEmail({
+        to: buyer.email,
+        buyerName: buyer.name || "Cliente",
+        orderId,
+        productName,
+        supportWhatsapp: (settings as any)?.supportWhatsapp ?? null,
+      }),
+      new Promise((resolve) => setTimeout(resolve, 12000)),
+    ]);
+  } catch (err) {
+    console.error("[Email] Falha ao avisar pedido registrado (ignorada):", err);
+  }
+}

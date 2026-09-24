@@ -1,7 +1,7 @@
 import { getSessionCookieOptions } from "./_core/cookies";
 import { COOKIE_NAME } from "@shared/const";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
+import { publicProcedure, router, protectedProcedure, supportProcedure } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
 import { getDb } from "./db";
@@ -136,7 +136,11 @@ export const appRouter = router({
     adminUpdateRole: protectedProcedure
       .input(z.object({
         openId: z.string(),
-        role: z.enum(["user", "admin", "vendedor", "collaborator"]),
+        role: z.enum(["user", "admin", "vendedor", "collaborator", "suporte"]),
+        // Só usados quando a conta acabou de ser criada no Firebase e ainda não entrou no site
+        // (logo, ainda não existe linha dela no Postgres): permite já nascer com o cargo certo.
+        email: z.string().email().optional(),
+        name: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem alterar permissões." });
@@ -144,7 +148,18 @@ export const appRouter = router({
         const database = await getDb();
         if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indisponível." });
 
-        const targetUser = await db.getUserByOpenId(input.openId);
+        let targetUser = await db.getUserByOpenId(input.openId);
+        if (!targetUser && input.email) {
+          await db.upsertUser({
+            openId: input.openId,
+            email: input.email.toLowerCase().trim(),
+            name: input.name?.trim() || input.email.split("@")[0],
+            loginMethod: "firebase",
+            role: input.role,
+            lastSignedIn: new Date(),
+          });
+          targetUser = await db.getUserByOpenId(input.openId);
+        }
         if (!targetUser) throw new TRPCError({ code: "NOT_FOUND", message: "Usuário não encontrado no banco de dados." });
 
         await database.update(users).set({ role: input.role }).where(eq(users.id, targetUser.id));
@@ -1016,6 +1031,19 @@ export const appRouter = router({
 
   // Platinador Club Router — gratuito: comprova platina, admin aprova, entra no ranking.
   // Sem assinatura/cobrança (removida — ver histórico de commits pra assinatura antiga).
+  // Painel do Suporte: vendas recentes pra quem faz o contato pós-compra. Mostra só o que o
+  // suporte precisa (comprador, telefone, jogo, dados de acesso entregues ao cliente) — nada
+  // de valores, comissão, CPF, pagamento nem códigos de segurança das contas.
+  support: router({
+    listSales: supportProcedure.query(() => db.getSupportSales()),
+    markContacted: supportProcedure
+      .input(z.object({ orderId: z.number(), contacted: z.boolean() }))
+      .mutation(async ({ input }) => {
+        await db.setOrderSupportContacted(input.orderId, input.contacted);
+        return { success: true };
+      }),
+  }),
+
   platinador: router({
     getStatus: protectedProcedure.query(async ({ ctx }) => {
       return {
