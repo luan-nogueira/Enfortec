@@ -319,13 +319,23 @@ export async function getApprovedUsedProducts() {
       product: usedProducts,
       sellerName: users.name,
       sellerOpenId: users.openId,
+      sellerRole: users.role,
     })
     .from(usedProducts)
     .leftJoin(sellers, eq(usedProducts.sellerId, sellers.id))
     .leftJoin(users, eq(sellers.userId, users.id))
     .where(eq(usedProducts.status, 'aprovado'))
     .orderBy(desc(usedProducts.createdAt));
-  return rows.map((r) => ({ ...withLightImages(r.product), sellerName: r.sellerName, sellerOpenId: r.sellerOpenId }));
+  // sellerIsAdmin: anúncio da própria equipe (André/Sandro/etc.) x de vendedor da comunidade.
+  // A tela usa isso pra decidir pra quem vai a pechincha: equipe -> WhatsApp dos atendentes;
+  // comunidade -> chat interno com o dono do anúncio. Só o boolean vai pro navegador, nunca
+  // o cargo/e-mail do vendedor.
+  return rows.map((r) => ({
+    ...withLightImages(r.product),
+    sellerName: r.sellerName,
+    sellerOpenId: r.sellerOpenId,
+    sellerIsAdmin: r.sellerRole === "admin",
+  }));
 }
 
 export async function getUsedProductsBySellerId(sellerId: number) {

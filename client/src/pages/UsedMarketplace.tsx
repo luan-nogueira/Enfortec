@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { isValidWhatsApp } from "@/lib/utils";
 import { WA_ATTENDANTS } from "@/lib/waAttendants";
+import { sendSellerChatMessage, sellerThreadId } from "@/lib/sellerChat";
 import {
   Dialog,
   DialogContent,
@@ -199,12 +200,62 @@ export default function UsedMarketplace() {
     setBargainOffer("");
   };
 
+  const buildBargainMessage = () => {
+    const price = parseFloat(selectedBargainProduct?.price || 0);
+    return `Olá! Tenho interesse no produto usado: ${selectedBargainProduct?.name} anunciado por ${selectedBargainProduct?.sellerName || "vendedor"} (Preço original: R$ ${price.toFixed(2).replace('.', ',')}). Gostaria de pechinchar: você fecharia por R$ ${parseFloat(bargainOffer).toFixed(2).replace('.', ',')}?`;
+  };
+
+  // Anúncio da própria equipe (André/Sandro/...): a pechincha vai pro WhatsApp do atendente.
   const handleFinalizeBargain = (attendantNumber: string) => {
     if (!selectedBargainProduct || !bargainOffer.trim()) return;
-    const price = parseFloat(selectedBargainProduct.price || 0);
-    const message = `Olá! Tenho interesse no produto usado: ${selectedBargainProduct.name} anunciado por ${selectedBargainProduct.sellerName || "vendedor"} (Preço original: R$ ${price.toFixed(2).replace('.', ',')}). Gostaria de pechinchar: você fecharia por R$ ${parseFloat(bargainOffer).toFixed(2).replace('.', ',')}?`;
-    window.open(`https://wa.me/${attendantNumber}?text=${encodeURIComponent(message)}`, "_blank");
+    window.open(`https://wa.me/${attendantNumber}?text=${encodeURIComponent(buildBargainMessage())}`, "_blank");
     setSelectedBargainProduct(null);
+  };
+
+  // Anúncio de vendedor da comunidade: a proposta tem que ir pro DONO do anúncio, não pra
+  // equipe. Vai pelo chat interno (mesmo "Vendedor" do card), então o vendedor recebe no
+  // painel dele e o telefone de ninguém é exposto — negociar por fora da plataforma tira a
+  // garantia do escrow.
+  const [sendingBargain, setSendingBargain] = useState(false);
+  const handleSendBargainToSeller = async () => {
+    const product = selectedBargainProduct;
+    if (!product || !bargainOffer.trim() || sendingBargain) return;
+    if (!isAuthenticated || !user?.id) {
+      toast.error("Faça login para enviar a proposta ao vendedor.");
+      navigate("/login");
+      return;
+    }
+    if (user.id === product.sellerOpenId) {
+      toast.info("Este anúncio é seu. As propostas dos compradores ficam no Painel do Vendedor.");
+      return;
+    }
+    setSendingBargain(true);
+    try {
+      await sendSellerChatMessage({
+        threadId: sellerThreadId(product.sellerOpenId, product.id, user.id),
+        text: buildBargainMessage(),
+        senderId: user.id,
+        senderName: user.name || "Cliente",
+        senderRole: "buyer",
+        thread: {
+          productId: String(product.id),
+          productName: product.name,
+          sellerId: product.sellerOpenId,
+          sellerName: product.sellerName || "Vendedor",
+          buyerId: user.id,
+          buyerName: user.name || "Cliente",
+          buyerEmail: user.email || "",
+          participants: [user.id, product.sellerOpenId],
+        },
+      });
+      toast.success(`Proposta enviada para ${product.sellerName || "o vendedor"}! A resposta aparece no botão "Vendedor" deste anúncio.`);
+      setSelectedBargainProduct(null);
+    } catch (err: any) {
+      console.error("[Pechincha] Erro ao enviar proposta ao vendedor:", err);
+      toast.error(err?.message || "Erro ao enviar a proposta. Tente novamente.");
+    } finally {
+      setSendingBargain(false);
+    }
   };
 
   const handleBuyClick = (product: any) => {
@@ -922,20 +973,38 @@ export default function UsedMarketplace() {
           </div>
 
           <DialogFooter className="pb-4 sm:pb-0 flex-col gap-2">
-            <label className="text-xs font-bold text-slate-400 uppercase tracking-wide self-start">Enviar proposta para:</label>
-            <div className="grid grid-cols-2 gap-2 w-full">
-              {WA_ATTENDANTS.map(att => (
+            {selectedBargainProduct && !selectedBargainProduct.sellerIsAdmin && selectedBargainProduct.sellerOpenId ? (
+              <>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wide self-start">
+                  Enviar proposta para o vendedor:
+                </label>
                 <Button
-                  key={att.name}
-                  disabled={!bargainOffer.trim()}
-                  onClick={() => handleFinalizeBargain(att.number)}
+                  disabled={!bargainOffer.trim() || sendingBargain}
+                  onClick={handleSendBargainToSeller}
                   className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-12 rounded-xl shadow-lg shadow-green-600/20 flex items-center justify-center gap-2"
                 >
-                  <span className={`w-6 h-6 rounded-full ${att.color} flex items-center justify-center text-[10px] font-black shrink-0`}>{att.avatar}</span>
-                  {att.name}
+                  <MessageCircle className="w-4 h-4" />
+                  {sendingBargain ? "Enviando..." : `Enviar para ${selectedBargainProduct.sellerName || "o vendedor"}`}
                 </Button>
-              ))}
-            </div>
+              </>
+            ) : (
+              <>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wide self-start">Enviar proposta para:</label>
+                <div className="grid grid-cols-2 gap-2 w-full">
+                  {WA_ATTENDANTS.map(att => (
+                    <Button
+                      key={att.name}
+                      disabled={!bargainOffer.trim()}
+                      onClick={() => handleFinalizeBargain(att.number)}
+                      className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-12 rounded-xl shadow-lg shadow-green-600/20 flex items-center justify-center gap-2"
+                    >
+                      <span className={`w-6 h-6 rounded-full ${att.color} flex items-center justify-center text-[10px] font-black shrink-0`}>{att.avatar}</span>
+                      {att.name}
+                    </Button>
+                  ))}
+                </div>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
