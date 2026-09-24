@@ -1,14 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import UserProfileButton from "@/components/UserProfileButton";
-import {
-  getNotificationPermission,
-  notifyAdmin,
-  requestNotificationPermission,
-} from "@/lib/soundAndNotifications";
+import { getNotificationPermission, requestNotificationPermission } from "@/lib/soundAndNotifications";
+import { announceNewSales, useSaleAlerts } from "@/lib/useSaleAlerts";
 import { ArrowLeft, Bell, BellOff, Check, Copy, Headset, MessageCircle, Phone, ShieldAlert, Volume2, VolumeX } from "lucide-react";
 import { toast } from "sonner";
 
@@ -52,7 +49,6 @@ export default function SupportDashboard() {
     }
   });
   const [permission, setPermission] = useState(getNotificationPermission());
-  const seenIdsRef = useRef<Set<number> | null>(null);
 
   useEffect(() => {
     if (!loading && !isAuthenticated) navigate("/login");
@@ -61,8 +57,10 @@ export default function SupportDashboard() {
   const salesQuery = trpc.support.listSales.useQuery(undefined, {
     enabled: isAuthenticated,
     retry: false,
-    // Só consulta com a aba visível (poupa o banco) e ao voltar pra aba na hora.
-    refetchInterval: () => (typeof document !== "undefined" && !document.hidden ? 45000 : false),
+    // A lista pesa ~50 KB, então quem avisa de venda nova é o useSaleAlerts (consulta de poucos
+    // bytes a cada ~25s), que manda recarregar esta lista quando entra pedido. Aqui só uma
+    // atualização de segurança a cada 5 min (aba visível) e ao voltar pra aba.
+    refetchInterval: () => (typeof document !== "undefined" && !document.hidden ? 300000 : false),
     refetchOnWindowFocus: true,
   });
   const markContacted = trpc.support.markContacted.useMutation({
@@ -72,27 +70,17 @@ export default function SupportDashboard() {
 
   const sales = (salesQuery.data || []) as any[];
 
-  // Aviso (som + pop-up) de venda nova. Na primeira carga só registra o que já existe.
-  useEffect(() => {
-    if (!salesQuery.data) return;
-    const ids = new Set(sales.map((s) => s.id as number));
-    if (seenIdsRef.current === null) {
-      seenIdsRef.current = ids;
-      return;
-    }
-    const fresh = sales.filter((s) => !seenIdsRef.current!.has(s.id));
-    fresh.forEach((s) => {
-      notifyAdmin({
-        title: `🛒 Nova venda #${s.id}`,
-        body: `${s.buyerName} • ${s.productName}`,
-        tag: `support_${s.id}`,
-        onClickUrl: "/suporte",
-        actionLabel: "Ver",
-        playSound: soundEnabled,
-      });
-    });
-    seenIdsRef.current = ids;
-  }, [salesQuery.data]);
+  const forbidden = (salesQuery.error as any)?.data?.code === "FORBIDDEN";
+
+  // Aviso (som + pop-up) de venda nova, por número de pedido (não por status: a entrega
+  // automática já deixa o pedido "enviado" em ~1s). Recarrega a lista quando entra venda.
+  useSaleAlerts({
+    enabled: isAuthenticated && !forbidden,
+    onNewSales: (newSales) => {
+      salesQuery.refetch();
+      announceNewSales(newSales, { playSound: soundEnabled, onClickUrl: "/suporte" });
+    },
+  });
 
   const toggleSound = () => {
     const next = !soundEnabled;
@@ -123,8 +111,6 @@ export default function SupportDashboard() {
       toast.error("Não foi possível copiar.");
     }
   };
-
-  const forbidden = (salesQuery.error as any)?.data?.code === "FORBIDDEN";
 
   return (
     <div className="min-h-screen bg-slate-950 text-white pb-24">
@@ -190,7 +176,7 @@ export default function SupportDashboard() {
             </div>
 
             <p className="text-[11px] text-slate-500">
-              Os avisos de venda nova só tocam com esta página aberta no navegador. Atualiza sozinha a cada 45 segundos.
+              Os avisos de venda nova só tocam com esta página aberta no navegador (ela confere a cada ~25 segundos). Se você ficar fora, ao voltar aparece um resumo das vendas que entraram.
             </p>
 
             {salesQuery.isLoading ? (

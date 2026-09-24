@@ -1036,6 +1036,11 @@ export const appRouter = router({
   // de valores, comissão, CPF, pagamento nem códigos de segurança das contas.
   support: router({
     listSales: supportProcedure.query(() => db.getSupportSales()),
+    // Usado pelos painéis (admin e suporte, ambos passam em supportProcedure) pra saber de
+    // venda nova. Ver getSaleAlerts em db.ts.
+    saleAlerts: supportProcedure
+      .input(z.object({ afterId: z.number().int().nonnegative().optional() }))
+      .query(({ input }) => db.getSaleAlerts(input.afterId)),
     markContacted: supportProcedure
       .input(z.object({ orderId: z.number(), contacted: z.boolean() }))
       .mutation(async ({ input }) => {

@@ -4,6 +4,7 @@ import { firebaseConfig } from "@/lib/firebase";
 import { useAuth, isAdminEmail } from "@/_core/hooks/useAuth";
 import AdminTeamChat from "@/components/AdminTeamChat";
 import { isTeamAdmin, isThreadUnread, useTeamChatThreads } from "@/lib/teamChat";
+import { announceNewSales, useSaleAlerts } from "@/lib/useSaleAlerts";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { db, storage } from "@/lib/firebase";
@@ -1391,8 +1392,12 @@ export default function AdminDashboard() {
 
   const { data: sales, isLoading: loadingSales, refetch: refetchSales } = trpc.orders.listAll.useQuery(undefined, {
     enabled: isAuthenticated && isAdmin,
-    // Otimização Neon: Só atualiza automaticamente a cada 60s se a aba estiver visível/em foco
-    refetchInterval: () => (typeof document !== "undefined" && !document.hidden ? 60000 : false),
+    // Otimização Neon: esta lista pesa ~80 KB por consulta, então ela NÃO é mais o que avisa de
+    // venda nova (isso agora é o useSaleAlerts, com uma consulta de poucos bytes a cada ~25s,
+    // que manda recarregar esta lista quando entra pedido). Aqui fica só uma atualização de
+    // segurança a cada 5 min, com a aba visível, pra refletir mudanças de status feitas por
+    // outra pessoa. Antes eram 60s: ~48 MB/dia por painel aberto.
+    refetchInterval: () => (typeof document !== "undefined" && !document.hidden ? 300000 : false),
     // refetchOnWindowFocus é desligado globalmente (client/src/main.tsx) pra não reconsultar
     // o banco toda hora que o admin troca de aba — mas aqui é justamente o feed de "novo
     // pedido" que ele fica de olho, então reativamos só pra essa query: sem isso, ele podia
@@ -2769,7 +2774,9 @@ export default function AdminDashboard() {
       return;
     }
 
-    const newOnes = notificationFeed.filter(n => n.status === "pendente" && n.category !== "mensagem" && !seenNotifIdsRef.current!.has(n.id));
+    // "pedido" fica de fora: venda nova agora é avisada pelo useSaleAlerts (por número do
+    // pedido, não por status). Manter aqui também avisaria duas vezes as vendas de entrega manual.
+    const newOnes = notificationFeed.filter(n => n.status === "pendente" && n.category !== "mensagem" && n.category !== "pedido" && !seenNotifIdsRef.current!.has(n.id));
     newOnes.forEach(n => {
       notifyAdmin({
         title: n.title,
@@ -2784,6 +2791,21 @@ export default function AdminDashboard() {
 
     seenNotifIdsRef.current = new Set(pendingIds);
   }, [notificationFeed, notifSoundEnabled]);
+
+  // Aviso de VENDA NOVA (som + pop-up + toast). Por número de pedido, não por status: com a
+  // entrega automática o pedido vira "enviado" em ~1s, e o alerta antigo (que olhava "pago")
+  // nunca via a venda. Ao chegar venda, recarrega a lista de vendas do painel.
+  useSaleAlerts({
+    enabled: isAuthenticated && isAdmin,
+    onNewSales: (newSales) => {
+      refetchSales();
+      announceNewSales(newSales, {
+        playSound: notifSoundEnabled,
+        onClickUrl: "/admin?tab=vendas",
+        onAction: () => setActiveTab("vendas"),
+      });
+    },
+  });
 
   // Chat interno entre gestores: conversas, contagem de não lidas e aviso de mensagem nova.
   const teamThreads = useTeamChatThreads(isAuthenticated && isAdmin);

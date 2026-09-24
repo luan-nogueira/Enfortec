@@ -1,4 +1,4 @@
-import { eq, and, or, lte, desc, sql, inArray, like, lt } from "drizzle-orm";
+import { eq, and, or, lte, desc, asc, gt, sql, inArray, like, lt } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
@@ -770,6 +770,54 @@ export async function getSupportSales(limit = 80) {
     productName: r.productName && r.productName.trim() !== "" ? r.productName : "Produto",
     buyerName: r.buyerName || "Sem Nome",
   }));
+}
+
+/**
+ * "Tem venda nova?" — consulta minúscula pros painéis (admin e suporte) avisarem de venda nova
+ * SEM baixar a lista inteira de pedidos toda hora (a lista do admin pesa ~80 KB; isso aqui
+ * devolve poucos bytes quando não há nada novo).
+ *
+ * Detecta por número do pedido, NÃO por status: com a entrega automática o pedido vira
+ * "enviado" cerca de 1 segundo depois de pago, então um alerta baseado em "pago" nunca via a
+ * venda. Sem `afterId` só devolve o último número (base de comparação, sem avisar nada).
+ */
+export async function getSaleAlerts(afterId?: number) {
+  const db = getDb();
+  if (!db) return { latestId: 0, sales: [] as { id: number; createdAt: Date; status: string | null; productName: string; buyerName: string }[] };
+
+  const statuses = ["pago", "enviado", "entregue"] as const;
+  const latestRows = await db
+    .select({ id: orders.id })
+    .from(orders)
+    .where(inArray(orders.status, [...statuses]))
+    .orderBy(desc(orders.id))
+    .limit(1);
+  const latestId = latestRows[0]?.id ?? 0;
+
+  if (afterId === undefined || latestId <= afterId) return { latestId, sales: [] };
+
+  const rows = await db
+    .select({
+      id: orders.id,
+      createdAt: orders.createdAt,
+      status: orders.status,
+      productName: orders.productName,
+      buyerName: users.name,
+    })
+    .from(orders)
+    .leftJoin(users, eq(orders.buyerId, users.id))
+    .where(and(inArray(orders.status, [...statuses]), gt(orders.id, afterId)))
+    .orderBy(asc(orders.id))
+    .limit(20);
+
+  return {
+    latestId,
+    sales: rows.map((r) => ({
+      ...r,
+      productName: r.productName && r.productName.trim() !== "" ? r.productName : "Produto",
+      buyerName: r.buyerName || "Cliente",
+    })),
+  };
 }
 
 export async function setOrderSupportContacted(orderId: number, contacted: boolean) {
