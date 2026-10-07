@@ -1658,14 +1658,13 @@ export default function AdminDashboard() {
     },
     onError: (err: any) => toast.error(err.message || "Erro ao remover conta."),
   });
-  // Editar quanto uma conta já cadastrada ainda pode vender — pra quando ela já teve
-  // pelo menos 1 venda e por isso não pode mais ser removida (só corrige a cota, sem
+  // Editar quanto uma conta já cadastrada ainda pode vender (só corrige a cota, sem
   // apagar a linha nem mexer no que já foi entregue).
   const [editingAccountId, setEditingAccountId] = useState<number | null>(null);
   const [editRemaining, setEditRemaining] = useState<{ ps4: number | ""; ps5: number | ""; total: number | ""; secundaria: number | "" }>({ ps4: "", ps5: "", total: "", secundaria: "" });
   const updateRemainingMutation = trpc.digitalProducts.accounts.updateRemaining.useMutation({
-    onSuccess: () => {
-      toast.success("Cota da conta atualizada.");
+    onSuccess: (data: any) => {
+      toast.success(data.removed ? "Conta removida do estoque." : "Cota da conta atualizada.");
       setEditingAccountId(null);
       accountsListQuery.refetch();
       accountsSummaryQuery.refetch();

@@ -1546,10 +1546,21 @@ async function removeDigitalProductAccount(id) {
   if (!account) throw new Error("Conta n\xE3o encontrada");
   const isQuota = account.capPrimariaTotal > 0 || account.capSecundaria > 0;
   const usedUnits = account.usedPrimariaPs4 + account.usedPrimariaPs5 + account.usedSecundaria;
-  if (isQuota ? usedUnits > 0 : account.status !== "disponivel") {
+  if (!isQuota && account.status !== "disponivel") {
     throw new Error("Essa conta j\xE1 foi entregue em um pedido e n\xE3o pode ser removida");
   }
-  await database.delete(digitalProductAccounts).where(eq(digitalProductAccounts.id, id));
+  if (isQuota && usedUnits > 0) {
+    await database.execute(sql`
+      UPDATE "digitalProductAccounts"
+      SET "capPrimariaPs4" = "usedPrimariaPs4",
+          "capPrimariaPs5" = "usedPrimariaPs5",
+          "capPrimariaTotal" = "usedPrimariaPs4" + "usedPrimariaPs5",
+          "capSecundaria" = "usedSecundaria"
+      WHERE id = ${id}
+    `);
+  } else {
+    await database.delete(digitalProductAccounts).where(eq(digitalProductAccounts.id, id));
+  }
   const remaining = await syncDigitalProductAccountStock(database, account.digitalProductId);
   return { available: remaining };
 }
@@ -1564,11 +1575,18 @@ async function updateDigitalProductAccountRemaining(id, updates) {
   if (updates.remainingPs5 !== void 0) sets.capPrimariaPs5 = account.usedPrimariaPs5 + Math.max(0, updates.remainingPs5);
   if (updates.remainingTotal !== void 0) sets.capPrimariaTotal = account.usedPrimariaPs4 + account.usedPrimariaPs5 + Math.max(0, updates.remainingTotal);
   if (updates.remainingSecundaria !== void 0) sets.capSecundaria = account.usedSecundaria + Math.max(0, updates.remainingSecundaria);
-  if (Object.keys(sets).length > 0) {
+  const wasQuota = account.capPrimariaTotal > 0 || account.capSecundaria > 0;
+  const usedUnits = account.usedPrimariaPs4 + account.usedPrimariaPs5 + account.usedSecundaria;
+  const nextCapPrimariaTotal = sets.capPrimariaTotal ?? account.capPrimariaTotal;
+  const nextCapSecundaria = sets.capSecundaria ?? account.capSecundaria;
+  const removed = wasQuota && usedUnits === 0 && nextCapPrimariaTotal === 0 && nextCapSecundaria === 0;
+  if (removed) {
+    await database.delete(digitalProductAccounts).where(eq(digitalProductAccounts.id, id));
+  } else if (Object.keys(sets).length > 0) {
     await database.update(digitalProductAccounts).set(sets).where(eq(digitalProductAccounts.id, id));
   }
   const remaining = await syncDigitalProductAccountStock(database, account.digitalProductId);
-  return { available: remaining };
+  return { available: remaining, removed };
 }
 async function getCouponByCode(code) {
   const db = getDb();

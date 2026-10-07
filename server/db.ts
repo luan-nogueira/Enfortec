@@ -1377,7 +1377,13 @@ export async function addDigitalProductAccountsBulk(digitalProductId: number, ra
   return { inserted: newRows.length, updated: updateRows.length, skipped, available: remaining };
 }
 
-/** Remove uma conta ainda não entregue (contas já usadas em um pedido ficam preservadas). */
+/**
+ * Tira uma conta do estoque. Conta que nunca vendeu é apagada de verdade; conta de cota
+ * que já teve venda mas ainda tem saldo (André pediu isso: não conseguia remover uma
+ * conta com saldo só porque ela já tinha vendido uma vez) não é apagada — só tem o saldo
+ * restante zerado, pra sair da lista de disponíveis e parar de vender sem perder a
+ * contagem de "já vendidas" do jogo.
+ */
 export async function removeDigitalProductAccount(id: number) {
   const database = getDb();
   if (!database) throw new Error("Database not available");
@@ -1387,20 +1393,32 @@ export async function removeDigitalProductAccount(id: number) {
   if (!account) throw new Error("Conta não encontrada");
   const isQuota = account.capPrimariaTotal > 0 || account.capSecundaria > 0;
   const usedUnits = account.usedPrimariaPs4 + account.usedPrimariaPs5 + account.usedSecundaria;
-  if (isQuota ? usedUnits > 0 : account.status !== "disponivel") {
+  if (!isQuota && account.status !== "disponivel") {
     throw new Error("Essa conta já foi entregue em um pedido e não pode ser removida");
   }
 
-  await database.delete(digitalProductAccounts).where(eq(digitalProductAccounts.id, id));
+  if (isQuota && usedUnits > 0) {
+    // cap = used direto no banco (não com os valores lidos acima), pra uma venda que
+    // caia bem nesse instante não deixar a conta com saldo de novo.
+    await database.execute(sql`
+      UPDATE "digitalProductAccounts"
+      SET "capPrimariaPs4" = "usedPrimariaPs4",
+          "capPrimariaPs5" = "usedPrimariaPs5",
+          "capPrimariaTotal" = "usedPrimariaPs4" + "usedPrimariaPs5",
+          "capSecundaria" = "usedSecundaria"
+      WHERE id = ${id}
+    `);
+  } else {
+    await database.delete(digitalProductAccounts).where(eq(digitalProductAccounts.id, id));
+  }
   const remaining = await syncDigitalProductAccountStock(database, account.digitalProductId);
   return { available: remaining };
 }
 
 /**
  * Ajusta quanto uma conta já cadastrada AINDA pode vender, sem apagar a linha nem mexer
- * no que já foi vendido — resolve o caso de uma conta já usada uma vez que não pode ser
- * removida (André pediu isso: queria corrigir a cota de uma conta que já tinha 1 venda,
- * mas o botão de remover trava contas com histórico de uso, e com razão).
+ * no que já foi vendido (André pediu isso: queria corrigir a cota de uma conta que já
+ * tinha 1 venda, sem ter que tirar a conta inteira do estoque).
  * Cada campo recebido é "quanto ainda falta vender" daquele tipo — a função soma o que já
  * foi usado por baixo dos panos e grava o total (cap) resultante, então o admin edita
  * pensando exatamente nos mesmos números que a tela já mostra (os "remaining").
@@ -1419,11 +1437,23 @@ export async function updateDigitalProductAccountRemaining(id: number, updates: 
   if (updates.remainingTotal !== undefined) sets.capPrimariaTotal = account.usedPrimariaPs4 + account.usedPrimariaPs5 + Math.max(0, updates.remainingTotal);
   if (updates.remainingSecundaria !== undefined) sets.capSecundaria = account.usedSecundaria + Math.max(0, updates.remainingSecundaria);
 
-  if (Object.keys(sets).length > 0) {
+  // Conta de cota que nunca vendeu e teve o saldo todo zerado: com capPrimariaTotal e
+  // capSecundaria em 0 ela passaria a ser lida como conta do modelo antigo (uso único,
+  // status 'disponivel') e continuaria contando como 1 venda disponível — e seria
+  // entregue no próximo pedido. Então sai do estoque de vez, igual ao botão de remover.
+  const wasQuota = account.capPrimariaTotal > 0 || account.capSecundaria > 0;
+  const usedUnits = account.usedPrimariaPs4 + account.usedPrimariaPs5 + account.usedSecundaria;
+  const nextCapPrimariaTotal = sets.capPrimariaTotal ?? account.capPrimariaTotal;
+  const nextCapSecundaria = sets.capSecundaria ?? account.capSecundaria;
+  const removed = wasQuota && usedUnits === 0 && nextCapPrimariaTotal === 0 && nextCapSecundaria === 0;
+
+  if (removed) {
+    await database.delete(digitalProductAccounts).where(eq(digitalProductAccounts.id, id));
+  } else if (Object.keys(sets).length > 0) {
     await database.update(digitalProductAccounts).set(sets).where(eq(digitalProductAccounts.id, id));
   }
   const remaining = await syncDigitalProductAccountStock(database, account.digitalProductId);
-  return { available: remaining };
+  return { available: remaining, removed };
 }
 
 // Coupons queries
