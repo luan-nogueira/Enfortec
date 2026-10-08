@@ -668,6 +668,28 @@ export const appRouter = router({
 
         return result;
       }),
+    // Troca só o preço de um jogo já cadastrado (Cadastro em Lote: jogo da lista que já
+    // está no site com outro preço). Não passa pelo adminUpdate porque ele regrava o
+    // cadastro inteiro e, recebendo só o preço, cairia nos padrões de estoque/ativo.
+    adminUpdatePrice: protectedProcedure
+      .input(z.object({ id: z.number(), price: z.number().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+
+        const [product] = await database.select().from(digitalProducts).where(eq(digitalProducts.id, input.id)).limit(1);
+        if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Jogo não encontrado" });
+
+        // Jogo só de secundária (sem preço de primária): o preço dele é o da secundária —
+        // mesma regra do formulário de jogo, onde "price" acompanha o preço que existir.
+        const newPrice = input.price.toString();
+        const isSecondaryOnly = !product.pricePrimary && !!product.priceSecondary && parseFloat(product.priceSecondary) > 0;
+        await database.update(digitalProducts)
+          .set(isSecondaryOnly ? { price: newPrice, priceSecondary: newPrice } : { price: newPrice, pricePrimary: newPrice })
+          .where(eq(digitalProducts.id, input.id));
+        return { success: true };
+      }),
     adminDelete: protectedProcedure
       .input(z.number())
       .mutation(async ({ ctx, input }) => {

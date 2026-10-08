@@ -1985,6 +1985,13 @@ export default function AdminDashboard() {
   const [isProcessingBatchSearch, setIsProcessingBatchSearch] = useState(false);
   const [isSavingBatch, setIsSavingBatch] = useState(false);
   const [batchSaveProgress, setBatchSaveProgress] = useState(0);
+  // Jogos da lista colada que já estão no site: não entram de novo no cadastro, e uma
+  // janela avisa quais são — se o preço da lista for diferente do preço do site, ela
+  // pergunta se é pra atualizar (cada linha = um jogo do site que bateu com a lista).
+  const [showBatchExistingModal, setShowBatchExistingModal] = useState(false);
+  const [batchExistingRows, setBatchExistingRows] = useState<any[]>([]);
+  const [isUpdatingBatchPrices, setIsUpdatingBatchPrices] = useState(false);
+  const batchUpdatePriceMutation = trpc.digitalProducts.adminUpdatePrice.useMutation();
 
   const handleProcessBatchText = () => {
     if (!batchRawText.trim()) {
@@ -2053,6 +2060,9 @@ export default function AdminDashboard() {
       let priceSecondary: number | null = null;
       let platform = "PS4/PS5";
       let stock = 999;
+      // Linha sem preço cai no valor padrão (33,30) só pra ter o que cadastrar — não é um
+      // preço que o admin digitou, então não pode ser comparado com o preço do site.
+      let usedDefaultPrice = false;
 
       // Caso A: Se a linha contiver ponto e vírgula, tratamos como delimitador clássico
       if (text.includes(";")) {
@@ -2124,6 +2134,7 @@ export default function AdminDashboard() {
         if (price === 0) {
           price = 33.30;
           pricePrimary = 33.30;
+          usedDefaultPrice = true;
         }
       }
 
@@ -2133,6 +2144,7 @@ export default function AdminDashboard() {
           name,
           price: isNaN(price) ? 33.30 : price,
           pricePrimary: isNaN(pricePrimary) ? 33.30 : pricePrimary,
+          hasListPrice: !usedDefaultPrice && !isNaN(pricePrimary) && pricePrimary > 0,
           priceSecondary: priceSecondary,
           platform: platform || "PS4/PS5",
           stock: isNaN(stock) ? 999 : stock,
@@ -2143,8 +2155,8 @@ export default function AdminDashboard() {
       }
     });
 
-    // Marca jogos que já existem no catálogo (comparação por nome normalizado, ignorando
-    // acentos/plataforma/maiúsculas) pra não duplicar o mesmo jogo cadastrado sem querer.
+    // Separa da lista os jogos que já existem no catálogo (comparação por nome normalizado,
+    // ignorando acentos/plataforma/maiúsculas) pra não duplicar o mesmo jogo sem querer.
     const normalizeGameName = (n: string) => {
       const noAccents = (n || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
       return noAccents
@@ -2153,22 +2165,120 @@ export default function AdminDashboard() {
         .trim();
     };
 
-    const existingNames = new Set(gamesList.map((g: any) => normalizeGameName(g.name)));
-    const seenInBatch = new Set<string>();
-    const gamesWithDuplicateFlag = parsedGames.map((g) => {
-      const norm = normalizeGameName(g.name);
-      const isDuplicate = existingNames.has(norm) || seenInBatch.has(norm);
-      seenInBatch.add(norm);
-      return { ...g, isDuplicate };
+    // Só o catálogo da própria loja conta como "já está no site" — anúncio de vendedor da
+    // comunidade com o mesmo nome é outro produto, e o preço dele não é nosso pra mexer.
+    const siteGamesByName = new Map<string, any[]>();
+    gamesList.forEach((g: any) => {
+      if (g.sellerId) return;
+      const key = normalizeGameName(g.name);
+      if (key) siteGamesByName.set(key, [...(siteGamesByName.get(key) || []), g]);
     });
 
-    const duplicateCount = gamesWithDuplicateFlag.filter((g) => g.isDuplicate).length;
+    // Mesmo nome em console diferente (ex.: versão PS4 e versão PS5 vendidas separadas) é
+    // outro jogo. Plataforma sem PS4 nem PS5 escrito não dá pra saber, então vale pros dois.
+    const platformKey = (p: string) => {
+      const up = (p || "").toUpperCase();
+      const ps4 = up.includes("PS4");
+      const ps5 = up.includes("PS5");
+      return ps4 === ps5 ? "PS4/PS5" : ps4 ? "PS4" : "PS5";
+    };
+    // Jogo só de secundária não tem preço de primária — o preço "do jogo" é o da secundária.
+    const siteMainPrice = (g: any) => {
+      const primary = parseFloat(g.pricePrimary);
+      const secondary = parseFloat(g.priceSecondary);
+      return primary > 0 ? primary : secondary > 0 ? secondary : parseFloat(g.price) || 0;
+    };
+
+    const existingRows: any[] = [];
+    const seenSiteIds = new Set<number>();
+    const seenInBatch = new Set<string>();
+    const newGames: any[] = [];
+    parsedGames.forEach((g) => {
+      const norm = normalizeGameName(g.name);
+      const listPlatform = platformKey(g.platform);
+      const sameName = siteGamesByName.get(norm) || [];
+      const samePlatform = sameName.filter((s) => platformKey(s.platform) === listPlatform);
+      const matches = samePlatform.length > 0
+        ? samePlatform
+        : sameName.filter((s) => listPlatform === "PS4/PS5" || platformKey(s.platform) === "PS4/PS5");
+
+      if (matches.length === 0) {
+        // Repetido dentro da própria lista colada (não no site) continua só marcado em
+        // amarelo na prévia, pra o admin decidir se remove.
+        newGames.push({ ...g, isDuplicate: seenInBatch.has(norm) });
+        seenInBatch.add(norm);
+        return;
+      }
+
+      matches.forEach((site) => {
+        if (seenSiteIds.has(site.id)) return;
+        seenSiteIds.add(site.id);
+        const sitePrice = siteMainPrice(site);
+        const priceDiffers = g.hasListPrice && Math.round(g.pricePrimary * 100) !== Math.round(sitePrice * 100);
+        existingRows.push({
+          siteId: site.id,
+          name: site.name,
+          platform: site.platform,
+          imageUrl: site.imageUrl,
+          sitePrice,
+          listPrice: g.pricePrimary,
+          priceDiffers,
+          update: priceDiffers,
+        });
+      });
+    });
+
+    const duplicateCount = newGames.filter((g) => g.isDuplicate).length;
     if (duplicateCount > 0) {
-      toast.warning(`${duplicateCount} jogo${duplicateCount > 1 ? "s" : ""} já ${duplicateCount > 1 ? "existem" : "existe"} no catálogo (marcado${duplicateCount > 1 ? "s" : ""} em amarelo). Remova se não quiser duplicar.`);
+      toast.warning(`${duplicateCount} jogo${duplicateCount > 1 ? "s aparecem" : " aparece"} mais de uma vez na lista (marcado${duplicateCount > 1 ? "s" : ""} em amarelo). Remova se não quiser duplicar.`);
     }
 
-    setBatchGames(gamesWithDuplicateFlag);
-    triggerBatchCoverSearch(gamesWithDuplicateFlag);
+    setBatchGames(newGames);
+    if (newGames.length > 0) triggerBatchCoverSearch(newGames);
+    if (existingRows.length > 0) {
+      setBatchExistingRows(existingRows);
+      setShowBatchExistingModal(true);
+    }
+  };
+
+  // Fecha a janela de "já está no site". Se não sobrou nenhum jogo novo da lista pra
+  // cadastrar, o Cadastro em Lote fecha junto — não há mais nada pra fazer nele.
+  const closeBatchExistingModal = () => {
+    setShowBatchExistingModal(false);
+    if (batchGames.length === 0) {
+      setShowBatchModal(false);
+      setBatchRawText("");
+    }
+  };
+
+  const handleConfirmBatchPriceUpdates = async () => {
+    const toUpdate = batchExistingRows.filter((r) => r.priceDiffers && r.update);
+    if (toUpdate.length === 0) {
+      closeBatchExistingModal();
+      return;
+    }
+    setIsUpdatingBatchPrices(true);
+    const failedIds = new Set<number>();
+    for (const row of toUpdate) {
+      try {
+        await batchUpdatePriceMutation.mutateAsync({ id: row.siteId, price: row.listPrice });
+      } catch (err: any) {
+        console.error(`Erro ao atualizar o preço de "${row.name}":`, err);
+        failedIds.add(row.siteId);
+      }
+    }
+    adminDigitalProductsQuery.refetch();
+    setIsUpdatingBatchPrices(false);
+
+    const okCount = toUpdate.length - failedIds.size;
+    if (failedIds.size === 0) {
+      toast.success(`${okCount} preço${okCount > 1 ? "s atualizados" : " atualizado"} no site!`);
+      closeBatchExistingModal();
+    } else {
+      toast.error(`Preços atualizados: ${okCount} de ${toUpdate.length}. Falharam: ${toUpdate.filter((r) => failedIds.has(r.siteId)).map((r) => r.name).join(", ")}`);
+      // Mantém na janela só os que falharam pra tentar de novo, sem repetir o que já deu certo.
+      setBatchExistingRows(batchExistingRows.filter((r) => failedIds.has(r.siteId)));
+    }
   };
 
   const triggerBatchCoverSearch = async (games: any[]) => {
@@ -7807,7 +7917,7 @@ export default function AdminDashboard() {
                           className={`h-8 text-xs text-white ${game.isDuplicate ? "bg-amber-950/30 border-amber-500/50" : "bg-slate-900 border-slate-800"}`}
                         />
                         {game.isDuplicate && (
-                          <p className="text-[9px] text-amber-400 font-bold">⚠️ Já existe no catálogo</p>
+                          <p className="text-[9px] text-amber-400 font-bold">⚠️ Repetido na lista</p>
                         )}
                         <div className="flex items-center gap-1.5">
                           <label className="cursor-pointer hover:bg-slate-800 p-1.5 rounded text-blue-400 hover:text-blue-300" title="Upload local de foto">
@@ -7955,7 +8065,7 @@ export default function AdminDashboard() {
                             className={`h-8 text-xs text-white ${game.isDuplicate ? "bg-amber-950/30 border-amber-500/50" : "bg-slate-950 border-slate-800"}`}
                           />
                           {game.isDuplicate && (
-                            <p className="text-[9px] text-amber-400 font-bold mt-0.5">⚠️ Já existe no catálogo</p>
+                            <p className="text-[9px] text-amber-400 font-bold mt-0.5">⚠️ Repetido na lista</p>
                           )}
                         </td>
                         <td className="py-3 px-3">
@@ -8083,6 +8193,136 @@ export default function AdminDashboard() {
               </DialogFooter>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Janela do Cadastro em Lote: jogos da lista que já estão no site (abre por cima dele) */}
+      <Dialog open={showBatchExistingModal} onOpenChange={(open) => { if (!open && !isUpdatingBatchPrices) closeBatchExistingModal(); }}>
+        <DialogContent className="bg-slate-900 border-amber-500/30 text-white w-[92vw] sm:w-full sm:max-w-lg card-neon max-h-[88dvh] overflow-y-auto p-0 gap-0">
+          {(() => {
+            const priceRows = batchExistingRows.filter((r) => r.priceDiffers);
+            const sameRows = batchExistingRows.filter((r) => !r.priceDiffers);
+            const selectedCount = priceRows.filter((r) => r.update).length;
+            const total = batchExistingRows.length;
+            const formatPrice = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
+            return (
+              <>
+                <div className="bg-gradient-to-b from-amber-500/15 via-amber-500/5 to-transparent px-5 pt-7 pb-4">
+                  <div className="mx-auto mb-3 w-14 h-14 rounded-full bg-amber-500/15 border border-amber-500/40 flex items-center justify-center shadow-[0_0_25px_rgba(245,158,11,0.25)]">
+                    <Gamepad2 className="w-7 h-7 text-amber-400" />
+                  </div>
+                  <DialogHeader className="sm:text-center">
+                    <DialogTitle className="text-lg font-black text-white leading-tight">
+                      {total === 1 ? "Esse jogo já está no site" : `${total} jogos da lista já estão no site`}
+                    </DialogTitle>
+                    <DialogDescription className="text-slate-400 text-xs leading-relaxed">
+                      {total === 1 ? "Ele não será cadastrado" : "Eles não serão cadastrados"} de novo.
+                      {batchGames.length === 0
+                        ? " Não sobrou nenhum jogo novo na lista."
+                        : batchGames.length === 1
+                          ? " O outro jogo da lista segue para o cadastro normalmente."
+                          : ` Os outros ${batchGames.length} jogos da lista seguem para o cadastro normalmente.`}
+                    </DialogDescription>
+                  </DialogHeader>
+                </div>
+
+                <div className="px-5 pb-5 space-y-4">
+                  {priceRows.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <Label className="text-xs text-amber-400 font-bold uppercase">Preço diferente — atualizar?</Label>
+                        {priceRows.length > 1 && (
+                          <button
+                            type="button"
+                            disabled={isUpdatingBatchPrices}
+                            onClick={() => setBatchExistingRows((rows) => rows.map((r) => (r.priceDiffers ? { ...r, update: selectedCount < priceRows.length } : r)))}
+                            className="text-[10px] font-bold text-slate-400 hover:text-white underline"
+                          >
+                            {selectedCount < priceRows.length ? "Marcar todos" : "Desmarcar todos"}
+                          </button>
+                        )}
+                      </div>
+                      <div className="max-h-[38vh] overflow-y-auto space-y-1.5 pr-1">
+                        {priceRows.map((row) => (
+                          <label
+                            key={row.siteId}
+                            className={`flex items-center gap-3 rounded-xl border px-3 py-2 cursor-pointer transition-colors ${row.update ? "bg-amber-950/25 border-amber-500/40" : "bg-slate-950/60 border-slate-800"}`}
+                          >
+                            <div className="h-10 w-16 shrink-0 rounded-md overflow-hidden bg-slate-800 flex items-center justify-center">
+                              {row.imageUrl ? (
+                                <img src={row.imageUrl} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <Gamepad2 className="w-4 h-4 text-slate-600" />
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-bold text-white truncate" title={row.name}>{row.name}</p>
+                              <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                                {row.platform && (
+                                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-blue-950/60 text-blue-300">{row.platform}</span>
+                                )}
+                                <span className="text-[11px] text-slate-500 line-through">{formatPrice(row.sitePrice)}</span>
+                                <span className="text-[11px] text-slate-600">→</span>
+                                <span className="text-xs font-black text-amber-400">{formatPrice(row.listPrice)}</span>
+                              </div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={row.update}
+                              disabled={isUpdatingBatchPrices}
+                              onChange={(e) => setBatchExistingRows((rows) => rows.map((r) => (r.siteId === row.siteId ? { ...r, update: e.target.checked } : r)))}
+                              className="w-4 h-4 rounded border-amber-600/40 bg-slate-950 text-amber-500 focus:ring-amber-500 shrink-0"
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {sameRows.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="text-xs text-slate-300 font-bold uppercase">
+                        {priceRows.length > 0 ? "Já no site, sem mudança de preço" : "Já no site"}
+                      </Label>
+                      <div className="max-h-36 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950/40 divide-y divide-slate-800/70">
+                        {sameRows.map((row) => (
+                          <div key={row.siteId} className="flex items-center justify-between gap-2 px-3 py-1.5">
+                            <span className="flex items-center gap-2 min-w-0">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                              <span className="text-xs text-slate-300 truncate" title={row.name}>{row.name}</span>
+                            </span>
+                            <span className="text-[11px] text-slate-500 shrink-0">{formatPrice(row.sitePrice)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <DialogFooter className="pt-1">
+                    {priceRows.length > 0 ? (
+                      <>
+                        <Button type="button" variant="ghost" disabled={isUpdatingBatchPrices} onClick={closeBatchExistingModal} className="text-slate-400 hover:text-white">
+                          Manter preços do site
+                        </Button>
+                        <Button
+                          type="button"
+                          disabled={isUpdatingBatchPrices || selectedCount === 0}
+                          onClick={handleConfirmBatchPriceUpdates}
+                          className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-6 btn-neon"
+                        >
+                          {isUpdatingBatchPrices ? "Atualizando..." : `Atualizar ${selectedCount} preço${selectedCount === 1 ? "" : "s"}`}
+                        </Button>
+                      </>
+                    ) : (
+                      <Button type="button" onClick={closeBatchExistingModal} className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-6 btn-neon">
+                        Entendi
+                      </Button>
+                    )}
+                  </DialogFooter>
+                </div>
+              </>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
