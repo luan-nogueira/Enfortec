@@ -275,6 +275,15 @@ var init_schema = __esm({
       // item: { title, url, platform: "ps4" | "ps5" | "ambos" } — o front só mostra pro
       // comprador os vídeos com platform "ambos" ou que batem com a plataforma do jogo comprado.
       deliveryHelpVideos: json("deliveryHelpVideos").$type().default([]),
+      // Texto enviado ao comprador junto com a conta do jogo, editável pelo admin, com
+      // marcadores ({email}, {senha}, {jogo}...) — ver shared/deliveryMessage.ts. Nulo = texto
+      // padrão (DEFAULT_DELIVERY_MESSAGE_TEMPLATE).
+      deliveryMessageTemplate: text("deliveryMessageTemplate"),
+      // WhatsApp de cada atendente (chave = nome, ex.: { Andre: "5562...", Sandro: "5571..." }),
+      // usado na pechincha, na lista de atendentes do chat e no e-mail de entrega. É separado
+      // do supportWhatsapp acima (número genérico de suporte). Nulo/sem a chave = número
+      // padrão de shared/whatsapp.ts.
+      waAttendantNumbers: json("waAttendantNumbers").$type(),
       updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => /* @__PURE__ */ new Date())
     });
     platinadorSubscriptions = pgTable("platinador_subscriptions", {
@@ -410,6 +419,31 @@ var init_schema = __esm({
   }
 });
 
+// shared/whatsapp.ts
+function normalizeWhatsappNumber(raw) {
+  let digits = (raw || "").replace(/\D/g, "");
+  if (digits.length === 10 || digits.length === 11) digits = `55${digits}`;
+  return digits.length >= 12 && digits.length <= 15 ? digits : null;
+}
+function formatWhatsappForDisplay(digits) {
+  const br = digits.match(/^55(\d{2})(\d{4,5})(\d{4})$/);
+  return br ? `+55 ${br[1]} ${br[2]}-${br[3]}` : `+${digits}`;
+}
+function attendantContactsText(saved) {
+  return Object.keys(WA_ATTENDANT_DEFAULT_NUMBERS).map((name) => `\u2022 ${WA_ATTENDANT_LABELS[name] || name}: ${formatWhatsappForDisplay(saved?.[name] || WA_ATTENDANT_DEFAULT_NUMBERS[name])}`).join("\n");
+}
+var WA_ATTENDANT_DEFAULT_NUMBERS, WA_ATTENDANT_LABELS;
+var init_whatsapp = __esm({
+  "shared/whatsapp.ts"() {
+    "use strict";
+    WA_ATTENDANT_DEFAULT_NUMBERS = {
+      Andre: "554384253691",
+      Sandro: "5571987650840"
+    };
+    WA_ATTENDANT_LABELS = { Andre: "Andr\xE9" };
+  }
+});
+
 // server/email.ts
 var email_exports = {};
 __export(email_exports, {
@@ -421,7 +455,8 @@ async function sendDeliveryEmail({
   to,
   buyerName,
   productName,
-  deliveryDetails
+  deliveryDetails,
+  attendantNumbers
 }) {
   if (!smtpHost || !smtpUser || !smtpPass) {
     console.warn("[Email] SMTP is not configured. Skipping sending email to:", to);
@@ -437,6 +472,7 @@ async function sendDeliveryEmail({
       pass: smtpPass
     }
   });
+  const contacts = attendantContactsText(attendantNumbers);
   const messageText = `Ol\xE1, ${buyerName}!
 
 Obrigado por adquirir o jogo ${productName}!
@@ -449,8 +485,7 @@ ${deliveryDetails}
 
 Qualquer d\xFAvida ou problema, nossa equipe estar\xE1 totalmente \xE0 disposi\xE7\xE3o para lhe ajudar!
 Voc\xEA pode entrar em contato conosco diretamente pelo chat do site ou pelos nossos WhatsApp:
-\u2022 Andr\xE9: +55 43 8425-3691
-\u2022 Sandro: +55 71 98765-0840
+${contacts}
 
 Atenciosamente,
 Equipe Eforte Games`;
@@ -467,8 +502,7 @@ Equipe Eforte Games`;
       
       <p>Qualquer d\xFAvida ou problema, estamos \xE0 total disposi\xE7\xE3o para ajudar no que for preciso.</p>
       <p>Voc\xEA pode entrar em contato conosco pelo chat em nosso site ou diretamente atrav\xE9s dos nossos WhatsApp:<br>
-        <strong>\u2022 Andr\xE9: +55 43 8425-3691</strong><br>
-        <strong>\u2022 Sandro: +55 71 98765-0840</strong>
+        <strong>${contacts.replace(/\n/g, "<br>")}</strong>
       </p>
       
       <hr style="border: 0; border-top: 1px solid #eeeeee; margin: 30px 0;">
@@ -559,6 +593,7 @@ var smtpHost, smtpPort, smtpUser, smtpPass, smtpFrom;
 var init_email = __esm({
   "server/email.ts"() {
     "use strict";
+    init_whatsapp();
     smtpHost = process.env.SMTP_HOST;
     smtpPort = parseInt(process.env.SMTP_PORT || "587");
     smtpUser = process.env.SMTP_USER;
@@ -604,7 +639,34 @@ var ENV = {
   mercadoPagoPublicKey: process.env.MERCADO_PAGO_PUBLIC_KEY ?? ""
 };
 
+// shared/deliveryMessage.ts
+var DEFAULT_DELIVERY_MESSAGE_TEMPLATE = `\u{1F3AE} Obrigado por comprar na EforteGames!
+
+Segue o acesso da sua conta \u2014 \xE9 s\xF3 entrar e aproveitar:
+
+\u{1F4E7} Email: {email}
+\u{1F511} Senha: {senha}
+
+Qualquer d\xFAvida ou problema pra acessar, voc\xEA encontra v\xEDdeos de ajuda e o contato do nosso suporte logo abaixo. Bom jogo! \u{1F525}`;
+function isValidDeliveryMessageTemplate(template) {
+  const lower = template.toLowerCase();
+  return lower.includes("{email}") && lower.includes("{senha}");
+}
+function renderDeliveryMessage(template, values, fallbackTemplate = DEFAULT_DELIVERY_MESSAGE_TEMPLATE) {
+  const base = template && template.trim() && isValidDeliveryMessageTemplate(template) ? template : fallbackTemplate;
+  const data = {
+    email: values.email,
+    senha: values.senha,
+    jogo: values.jogo || "seu jogo",
+    cliente: values.cliente || "Cliente",
+    pedido: values.pedido != null ? String(values.pedido) : "",
+    contatos: values.contatos || ""
+  };
+  return base.replace(/\{(email|senha|jogo|cliente|pedido|contatos)\}/gi, (_match, key) => data[key.toLowerCase()]);
+}
+
 // server/db.ts
+init_whatsapp();
 function getDb() {
   if (!process.env.DATABASE_URL) {
     console.warn("[Database] DATABASE_URL is not set");
@@ -1204,12 +1266,14 @@ async function deliverOrder(orderId, deliveryDetails) {
       productName = orderInfo.digitalProduct.name;
     }
     try {
+      const settings = await getPlatformSettings();
       const { sendDeliveryEmail: sendDeliveryEmail2 } = await Promise.resolve().then(() => (init_email(), email_exports));
       await sendDeliveryEmail2({
         to: buyerEmail,
         buyerName: orderInfo.buyer?.name || "Cliente",
         productName,
-        deliveryDetails
+        deliveryDetails,
+        attendantNumbers: settings?.waAttendantNumbers
       });
     } catch (emailErr) {
       console.error("[Email] Erro ao enviar email de entrega:", emailErr);
@@ -1320,28 +1384,40 @@ async function attemptAutoDeliverDigitalOrder(database, params) {
     if (platform.includes("PS4") && !platform.includes("PS5")) consoleType = "PS4";
     else if (platform.includes("PS5") && !platform.includes("PS4")) consoleType = "PS5";
   }
+  let deliverySettings;
+  let buyer;
+  try {
+    const settingsRows = await database.select({ deliveryMessageTemplate: platformSettings.deliveryMessageTemplate, waAttendantNumbers: platformSettings.waAttendantNumbers }).from(platformSettings).where(eq(platformSettings.id, 1)).limit(1);
+    deliverySettings = settingsRows[0];
+    const buyerRows = await database.select().from(users).where(eq(users.id, buyerId)).limit(1);
+    buyer = buyerRows[0];
+  } catch (settingsErr) {
+    console.error(`[AutoDeliver] Pedido #${orderId}: falha ao ler o texto de entrega/comprador, segue com o texto padr\xE3o:`, settingsErr);
+  }
   const account = await claimDigitalProductAccount(database, digitalProductId, orderId, accountType, consoleType);
   if (!account) {
     console.log(`[AutoDeliver] Pedido #${orderId}: sem conta dispon\xEDvel no pool do jogo #${digitalProductId} \u2014 segue pro fluxo manual.`);
     return { delivered: false };
   }
   console.log(`[AutoDeliver] Pedido #${orderId}: conta reivindicada do pool (${account.email}), atualizando pedido...`);
-  const deliveryDetails = `\u{1F3AE} Obrigado por comprar na EforteGames!
-
-Segue o acesso da sua conta \u2014 \xE9 s\xF3 entrar e aproveitar:
-
-\u{1F4E7} Email: ${account.email}
-\u{1F511} Senha: ${account.password}
-
-Qualquer d\xFAvida ou problema pra acessar, voc\xEA encontra v\xEDdeos de ajuda e o contato do nosso suporte logo abaixo. Bom jogo! \u{1F525}`;
+  const deliveryDetails = renderDeliveryMessage(deliverySettings?.deliveryMessageTemplate, {
+    email: account.email,
+    senha: account.password,
+    jogo: productName,
+    cliente: buyer?.name,
+    pedido: orderId,
+    contatos: attendantContactsText(deliverySettings?.waAttendantNumbers)
+  });
   const updateResult = await database.update(orders).set({ deliveryDetails, status: "enviado" }).where(eq(orders.id, orderId)).returning({ id: orders.id });
   if (updateResult.length === 0) {
     console.error(`[AutoDeliver] CR\xCDTICO: pedido #${orderId} n\xE3o encontrado ao tentar salvar a entrega. Conta consumida do pool do jogo #${digitalProductId}: ${account.email} / ${account.password}`);
     return { delivered: false };
   }
   console.log(`[AutoDeliver] Pedido #${orderId}: status atualizado pra "enviado" com sucesso.`);
-  const buyerResult = await database.select().from(users).where(eq(users.id, buyerId)).limit(1);
-  const buyer = buyerResult[0];
+  if (!buyer) {
+    const buyerResult = await database.select().from(users).where(eq(users.id, buyerId)).limit(1);
+    buyer = buyerResult[0];
+  }
   if (buyer?.email) {
     try {
       const { sendDeliveryEmail: sendDeliveryEmail2 } = await Promise.resolve().then(() => (init_email(), email_exports));
@@ -1349,7 +1425,8 @@ Qualquer d\xFAvida ou problema pra acessar, voc\xEA encontra v\xEDdeos de ajuda 
         to: buyer.email,
         buyerName: buyer.name || "Cliente",
         productName,
-        deliveryDetails
+        deliveryDetails,
+        attendantNumbers: deliverySettings?.waAttendantNumbers
       });
     } catch (emailErr) {
       console.error("[Email] Erro ao enviar email de entrega autom\xE1tica:", emailErr);
@@ -1633,7 +1710,9 @@ async function getPlatformSettings() {
       maxCoinsPerPurchase: 10,
       maxCoinsPreVenda: 50,
       supportWhatsapp: "554384253691",
-      deliveryHelpVideos: []
+      deliveryHelpVideos: [],
+      deliveryMessageTemplate: null,
+      waAttendantNumbers: null
     };
   }
   return result[0];
@@ -3134,6 +3213,9 @@ ID: ${paymentId || "N/A"}`
   app2.all("/api/infinitepay/webhook", handleWebhook);
 }
 
+// server/routers.ts
+init_whatsapp();
+
 // server/_core/systemRouter.ts
 import { z } from "zod";
 
@@ -3975,7 +4057,29 @@ var appRouter = router({
       supportWhatsapp: z2.string().min(8)
     })).mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
-      return updatePlatformSettings({ supportWhatsapp: input.supportWhatsapp });
+      const digits = normalizeWhatsappNumber(input.supportWhatsapp);
+      if (!digits) {
+        throw new TRPCError3({ code: "BAD_REQUEST", message: "N\xFAmero de WhatsApp de atendimento inv\xE1lido. Use 55 + DDD + n\xFAmero." });
+      }
+      return updatePlatformSettings({ supportWhatsapp: digits });
+    }),
+    // WhatsApp de cada atendente (André, Sandro) usado na pechincha, na lista de atendentes
+    // do chat e no e-mail de entrega — antes era fixo no código. Campo em branco = volta pro
+    // número padrão daquele atendente.
+    updateAttendantNumbers: protectedProcedure.input(z2.object({ numbers: z2.record(z2.string(), z2.string()) })).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
+      const numbers = {};
+      for (const name of Object.keys(WA_ATTENDANT_DEFAULT_NUMBERS)) {
+        const raw = input.numbers[name]?.trim();
+        if (!raw) continue;
+        const digits = normalizeWhatsappNumber(raw);
+        if (!digits) {
+          throw new TRPCError3({ code: "BAD_REQUEST", message: `N\xFAmero de WhatsApp inv\xE1lido para ${name}. Use 55 + DDD + n\xFAmero.` });
+        }
+        numbers[name] = digits;
+      }
+      await updatePlatformSettings({ waAttendantNumbers: numbers });
+      return { success: true };
     }),
     // Lista flexível de materiais de ajuda (vídeo ou link, ex.: página de tutorial no Canva)
     // mostrados ao comprador em "Minhas Compras" — cada item pode ser restrito a PS4/PS5
@@ -3989,6 +4093,18 @@ var appRouter = router({
     })).mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
       return updatePlatformSettings({ deliveryHelpVideos: input.videos });
+    }),
+    // Texto automático enviado junto com a conta do jogo (ver shared/deliveryMessage.ts).
+    // Vazio = volta pro texto padrão. Recusa texto sem {email}/{senha}: salvar assim faria
+    // toda entrega automática chegar pro cliente sem o acesso.
+    updateDeliveryMessage: protectedProcedure.input(z2.object({ template: z2.string().max(4e3) })).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Unauthorized" });
+      const template = input.template.trim();
+      if (template && !isValidDeliveryMessageTemplate(template)) {
+        throw new TRPCError3({ code: "BAD_REQUEST", message: "O texto precisa ter os marcadores {email} e {senha}, sen\xE3o o cliente n\xE3o recebe o acesso." });
+      }
+      await updatePlatformSettings({ deliveryMessageTemplate: template || null });
+      return { success: true };
     })
   }),
   // Central de Notificações do admin — "dispensar" aqui só esconde da lista (compartilhado

@@ -19,7 +19,7 @@ import { MessageCircle, X, Send, Bot, ShieldCheck, Zap, Trophy, ShoppingBag, Spa
 import { toast } from "sonner";
 import { containsLink, LINK_BLOCKED_MESSAGE } from "@/lib/textFilters";
 import { trpc } from "@/lib/trpc";
-import { WA_ATTENDANTS } from "@/lib/waAttendants";
+import { useWaAttendants } from "@/lib/waAttendants";
 
 // Catalog is fetched from the same tRPC query the storefront uses (Postgres), so the
 // bot never quotes a game that's out of stock or was removed from the real catalog.
@@ -183,6 +183,7 @@ export default function FloatingChat() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isPageScrolling, setIsPageScrolling] = useState(false);
   const { data: platformSettings } = trpc.settings.get.useQuery();
+  const waAttendants = useWaAttendants();
   const waBase = `https://wa.me/${platformSettings?.supportWhatsapp || WA_NUMBER}`;
 
   // Mesma fonte (Postgres, via tRPC) usada pela loja — garante que o bot nunca ofereça
@@ -415,7 +416,7 @@ export default function FloatingChat() {
                     Com qual atendente deseja falar?
                   </p>
                   <div className="space-y-2">
-                    {WA_ATTENDANTS.map(att => (
+                    {waAttendants.map(att => (
                       <a
                         key={att.name}
                         href={`https://wa.me/${att.number}?text=${encodeURIComponent("Olá! Vim pelo chat do site da Eforte Games e gostaria de atendimento.")}`}

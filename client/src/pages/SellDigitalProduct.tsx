@@ -12,6 +12,7 @@ import { Upload, Image as ImageIcon, X, Loader2 } from "lucide-react";
 export default function SellDigitalProduct() {
   const { isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
+  const { data: platformSettings } = trpc.settings.get.useQuery();
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -32,7 +33,9 @@ export default function SellDigitalProduct() {
   const createProductMutation = trpc.digitalProducts.create.useMutation();
 
   const handleWhatsAppProof = (contact: "Andre" | "Sandro") => {
-    const numbers = { Andre: "554384253691", Sandro: "557187650840" };
+    // Número que o admin cadastrou pra cada atendente no painel; sem cadastro, o de sempre.
+    const saved = (platformSettings?.waAttendantNumbers || {}) as Record<string, string>;
+    const numbers = { Andre: saved.Andre || "554384253691", Sandro: saved.Sandro || "557187650840" };
     const contactName = contact === "Andre" ? "André" : "Sandro";
     const accountLabel = formData.name.trim() || "minha conta";
     const credentials = formData.keyOrCode.trim();

@@ -12,7 +12,7 @@ import { collection, onSnapshot, query, orderBy, doc, getDoc, updateDoc, deleteD
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { isValidWhatsApp } from "@/lib/utils";
-import { WA_ATTENDANTS } from "@/lib/waAttendants";
+import { useWaAttendants } from "@/lib/waAttendants";
 import { sendSellerChatMessage, sellerThreadId } from "@/lib/sellerChat";
 import {
   Dialog,
@@ -96,6 +96,8 @@ function getUsedCategoryLabel(product: any): string {
 export default function UsedMarketplace() {
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
+  const { data: platformSettings } = trpc.settings.get.useQuery();
+  const waAttendants = useWaAttendants();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCondition, setSelectedCondition] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -262,7 +264,7 @@ export default function UsedMarketplace() {
     const price = parseFloat(product.price || 0);
     if (price === 0) {
       const msg = encodeURIComponent(`Olá! Tenho interesse no jogo USADO: ${product.name} anunciado por ${product.sellerName || "vendedor"}. Como faço para comprar?`);
-      window.open(`https://wa.me/5543984253691?text=${msg}`, '_blank');
+      window.open(`https://wa.me/${platformSettings?.supportWhatsapp || "5543984253691"}?text=${msg}`, '_blank');
       return;
     }
 
@@ -345,7 +347,7 @@ export default function UsedMarketplace() {
       // Só vai para WhatsApp se for erro de rede (servidor offline)
       if (error instanceof TypeError && error.message.includes("fetch")) {
         const msg = encodeURIComponent(`Olá! Tenho interesse no jogo USADO: ${selectedProduct.name} anunciado por ${selectedProduct.sellerName || "vendedor"}. Ainda está disponível?`);
-        window.open(`https://wa.me/5543984253691?text=${msg}`, '_blank');
+        window.open(`https://wa.me/${platformSettings?.supportWhatsapp || "5543984253691"}?text=${msg}`, '_blank');
         setSelectedProduct(null);
       } else {
         setCheckoutError(error.message || "Erro desconhecido ao processar pagamento.");
@@ -991,7 +993,7 @@ export default function UsedMarketplace() {
               <>
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wide self-start">Enviar proposta para:</label>
                 <div className="grid grid-cols-2 gap-2 w-full">
-                  {WA_ATTENDANTS.map(att => (
+                  {waAttendants.map(att => (
                     <Button
                       key={att.name}
                       disabled={!bargainOffer.trim()}

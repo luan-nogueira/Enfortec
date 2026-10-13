@@ -11,7 +11,7 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { isValidWhatsApp } from "@/lib/utils";
-import { WA_ATTENDANTS } from "@/lib/waAttendants";
+import { useWaAttendants } from "@/lib/waAttendants";
 import {
   Dialog,
   DialogContent,
@@ -48,6 +48,7 @@ export default function Store() {
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
   const { data: platformSettings } = trpc.settings.get.useQuery();
+  const waAttendants = useWaAttendants();
   const [searchTerm, setSearchTerm] = useState("");
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -291,7 +292,7 @@ export default function Store() {
       // Só vai para WhatsApp se for erro de rede (servidor offline)
       if (error instanceof TypeError && error.message.includes("fetch")) {
         const message = `Olá! Quero comprar o produto: ${selectedProduct.name} no valor de R$ ${price.toFixed(2)}`;
-        const phone = "5543984253691";
+        const phone = platformSettings?.supportWhatsapp || "5543984253691";
         window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
         setSelectedProduct(null);
       } else {
@@ -772,7 +773,7 @@ export default function Store() {
           <DialogFooter className="pb-4 sm:pb-0 flex-col gap-2">
             <label className="text-xs font-bold text-slate-400 uppercase tracking-wide self-start">Enviar proposta para:</label>
             <div className="grid grid-cols-2 gap-2 w-full">
-              {WA_ATTENDANTS.map(att => (
+              {waAttendants.map(att => (
                 <Button
                   key={att.name}
                   disabled={!bargainOffer.trim()}

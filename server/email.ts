@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { attendantContactsText } from "../shared/whatsapp";
 
 const smtpHost = process.env.SMTP_HOST;
 const smtpPort = parseInt(process.env.SMTP_PORT || "587");
@@ -11,11 +12,14 @@ export async function sendDeliveryEmail({
   buyerName,
   productName,
   deliveryDetails,
+  attendantNumbers,
 }: {
   to: string;
   buyerName: string;
   productName: string;
   deliveryDetails: string;
+  /** WhatsApp dos atendentes cadastrado no admin ({ Andre, Sandro }). Opcional. */
+  attendantNumbers?: Record<string, string> | null;
 }) {
   if (!smtpHost || !smtpUser || !smtpPass) {
     console.warn("[Email] SMTP is not configured. Skipping sending email to:", to);
@@ -32,6 +36,10 @@ export async function sendDeliveryEmail({
     },
   });
 
+  // Os contatos seguem o que o admin cadastrou no painel (eram fixos aqui e ficavam
+  // desatualizados quando alguém trocava de telefone).
+  const contacts = attendantContactsText(attendantNumbers);
+
   const messageText = `Olá, ${buyerName}!
 
 Obrigado por adquirir o jogo ${productName}!
@@ -44,8 +52,7 @@ ${deliveryDetails}
 
 Qualquer dúvida ou problema, nossa equipe estará totalmente à disposição para lhe ajudar!
 Você pode entrar em contato conosco diretamente pelo chat do site ou pelos nossos WhatsApp:
-• André: +55 43 8425-3691
-• Sandro: +55 71 98765-0840
+${contacts}
 
 Atenciosamente,
 Equipe Eforte Games`;
@@ -63,8 +70,7 @@ Equipe Eforte Games`;
       
       <p>Qualquer dúvida ou problema, estamos à total disposição para ajudar no que for preciso.</p>
       <p>Você pode entrar em contato conosco pelo chat em nosso site ou diretamente através dos nossos WhatsApp:<br>
-        <strong>• André: +55 43 8425-3691</strong><br>
-        <strong>• Sandro: +55 71 98765-0840</strong>
+        <strong>${contacts.replace(/\n/g, "<br>")}</strong>
       </p>
       
       <hr style="border: 0; border-top: 1px solid #eeeeee; margin: 30px 0;">

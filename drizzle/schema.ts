@@ -295,6 +295,15 @@ export const platformSettings = pgTable("platform_settings", {
   // item: { title, url, platform: "ps4" | "ps5" | "ambos" } — o front só mostra pro
   // comprador os vídeos com platform "ambos" ou que batem com a plataforma do jogo comprado.
   deliveryHelpVideos: json("deliveryHelpVideos").$type<{ title: string; url: string; platform: "ps4" | "ps5" | "ambos" }[]>().default([]),
+  // Texto enviado ao comprador junto com a conta do jogo, editável pelo admin, com
+  // marcadores ({email}, {senha}, {jogo}...) — ver shared/deliveryMessage.ts. Nulo = texto
+  // padrão (DEFAULT_DELIVERY_MESSAGE_TEMPLATE).
+  deliveryMessageTemplate: text("deliveryMessageTemplate"),
+  // WhatsApp de cada atendente (chave = nome, ex.: { Andre: "5562...", Sandro: "5571..." }),
+  // usado na pechincha, na lista de atendentes do chat e no e-mail de entrega. É separado
+  // do supportWhatsapp acima (número genérico de suporte). Nulo/sem a chave = número
+  // padrão de shared/whatsapp.ts.
+  waAttendantNumbers: json("waAttendantNumbers").$type<Record<string, string>>(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdateFn(() => new Date()),
 });
 

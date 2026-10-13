@@ -1,5 +1,7 @@
 import { getSessionCookieOptions } from "./_core/cookies";
 import { COOKIE_NAME } from "@shared/const";
+import { isValidDeliveryMessageTemplate } from "@shared/deliveryMessage";
+import { WA_ATTENDANT_DEFAULT_NUMBERS, normalizeWhatsappNumber } from "@shared/whatsapp";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure, supportProcedure } from "./_core/trpc";
 import { z } from "zod";
@@ -854,7 +856,33 @@ export const appRouter = router({
       }))
       .mutation(async ({ ctx, input }) => {
         if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
-        return db.updatePlatformSettings({ supportWhatsapp: input.supportWhatsapp });
+        // O número vai direto em wa.me/<numero>, então guarda só dígitos — o admin pode
+        // digitar "+55 (43) 98425-3691" ou esquecer o 55 que o link continua funcionando.
+        const digits = normalizeWhatsappNumber(input.supportWhatsapp);
+        if (!digits) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Número de WhatsApp de atendimento inválido. Use 55 + DDD + número." });
+        }
+        return db.updatePlatformSettings({ supportWhatsapp: digits });
+      }),
+    // WhatsApp de cada atendente (André, Sandro) usado na pechincha, na lista de atendentes
+    // do chat e no e-mail de entrega — antes era fixo no código. Campo em branco = volta pro
+    // número padrão daquele atendente.
+    updateAttendantNumbers: protectedProcedure
+      .input(z.object({ numbers: z.record(z.string(), z.string()) }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+        const numbers: Record<string, string> = {};
+        for (const name of Object.keys(WA_ATTENDANT_DEFAULT_NUMBERS)) {
+          const raw = input.numbers[name]?.trim();
+          if (!raw) continue;
+          const digits = normalizeWhatsappNumber(raw);
+          if (!digits) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: `Número de WhatsApp inválido para ${name}. Use 55 + DDD + número.` });
+          }
+          numbers[name] = digits;
+        }
+        await db.updatePlatformSettings({ waAttendantNumbers: numbers });
+        return { success: true };
       }),
     // Lista flexível de materiais de ajuda (vídeo ou link, ex.: página de tutorial no Canva)
     // mostrados ao comprador em "Minhas Compras" — cada item pode ser restrito a PS4/PS5
@@ -870,6 +898,20 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
         return db.updatePlatformSettings({ deliveryHelpVideos: input.videos });
+      }),
+    // Texto automático enviado junto com a conta do jogo (ver shared/deliveryMessage.ts).
+    // Vazio = volta pro texto padrão. Recusa texto sem {email}/{senha}: salvar assim faria
+    // toda entrega automática chegar pro cliente sem o acesso.
+    updateDeliveryMessage: protectedProcedure
+      .input(z.object({ template: z.string().max(4000) }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized" });
+        const template = input.template.trim();
+        if (template && !isValidDeliveryMessageTemplate(template)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "O texto precisa ter os marcadores {email} e {senha}, senão o cliente não recebe o acesso." });
+        }
+        await db.updatePlatformSettings({ deliveryMessageTemplate: template || null });
+        return { success: true };
       }),
   }),
 

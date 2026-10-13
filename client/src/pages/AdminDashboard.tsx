@@ -30,6 +30,9 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, 
 import SellerChatsPanel from "@/components/SellerChatsPanel";
 import { STORE_SELLER_NAME } from "@/lib/sellerChat";
 import { getStoreStatus } from "@/lib/storeHours";
+import { DEFAULT_MANUAL_DELIVERY_MESSAGE_TEMPLATE, DELIVERY_MESSAGE_PLACEHOLDERS, isValidDeliveryMessageTemplate, renderDeliveryMessage } from "@shared/deliveryMessage";
+import { WA_ATTENDANT_DEFAULT_NUMBERS, attendantContactsText } from "@shared/whatsapp";
+import { WA_ATTENDANTS } from "@/lib/waAttendants";
 import {
   notifyAdmin,
   playNotificationChime,
@@ -2452,6 +2455,64 @@ export default function AdminDashboard() {
     onError: (err: any) => toast.error(err.message || "Erro ao salvar materiais de ajuda."),
   });
 
+  // WhatsApp de cada atendente (pechincha, lista de atendentes do chat, e-mail de entrega) —
+  // André pediu poder trocar o contato dele sem depender de mexer no código. Começa no
+  // número padrão e troca pelo que estiver salvo no painel. Salvo junto com o resto do card
+  // de WhatsApp, em handleSaveWaConfig.
+  const [attendantNumbersInput, setAttendantNumbersInput] = useState<Record<string, string>>({ ...WA_ATTENDANT_DEFAULT_NUMBERS });
+  useEffect(() => {
+    if (supportSettingsQuery.data?.waAttendantNumbers !== undefined) {
+      setAttendantNumbersInput({ ...WA_ATTENDANT_DEFAULT_NUMBERS, ...((supportSettingsQuery.data.waAttendantNumbers as Record<string, string> | null) || {}) });
+    }
+  }, [supportSettingsQuery.data?.waAttendantNumbers]);
+  const updateAttendantNumbersMutation = trpc.settings.updateAttendantNumbers.useMutation({
+    onSuccess: () => supportSettingsQuery.refetch(),
+  });
+
+  // Texto automático que vai pro comprador junto com a conta do jogo (André pediu poder
+  // editar). Um texto só vale pra entrega automática e pro "Fornecer Jogo"; enquanto ele
+  // não salva nada, cada um continua com o texto de sempre (ver shared/deliveryMessage.ts)
+  // e o campo abre com o do "Fornecer Jogo", que é o que ele conhece.
+  const [deliveryMessageInput, setDeliveryMessageInput] = useState(DEFAULT_MANUAL_DELIVERY_MESSAGE_TEMPLATE);
+  const deliveryMessageRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (supportSettingsQuery.data?.deliveryMessageTemplate !== undefined) {
+      setDeliveryMessageInput(supportSettingsQuery.data.deliveryMessageTemplate || DEFAULT_MANUAL_DELIVERY_MESSAGE_TEMPLATE);
+    }
+  }, [supportSettingsQuery.data?.deliveryMessageTemplate]);
+
+  const updateDeliveryMessageMutation = trpc.settings.updateDeliveryMessage.useMutation({
+    onSuccess: () => {
+      toast.success("Texto automático de entrega salvo com sucesso!");
+      supportSettingsQuery.refetch();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao salvar o texto de entrega."),
+  });
+
+  // Insere o marcador onde o cursor está no texto (ou no fim, se o campo não foi tocado).
+  const insertDeliveryPlaceholder = (key: string) => {
+    const el = deliveryMessageRef.current;
+    const start = el?.selectionStart ?? deliveryMessageInput.length;
+    const end = el?.selectionEnd ?? deliveryMessageInput.length;
+    setDeliveryMessageInput(deliveryMessageInput.slice(0, start) + key + deliveryMessageInput.slice(end));
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(start + key.length, start + key.length);
+    });
+  };
+
+  // Entrega manual: monta o texto automático já com jogo/cliente/pedido/contatos e deixa o
+  // login e a senha em branco pro admin completar.
+  const buildManualDeliveryText = (order: any) =>
+    renderDeliveryMessage(supportSettingsQuery.data?.deliveryMessageTemplate, {
+      email: "",
+      senha: "",
+      jogo: order?.productName,
+      cliente: order?.buyerName,
+      pedido: order?.id,
+      contatos: attendantContactsText(supportSettingsQuery.data?.waAttendantNumbers as Record<string, string> | null | undefined),
+    }, DEFAULT_MANUAL_DELIVERY_MESSAGE_TEMPLATE);
+
   const [uploadingDeliveryVideoIdx, setUploadingDeliveryVideoIdx] = useState<number | null>(null);
 
   const handleDeliveryVideoFileChange = async (e: React.ChangeEvent<HTMLInputElement>, idx: number) => {
@@ -2538,10 +2599,12 @@ export default function AdminDashboard() {
       // supportNumber precisa ir pro Postgres (settings.get), não só pro Firestore acima —
       // é essa fonte que as páginas do site (FAQ, chat, entrega, etc.) realmente leem.
       await updateSupportSettingsMutation.mutateAsync({ supportWhatsapp: waConfig.supportNumber });
-      toast.success("Link do Grupo e Número do WhatsApp salvos com sucesso!");
-    } catch (err) {
+      await updateAttendantNumbersMutation.mutateAsync({ numbers: attendantNumbersInput });
+      toast.success("Link do Grupo e Números do WhatsApp salvos com sucesso!");
+    } catch (err: any) {
       console.error("Erro ao salvar config do WhatsApp:", err);
-      toast.error("Erro ao salvar configurações do WhatsApp.");
+      // Número inválido volta do servidor com a explicação de qual campo corrigir.
+      toast.error(err?.data?.code === "BAD_REQUEST" ? err.message : "Erro ao salvar configurações do WhatsApp.");
     } finally {
       setSavingWaConfig(false);
     }
@@ -5612,14 +5675,7 @@ export default function AdminDashboard() {
                                   size="sm"
                                   onClick={() => {
                                     setSelectedDeliverOrder(sale);
-                                    setDeliveryInstructions(
-                                      `Obrigado por adquirir o jogo ${sale.productName}, aqui está o login e senha para acesso a conta:\n\n` +
-                                      `Login: \n` +
-                                      `Senha: \n\n` +
-                                      `Qualquer coisa estaremos a disposição para ajudar no que precisar, você pode entrar em contato conosco pelo chat do site ou pelos nossos WhatsApp:\n` +
-                                      `• André: +55 43 8425-3691\n` +
-                                      `• Sandro: +55 71 98765-0840`
-                                    );
+                                    setDeliveryInstructions(buildManualDeliveryText(sale));
                                     setDeliverGameOpen(true);
                                   }}
                                   className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs"
@@ -6255,7 +6311,7 @@ export default function AdminDashboard() {
                     <MessageCircle className="w-5 h-5 text-green-500" /> Gerenciar Link do WhatsApp & Comunidade
                   </h4>
                   <p className="text-slate-400 text-xs mt-0.5">
-                    Caso o grupo do WhatsApp fique cheio, atualize o link abaixo para redirecionar novos clientes automaticamente. O número de atendimento é usado em todo o site (chat flutuante, FAQ, entrega, etc.).
+                    Caso o grupo do WhatsApp fique cheio, atualize o link abaixo para redirecionar novos clientes automaticamente. O número de atendimento é o contato geral do site (chat flutuante, FAQ, botão de ajuda em "Minhas Compras", etc.).
                   </p>
                 </div>
                 <Button
@@ -6289,6 +6345,29 @@ export default function AdminDashboard() {
                     className="bg-slate-950 border-slate-800 text-white text-xs h-10 mt-1 font-mono"
                   />
                   <span className="text-[10px] text-slate-500 mt-1 block">Formato: 55 + DDD + Número (apenas dígitos)</span>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-800 pt-4 space-y-3">
+                <div>
+                  <Label className="text-xs text-slate-300 font-bold uppercase">WhatsApp dos Atendentes</Label>
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    São os contatos que o cliente escolhe na <strong className="text-slate-400">pechincha</strong> e na lista de atendentes do <strong className="text-slate-400">chat de suporte</strong>, e os que vão no <strong className="text-slate-400">e-mail de entrega do jogo</strong>. Trocou de telefone? Mude aqui e clique em "Salvar Configurações".
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {WA_ATTENDANTS.map((att) => (
+                    <div key={att.name}>
+                      <Label className="text-xs text-slate-300 font-bold">WhatsApp — {att.name}</Label>
+                      <Input
+                        value={attendantNumbersInput[att.name] ?? ""}
+                        onChange={(e) => setAttendantNumbersInput({ ...attendantNumbersInput, [att.name]: e.target.value })}
+                        placeholder={`Ex: ${att.number}`}
+                        className="bg-slate-950 border-slate-800 text-white text-xs h-10 mt-1 font-mono"
+                      />
+                      <span className="text-[10px] text-slate-500 mt-1 block">Formato: 55 + DDD + Número</span>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -6382,6 +6461,86 @@ export default function AdminDashboard() {
                   <Plus className="w-3.5 h-3.5 mr-1" /> Adicionar Material de Ajuda
                 </Button>
                 <p className="text-[10px] text-slate-500">Cole um link (YouTube, Canva etc.) ou envie o arquivo de vídeo direto — máximo 200MB por arquivo.</p>
+              </div>
+            </Card>
+
+            {/* Card do Texto Automático de Entrega — o texto que vai pro comprador junto com a conta */}
+            <Card className="bg-slate-900 border-green-500/30 p-6 card-neon space-y-4 mb-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800 pb-4">
+                <div>
+                  <h4 className="font-black text-white text-base flex items-center gap-2">
+                    ✉️ Texto Automático de Entrega
+                  </h4>
+                  <p className="text-slate-400 text-xs mt-0.5">
+                    É o texto que o cliente recebe junto com a conta do jogo, em "Minhas Compras" e por e-mail. Vale pra entrega automática e também é o texto que já vem preenchido no botão "Fornecer Jogo" (lá você só completa o login e a senha). Enquanto você não salvar um texto seu aqui, as duas entregas continuam com os textos de sempre.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => updateDeliveryMessageMutation.mutate({ template: deliveryMessageInput })}
+                  disabled={updateDeliveryMessageMutation.isPending || !isValidDeliveryMessageTemplate(deliveryMessageInput)}
+                  className="bg-green-600 hover:bg-green-700 text-white font-bold h-9 px-4 text-xs flex items-center gap-1.5 shrink-0"
+                >
+                  <Check className="w-4 h-4" />
+                  {updateDeliveryMessageMutation.isPending ? "Salvando..." : "Salvar Texto"}
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs text-slate-300 font-bold">Texto</Label>
+                  <textarea
+                    ref={deliveryMessageRef}
+                    rows={11}
+                    maxLength={4000}
+                    value={deliveryMessageInput}
+                    onChange={(e) => setDeliveryMessageInput(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:ring-2 focus:ring-green-500/50 font-mono resize-y"
+                  />
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-[10px] text-slate-500">Clique pra inserir:</span>
+                    {DELIVERY_MESSAGE_PLACEHOLDERS.map((p) => (
+                      <button
+                        key={p.key}
+                        type="button"
+                        onClick={() => insertDeliveryPlaceholder(p.key)}
+                        title={p.label}
+                        className={`text-[10px] font-mono font-bold px-2 py-1 rounded-md border transition-colors ${p.required ? "bg-green-950/40 border-green-600/40 text-green-300 hover:bg-green-900/50" : "bg-slate-950 border-slate-700 text-slate-300 hover:border-slate-500"}`}
+                      >
+                        {p.key}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-slate-500">
+                    Cada marcador é trocado pelo dado real na hora da entrega. {"{email}"} e {"{senha}"} são obrigatórios.
+                  </p>
+                  {supportSettingsQuery.data?.deliveryMessageTemplate && (
+                    <button
+                      type="button"
+                      disabled={updateDeliveryMessageMutation.isPending}
+                      onClick={() => {
+                        // Texto vazio no servidor = apaga o texto salvo e volta aos originais.
+                        setDeliveryMessageInput(DEFAULT_MANUAL_DELIVERY_MESSAGE_TEMPLATE);
+                        updateDeliveryMessageMutation.mutate({ template: "" });
+                      }}
+                      className="text-[10px] font-bold text-slate-400 hover:text-white underline"
+                    >
+                      Apagar meu texto e voltar aos textos originais
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs text-slate-300 font-bold">Como o cliente vai ver (exemplo)</Label>
+                  {isValidDeliveryMessageTemplate(deliveryMessageInput) ? (
+                    <pre className="text-slate-200 text-xs font-mono whitespace-pre-wrap bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+                      {renderDeliveryMessage(deliveryMessageInput, { email: "conta.exemplo@outlook.com", senha: "Senha123", jogo: "God of War Ragnarök", cliente: "João", pedido: 1234, contatos: attendantContactsText(supportSettingsQuery.data?.waAttendantNumbers as Record<string, string> | null | undefined) })}
+                    </pre>
+                  ) : (
+                    <p className="text-xs text-red-400 font-bold bg-red-950/20 border border-red-500/30 rounded-xl p-3">
+                      O texto precisa ter {"{email}"} e {"{senha}"} — sem eles o cliente não recebe o acesso da conta.
+                    </p>
+                  )}
+                </div>
               </div>
             </Card>
 
@@ -8845,7 +9004,16 @@ export default function AdminDashboard() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs text-slate-300 font-bold uppercase">Instruções / Login & Senha da Conta</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs text-slate-300 font-bold uppercase">Instruções / Login & Senha da Conta</Label>
+                <button
+                  type="button"
+                  onClick={() => setDeliveryDetailsInput(buildManualDeliveryText(selectedDeliveryOrder))}
+                  className="text-[10px] font-bold text-green-400 hover:text-green-300 underline shrink-0"
+                >
+                  ✨ Usar texto automático
+                </button>
+              </div>
               <textarea
                 rows={5}
                 value={deliveryDetailsInput}

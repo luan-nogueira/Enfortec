@@ -19,7 +19,7 @@ import { auth, db } from "@/lib/firebase";
 import { collection, onSnapshot, doc, getDoc, updateDoc } from "firebase/firestore";
 import { trpc } from "@/lib/trpc";
 import { isValidWhatsApp } from "@/lib/utils";
-import { WA_ATTENDANTS } from "@/lib/waAttendants";
+import { useWaAttendants } from "@/lib/waAttendants";
 import { isConsoleUnavailable, isLicenseUnavailable, platformSupportsConsole } from "@/lib/consoleAvailability";
 
 // Mapeamento de gêneros → palavras-chave nos nomes dos jogos
@@ -166,6 +166,7 @@ export default function DigitalMedia() {
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
   const { data: platformSettings } = trpc.settings.get.useQuery();
+  const waAttendants = useWaAttendants();
   const [searchTerm, setSearchTerm] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get("search") || "";
@@ -1393,7 +1394,7 @@ export default function DigitalMedia() {
           <DialogFooter className="pb-4 sm:pb-0 flex-col gap-2">
             <label className="text-xs font-bold text-slate-400 uppercase tracking-wide self-start">Enviar proposta para:</label>
             <div className="grid grid-cols-2 gap-2 w-full">
-              {WA_ATTENDANTS.map(att => (
+              {waAttendants.map(att => (
                 <Button
                   key={att.name}
                   disabled={!bargainOffer.trim()}

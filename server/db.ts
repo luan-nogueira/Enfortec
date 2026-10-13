@@ -4,6 +4,8 @@ import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { InsertUser, InsertCoupon, users, sellers, products, usedProducts, digitalProducts, digitalProductAccounts, orders, reviews, coupons, platformSettings, adminDismissedNotifications, messages, platinumSubmissions } from "../drizzle/schema";
 import { ENV } from './_core/env';
+import { renderDeliveryMessage } from "../shared/deliveryMessage";
+import { attendantContactsText } from "../shared/whatsapp";
 
 /**
  * Returns a Drizzle ORM instance connected to Neon (PostgreSQL).
@@ -876,12 +878,14 @@ export async function deliverOrder(orderId: number, deliveryDetails: string) {
     }
 
     try {
+      const settings = await getPlatformSettings();
       const { sendDeliveryEmail } = await import("./email");
       await sendDeliveryEmail({
         to: buyerEmail,
         buyerName: orderInfo.buyer?.name || "Cliente",
         productName,
         deliveryDetails,
+        attendantNumbers: settings?.waAttendantNumbers,
       });
     } catch (emailErr) {
       console.error("[Email] Erro ao enviar email de entrega:", emailErr);
@@ -1055,6 +1059,24 @@ export async function attemptAutoDeliverDigitalOrder(
     else if (platform.includes("PS5") && !platform.includes("PS4")) consoleType = "PS5";
   }
 
+  // Texto de entrega (editável no painel) e comprador são lidos ANTES de reivindicar a
+  // conta, e uma falha aqui nunca derruba a entrega (vai o texto padrão): conta consumida
+  // do pool sem o pedido atualizado é o pior cenário desse fluxo.
+  let deliverySettings: { deliveryMessageTemplate: string | null; waAttendantNumbers: Record<string, string> | null } | undefined;
+  let buyer: typeof users.$inferSelect | undefined;
+  try {
+    const settingsRows = await database
+      .select({ deliveryMessageTemplate: platformSettings.deliveryMessageTemplate, waAttendantNumbers: platformSettings.waAttendantNumbers })
+      .from(platformSettings)
+      .where(eq(platformSettings.id, 1))
+      .limit(1);
+    deliverySettings = settingsRows[0];
+    const buyerRows = await database.select().from(users).where(eq(users.id, buyerId)).limit(1);
+    buyer = buyerRows[0];
+  } catch (settingsErr) {
+    console.error(`[AutoDeliver] Pedido #${orderId}: falha ao ler o texto de entrega/comprador, segue com o texto padrão:`, settingsErr);
+  }
+
   const account = await claimDigitalProductAccount(database, digitalProductId, orderId, accountType, consoleType);
   if (!account) {
     console.log(`[AutoDeliver] Pedido #${orderId}: sem conta disponível no pool do jogo #${digitalProductId} — segue pro fluxo manual.`);
@@ -1062,7 +1084,14 @@ export async function attemptAutoDeliverDigitalOrder(
   }
   console.log(`[AutoDeliver] Pedido #${orderId}: conta reivindicada do pool (${account.email}), atualizando pedido...`);
 
-  const deliveryDetails = `🎮 Obrigado por comprar na EforteGames!\n\nSegue o acesso da sua conta — é só entrar e aproveitar:\n\n📧 Email: ${account.email}\n🔑 Senha: ${account.password}\n\nQualquer dúvida ou problema pra acessar, você encontra vídeos de ajuda e o contato do nosso suporte logo abaixo. Bom jogo! 🔥`;
+  const deliveryDetails = renderDeliveryMessage(deliverySettings?.deliveryMessageTemplate, {
+    email: account.email,
+    senha: account.password,
+    jogo: productName,
+    cliente: buyer?.name,
+    pedido: orderId,
+    contatos: attendantContactsText(deliverySettings?.waAttendantNumbers),
+  });
   const updateResult = await database
     .update(orders)
     .set({ deliveryDetails, status: "enviado" })
@@ -1078,8 +1107,10 @@ export async function attemptAutoDeliverDigitalOrder(
   }
   console.log(`[AutoDeliver] Pedido #${orderId}: status atualizado pra "enviado" com sucesso.`);
 
-  const buyerResult = await database.select().from(users).where(eq(users.id, buyerId)).limit(1);
-  const buyer = buyerResult[0];
+  if (!buyer) {
+    const buyerResult = await database.select().from(users).where(eq(users.id, buyerId)).limit(1);
+    buyer = buyerResult[0];
+  }
   if (buyer?.email) {
     try {
       const { sendDeliveryEmail } = await import("./email");
@@ -1088,6 +1119,7 @@ export async function attemptAutoDeliverDigitalOrder(
         buyerName: buyer.name || "Cliente",
         productName,
         deliveryDetails,
+        attendantNumbers: deliverySettings?.waAttendantNumbers,
       });
     } catch (emailErr) {
       console.error("[Email] Erro ao enviar email de entrega automática:", emailErr);
@@ -1512,6 +1544,8 @@ export async function getPlatformSettings() {
     return {
       id: 1, commissionPercentage: "6", vipWhatsappUrl: null, maxCoinsPerPurchase: 10, maxCoinsPreVenda: 50,
       supportWhatsapp: "554384253691", deliveryHelpVideos: [] as { title: string; url: string; platform: "ps4" | "ps5" | "ambos" }[],
+      deliveryMessageTemplate: null as string | null,
+      waAttendantNumbers: null as Record<string, string> | null,
     };
   }
   return result[0];
@@ -1524,6 +1558,8 @@ export async function updatePlatformSettings(data: {
   maxCoinsPreVenda?: number,
   supportWhatsapp?: string,
   deliveryHelpVideos?: { title: string; url: string; platform: "ps4" | "ps5" | "ambos" }[],
+  deliveryMessageTemplate?: string | null,
+  waAttendantNumbers?: Record<string, string> | null,
 }) {
   const db = getDb();
   if (!db) return;
