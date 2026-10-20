@@ -21,10 +21,22 @@ export default function OrderDeliveredNotifier() {
   const previousDeliveredIdsRef = useRef<Set<number>>(new Set());
   const hasInitializedRef = useRef(false);
 
-  // Consulta pedidos do comprador a cada 20 segundos em background
+  // Único poller de pedidos do comprador (MobileBottomNav e UserProfileButton leem o mesmo
+  // cache, sem consultar por conta própria). Frequência adaptativa pra economizar transferência
+  // do banco: 20s só enquanto há pedido aguardando entrega (pago, ou pendente criado há <30min);
+  // fora disso 60s. O react-query já pausa o intervalo com a aba em segundo plano.
   const { data: orders } = trpc.orders.getByBuyerId.useQuery(undefined, {
     enabled: isAuthenticated && !loading,
-    refetchInterval: 20000,
+    refetchInterval: (query) => {
+      const list = (query.state.data as any[] | undefined) ?? [];
+      const now = Date.now();
+      const awaitingDelivery = list.some(
+        (o: any) =>
+          o.status === "pago" ||
+          (o.status === "pendente" && now - new Date(o.createdAt).getTime() < 30 * 60 * 1000)
+      );
+      return awaitingDelivery ? 20000 : 60000;
+    },
   });
 
   // Filtra pedidos com status "enviado" (já entregues com acesso, aguardando avaliação)

@@ -41,9 +41,10 @@ export default function MobileBottomNav() {
   const [openMenu, setOpenMenu] = useState(false);
   const [hasOpenModal, setHasOpenModal] = useState(false);
 
+  // Sem refetchInterval próprio: o OrderDeliveredNotifier já mantém esta query atualizada
+  // (mesmo cache do react-query), então consultar de novo aqui só duplicaria o tráfego.
   const { data: orders } = trpc.orders.getByBuyerId.useQuery(undefined, {
     enabled: !!user,
-    refetchInterval: 30000,
   });
 
   const pendingDeliveredCount = (orders || []).filter((o: any) => o.status === "enviado").length;

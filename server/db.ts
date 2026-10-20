@@ -609,12 +609,15 @@ export async function getOrdersByBuyerId(buyerId: number) {
   // sellerId e a conversa caía sempre na Loja Eforte, mesmo em pedidos de vendedor real.
   const sellerUsers = alias(users, "sellerUsers");
 
+  // Só name/platform dos produtos: puxar a linha inteira trazia junto as imagens (base64),
+  // descrição e keyOrCode de cada produto — e esta consulta roda em polling pra todo usuário logado.
   const results = await db
     .select({
       order: orders,
-      product: products,
-      usedProduct: usedProducts,
-      digitalProduct: digitalProducts,
+      storeProductName: products.name,
+      usedProductName: usedProducts.name,
+      digitalProductName: digitalProducts.name,
+      digitalProductPlatform: digitalProducts.platform,
       sellerOpenId: sellerUsers.openId,
       sellerName: sellerUsers.name,
     })
@@ -629,12 +632,12 @@ export async function getOrdersByBuyerId(buyerId: number) {
   const mapped = results.map(r => {
     let productName = r.order.productName;
     if (!productName || productName.trim() === "" || productName === "Produto") {
-      if (r.order.productType === "store" && r.product) {
-        productName = r.product.name;
-      } else if (r.order.productType === "used" && r.usedProduct) {
-        productName = r.usedProduct.name;
-      } else if (r.order.productType === "digital" && r.digitalProduct) {
-        productName = r.digitalProduct.name;
+      if (r.order.productType === "store" && r.storeProductName) {
+        productName = r.storeProductName;
+      } else if (r.order.productType === "used" && r.usedProductName) {
+        productName = r.usedProductName;
+      } else if (r.order.productType === "digital" && r.digitalProductName) {
+        productName = r.digitalProductName;
       } else {
         productName = "Produto";
       }
@@ -646,7 +649,7 @@ export async function getOrdersByBuyerId(buyerId: number) {
       sellerName: r.sellerName,
       // Plataforma do jogo (PS4/PS5/PS4-PS5) pra filtrar os materiais de ajuda de entrega
       // pela plataforma certa — usado só quando o pedido é digital.
-      digitalProductPlatform: r.digitalProduct?.platform || null,
+      digitalProductPlatform: r.digitalProductPlatform || null,
     };
   });
 
@@ -660,9 +663,9 @@ export async function getOrdersBySellerId(sellerId: number) {
   const results = await db
     .select({
       order: orders,
-      product: products,
-      usedProduct: usedProducts,
-      digitalProduct: digitalProducts,
+      storeProductName: products.name,
+      usedProductName: usedProducts.name,
+      digitalProductName: digitalProducts.name,
     })
     .from(orders)
     .leftJoin(products, eq(orders.productId, products.id))
@@ -674,12 +677,12 @@ export async function getOrdersBySellerId(sellerId: number) {
   const mapped = results.map(r => {
     let productName = r.order.productName;
     if (!productName || productName.trim() === "" || productName === "Produto") {
-      if (r.order.productType === "store" && r.product) {
-        productName = r.product.name;
-      } else if (r.order.productType === "used" && r.usedProduct) {
-        productName = r.usedProduct.name;
-      } else if (r.order.productType === "digital" && r.digitalProduct) {
-        productName = r.digitalProduct.name;
+      if (r.order.productType === "store" && r.storeProductName) {
+        productName = r.storeProductName;
+      } else if (r.order.productType === "used" && r.usedProductName) {
+        productName = r.usedProductName;
+      } else if (r.order.productType === "digital" && r.digitalProductName) {
+        productName = r.digitalProductName;
       } else {
         productName = "Produto";
       }
@@ -701,9 +704,9 @@ export async function getAllOrdersWithDetails() {
     .select({
       order: orders,
       buyer: users,
-      product: products,
-      usedProduct: usedProducts,
-      digitalProduct: digitalProducts,
+      storeProductName: products.name,
+      usedProductName: usedProducts.name,
+      digitalProductName: digitalProducts.name,
     })
     .from(orders)
     .leftJoin(users, eq(orders.buyerId, users.id))
@@ -715,12 +718,12 @@ export async function getAllOrdersWithDetails() {
   const mapped = results.map(r => {
     let productName = r.order.productName;
     if (!productName || productName.trim() === "" || productName === "Produto") {
-      if (r.order.productType === "store" && r.product) {
-        productName = r.product.name;
-      } else if (r.order.productType === "used" && r.usedProduct) {
-        productName = r.usedProduct.name;
-      } else if (r.order.productType === "digital" && r.digitalProduct) {
-        productName = r.digitalProduct.name;
+      if (r.order.productType === "store" && r.storeProductName) {
+        productName = r.storeProductName;
+      } else if (r.order.productType === "used" && r.usedProductName) {
+        productName = r.usedProductName;
+      } else if (r.order.productType === "digital" && r.digitalProductName) {
+        productName = r.digitalProductName;
       } else {
         productName = "Produto";
       }

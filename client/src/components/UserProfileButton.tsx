@@ -24,9 +24,10 @@ export default function UserProfileButton() {
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [, navigate] = useLocation();
 
+  // Sem refetchInterval próprio: o OrderDeliveredNotifier já mantém esta query atualizada
+  // (mesmo cache do react-query), então consultar de novo aqui só duplicaria o tráfego.
   const { data: orders } = trpc.orders.getByBuyerId.useQuery(undefined, {
     enabled: isAuthenticated && !!user,
-    refetchInterval: 30000,
   });
 
   const pendingDeliveredCount = (orders || []).filter((o: any) => o.status === "enviado").length;
