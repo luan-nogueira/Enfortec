@@ -264,12 +264,38 @@ app.get("/api/used-product-image/:id/:index", async (req, res) => {
   }
 });
 
+// Listagens públicas (mesma resposta pra qualquer visitante, não dependem do usuário logado).
+// Com Cache-Control s-maxage o CDN da Vercel responde direto e o banco Neon só é consultado
+// uma vez por janela, em vez de uma vez por visitante — principal economia de transferência.
+// settings.get NÃO entra aqui de propósito: o admin edita e precisa ver a mudança na hora.
+const CDN_CACHEABLE_PATHS = new Set([
+  "products.list",
+  "usedProducts.list",
+  "digitalProducts.list",
+  "reviews.getRecent",
+  "sellers.list",
+]);
+
 // tRPC API
 app.use(
   "/api/trpc",
   createExpressMiddleware({
     router: appRouter,
     createContext,
+    responseMeta({ paths, errors, type }) {
+      const allCacheable =
+        type === "query" &&
+        errors.length === 0 &&
+        !!paths &&
+        paths.length > 0 &&
+        paths.every((p) => CDN_CACHEABLE_PATHS.has(p));
+      if (!allCacheable) return {};
+      return {
+        headers: new Headers([
+          ["Cache-Control", "public, max-age=0, s-maxage=120, stale-while-revalidate=120"],
+        ]),
+      };
+    },
   })
 );
 
