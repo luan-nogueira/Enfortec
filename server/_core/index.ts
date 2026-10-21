@@ -292,7 +292,7 @@ app.use(
       if (!allCacheable) return {};
       return {
         headers: new Headers([
-          ["Cache-Control", "public, max-age=0, s-maxage=120, stale-while-revalidate=120"],
+          ["Cache-Control", "public, max-age=0, s-maxage=600, stale-while-revalidate=600"],
         ]),
       };
     },
