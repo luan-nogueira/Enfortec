@@ -1,4 +1,4 @@
-﻿import { initializeApp, deleteApp } from "firebase/app";
+import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { firebaseConfig } from "@/lib/firebase";
 import { useAuth, isAdminEmail } from "@/_core/hooks/useAuth";
@@ -11,7 +11,7 @@ import { db, storage } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, onSnapshot, doc, updateDoc, setDoc, deleteDoc, query, orderBy, serverTimestamp, addDoc, getDoc } from "firebase/firestore";
 import { useLocation } from "wouter";
-import { Shield, User, UserCheck, UserPlus, ArrowLeft, Plus, X, Lock, Mail, Trash2, MessageCircle, Send, Coins, Gift, Check, Clock, LogOut, Gamepad2, Edit, Menu, BarChart3, Users, ShoppingBag, Tag, Image, Percent, Ban, Trophy, ExternalLink, Flame, Copy, Settings, Bell, Filter, CheckCircle2, ShieldAlert, Package, Store, Star, MapPin, Search } from "lucide-react";
+import { Shield, User, UserCheck, UserPlus, ArrowLeft, Plus, X, Lock, Mail, Trash2, MessageCircle, Send, Coins, Gift, Check, Clock, LogOut, Gamepad2, Edit, Menu, BarChart3, Users, ShoppingBag, Tag, Image, Percent, Ban, Trophy, ExternalLink, Flame, Copy, Settings, Bell, Filter, CheckCircle2, ShieldAlert, Package, Store, Star, MapPin, Search, Zap } from "lucide-react";
 import { useState, useEffect, useRef, useMemo } from "react";
 import {
   Dialog,
@@ -1992,6 +1992,7 @@ export default function AdminDashboard() {
   // janela avisa quais são — se o preço da lista for diferente do preço do site, ela
   // pergunta se é pra atualizar (cada linha = um jogo do site que bateu com a lista).
   const [showBatchExistingModal, setShowBatchExistingModal] = useState(false);
+  const [showBatchEconomiaPrompt, setShowBatchEconomiaPrompt] = useState(false);
   const [batchExistingRows, setBatchExistingRows] = useState<any[]>([]);
   const [isUpdatingBatchPrices, setIsUpdatingBatchPrices] = useState(false);
   const batchUpdatePriceMutation = trpc.digitalProducts.adminUpdatePrice.useMutation();
@@ -2218,6 +2219,7 @@ export default function AdminDashboard() {
         seenSiteIds.add(site.id);
         const sitePrice = siteMainPrice(site);
         const priceDiffers = g.hasListPrice && Math.round(g.pricePrimary * 100) !== Math.round(sitePrice * 100);
+        const isEconomia = site.showInEconomia === true;
         existingRows.push({
           siteId: site.id,
           name: site.name,
@@ -2226,7 +2228,9 @@ export default function AdminDashboard() {
           sitePrice,
           listPrice: g.pricePrimary,
           priceDiffers,
-          update: priceDiffers,
+          isEconomia,
+          // Se for da área "Jogue com Economia", inicia como falso para não sobrescrever por engano
+          update: priceDiffers && !isEconomia,
         });
       });
     });
@@ -2240,7 +2244,26 @@ export default function AdminDashboard() {
     if (newGames.length > 0) triggerBatchCoverSearch(newGames);
     if (existingRows.length > 0) {
       setBatchExistingRows(existingRows);
-      setShowBatchExistingModal(true);
+      // Se houver jogos da área "Jogue com Economia" com preços diferentes, abre primeiro o pop-up perguntando
+      const hasEconomiaDiff = existingRows.some((r) => r.isEconomia && r.priceDiffers);
+      if (hasEconomiaDiff) {
+        setShowBatchEconomiaPrompt(true);
+      } else {
+        setShowBatchExistingModal(true);
+      }
+    }
+  };
+
+  const handleEconomiaChoice = (alterEconomia: boolean) => {
+    setBatchExistingRows((rows) =>
+      rows.map((r) => (r.isEconomia && r.priceDiffers ? { ...r, update: alterEconomia } : r))
+    );
+    setShowBatchEconomiaPrompt(false);
+    setShowBatchExistingModal(true);
+    if (alterEconomia) {
+      toast.info("Jogos da área 'Jogue com Economia' incluídos para alteração.");
+    } else {
+      toast.info("Preços da área 'Jogue com Economia' mantidos sem alteração.");
     }
   };
 
@@ -2248,6 +2271,7 @@ export default function AdminDashboard() {
   // cadastrar, o Cadastro em Lote fecha junto — não há mais nada pra fazer nele.
   const closeBatchExistingModal = () => {
     setShowBatchExistingModal(false);
+    setShowBatchEconomiaPrompt(false);
     if (batchGames.length === 0) {
       setShowBatchModal(false);
       setBatchRawText("");
@@ -8355,6 +8379,103 @@ export default function AdminDashboard() {
         </DialogContent>
       </Dialog>
 
+      {/* Pop-up do Cadastro em Lote: Pergunta se deseja alterar os preços da área "Jogue com Economia" */}
+      <Dialog
+        open={showBatchEconomiaPrompt}
+        onOpenChange={(open) => {
+          if (!open) {
+            handleEconomiaChoice(false);
+          }
+        }}
+      >
+        <DialogContent className="bg-slate-900 border-red-500/40 text-white w-[92vw] sm:w-full sm:max-w-md card-neon max-h-[88dvh] overflow-y-auto p-0 gap-0">
+          {(() => {
+            const economiaRows = batchExistingRows.filter((r) => r.isEconomia && r.priceDiffers);
+            const formatPrice = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
+            const totalEconomia = economiaRows.length;
+
+            return (
+              <>
+                <div className="bg-gradient-to-b from-red-500/20 via-red-500/5 to-transparent px-5 pt-7 pb-4">
+                  <div className="mx-auto mb-3 w-14 h-14 rounded-full bg-red-500/20 border border-red-500/50 flex items-center justify-center shadow-[0_0_25px_rgba(239,68,68,0.35)]">
+                    <Zap className="w-7 h-7 text-red-500 animate-pulse" />
+                  </div>
+                  <DialogHeader className="sm:text-center">
+                    <DialogTitle className="text-lg font-black text-white leading-tight">
+                      Alterar área "Jogue com Economia"?
+                    </DialogTitle>
+                    <DialogDescription className="text-slate-300 text-xs leading-relaxed mt-1.5">
+                      Identificamos que {totalEconomia === 1 ? "1 jogo da sua lista está" : `${totalEconomia} jogos da sua lista estão`} na área <strong className="text-red-400 font-bold">Jogue com Economia</strong> com preço diferente do que está no site.
+                    </DialogDescription>
+                  </DialogHeader>
+                </div>
+
+                <div className="px-5 pb-5 space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-[11px] text-red-400 font-bold uppercase tracking-wide flex items-center gap-1.5">
+                        <Zap className="w-3.5 h-3.5" />
+                        {totalEconomia === 1 ? "Jogo encontrado na Economia:" : "Jogos encontrados na Economia:"}
+                      </Label>
+                    </div>
+
+                    <div className="max-h-44 overflow-y-auto space-y-1.5 pr-1 rounded-xl border border-red-950/50 bg-slate-950/60 p-2">
+                      {economiaRows.map((row) => (
+                        <div
+                          key={row.siteId}
+                          className="flex items-center gap-2.5 rounded-lg border border-red-900/30 bg-slate-900/80 px-2.5 py-1.5"
+                        >
+                          <div className="h-9 w-12 shrink-0 rounded overflow-hidden bg-slate-800 flex items-center justify-center">
+                            {row.imageUrl ? (
+                              <img src={row.imageUrl} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <Gamepad2 className="w-4 h-4 text-slate-600" />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-white truncate" title={row.name}>{row.name}</p>
+                            <div className="flex items-center gap-1.5 text-[11px]">
+                              {row.platform && (
+                                <span className="text-[9px] font-black px-1 rounded bg-blue-950/60 text-blue-300">{row.platform}</span>
+                              )}
+                              <span className="text-slate-400 line-through">{formatPrice(row.sitePrice)}</span>
+                              <span className="text-slate-500">→</span>
+                              <span className="text-red-400 font-bold">{formatPrice(row.listPrice)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 p-2.5 text-[11px] text-amber-200/90 leading-relaxed">
+                    💡 <strong>Aviso:</strong> Se optar por não alterar, os preços atuais da vitrine Economia serão mantidos intactos.
+                  </div>
+
+                  <DialogFooter className="flex-col sm:flex-row gap-2 pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => handleEconomiaChoice(false)}
+                      className="w-full sm:w-auto border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 text-xs"
+                    >
+                      Não alterar Economia
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => handleEconomiaChoice(true)}
+                      className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white font-bold text-xs btn-neon"
+                    >
+                      Sim, alterar também
+                    </Button>
+                  </DialogFooter>
+                </div>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
       {/* Janela do Cadastro em Lote: jogos da lista que já estão no site (abre por cima dele) */}
       <Dialog open={showBatchExistingModal} onOpenChange={(open) => { if (!open && !isUpdatingBatchPrices) closeBatchExistingModal(); }}>
         <DialogContent className="bg-slate-900 border-amber-500/30 text-white w-[92vw] sm:w-full sm:max-w-lg card-neon max-h-[88dvh] overflow-y-auto p-0 gap-0">
@@ -8405,7 +8526,15 @@ export default function AdminDashboard() {
                         {priceRows.map((row) => (
                           <label
                             key={row.siteId}
-                            className={`flex items-center gap-3 rounded-xl border px-3 py-2 cursor-pointer transition-colors ${row.update ? "bg-amber-950/25 border-amber-500/40" : "bg-slate-950/60 border-slate-800"}`}
+                            className={`flex items-center gap-3 rounded-xl border px-3 py-2 cursor-pointer transition-colors ${
+                              row.isEconomia
+                                ? row.update
+                                  ? "bg-red-950/25 border-red-500/40"
+                                  : "bg-slate-950/60 border-red-950/40"
+                                : row.update
+                                  ? "bg-amber-950/25 border-amber-500/40"
+                                  : "bg-slate-950/60 border-slate-800"
+                            }`}
                           >
                             <div className="h-10 w-16 shrink-0 rounded-md overflow-hidden bg-slate-800 flex items-center justify-center">
                               {row.imageUrl ? (
@@ -8415,14 +8544,22 @@ export default function AdminDashboard() {
                               )}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <p className="text-xs font-bold text-white truncate" title={row.name}>{row.name}</p>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <p className="text-xs font-bold text-white truncate" title={row.name}>{row.name}</p>
+                                {row.isEconomia && (
+                                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-red-950/80 text-red-300 border border-red-800/50 flex items-center gap-1 shrink-0">
+                                    <Zap className="w-2.5 h-2.5 text-red-400 fill-red-400" />
+                                    Jogue com Economia
+                                  </span>
+                                )}
+                              </div>
                               <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
                                 {row.platform && (
                                   <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-blue-950/60 text-blue-300">{row.platform}</span>
                                 )}
                                 <span className="text-[11px] text-slate-500 line-through">{formatPrice(row.sitePrice)}</span>
                                 <span className="text-[11px] text-slate-600">→</span>
-                                <span className="text-xs font-black text-amber-400">{formatPrice(row.listPrice)}</span>
+                                <span className={`text-xs font-black ${row.isEconomia ? "text-red-400" : "text-amber-400"}`}>{formatPrice(row.listPrice)}</span>
                               </div>
                             </div>
                             <input
@@ -8430,7 +8567,7 @@ export default function AdminDashboard() {
                               checked={row.update}
                               disabled={isUpdatingBatchPrices}
                               onChange={(e) => setBatchExistingRows((rows) => rows.map((r) => (r.siteId === row.siteId ? { ...r, update: e.target.checked } : r)))}
-                              className="w-4 h-4 rounded border-amber-600/40 bg-slate-950 text-amber-500 focus:ring-amber-500 shrink-0"
+                              className={`w-4 h-4 rounded shrink-0 ${row.isEconomia ? "border-red-600/40 bg-slate-950 text-red-500 focus:ring-red-500" : "border-amber-600/40 bg-slate-950 text-amber-500 focus:ring-amber-500"}`}
                             />
                           </label>
                         ))}
@@ -8449,6 +8586,11 @@ export default function AdminDashboard() {
                             <span className="flex items-center gap-2 min-w-0">
                               <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
                               <span className="text-xs text-slate-300 truncate" title={row.name}>{row.name}</span>
+                              {row.isEconomia && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-950/60 text-red-400 border border-red-900/40 shrink-0">
+                                  Economia
+                                </span>
+                              )}
                             </span>
                             <span className="text-[11px] text-slate-500 shrink-0">{formatPrice(row.sitePrice)}</span>
                           </div>

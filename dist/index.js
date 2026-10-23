@@ -1094,21 +1094,22 @@ async function getOrdersByBuyerId(buyerId) {
   const sellerUsers = alias(users, "sellerUsers");
   const results = await db.select({
     order: orders,
-    product: products,
-    usedProduct: usedProducts,
-    digitalProduct: digitalProducts,
+    storeProductName: products.name,
+    usedProductName: usedProducts.name,
+    digitalProductName: digitalProducts.name,
+    digitalProductPlatform: digitalProducts.platform,
     sellerOpenId: sellerUsers.openId,
     sellerName: sellerUsers.name
   }).from(orders).leftJoin(products, eq(orders.productId, products.id)).leftJoin(usedProducts, eq(orders.usedProductId, usedProducts.id)).leftJoin(digitalProducts, eq(orders.digitalProductId, digitalProducts.id)).leftJoin(sellerUsers, eq(orders.sellerId, sellerUsers.id)).where(eq(orders.buyerId, buyerId)).orderBy(desc(orders.createdAt));
   const mapped = results.map((r) => {
     let productName = r.order.productName;
     if (!productName || productName.trim() === "" || productName === "Produto") {
-      if (r.order.productType === "store" && r.product) {
-        productName = r.product.name;
-      } else if (r.order.productType === "used" && r.usedProduct) {
-        productName = r.usedProduct.name;
-      } else if (r.order.productType === "digital" && r.digitalProduct) {
-        productName = r.digitalProduct.name;
+      if (r.order.productType === "store" && r.storeProductName) {
+        productName = r.storeProductName;
+      } else if (r.order.productType === "used" && r.usedProductName) {
+        productName = r.usedProductName;
+      } else if (r.order.productType === "digital" && r.digitalProductName) {
+        productName = r.digitalProductName;
       } else {
         productName = "Produto";
       }
@@ -1120,7 +1121,7 @@ async function getOrdersByBuyerId(buyerId) {
       sellerName: r.sellerName,
       // Plataforma do jogo (PS4/PS5/PS4-PS5) pra filtrar os materiais de ajuda de entrega
       // pela plataforma certa — usado só quando o pedido é digital.
-      digitalProductPlatform: r.digitalProduct?.platform || null
+      digitalProductPlatform: r.digitalProductPlatform || null
     };
   });
   return deduplicateOrders(mapped);
@@ -1130,19 +1131,19 @@ async function getOrdersBySellerId(sellerId) {
   if (!db) return [];
   const results = await db.select({
     order: orders,
-    product: products,
-    usedProduct: usedProducts,
-    digitalProduct: digitalProducts
+    storeProductName: products.name,
+    usedProductName: usedProducts.name,
+    digitalProductName: digitalProducts.name
   }).from(orders).leftJoin(products, eq(orders.productId, products.id)).leftJoin(usedProducts, eq(orders.usedProductId, usedProducts.id)).leftJoin(digitalProducts, eq(orders.digitalProductId, digitalProducts.id)).where(eq(orders.sellerId, sellerId)).orderBy(desc(orders.createdAt));
   const mapped = results.map((r) => {
     let productName = r.order.productName;
     if (!productName || productName.trim() === "" || productName === "Produto") {
-      if (r.order.productType === "store" && r.product) {
-        productName = r.product.name;
-      } else if (r.order.productType === "used" && r.usedProduct) {
-        productName = r.usedProduct.name;
-      } else if (r.order.productType === "digital" && r.digitalProduct) {
-        productName = r.digitalProduct.name;
+      if (r.order.productType === "store" && r.storeProductName) {
+        productName = r.storeProductName;
+      } else if (r.order.productType === "used" && r.usedProductName) {
+        productName = r.usedProductName;
+      } else if (r.order.productType === "digital" && r.digitalProductName) {
+        productName = r.digitalProductName;
       } else {
         productName = "Produto";
       }
@@ -1160,19 +1161,19 @@ async function getAllOrdersWithDetails() {
   const results = await db.select({
     order: orders,
     buyer: users,
-    product: products,
-    usedProduct: usedProducts,
-    digitalProduct: digitalProducts
+    storeProductName: products.name,
+    usedProductName: usedProducts.name,
+    digitalProductName: digitalProducts.name
   }).from(orders).leftJoin(users, eq(orders.buyerId, users.id)).leftJoin(products, eq(orders.productId, products.id)).leftJoin(usedProducts, eq(orders.usedProductId, usedProducts.id)).leftJoin(digitalProducts, eq(orders.digitalProductId, digitalProducts.id)).orderBy(desc(orders.createdAt));
   const mapped = results.map((r) => {
     let productName = r.order.productName;
     if (!productName || productName.trim() === "" || productName === "Produto") {
-      if (r.order.productType === "store" && r.product) {
-        productName = r.product.name;
-      } else if (r.order.productType === "used" && r.usedProduct) {
-        productName = r.usedProduct.name;
-      } else if (r.order.productType === "digital" && r.digitalProduct) {
-        productName = r.digitalProduct.name;
+      if (r.order.productType === "store" && r.storeProductName) {
+        productName = r.storeProductName;
+      } else if (r.order.productType === "used" && r.usedProductName) {
+        productName = r.usedProductName;
+      } else if (r.order.productType === "digital" && r.digitalProductName) {
+        productName = r.digitalProductName;
       } else {
         productName = "Produto";
       }
@@ -4731,11 +4732,27 @@ app.get("/api/used-product-image/:id/:index", async (req, res) => {
     return res.status(500).end();
   }
 });
+var CDN_CACHEABLE_PATHS = /* @__PURE__ */ new Set([
+  "products.list",
+  "usedProducts.list",
+  "digitalProducts.list",
+  "reviews.getRecent",
+  "sellers.list"
+]);
 app.use(
   "/api/trpc",
   createExpressMiddleware({
     router: appRouter,
-    createContext
+    createContext,
+    responseMeta({ paths, errors, type }) {
+      const allCacheable = type === "query" && errors.length === 0 && !!paths && paths.length > 0 && paths.every((p) => CDN_CACHEABLE_PATHS.has(p));
+      if (!allCacheable) return {};
+      return {
+        headers: new Headers([
+          ["Cache-Control", "public, max-age=0, s-maxage=600, stale-while-revalidate=600"]
+        ])
+      };
+    }
   })
 );
 async function runMigrations() {
