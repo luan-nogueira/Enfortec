@@ -1510,8 +1510,9 @@ export default function AdminDashboard() {
   const adminDigitalProductsQuery = trpc.digitalProducts.adminList.useQuery(undefined, { enabled: !!(isAuthenticated && isAdmin) });
   const gamesList = adminDigitalProductsQuery.data || [];
   const [gameSearchQuery, setGameSearchQuery] = useState("");
+  const [gameCatalogFilter, setGameCatalogFilter] = useState<"todos" | "loja_normal" | "economia">("todos");
   const [stockSearchQuery, setStockSearchQuery] = useState("");
-  const [stockFilterMode, setStockFilterMode] = useState<"todos" | "com_pool" | "manual">("todos");
+  const [stockFilterMode, setStockFilterMode] = useState<"todos" | "com_pool" | "manual" | "economia" | "loja_normal">("todos");
   const [stockSortBy, setStockSortBy] = useState<"nome" | "estoque" | "pool">("nome");
   const [stockSortDir, setStockSortDir] = useState<"asc" | "desc">("asc");
   const LOW_STOCK_THRESHOLD = 3;
@@ -1579,7 +1580,7 @@ export default function AdminDashboard() {
   });
 
   // Pool de contas (email+senha) em estoque por jogo — entrega automática na compra
-  const [accountsModalGame, setAccountsModalGame] = useState<{ id: number; name: string; hasSecondary: boolean; isCombinedPlatform: boolean; allowManualWithoutStock: boolean } | null>(null);
+  const [accountsModalGame, setAccountsModalGame] = useState<{ id: number; name: string; hasSecondary: boolean; isCombinedPlatform: boolean; allowManualWithoutStock: boolean; isEconomia: boolean } | null>(null);
   const [accountsRawTextPrimary, setAccountsRawTextPrimary] = useState("");
   const [accountsRawTextSecondary, setAccountsRawTextSecondary] = useState("");
   // Quantidade que cada conta cadastrada vai aguentar vender — o admin escolhe direto
@@ -1706,7 +1707,14 @@ export default function AdminDashboard() {
     // console só não precisa dessa escolha extra.
     const plat = (game.platform || "").toUpperCase();
     const isCombinedPlatform = !((plat.includes("PS4") && !plat.includes("PS5")) || (plat.includes("PS5") && !plat.includes("PS4")));
-    setAccountsModalGame({ id: game.id, name: game.name, hasSecondary, isCombinedPlatform, allowManualWithoutStock: !!game.allowManualWithoutStock });
+    setAccountsModalGame({
+      id: game.id,
+      name: game.name,
+      hasSecondary,
+      isCombinedPlatform,
+      allowManualWithoutStock: !!game.allowManualWithoutStock,
+      isEconomia: Boolean(game.showInEconomia),
+    });
   };
 
   // Modal "Ver Loja" — detalhe de um vendedor da comunidade (contato, anúncios, vendas)
@@ -1892,6 +1900,8 @@ export default function AdminDashboard() {
       if (query && !(game.name || "").toLowerCase().includes(query)) return false;
       if (stockFilterMode === "com_pool" && !poolInfo) return false;
       if (stockFilterMode === "manual" && poolInfo) return false;
+      if (stockFilterMode === "economia" && !game.showInEconomia) return false;
+      if (stockFilterMode === "loja_normal" && game.showInEconomia) return false;
       return true;
     });
 
@@ -3275,24 +3285,32 @@ export default function AdminDashboard() {
       toast.warning("Nome e plataforma são obrigatórios.");
       return;
     }
-    const pricePrimaryVal = gamePricePrimary !== "" ? Number(gamePricePrimary) : null;
-    const priceSecondaryVal = gamePriceSecondary !== "" ? Number(gamePriceSecondary) : null;
-    if (pricePrimaryVal === null && priceSecondaryVal === null) {
-      toast.warning("Informe ao menos um preço: Primária ou Secundária.");
-      return;
+    const isEconomia = Boolean(gameShowInEconomia);
+    let pricePrimaryVal = (gamePricePrimary !== "" && !isNaN(Number(gamePricePrimary))) ? Number(gamePricePrimary) : null;
+    let priceSecondaryVal = (gamePriceSecondary !== "" && !isNaN(Number(gamePriceSecondary))) ? Number(gamePriceSecondary) : null;
+
+    if (isEconomia) {
+      if (priceSecondaryVal === null || priceSecondaryVal <= 0) {
+        toast.warning("Para jogos da vitrine Economia, informe o preço da conta secundária.");
+        return;
+      }
+      // Vitrine Economia é exclusiva para Conta Secundária
+      pricePrimaryVal = null;
+    } else {
+      if (pricePrimaryVal === null && priceSecondaryVal === null) {
+        toast.warning("Informe ao menos um preço: Primária ou Secundária.");
+        return;
+      }
     }
     setAddingGame(true);
 
-    // Jogo só com conta secundária (sem primária): a coluna "price" (base, obrigatória
-    // no banco) usa o preço secundário, e "Conta Primária" some do site — não faz mais
-    // sentido oferecer/cobrar por uma conta primária que não existe.
-    const basePriceVal = pricePrimaryVal ?? priceSecondaryVal!;
+    const basePriceVal = isEconomia ? priceSecondaryVal! : (pricePrimaryVal ?? priceSecondaryVal!);
     const itemType = (gameCategory === "Assinaturas" || gameCategory === "assinatura") ? "assinatura" : "jogo";
 
     const payload = {
       name: gameName.trim(),
       price: basePriceVal,
-      pricePrimary: pricePrimaryVal,
+      pricePrimary: isEconomia ? null : pricePrimaryVal,
       priceSecondary: priceSecondaryVal,
       platform: gamePlatform.trim(),
       category: gameCategory.trim(),
@@ -3302,8 +3320,8 @@ export default function AdminDashboard() {
       stock: Number(gameStock),
       isActive: gameIsActive,
       isPreVenda: gameIsPreVenda,
-      showInEconomia: gameShowInEconomia,
-      economiaLicenseType: gameEconomiaLicenseType,
+      showInEconomia: isEconomia,
+      economiaLicenseType: "secundaria",
       expiresAt: gameExpiresAt ? new Date(gameExpiresAt).toISOString() : null,
       description: "Mídia Digital Eforte Games.",
     };
@@ -3350,14 +3368,21 @@ export default function AdminDashboard() {
     setGameName(game.name || "");
     setGamePrice(game.price || 0);
 
+    const isEconomia = Boolean(game.showInEconomia);
     const rawPrimary = game.pricePrimary ?? game.price_primary;
     const rawSecondary = game.priceSecondary ?? game.price_secondary;
-    const effectivePrimary = (rawPrimary !== undefined && rawPrimary !== null && rawPrimary !== "")
-      ? String(rawPrimary)
-      : (!rawSecondary && game.price ? String(game.price) : "");
+    const effectivePrimary = isEconomia
+      ? ""
+      : (rawPrimary !== undefined && rawPrimary !== null && rawPrimary !== "")
+        ? String(rawPrimary)
+        : (!rawSecondary && game.price ? String(game.price) : "");
+
+    const effectiveSecondary = (rawSecondary !== undefined && rawSecondary !== null && rawSecondary !== "")
+      ? String(rawSecondary)
+      : (isEconomia && game.price ? String(game.price) : "");
 
     setGamePricePrimary(effectivePrimary);
-    setGamePriceSecondary(rawSecondary !== undefined && rawSecondary !== null ? String(rawSecondary) : "");
+    setGamePriceSecondary(effectiveSecondary);
     setGamePlatform(game.platform || "");
     setGameCategory(game.category || "");
     setGameImageUrl(game.imageUrl || "");
@@ -3366,8 +3391,8 @@ export default function AdminDashboard() {
     setGameIsActive(game.isActive ?? true);
     setGameIsPreVenda(game.isPreVenda ?? false);
     setGameExpiresAt(toDatetimeLocalValue(game.expiresAt));
-    setGameShowInEconomia(game.showInEconomia ?? false);
-    setGameEconomiaLicenseType(game.economiaLicenseType || "secundaria");
+    setGameShowInEconomia(isEconomia);
+    setGameEconomiaLicenseType("secundaria");
     setShowGameModal(true);
   };
 
@@ -5068,19 +5093,39 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            <div className="relative mb-6 max-w-sm">
-              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <Input
-                value={gameSearchQuery}
-                onChange={(e) => setGameSearchQuery(e.target.value)}
-                placeholder="Pesquisar jogo pelo nome..."
-                className="bg-slate-950 border-red-600/20 text-white pl-9"
-              />
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
+              <div className="relative max-w-sm w-full">
+                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <Input
+                  value={gameSearchQuery}
+                  onChange={(e) => setGameSearchQuery(e.target.value)}
+                  placeholder="Pesquisar jogo pelo nome..."
+                  className="bg-slate-950 border-red-600/20 text-white pl-9"
+                />
+              </div>
+              <div className="flex gap-1.5 bg-slate-950 border border-slate-800 rounded-lg p-1 w-fit">
+                {([
+                  ["todos", "Todos"],
+                  ["loja_normal", "🛍️ Loja Normal"],
+                  ["economia", "⚡ Economia"],
+                ] as const).map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setGameCatalogFilter(mode)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${
+                      gameCatalogFilter === mode ? "bg-red-600 text-white" : "text-slate-400 hover:bg-slate-800"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {(() => {
               const queryStr = gameSearchQuery.trim().toLowerCase();
-              const filteredGamesList = queryStr
+              let filteredGamesList = queryStr
                 ? gamesList.filter((g: any) =>
                     g.name?.toLowerCase().includes(queryStr) ||
                     g.sellerName?.toLowerCase().includes(queryStr) ||
@@ -5089,11 +5134,18 @@ export default function AdminDashboard() {
                     String(g.sellerId || "").includes(queryStr)
                   )
                 : gamesList;
+
+              if (gameCatalogFilter === "economia") {
+                filteredGamesList = filteredGamesList.filter((g: any) => Boolean(g.showInEconomia));
+              } else if (gameCatalogFilter === "loja_normal") {
+                filteredGamesList = filteredGamesList.filter((g: any) => !g.showInEconomia);
+              }
+
               if (filteredGamesList.length === 0) {
                 return (
                   <div className="text-center py-16 bg-slate-900 border border-slate-800 rounded-2xl">
                     <Gamepad2 className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                    <p className="text-slate-400 text-sm">Nenhum jogo encontrado para "{gameSearchQuery}".</p>
+                    <p className="text-slate-400 text-sm">Nenhum jogo encontrado para os filtros selecionados.</p>
                   </div>
                 );
               }
@@ -5115,7 +5167,14 @@ export default function AdminDashboard() {
                   <div>
                     <div className="flex justify-between items-start gap-2 mb-2">
                       <div className="min-w-0 flex-1">
-                        <h3 className="font-bold text-white text-sm line-clamp-2" title={game.name}>{game.name}</h3>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h3 className="font-bold text-white text-sm line-clamp-2" title={game.name}>{game.name}</h3>
+                          {Boolean(game.showInEconomia) && (
+                            <span className="bg-red-600/20 border border-red-500/40 text-red-400 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider inline-flex items-center gap-0.5 shrink-0">
+                              ⚡ Economia
+                            </span>
+                          )}
+                        </div>
                         {game.sellerId && (
                           <div className="mt-1 bg-amber-950/40 border border-amber-500/30 p-2 rounded-lg text-xs space-y-0.5">
                             <div className="flex items-center justify-between gap-1 flex-wrap">
@@ -5193,18 +5252,18 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className="mt-2 pt-2 border-t border-slate-800 flex items-center justify-between">
-                      <span className="text-[10px] text-slate-400 font-bold" title="Isso NÃO ativa/desativa o jogo — só controla se ele também aparece na página separada 'Jogue com Economia'.">⚡ Vitrine "Economia":</span>
+                      <span className="text-[10px] text-slate-400 font-bold" title="Isso controla se o jogo aparece exclusivamente na página 'Jogue com Economia'.">⚡ Vitrine "Economia":</span>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          const currentVal = game.showInEconomia !== false;
+                          const currentVal = Boolean(game.showInEconomia);
 
                           const applyToggle = () => {
                             // Reconstruímos o payload necessário para a mutation
                             const payload = {
                               name: game.name,
                               price: Number(game.price),
-                              pricePrimary: game.pricePrimary != null ? Number(game.pricePrimary) : null,
+                              pricePrimary: !currentVal ? null : (game.pricePrimary != null ? Number(game.pricePrimary) : null),
                               priceSecondary: game.priceSecondary != null ? Number(game.priceSecondary) : null,
                               type: game.type as any,
                               platform: game.platform ?? undefined,
@@ -5214,22 +5273,20 @@ export default function AdminDashboard() {
                               stock: game.stock ?? 1,
                               isActive: game.isActive ?? true,
                               isPreVenda: game.isPreVenda ?? false,
-                              economiaLicenseType: game.economiaLicenseType ?? undefined,
+                              economiaLicenseType: "secundaria",
                               showInEconomia: !currentVal,
                               id: game.id,
                             };
 
                             adminUpdateGameMutation.mutate(payload, {
                               onSuccess: () => {
-                                toast.success(!currentVal ? "Movido para a vitrine 'Jogue com Economia' — some do catálogo normal." : "Voltou pro catálogo normal — saiu da vitrine 'Jogue com Economia'.");
+                                toast.success(!currentVal ? "Movido para a vitrine 'Jogue com Economia' (apenas Secundária)." : "Voltou pro catálogo normal — saiu da vitrine 'Jogue com Economia'.");
                               }
                             });
                           };
 
-                          // Marcar "Economia" tira o jogo do catálogo normal e do banner da Home —
-                          // pede confirmação só nessa direção, já que é a que causa surpresa.
                           if (!currentVal) {
-                            toast(`"${game.name}" vai sumir do catálogo normal e do banner, e só vai aparecer na página "Jogue com Economia". Confirma?`, {
+                            toast(`"${game.name}" vai sumir do catálogo normal e do banner, e só vai aparecer na página "Jogue com Economia" (apenas Secundária). Confirma?`, {
                               action: { label: "Confirmar", onClick: applyToggle },
                             });
                           } else {
@@ -5237,12 +5294,12 @@ export default function AdminDashboard() {
                           }
                         }}
                         className={`text-[9px] px-2 py-0.5 rounded font-black uppercase transition-all ${
-                          game.showInEconomia !== false
+                          Boolean(game.showInEconomia)
                             ? "bg-red-600/20 text-red-400 border border-red-500/40 hover:bg-red-600/40"
                             : "bg-slate-900 text-slate-500 border border-slate-800 hover:bg-slate-800"
                         }`}
                       >
-                        {game.showInEconomia !== false ? `⚡ Também na Economia (${game.economiaLicenseType === "primaria" ? "Primária" : game.economiaLicenseType === "ambas" ? "Ambas" : "Secundária"})` : "Fora da Economia"}
+                        {Boolean(game.showInEconomia) ? "⚡ Na Economia (Secundária)" : "Fora da Economia"}
                       </button>
                     </div>
 
@@ -5309,11 +5366,13 @@ export default function AdminDashboard() {
                   className="bg-slate-950 border-red-600/20 text-white pl-9"
                 />
               </div>
-              <div className="flex gap-1.5 bg-slate-950 border border-slate-800 rounded-lg p-1 w-fit">
+              <div className="flex gap-1.5 bg-slate-950 border border-slate-800 rounded-lg p-1 w-fit flex-wrap">
                 {([
                   ["todos", "Todos"],
                   ["com_pool", "Com Conta"],
                   ["manual", "Manual"],
+                  ["loja_normal", "🛍️ Loja Normal"],
+                  ["economia", "⚡ Economia"],
                 ] as const).map(([mode, label]) => (
                   <button
                     key={mode}
@@ -5367,7 +5426,16 @@ export default function AdminDashboard() {
                                 </div>
                               )}
                             </div>
-                            <span className="text-white font-medium max-w-[200px] truncate" title={game.name}>{game.name}</span>
+                            <div className="flex flex-col min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-white font-medium max-w-[200px] truncate" title={game.name}>{game.name}</span>
+                                {Boolean(game.showInEconomia) && (
+                                  <span className="bg-red-600/20 border border-red-500/40 text-red-400 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider inline-flex items-center gap-0.5 shrink-0">
+                                    ⚡ Economia
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         </td>
                         <td className="p-3 text-slate-400">{game.platform || "—"}</td>
@@ -7005,15 +7073,73 @@ export default function AdminDashboard() {
 
       {/* Modal de Adicionar / Editar Jogo */}
       <Dialog open={showGameModal} onOpenChange={setShowGameModal}>
-        <DialogContent className="bg-slate-900 border-red-600/30 text-white max-w-md card-neon">
+        <DialogContent className="bg-slate-900 border-red-600/30 text-white max-w-md card-neon max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold flex items-center gap-2 text-neon">
+            <DialogTitle className="text-xl font-bold flex items-center gap-2 text-neon flex-wrap">
               <Gamepad2 className="text-red-500" /> {editingGameId ? "Editar Jogo" : "Cadastrar Novo Jogo"}
+              {gameShowInEconomia && (
+                <span className="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ml-auto shadow-sm">
+                  ⚡ Economia
+                </span>
+              )}
             </DialogTitle>
             <DialogDescription className="text-slate-400 text-xs">
-              Preencha as informações do jogo que ficará disponível na loja.
+              Preencha as informações do produto que ficará disponível na loja.
             </DialogDescription>
           </DialogHeader>
+
+          {/* Seletor visual de Destino: Loja Principal vs Jogue com Economia */}
+          <div className="space-y-1.5 my-1">
+            <Label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+              Destino do Cadastro:
+            </Label>
+            <div className="p-1 bg-slate-950 border border-slate-800 rounded-lg grid grid-cols-2 gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setGameShowInEconomia(false);
+                }}
+                className={`py-2 px-2.5 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  !gameShowInEconomia
+                    ? "bg-red-600 text-white shadow-md shadow-red-600/30"
+                    : "text-slate-400 hover:text-white hover:bg-slate-900"
+                }`}
+              >
+                🛍️ Loja Principal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setGameShowInEconomia(true);
+                  setGameEconomiaLicenseType("secundaria");
+                  setGamePricePrimary("");
+                }}
+                className={`py-2 px-2.5 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  gameShowInEconomia
+                    ? "bg-red-600 text-white shadow-md shadow-red-600/30"
+                    : "text-slate-400 hover:text-white hover:bg-slate-900"
+                }`}
+              >
+                ⚡ Jogue com Economia
+              </button>
+            </div>
+            {gameShowInEconomia ? (
+              <div className="bg-red-950/40 border border-red-500/40 p-2.5 rounded-lg text-xs space-y-1">
+                <div className="flex items-center gap-1.5 text-red-400 font-bold uppercase text-[10px]">
+                  <Zap className="w-3.5 h-3.5 text-red-500 animate-pulse" />
+                  <span>Modo Economia Ativo — Exclusivo Conta Secundária</span>
+                </div>
+                <p className="text-[10px] text-slate-300 leading-tight">
+                  Este produto aparecerá exclusivamente na página separada <strong>/jogue-com-economia</strong> e funcionará <strong>apenas com Conta Secundária</strong>. A opção de Primária foi desativada para este cadastro.
+                </p>
+              </div>
+            ) : (
+              <p className="text-[9px] text-slate-500 leading-tight">
+                Aparecerá no catálogo normal da loja e na Home, com opção de cadastrar conta Primária e/ou Secundária.
+              </p>
+            )}
+          </div>
+
           <form onSubmit={handleSaveGame} className="space-y-4 my-2">
             <div className="space-y-2">
               <div className="flex justify-between items-center">
@@ -7032,7 +7158,7 @@ export default function AdminDashboard() {
                 value={gameName}
                 onChange={(e) => setGameName(e.target.value)}
                 onBlur={() => { if (!gameImageUrl && gameName.trim().length >= 3) handleSearchCoverAuto(gameName); }}
-                placeholder="Ex: God of War Ragnarok ou PS Plus Essential 12 Meses"
+                placeholder={gameShowInEconomia ? "Ex: Call of Duty Modern Warfare 3" : "Ex: God of War Ragnarok ou PS Plus Essential"}
                 className="bg-slate-950 border-red-600/20 text-white"
                 required
               />
@@ -7082,83 +7208,70 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Preços: Primária vs Secundária */}
-            <div className="grid grid-cols-2 gap-3 bg-slate-950/60 p-3 rounded-lg border border-red-600/20">
-              <div className="space-y-1.5">
-                <Label className="text-xs text-slate-300 font-bold uppercase flex items-center gap-1">
-                  <span>👤 Preço Primária (R$)</span>
-                </Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={gamePricePrimary}
-                  onChange={(e) => {
-                    setGamePricePrimary(e.target.value);
-                    setGamePrice(Number(e.target.value));
-                  }}
-                  placeholder="Deixe em branco se não tiver conta primária"
-                  className="bg-slate-950 border-red-600/30 text-white font-bold"
-                  min={0}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs text-slate-400 font-bold uppercase flex items-center gap-1">
-                  <span>👥 Preço Secundária (R$)</span>
-                </Label>
+            {/* Preços: Primária vs Secundária ou Exclusivo Secundária (Economia) */}
+            {gameShowInEconomia ? (
+              <div className="bg-slate-950/60 p-3 rounded-lg border border-purple-500/30 space-y-2">
+                <div className="flex justify-between items-center">
+                  <Label className="text-xs text-purple-300 font-bold uppercase flex items-center gap-1">
+                    <span>👥 Preço da Conta Secundária (R$) *</span>
+                  </Label>
+                  <span className="text-[9px] bg-red-600/20 text-red-400 border border-red-500/30 px-1.5 py-0.2 rounded font-bold uppercase">
+                    Exclusivo Secundária
+                  </span>
+                </div>
                 <Input
                   type="number"
                   step="0.01"
                   value={gamePriceSecondary}
-                  onChange={(e) => setGamePriceSecondary(e.target.value)}
-                  placeholder="Ex: 90.00 (Opcional)"
-                  className="bg-slate-950 border-slate-800 text-white font-bold"
-                  min={0}
-                />
-              </div>
-            </div>
-
-            {/* Configuração para o "Jogue com Economia" */}
-            <div className="bg-red-950/20 p-3 rounded-lg border border-red-500/30 space-y-2.5">
-              <div className="flex items-center justify-between gap-3">
-                <Label className="text-xs text-white font-bold uppercase flex items-center gap-1.5 cursor-pointer">
-                  <span>⚠️ Tirar da loja principal e pôr SÓ na vitrine "Jogue com Economia"</span>
-                </Label>
-                <input
-                  type="checkbox"
-                  checked={gameShowInEconomia}
                   onChange={(e) => {
-                    const next = e.target.checked;
-                    if (next) {
-                      if (!window.confirm('Isso vai TIRAR este jogo do catálogo normal e do banner da Home — ele só vai aparecer na página separada /jogue-com-economia. NÃO marque isso só porque o jogo é "conta secundária/barata": jogos de conta secundária normais devem ficar desmarcados aqui. Confirma?')) {
-                        return;
-                      }
-                    }
-                    setGameShowInEconomia(next);
+                    setGamePriceSecondary(e.target.value);
+                    setGamePrice(Number(e.target.value));
                   }}
-                  className="w-4 h-4 accent-red-600 rounded cursor-pointer"
+                  placeholder="Ex: 89.90"
+                  className="bg-slate-950 border-purple-600/30 text-white font-bold"
+                  min={0}
+                  required
                 />
+                <p className="text-[10px] text-slate-400 leading-tight">
+                  ⚡ Na vitrine Economia, o cadastro é exclusivo para <strong>Conta Secundária</strong>. A opção primária foi removida deste cadastro para evitar confusão.
+                </p>
               </div>
-              <p className="text-[9px] text-slate-400 leading-tight">
-                Deixe DESMARCADO para jogos normais, mesmo que só tenham conta secundária — eles aparecem certinho no catálogo principal (só com a opção Secundária). Marque isto apenas para os poucos jogos que devem existir EXCLUSIVAMENTE na vitrine promocional separada /jogue-com-economia.
-              </p>
-              {gameShowInEconomia && (
-                <div className="space-y-1.5 pt-2 border-t border-red-500/20">
-                  <Label className="text-[10px] text-slate-300 font-bold uppercase block">
-                    Tipo de Conta em Destaque no Economia:
+            ) : (
+              <div className="grid grid-cols-2 gap-3 bg-slate-950/60 p-3 rounded-lg border border-red-600/20">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-slate-300 font-bold uppercase flex items-center gap-1">
+                    <span>👤 Preço Primária (R$)</span>
                   </Label>
-                  <select
-                    value={gameEconomiaLicenseType}
-                    onChange={(e) => setGameEconomiaLicenseType(e.target.value as any)}
-                    className="w-full bg-slate-950 border border-red-600/30 rounded-md h-9 px-3 text-xs text-white"
-                  >
-                    <option value="secundaria">👥 Conta Secundária (Padrão)</option>
-                    <option value="primaria">👤 Conta Primária</option>
-                    <option value="ambas">⚡ Ambas (Permitir escolha)</option>
-                  </select>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={gamePricePrimary}
+                    onChange={(e) => {
+                      setGamePricePrimary(e.target.value);
+                      setGamePrice(Number(e.target.value));
+                    }}
+                    placeholder="Deixe em branco se não tiver conta primária"
+                    className="bg-slate-950 border-red-600/30 text-white font-bold"
+                    min={0}
+                  />
                 </div>
-              )}
-            </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-slate-400 font-bold uppercase flex items-center gap-1">
+                    <span>👥 Preço Secundária (R$)</span>
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={gamePriceSecondary}
+                    onChange={(e) => setGamePriceSecondary(e.target.value)}
+                    placeholder="Ex: 90.00 (Opcional)"
+                    className="bg-slate-950 border-slate-800 text-white font-bold"
+                    min={0}
+                  />
+                </div>
+              </div>
+            )}
             <div className="space-y-4 border border-red-600/10 p-3 rounded-lg bg-slate-950/20">
               <div className="space-y-2">
                 <Label className="text-xs text-slate-300 font-bold uppercase">URL da Capa (Imagem)</Label>
@@ -7297,13 +7410,26 @@ export default function AdminDashboard() {
 
       {/* Modal de Gerenciar Contas em Estoque (pool de email+senha, entrega automática) */}
       <Dialog open={!!accountsModalGame} onOpenChange={(open) => !open && setAccountsModalGame(null)}>
-        <DialogContent className={`bg-slate-900 border-amber-600/30 text-white card-neon max-h-[85dvh] overflow-y-auto ${accountsModalGame?.hasSecondary ? "max-w-2xl" : "max-w-lg"}`}>
+        <DialogContent className={`bg-slate-900 border-amber-600/30 text-white card-neon max-h-[85dvh] overflow-y-auto ${accountsModalGame?.isEconomia ? "max-w-xl" : accountsModalGame?.hasSecondary ? "max-w-2xl" : "max-w-lg"}`}>
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-neon flex items-center gap-2">
+            <DialogTitle className="text-xl font-bold text-neon flex items-center gap-2 flex-wrap">
               <Lock className="w-5 h-5 text-amber-400" /> Contas em Estoque
+              {accountsModalGame?.isEconomia && (
+                <span className="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ml-auto shadow-sm flex items-center gap-1">
+                  ⚡ Jogue com Economia (Secundária)
+                </span>
+              )}
             </DialogTitle>
             <DialogDescription className="text-slate-400 text-xs">
-              {accountsModalGame?.name} — cadastre contas (email+senha) aqui pra elas serem entregues automaticamente assim que alguém comprar este jogo.
+              {accountsModalGame?.isEconomia ? (
+                <>
+                  <strong className="text-white">{accountsModalGame?.name}</strong> — jogo cadastrado na vitrine <strong className="text-red-400">Jogue com Economia</strong>. O cadastro é <strong className="text-purple-300">exclusivo para Conta Secundária</strong>.
+                </>
+              ) : (
+                <>
+                  {accountsModalGame?.name} — cadastre contas (email+senha) aqui pra elas serem entregues automaticamente assim que alguém comprar este jogo.
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
 
@@ -7331,7 +7457,49 @@ export default function AdminDashboard() {
               </span>
             </label>
 
-            {accountsModalGame?.hasSecondary ? (
+            {accountsModalGame?.isEconomia ? (
+              <div className="space-y-3 bg-slate-950/70 p-4 rounded-xl border border-purple-500/30">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-purple-300 font-bold uppercase whitespace-nowrap flex items-center gap-1.5">
+                    <span>👥 Conta Secundária (Exclusivo Economia)</span>
+                  </Label>
+                  <span className="text-[10px] bg-red-600/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full font-bold">
+                    Sem opção primária
+                  </span>
+                </div>
+                <textarea
+                  value={accountsRawTextSecondary}
+                  onChange={(e) => setAccountsRawTextSecondary(e.target.value)}
+                  placeholder={"email1@exemplo.com:senha123\nemail2@exemplo.com:senha456"}
+                  rows={4}
+                  className="w-full bg-slate-950 border border-purple-600/30 rounded-md p-3 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                />
+                <div className="flex items-center gap-2">
+                  <Label className="text-[10px] text-slate-400 font-bold uppercase whitespace-nowrap">Quantidade padrão</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={secundariaQty}
+                    onChange={(e) => setSecundariaQty(e.target.value === "" ? "" : Math.max(1, parseInt(e.target.value) || 1))}
+                    placeholder="Ex: 1"
+                    className="bg-slate-950 border-purple-600/20 text-white h-8 text-xs w-20"
+                  />
+                </div>
+                <AccountQtyRows raw={accountsRawTextSecondary} defaultQty={secundariaQty} overrides={secundariaQtyOverrides} setOverrides={setSecundariaQtyOverrides} textColorClass="text-purple-200" />
+                <Button
+                  type="button"
+                  disabled={!accountsRawTextSecondary.trim() || !secundariaQty || secundariaQty < 1 || addAccountsMutation.isPending}
+                  onClick={() => accountsModalGame && addAccountsMutation.mutate(
+                    { digitalProductId: accountsModalGame.id, rawText: buildRawTextWithQuantities(accountsRawTextSecondary, secundariaQtyOverrides, secundariaQty || 1), accountType: "secundaria" },
+                    { onSuccess: () => { setAccountsRawTextSecondary(""); setSecundariaQty(""); setSecundariaQtyOverrides({}); } }
+                  )}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold btn-neon"
+                >
+                  {addAccountsMutation.isPending ? "Adicionando..." : "Adicionar Secundárias"}
+                </Button>
+                <p className="text-[10px] text-slate-500">Uma conta por linha, no formato email:senha (ou email;senha) — <strong className="text-amber-400">direto, sem escrever a palavra "senha" antes</strong> (ex.: email@site.com:MinhaSenha123).</p>
+              </div>
+            ) : accountsModalGame?.hasSecondary ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {accountsModalGame?.isCombinedPlatform ? (
                   <div className="space-y-2">
