@@ -2,7 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocation } from "wouter";
-import { Zap, Gamepad2, Search, Shield, Package, LayoutGrid, Tag, Coins, LogOut, HelpCircle, Home as HomeIcon, Instagram, ChevronLeft, ChevronRight, ShieldCheck, Sparkles, PlusCircle, Swords, Compass, Trophy, Gauge, Crosshair, Flame, Star, Menu, ArrowRight } from "lucide-react";
+import { Zap, Gamepad2, Search, Shield, Package, LayoutGrid, Tag, Coins, LogOut, HelpCircle, Home as HomeIcon, Instagram, ChevronLeft, ChevronRight, ShieldCheck, Sparkles, PlusCircle, Swords, Compass, Trophy, Gauge, Crosshair, Flame, Star, Menu, ArrowRight, Clock, Handshake } from "lucide-react";
 import { getLoginUrl } from "@/const";
 import UserProfileButton from "@/components/UserProfileButton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -72,6 +72,20 @@ function bannerDescription(banner: { title?: string; description?: string }) {
   return description && description !== banner.title?.trim() ? description : null;
 }
 
+// Capas reais para as seções decorativas: prefere os jogos da lista e, se algum sair do
+// catálogo, completa com os primeiros disponíveis para a seção nunca ficar vazia.
+function pickCovers(items: { name: string; image?: string | null }[], preferred: RegExp[], count: number) {
+  const withImage = items.filter((item) => item.image);
+  const chosen = preferred
+    .map((re) => withImage.find((item) => re.test(item.name)))
+    .filter((item): item is (typeof withImage)[number] => !!item);
+  for (const item of withImage) {
+    if (chosen.length >= count) break;
+    if (!chosen.includes(item)) chosen.push(item);
+  }
+  return chosen.slice(0, count);
+}
+
 function BannerCountdown({ expiresAt }: { expiresAt: string }) {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
@@ -100,17 +114,10 @@ function BannerCountdown({ expiresAt }: { expiresAt: string }) {
   const padZero = (n: number) => n.toString().padStart(2, "0");
 
   return (
-    <div className="inline-flex gap-1.5 sm:gap-2 items-center bg-slate-950/85 backdrop-blur-md px-3 py-1.5 rounded-xl border border-red-500/40 text-white font-bold text-[10px] sm:text-xs shadow-[0_0_15px_rgba(220,38,38,0.25)]">
-      <span className="flex items-center gap-1.5 text-red-400 font-extrabold tracking-wide">
-        <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse inline-block" />
-        OFERTA TERMINA EM:
-      </span>
-      <div className="flex items-center gap-1 font-mono">
-        <span className="bg-red-950/60 border border-red-500/30 px-1.5 py-0.5 rounded text-red-400 font-bold">{timeLeft.days}d</span>
-        <span className="bg-red-950/60 border border-red-500/30 px-1.5 py-0.5 rounded text-red-400 font-bold">{padZero(timeLeft.hours)}h</span>
-        <span className="bg-red-950/60 border border-red-500/30 px-1.5 py-0.5 rounded text-red-400 font-bold">{padZero(timeLeft.minutes)}m</span>
-        <span className="bg-red-950/60 border border-red-500/30 px-1.5 py-0.5 rounded text-red-400 font-bold">{padZero(timeLeft.seconds)}s</span>
-      </div>
+    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs lg:text-[13px] font-extrabold text-[#FF6B73]">
+      <Clock className="w-3.5 h-3.5 shrink-0" />
+      <span>Oferta termina em:</span>
+      <span className="tabular-nums">{timeLeft.days}d {padZero(timeLeft.hours)}h {padZero(timeLeft.minutes)}m {padZero(timeLeft.seconds)}s</span>
     </div>
   );
 }
@@ -235,7 +242,7 @@ export default function Home() {
     return {
       id: `game-banner-${game.id}`,
       title: game.name,
-      description: `💥 Jogo de Mídia Digital de alta performance para ${game.platform || "PS4/PS5"}. Compre no precinho com cashback de 7 ForteCoins!`,
+      description: `Jogo de Mídia Digital de alta performance para ${game.platform || "PS4/PS5"}. Compre no precinho com cashback de 7 ForteCoins!`,
       imageUrl: imageUrl || FALLBACK_GAME_IMAGE,
       link: `/digital?search=${encodeURIComponent(game.name)}`,
       expiresAt: null
@@ -315,37 +322,115 @@ export default function Home() {
   });
 
   const categories = [
-    { name: "Assinaturas", icon: Sparkles, color: "from-amber-500 to-yellow-600" },
-    { name: "Ação", icon: Swords, color: "from-red-500 to-red-600" },
-    { name: "Aventura", icon: Compass, color: "from-blue-500 to-blue-600" },
-    { name: "RPG", icon: Shield, color: "from-purple-500 to-purple-600" },
-    { name: "Esportes", icon: Trophy, color: "from-green-500 to-green-600" },
-    { name: "Corrida", icon: Gauge, color: "from-orange-500 to-orange-600" },
-    { name: "Tiro / FPS", icon: Crosshair, color: "from-slate-500 to-slate-700" },
-    { name: "Pré Venda", icon: Flame, color: "from-orange-500 to-yellow-500" },
+    { name: "Assinaturas", icon: Sparkles, color: "from-amber-500 to-yellow-600", cover: /ps plus/i },
+    { name: "Ação", icon: Swords, color: "from-red-500 to-red-600", cover: /resident evil 4 gold/i },
+    { name: "Aventura", icon: Compass, color: "from-blue-500 to-blue-600", cover: /spider-man/i },
+    { name: "RPG", icon: Shield, color: "from-purple-500 to-purple-600", cover: /nioh 3/i },
+    { name: "Esportes", icon: Trophy, color: "from-green-500 to-green-600", cover: /fc 27/i },
+    { name: "Corrida", icon: Gauge, color: "from-orange-500 to-orange-600", cover: /need for speed heat/i },
+    { name: "Tiro / FPS", icon: Crosshair, color: "from-slate-500 to-slate-700", cover: /ghost recon/i },
+    { name: "Pré Venda", icon: Flame, color: "from-orange-500 to-yellow-500", cover: /gta vi/i },
   ];
 
-  return (
-    <div className="min-h-screen bg-slate-950 overflow-x-hidden w-full max-w-full">
-      {/* Navigation */}
-      <nav className="nav-glass sticky top-0 z-50 border-b border-slate-800/80">
-        <div className="max-w-[1600px] mx-auto px-4 py-3 flex justify-between items-center gap-3">
-          
-          {/* Logo & Desktop Menu Drawer Trigger */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
-            <div className="flex items-center gap-1.5 sm:gap-2.5 cursor-pointer min-w-0" onClick={() => navigate("/")}>
-              <img src="/logo.png" alt="Eforte Games Logo" className="w-8 h-8 sm:w-9 sm:h-9 object-contain rounded-lg shadow-[0_0_15px_rgba(220,38,38,0.3)] border border-slate-800 bg-slate-950 shrink-0" />
-              <span className="text-base sm:text-2xl font-black text-white tracking-tight whitespace-nowrap">EFORTE<span className="text-red-500">GAMES</span></span>
-            </div>
+  const mainLinks = [
+    { label: "Jogue com Economia", href: "/jogue-com-economia", icon: Zap, highlight: true },
+    { label: "Mídia Física", href: "/usados", icon: Package, highlight: false },
+    { label: "Assinaturas", href: "/digital?type=assinatura", icon: Sparkles, highlight: false },
+    { label: "Clube Platinador", href: "/platinador", icon: Trophy, highlight: false },
+  ];
 
-            {/* Desktop & Mobile Sheet Drawer Trigger Button */}
-            <Sheet>
-              <SheetTrigger asChild>
-                <button className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-red-500/50 hover:bg-slate-800 text-xs font-bold text-slate-200 transition-all shadow-sm active:scale-95">
-                  <Menu className="w-4 h-4 text-red-500" />
-                  <span className="text-[11px] sm:text-xs font-bold">Categorias</span>
-                </button>
-              </SheetTrigger>
+  const activeBanner = finalBanners.find((banner) => banner.id === currentSlideId) ?? finalBanners[0];
+
+  const sideBanners = [
+    { banner: sidebarTopBanner, fallback: "/", titleColor: "text-white" },
+    { banner: sidebarBottomBanner, fallback: "/", titleColor: "text-white" },
+    { banner: sidebarPlatinadorBanner, fallback: "/platinador", titleColor: "text-amber-400" },
+  ];
+
+  const onBannerImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    e.currentTarget.src = FALLBACK_GAME_IMAGE;
+    e.currentTarget.onerror = null;
+  };
+
+  const economiaCovers = pickCovers(
+    digitalProducts
+      .filter((game: any) => game.showInEconomia === true)
+      .map((game: any) => ({ name: game.name, image: game.imageUrl })),
+    [/^gta v\b/i, /spider-man/i, /resident evil 4/i],
+    3
+  );
+
+  const fisicosCovers = pickCovers(
+    usedProducts.map((product: any) => ({ name: product.name, image: product.images?.[0] })),
+    [/ragnarok/i, /last of us/i, /nioh/i, /pes 2021/i],
+    4
+  );
+
+  const trustItems = [
+    { title: "Entrega Imediata", text: "Ativação rápida e fácil", icon: Zap },
+    { title: "Compra Segura", text: "Garantia Eforte Games", icon: ShieldCheck },
+    { title: "Cashback ForteCoins", text: "Moedas em cada compra", icon: Coins },
+    { title: "PS4, PS5 & Físicos", text: "Catálogo atualizado", icon: Gamepad2 },
+  ];
+
+  const guideCards = [
+    {
+      title: "ForteCoins (Fidelidade)",
+      text: "Nossas moedas de fidelidade! Ganhe comprando jogos ou indicando amigos (+15 FC por amigo). Acumule e troque por Gift Cards Steam, PSN e Xbox de graça na loja de resgates.",
+      link: "Ver prêmios & indicar amigo →",
+      path: "/fortecoins",
+      icon: Coins,
+    },
+    {
+      title: "Venda seus Jogos e Contas",
+      text: "Deseja desapegar ou revender? Crie sua loja de revendedor, anuncie seus jogos físicos usados ou chaves digitais. Nós gerenciamos o processo e você recebe direto na sua conta.",
+      link: "Seja um revendedor →",
+      path: "/virar-vendedor",
+      icon: PlusCircle,
+    },
+    {
+      title: "Mídia Digital com Garantia",
+      text: "Compre jogos de PS4, PS5 e Gift Cards no menor preço com ativação garantida em até 24h úteis (ou reembolso). Além disso, todas as compras garantem cashback de 7 ForteCoins!",
+      link: "Explorar mídia digital →",
+      path: "/digital",
+      icon: Sparkles,
+    },
+    {
+      title: "Compra Segura (Escrow)",
+      text: "Aqui você está 100% protegido. O dinheiro do pagamento fica retido de forma segura na plataforma e só é liberado para o vendedor após você confirmar o recebimento do produto.",
+      link: "Tirar dúvidas no FAQ →",
+      path: "/faq",
+      icon: ShieldCheck,
+    },
+  ];
+
+  const sectionTitle = "font-display font-extrabold uppercase leading-[1.1] text-white";
+  const scrollRow = "flex overflow-x-auto snap-x snap-proximity scroll-pl-4 scrollbar-none";
+
+  return (
+    <div className="home-page min-h-screen bg-[#0A0A0C] text-zinc-100 overflow-x-clip w-full max-w-full">
+      {/* Navigation */}
+      <header className="sticky top-0 z-50 bg-[#0A0A0C] border-b border-[#26262D]">
+        <div className="max-w-[1440px] mx-auto px-4 lg:px-10 pt-1.5 pb-2 lg:pt-2.5 lg:pb-1 flex flex-wrap items-center gap-x-1 lg:gap-x-4 gap-y-1 lg:gap-y-2.5">
+
+          {/* No celular esta primeira linha nunca quebra; no computador (lg:contents) os itens
+              voltam a dividir a mesma linha com a busca. */}
+          <div className="flex items-center gap-1 w-full min-w-0 lg:contents">
+
+          {/* Logo */}
+          <div className="flex items-center gap-1.5 lg:gap-2.5 cursor-pointer min-w-0 h-11 mr-auto lg:mr-0" onClick={() => navigate("/")}>
+            <img src="/logo.png" alt="Eforte Games Logo" className="w-7 h-7 lg:w-9 lg:h-9 object-contain rounded-md lg:rounded-lg shrink-0" />
+            <span className="text-[13px] min-[360px]:text-[15px] lg:text-[22px] font-black text-white tracking-[-0.03em] lg:tracking-[-0.02em] whitespace-nowrap">EFORTE<span className="text-[#FF2B36]">GAMES</span></span>
+          </div>
+
+          {/* Desktop & Mobile Sheet Drawer Trigger Button */}
+          <Sheet>
+            <SheetTrigger asChild>
+              <button aria-label="Categorias" className="h-11 px-1.5 lg:px-3.5 flex items-center gap-1 lg:gap-2 text-[11px] lg:text-[13px] font-bold text-zinc-100 lg:bg-[#141418] lg:border lg:border-[#2E2E36] lg:rounded-[10px] lg:hover:border-red-600/60 transition-colors active:scale-95 shrink-0">
+                <Menu className="w-[15px] h-[15px] lg:w-4 lg:h-4 text-[#FF4D57]" />
+                <span className="hidden min-[390px]:inline">Categorias</span>
+              </button>
+            </SheetTrigger>
               <SheetContent side="left" className="bg-slate-950 border-r border-slate-800 text-white w-80 sm:w-96 p-0 overflow-y-auto">
                 <SheetHeader className="p-5 border-b border-slate-800 bg-slate-900/60">
                   <div className="flex items-center gap-2.5">
@@ -424,68 +509,96 @@ export default function Home() {
                   </div>
                 </div>
               </SheetContent>
-            </Sheet>
-          </div>
-          
-          {/* Desktop Clean Main Links (Requirement: Organizado e Sem Poluição) */}
-          <div className="hidden lg:flex items-center gap-4 text-xs xl:text-sm font-medium">
-            <a href="/jogue-com-economia" className="text-red-400 hover:text-red-300 font-bold transition flex items-center gap-1.5 whitespace-nowrap bg-red-950/40 border border-red-800/40 px-3 py-1 rounded-full">
-              <Zap className="w-3.5 h-3.5 text-red-500 animate-pulse" /> Jogue com Economia
-            </a>
-            <a href="/usados" className="text-blue-400 hover:text-blue-300 font-bold transition flex items-center gap-1.5 whitespace-nowrap bg-blue-950/30 border border-blue-800/30 px-3 py-1 rounded-full">
-              <Package className="w-3.5 h-3.5 text-blue-400" /> Mídia Física
-            </a>
-            <a href="/digital?type=assinatura" className="text-amber-400 hover:text-amber-300 font-bold transition flex items-center gap-1.5 whitespace-nowrap">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Assinaturas
-            </a>
-            <a href="/platinador" className="text-amber-400 hover:text-amber-300 font-bold transition flex items-center gap-1.5 whitespace-nowrap bg-amber-950/30 border border-amber-800/30 px-3 py-1 rounded-full">
-              <Trophy className="w-3.5 h-3.5 text-amber-400" /> Clube Platinador
-            </a>
-          </div>
-          
+          </Sheet>
+
           {/* Right Controls */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1 lg:gap-2 shrink-0 lg:order-last lg:ml-auto">
             {isAuthenticated ? (
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white hover:bg-slate-900 text-xs px-2.5 h-8 hidden sm:flex" onClick={() => navigate("/fortecoins")}>
-                  <Coins className="w-3.5 h-3.5 mr-1.5 text-red-500" /> {user?.forteCoins ?? 0} FC
+                <Button variant="ghost" size="sm" className="text-zinc-300 hover:text-white hover:bg-[#141418] text-xs px-2.5 h-8 hidden sm:flex" onClick={() => navigate("/fortecoins")}>
+                  <Coins className="w-3.5 h-3.5 mr-1.5 text-amber-400" /> {user?.forteCoins ?? 0} FC
                 </Button>
-                <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white hover:bg-slate-900 text-xs px-2.5 h-8 hidden md:flex" onClick={() => navigate("/minhas-compras")}>
+                <Button variant="ghost" size="sm" className="text-zinc-300 hover:text-white hover:bg-[#141418] text-xs px-2.5 h-8 hidden md:flex" onClick={() => navigate("/minhas-compras")}>
                   <Package className="w-3.5 h-3.5 mr-1.5" /> Compras
                 </Button>
                 <UserProfileButton />
               </div>
             ) : (
-              <div className="flex gap-1.5 sm:gap-2 shrink-0">
-                <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white hover:bg-slate-900 text-[11px] sm:text-xs px-2 sm:px-3 h-8" onClick={() => navigate("/login")}>
+              <>
+                <button type="button" className="h-11 px-[5px] lg:px-3 text-xs lg:text-sm font-semibold text-zinc-300 hover:text-white transition-colors" onClick={() => navigate("/login")}>
                   Entrar
-                </Button>
-                <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 h-8 shadow-[0_0_10px_rgba(220,38,38,0.3)]" onClick={() => navigate("/login")}>
-                  Cadastrar
-                </Button>
-              </div>
+                </button>
+                <button type="button" className="h-11 text-white text-xs lg:text-sm font-extrabold active:scale-95 transition-transform" onClick={() => navigate("/login")}>
+                  <span className="h-[34px] lg:h-11 px-2 min-[360px]:px-[9px] lg:px-4 flex items-center bg-red-600 hover:bg-red-700 rounded-lg lg:rounded-[10px] transition-colors">Cadastrar</span>
+                </button>
+              </>
             )}
           </div>
+
+          </div>
+
+          {/* Busca */}
+          <div className="w-full lg:w-auto lg:flex-1 min-w-0 relative">
+            <Search className="hidden lg:block absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-[#8E8E99] z-10 pointer-events-none" />
+            <Input
+              type="text"
+              aria-label="Buscar jogos"
+              placeholder="Busque por jogos (ex: Mad Max), gift cards..."
+              value={heroSearch}
+              onChange={(e) => setHeroSearch(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && heroSearch.trim()) navigate(`/digital?search=${encodeURIComponent(heroSearch.trim())}`); }}
+              className="w-full h-11 pl-3 pr-[70px] lg:pl-[42px] lg:pr-[92px] bg-[#141418] border-[#2E2E36] text-zinc-100 text-base lg:text-sm rounded-[10px] focus:border-red-600 focus:ring-red-600/20 placeholder:text-[12.5px] lg:placeholder:text-sm placeholder:text-[#8E8E99] transition-all"
+            />
+            <button
+              type="button"
+              className="absolute right-0 top-0 h-11 p-1 text-white text-[13px] font-extrabold active:scale-95 transition-transform"
+              onClick={() => { if (heroSearch.trim()) navigate(`/digital?search=${encodeURIComponent(heroSearch.trim())}`); }}
+            >
+              <span className="h-9 px-2.5 lg:px-4 flex items-center bg-red-600 hover:bg-red-700 rounded-[7px] transition-colors">Buscar</span>
+            </button>
+          </div>
         </div>
+
+        {/* Atalhos principais (computador) */}
+        <nav aria-label="Principal" className="hidden lg:flex max-w-[1440px] mx-auto px-10 items-center gap-[26px]">
+          {mainLinks.map((link) => (
+            <a key={link.href} href={link.href} className={`h-10 flex items-center gap-[7px] text-sm transition-colors ${link.highlight ? "font-bold text-[#FF4D57] hover:text-[#FF6B73]" : "font-semibold text-zinc-300 hover:text-white"}`}>
+              <link.icon className="w-[15px] h-[15px]" /> {link.label}
+            </a>
+          ))}
+        </nav>
+      </header>
+
+      {/* Atalhos principais (celular) */}
+      <nav aria-label="Atalhos" className={`lg:hidden ${scrollRow} gap-[18px] px-4`}>
+        {mainLinks.map((link) => (
+          <a key={link.href} href={link.href} className={`flex-none snap-start h-11 flex items-center gap-1.5 text-[13px] ${link.highlight ? "font-bold text-[#FF4D57]" : "font-semibold text-zinc-300"}`}>
+            <link.icon className="w-3.5 h-3.5" /> {link.label}
+          </a>
+        ))}
       </nav>
 
-      {/* Hero Banner Carousel Section */}
-      <section className="relative pt-6 pb-8 overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute inset-0 bg-gradient-to-b from-red-950/8 via-transparent to-slate-950" />
-          <div className="absolute top-0 left-1/4 w-96 h-96 bg-red-900/5 rounded-full blur-3xl" />
-          <div className="absolute top-0 right-1/4 w-64 h-64 bg-red-800/4 rounded-full blur-2xl" />
-        </div>
-        <div className="container mx-auto px-4 relative z-10">
-          
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Left side: Banner Carousel Container */}
-            <div className="lg:col-span-2 relative w-full h-[240px] sm:h-[380px] md:h-[420px] bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-[0_0_30px_rgba(0,0,0,0.5)] group/carousel">
-              
-              {/* Loading Skeleton */}
+      <div className="max-w-[1440px] mx-auto px-4 lg:px-10 lg:pt-3.5">
+
+        {/* Hero Banner Carousel Section */}
+        <section aria-label="Destaques" className="flex flex-col lg:flex-row lg:items-stretch gap-3 lg:gap-3.5">
+
+          {/* Banner principal */}
+          <div className="lg:flex-1 min-w-0 relative overflow-hidden flex flex-col xl:flex-row-reverse bg-[#141418] xl:bg-[#101014] border border-[#26262D] rounded-[14px] lg:rounded-2xl xl:min-h-[420px]">
+            {activeBanner?.imageUrl && (
+              <img
+                src={activeBanner.imageUrl}
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 w-full h-full object-cover blur-[40px] saturate-[1.2] opacity-35 scale-125 pointer-events-none"
+              />
+            )}
+
+            {/* Arte */}
+            <div className="relative aspect-video xl:aspect-auto xl:flex-1 min-w-0 overflow-hidden">
               {!isCarouselReady && (
-                <div className="absolute inset-0 flex items-center justify-center bg-slate-900 z-20">
-                   <div className="w-8 h-8 border-4 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="absolute inset-0 flex items-center justify-center z-20">
+                  <div className="w-8 h-8 border-4 border-red-500 border-t-transparent rounded-full animate-spin"></div>
                 </div>
               )}
 
@@ -494,47 +607,20 @@ export default function Home() {
                 <div
                   key={banner.id}
                   onClick={() => openBannerLink(banner.link)}
-                  className={`absolute inset-0 w-full h-full cursor-pointer transition-all duration-700 ease-in-out ${
-                    banner.id === currentSlideId ? "opacity-100 scale-100 z-10" : "opacity-0 scale-95 pointer-events-none z-0"
+                  className={`absolute inset-0 w-full h-full cursor-pointer transition-opacity duration-700 ease-in-out ${
+                    banner.id === activeBanner?.id ? "opacity-100 z-10" : "opacity-0 pointer-events-none z-0"
                   }`}
                 >
-                  {/* Background Image */}
                   {banner.imageUrl ? (
                     <img
                       src={banner.imageUrl}
                       alt={banner.title}
-                      className="w-full h-full object-cover brightness-[0.75] group-hover/carousel:scale-[1.01] transition-transform duration-700"
-                      onError={(e) => {
-                        e.currentTarget.src = FALLBACK_GAME_IMAGE;
-                        e.currentTarget.onerror = null;
-                      }}
+                      className="hero-art-fade w-full h-full object-contain"
+                      onError={onBannerImageError}
                     />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-red-950 to-slate-900" />
+                    <div className="w-full h-full bg-gradient-to-br from-red-950 to-[#0A0A0C]" />
                   )}
-
-                  {/* Content Overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent flex flex-col justify-end p-6 sm:p-10 text-left">
-                    <div className="max-w-2xl space-y-2 sm:space-y-3">
-                      {/* Countdown Timer if available */}
-                      {banner.expiresAt && <BannerCountdown expiresAt={banner.expiresAt} />}
-                      
-                      <h2 className="text-lg sm:text-2xl md:text-4xl font-black text-white leading-tight tracking-tight drop-shadow-[0_2px_8px_rgba(0,0,0,1)] [text-shadow:0_2px_12px_rgba(0,0,0,0.9)]">
-                        {banner.title}
-                      </h2>
-                      {bannerDescription(banner) && (
-                        <p className="text-[10px] sm:text-xs md:text-sm text-slate-200 line-clamp-2 drop-shadow-[0_1px_4px_rgba(0,0,0,1)] max-w-xl">
-                          {bannerDescription(banner)}
-                        </p>
-                      )}
-                      
-                      <div className="pt-1">
-                        <Button className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-1.5 sm:px-5 sm:py-2.5 text-[10px] sm:text-xs rounded-xl shadow-[0_0_15px_rgba(220,38,38,0.4)] transition-all hover:scale-105">
-                          Aproveitar Oferta
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               ))}
 
@@ -542,353 +628,213 @@ export default function Home() {
               {finalBanners.length > 1 && (
                 <>
                   <button
+                    aria-label="Banner anterior"
                     onClick={(e) => {
                       e.stopPropagation();
                       prevSlide();
                     }}
-                    className="absolute left-2 sm:left-4 top-4 sm:top-1/2 sm:-translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-950/70 hover:bg-red-600/90 text-white flex items-center justify-center border border-slate-800 hover:border-red-500/30 backdrop-blur-sm transition-all duration-300 z-20 shadow-[0_0_10px_rgba(0,0,0,0.5)]"
+                    className="absolute left-1.5 lg:left-3.5 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-[#0A0A0C]/70 hover:bg-red-600 text-white flex items-center justify-center transition-colors z-20"
                   >
-                    <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <ChevronLeft className="w-[18px] h-[18px] lg:w-5 lg:h-5" />
                   </button>
                   <button
+                    aria-label="Próximo banner"
                     onClick={(e) => {
                       e.stopPropagation();
                       nextSlide();
                     }}
-                    className="absolute right-2 sm:right-4 top-4 sm:top-1/2 sm:-translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-950/70 hover:bg-red-600/90 text-white flex items-center justify-center border border-slate-800 hover:border-red-500/30 backdrop-blur-sm transition-all duration-300 z-20 shadow-[0_0_10px_rgba(0,0,0,0.5)]"
+                    className="absolute right-1.5 lg:right-3.5 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-[#0A0A0C]/70 hover:bg-red-600 text-white flex items-center justify-center transition-colors z-20"
                   >
-                    <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <ChevronRight className="w-[18px] h-[18px] lg:w-5 lg:h-5" />
                   </button>
                 </>
               )}
 
               {/* Slide Indicators */}
               {finalBanners.length > 1 && (
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-20 px-2.5 py-1 rounded-full bg-slate-950/60 backdrop-blur-sm border border-slate-800/80">
-                  {finalBanners.map((banner) => (
+                <div className="absolute bottom-1.5 lg:bottom-2.5 left-1/2 -translate-x-1/2 flex items-center gap-px lg:gap-0.5 z-20 px-1.5 lg:px-2 rounded-xl bg-[#0A0A0C]/70">
+                  {finalBanners.map((banner, index) => (
                     <button
                       key={banner.id}
+                      aria-label={`Ver banner ${index + 1}`}
+                      aria-pressed={banner.id === activeBanner?.id}
                       onClick={(e) => {
                         e.stopPropagation();
                         setCurrentSlideId(banner.id);
                       }}
-                      className={`h-1.5 rounded-full transition-all duration-300 ${
-                        banner.id === currentSlideId ? "bg-red-500 w-5 shadow-[0_0_8px_rgba(220,38,38,0.8)]" : "bg-slate-500/60 hover:bg-slate-400 w-1.5"
-                      }`}
-                    />
+                      className={`h-[18px] lg:h-[22px] flex items-center justify-center ${banner.id === activeBanner?.id ? "w-[26px] lg:w-[30px]" : "w-3.5 lg:w-4"}`}
+                    >
+                      <span className={`h-[5px] lg:h-1.5 rounded-full transition-all duration-300 ${banner.id === activeBanner?.id ? "w-[18px] lg:w-[22px] bg-white" : "w-[5px] lg:w-1.5 bg-white/50"}`} />
+                    </button>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Right side: Sidebar Banners */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 lg:grid-rows-3 gap-3 sm:gap-4 lg:h-[420px]">
-              {/* Top Banner Card */}
-              {isLoadingPromos ? (
-                <div className="relative h-[110px] sm:h-[130px] lg:h-full bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 animate-pulse" />
-              ) : (
-              <div
-                onClick={() => openBannerLink(sidebarTopBanner.link)}
-                className="relative h-[110px] sm:h-[130px] lg:h-full bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-lg hover:border-red-500/30 hover:shadow-[0_0_20px_rgba(220,38,38,0.1)] transition-all duration-300 group/sidebar cursor-pointer flex flex-col justify-end p-4 sm:p-5"
-              >
-                {sidebarTopBanner.imageUrl ? (
-                  <img
-                    src={sidebarTopBanner.imageUrl}
-                    alt={sidebarTopBanner.title}
-                    className="absolute inset-0 w-full h-full object-cover brightness-[0.75] group-hover/sidebar:scale-[1.02] transition-transform duration-500"
-                    onError={(e) => {
-                      e.currentTarget.src = FALLBACK_GAME_IMAGE;
-                      e.currentTarget.onerror = null;
-                    }}
-                  />
-                ) : (
-                  <div className="absolute inset-0 bg-gradient-to-br from-red-950 to-slate-900" />
-                )}
-                <div className="relative z-10 space-y-0.5 sm:space-y-1 text-left [text-shadow:0_1px_6px_rgba(0,0,0,0.9)]">
-                  {sidebarTopBanner.expiresAt && <BannerCountdown expiresAt={sidebarTopBanner.expiresAt} />}
-                  <h3 className="text-xs sm:text-sm lg:text-base font-black text-white leading-tight drop-shadow-[0_2px_6px_rgba(0,0,0,1)]">
-                    {sidebarTopBanner.title}
-                  </h3>
-                  {bannerDescription(sidebarTopBanner) && (
-                    <p className="text-[9px] sm:text-[10px] lg:text-xs text-slate-200 line-clamp-2 drop-shadow-[0_1px_4px_rgba(0,0,0,1)] max-w-md">
-                      {bannerDescription(sidebarTopBanner)}
-                    </p>
-                  )}
-                </div>
-              </div>
-              )}
-
-              {/* Middle Banner Card */}
-              {isLoadingPromos ? (
-                <div className="relative h-[110px] sm:h-[130px] lg:h-full bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 animate-pulse" />
-              ) : (
-              <div
-                onClick={() => openBannerLink(sidebarBottomBanner.link)}
-                className="relative h-[110px] sm:h-[130px] lg:h-full bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-lg hover:border-red-500/30 hover:shadow-[0_0_20px_rgba(220,38,38,0.1)] transition-all duration-300 group/sidebar cursor-pointer flex flex-col justify-end p-4 sm:p-5"
-              >
-                {sidebarBottomBanner.imageUrl ? (
-                  <img
-                    src={sidebarBottomBanner.imageUrl}
-                    alt={sidebarBottomBanner.title}
-                    className="absolute inset-0 w-full h-full object-cover brightness-[0.75] group-hover/sidebar:scale-[1.02] transition-transform duration-500"
-                    onError={(e) => {
-                      e.currentTarget.src = FALLBACK_GAME_IMAGE;
-                      e.currentTarget.onerror = null;
-                    }}
-                  />
-                ) : (
-                  <div className="absolute inset-0 bg-gradient-to-br from-red-950 to-slate-900" />
-                )}
-                <div className="relative z-10 space-y-0.5 sm:space-y-1 text-left [text-shadow:0_1px_6px_rgba(0,0,0,0.9)]">
-                  {sidebarBottomBanner.expiresAt && <BannerCountdown expiresAt={sidebarBottomBanner.expiresAt} />}
-                  <h3 className="text-xs sm:text-sm lg:text-base font-black text-white leading-tight drop-shadow-[0_2px_6px_rgba(0,0,0,1)]">
-                    {sidebarBottomBanner.title}
-                  </h3>
-                  {bannerDescription(sidebarBottomBanner) && (
-                    <p className="text-[9px] sm:text-[10px] lg:text-xs text-slate-200 line-clamp-2 drop-shadow-[0_1px_4px_rgba(0,0,0,1)] max-w-md">
-                      {bannerDescription(sidebarBottomBanner)}
-                    </p>
-                  )}
-                </div>
-              </div>
-              )}
-              
-              {/* Bottom Banner Card (Platinador) */}
-              {isLoadingPromos ? (
-                <div className="relative h-[110px] sm:h-[130px] lg:h-full bg-slate-900 rounded-2xl overflow-hidden border border-amber-500/30 animate-pulse" />
-              ) : (
-              <div
-                onClick={() => openBannerLink(sidebarPlatinadorBanner.link, "/platinador")}
-                className="relative h-[110px] sm:h-[130px] lg:h-full bg-slate-900 rounded-2xl overflow-hidden border border-amber-500/30 shadow-lg hover:border-amber-400/50 hover:shadow-[0_0_20px_rgba(251,191,36,0.15)] transition-all duration-300 group/sidebar cursor-pointer flex flex-col justify-end p-4 sm:p-5"
-              >
-                {sidebarPlatinadorBanner.imageUrl ? (
-                  <img
-                    src={sidebarPlatinadorBanner.imageUrl}
-                    alt={sidebarPlatinadorBanner.title}
-                    className="absolute inset-0 w-full h-full object-cover brightness-[0.75] group-hover/sidebar:scale-[1.02] transition-transform duration-500"
-                    onError={(e) => {
-                      e.currentTarget.src = FALLBACK_GAME_IMAGE;
-                      e.currentTarget.onerror = null;
-                    }}
-                  />
-                ) : (
-                  <div className="absolute inset-0 bg-gradient-to-br from-amber-950 to-slate-900" />
-                )}
-                <div className="relative z-10 space-y-0.5 sm:space-y-1 text-left [text-shadow:0_1px_6px_rgba(0,0,0,0.9)]">
-                  {sidebarPlatinadorBanner.expiresAt && <BannerCountdown expiresAt={sidebarPlatinadorBanner.expiresAt} />}
-                  <h3 className="text-xs sm:text-sm lg:text-base font-black text-amber-400 leading-tight drop-shadow-[0_2px_6px_rgba(0,0,0,1)]">
-                    {sidebarPlatinadorBanner.title}
-                  </h3>
-                  {bannerDescription(sidebarPlatinadorBanner) && (
-                    <p className="text-[9px] sm:text-[10px] lg:text-xs text-slate-200 line-clamp-2 drop-shadow-[0_1px_4px_rgba(0,0,0,1)] max-w-md">
-                      {bannerDescription(sidebarPlatinadorBanner)}
-                    </p>
-                  )}
-                </div>
-              </div>
-              )}
-            </div>
-          </div>
-
-          {/* Search bar below the banner */}
-          <div className="max-w-3xl mx-auto mt-6 flex flex-col sm:flex-row gap-2 relative">
-            <div className="relative w-full">
-              <Search className="absolute left-3.5 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
-              <Input 
-                type="text" 
-                placeholder="Busque por jogos (ex: Mad Max), gift cards..." 
-                value={heroSearch}
-                onChange={(e) => setHeroSearch(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && heroSearch.trim()) navigate(`/digital?search=${encodeURIComponent(heroSearch.trim())}`); }}
-                className="w-full h-12 sm:h-14 pl-10 sm:pl-12 pr-4 bg-slate-900/80 border-slate-800 text-white text-sm sm:text-base rounded-xl focus:border-red-500 focus:ring-red-500/20 shadow-xl placeholder:text-slate-500 transition-all"
-              />
-            </div>
-            <Button
-              className="h-12 sm:h-14 px-6 sm:px-8 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm sm:text-base font-bold shrink-0 shadow-[0_0_20px_rgba(220,38,38,0.35)] w-full sm:w-auto active:scale-95 transition-all flex items-center justify-center gap-2"
-              onClick={() => { if (heroSearch.trim()) navigate(`/digital?search=${encodeURIComponent(heroSearch.trim())}`); }}
+            {/* Texto */}
+            <div
+              onClick={() => activeBanner && openBannerLink(activeBanner.link)}
+              className="relative z-10 cursor-pointer min-h-[186px] md:min-h-[96px] xl:min-h-0 xl:w-[320px] xl:shrink-0 flex flex-col md:flex-row xl:flex-col md:items-center xl:items-start xl:justify-center gap-2 md:gap-5 xl:gap-3 px-3.5 md:px-5 pt-2.5 pb-3.5 md:py-3.5 xl:py-6 xl:pl-[30px] xl:pr-1 text-left"
             >
-              <Search className="w-4 h-4 sm:hidden" />
-              <span>Buscar</span>
-            </Button>
+              {activeBanner && (
+                <>
+                  <div className="flex-1 xl:flex-none min-h-0 min-w-0 flex flex-col justify-center gap-1.5 xl:gap-3">
+                    {activeBanner.expiresAt && <BannerCountdown expiresAt={activeBanner.expiresAt} />}
+                    <h2 className="font-display font-extrabold uppercase text-white text-[28px] xl:text-[44px] leading-[1.05] xl:leading-[1.03] line-clamp-3 md:line-clamp-2 xl:line-clamp-4">
+                      {activeBanner.title}
+                    </h2>
+                    {bannerDescription(activeBanner) && (
+                      <p className="text-[12.5px] xl:text-sm leading-[1.35] xl:leading-[1.45] text-zinc-300 line-clamp-2 xl:line-clamp-3">
+                        {bannerDescription(activeBanner)}
+                      </p>
+                    )}
+                  </div>
+                  <Button className="h-12 w-full md:w-fit xl:mt-1 md:px-6 shrink-0 bg-red-600 hover:bg-red-700 text-white text-sm xl:text-[15px] font-extrabold rounded-[10px]">
+                    Aproveitar Oferta
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
 
-          {/* Quick Search Pills & Console Filter Pills */}
-          <div className="max-w-4xl mx-auto mt-4 px-4 pb-2 space-y-3">
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-xs text-slate-400">
-              <span className="font-bold text-slate-500 shrink-0">Buscas populares:</span>
-              <div className="flex sm:flex-wrap items-center gap-2 overflow-x-auto sm:overflow-visible w-full sm:w-auto py-1 scrollbar-none justify-start sm:justify-center max-w-full">
-                {[
-                  { label: "Gift Cards PSN", url: "/digital?search=Gift+Card+PSN" },
-                  { label: "PS Plus / Game Pass", url: "/digital?type=assinatura" },
-                  { label: "Gift Cards Xbox", url: "/digital?search=Gift+Card+Xbox" },
-                ].map((pill) => (
-                  <button
-                    key={pill.label}
-                    onClick={() => navigate(pill.url)}
-                    className="bg-slate-900/60 border border-slate-800 hover:border-red-500/40 hover:text-white px-3 py-1.5 rounded-full transition-all text-xs font-semibold cursor-pointer active:scale-95 whitespace-nowrap shrink-0 snap-start"
-                  >
-                    🔥 {pill.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Platform Console Pills — atalho direto para o catálogo já filtrado */}
-            <div className="flex items-center justify-center gap-2 pt-2 border-t border-slate-800/80 flex-wrap">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mr-1">Filtrar Console:</span>
-              {[
-                { id: null, label: "🎮 Todos Consoles" },
-                { id: "PS5", label: "🔵 PS5" },
-                { id: "PS4", label: "🔷 PS4" },
-                { id: "PS4/PS5", label: "🌟 Dual (PS4 & PS5)" },
-              ].map((plat) => (
-                <button
-                  key={plat.label}
-                  onClick={() => navigate(plat.id ? `/digital?platform=${plat.id}` : "/digital")}
-                  className="px-3 py-1 rounded-lg text-xs font-bold transition-all bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800 active:scale-95"
+          {/* Banners laterais: a arte aparece inteira e o título fica abaixo dela */}
+          <div className={`${scrollRow} lg:overflow-visible lg:flex-col lg:w-[262px] lg:shrink-0 gap-2.5 -mx-4 px-4 lg:mx-0 lg:px-0`}>
+            {isLoadingPromos ? (
+              [0, 1, 2].map((slot) => (
+                <div key={slot} className="flex-none w-[282px] lg:w-full h-[150px] lg:flex-1 bg-[#141418] rounded-[10px] lg:rounded-xl border border-[#26262D] animate-pulse" />
+              ))
+            ) : (
+              sideBanners.map(({ banner, fallback, titleColor }) => (
+                <div
+                  key={banner.id}
+                  onClick={() => openBannerLink(banner.link, fallback)}
+                  className="flex-none snap-start flex flex-col overflow-hidden cursor-pointer bg-[#141418] border border-[#26262D] hover:border-red-600 rounded-[10px] lg:rounded-xl transition-colors"
                 >
-                  {plat.label}
-                </button>
-              ))}
-            </div>
+                  {banner.imageUrl ? (
+                    <img
+                      src={banner.imageUrl}
+                      alt={banner.title}
+                      className="block h-28 w-auto min-w-[200px] max-w-[300px] lg:h-auto lg:w-full lg:min-w-0 lg:max-w-none"
+                      onError={onBannerImageError}
+                    />
+                  ) : (
+                    <div className="h-28 w-[240px] lg:h-24 lg:w-full bg-gradient-to-br from-red-950 to-[#0A0A0C]" />
+                  )}
+                  {/* w-0 + min-w-full: o texto acompanha a largura da arte em vez de esticar o card */}
+                  <div className="w-0 min-w-full flex-1 flex flex-col justify-center gap-1 px-2.5 py-2 lg:py-1.5 text-left">
+                    {banner.expiresAt && <BannerCountdown expiresAt={banner.expiresAt} />}
+                    <h3 className={`text-[11px] font-extrabold leading-[1.25] ${titleColor}`}>
+                      {banner.title}
+                    </h3>
+                    {bannerDescription(banner) && (
+                      <p className="text-[10px] leading-snug text-zinc-400 line-clamp-2">
+                        {bannerDescription(banner)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
+        </section>
 
-          {/* Trust Badges Bar */}
-          <div className="max-w-5xl mx-auto mt-4 pt-4 border-t border-slate-800/80">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4">
-              <div className="flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-slate-900/50 border border-slate-800/70 backdrop-blur-sm">
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-red-600/10 border border-red-500/20 flex items-center justify-center shrink-0">
-                  <Zap className="w-4 h-4 text-red-500" />
-                </div>
-                <div>
-                  <h4 className="text-[11px] sm:text-xs font-bold text-white leading-tight">Entrega Imediata</h4>
-                  <p className="text-[10px] sm:text-[11px] text-slate-400">Ativação rápida e fácil</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-slate-900/50 border border-slate-800/70 backdrop-blur-sm">
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-emerald-600/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                </div>
-                <div>
-                  <h4 className="text-[11px] sm:text-xs font-bold text-white leading-tight">Compra Segura</h4>
-                  <p className="text-[10px] sm:text-[11px] text-slate-400">Garantia Eforte Games</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-slate-900/50 border border-slate-800/70 backdrop-blur-sm">
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-amber-600/10 border border-amber-500/20 flex items-center justify-center shrink-0">
-                  <Coins className="w-4 h-4 text-amber-400" />
-                </div>
-                <div>
-                  <h4 className="text-[11px] sm:text-xs font-bold text-white leading-tight">Cashback ForteCoins</h4>
-                  <p className="text-[10px] sm:text-[11px] text-slate-400">Moedas em cada compra</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-slate-900/50 border border-slate-800/70 backdrop-blur-sm">
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-blue-600/10 border border-blue-500/20 flex items-center justify-center shrink-0">
-                  <Gamepad2 className="w-4 h-4 text-blue-400" />
-                </div>
-                <div>
-                  <h4 className="text-[11px] sm:text-xs font-bold text-white leading-tight">PS4, PS5 & Físicos</h4>
-                  <p className="text-[10px] sm:text-[11px] text-slate-400">Catálogo atualizado</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </section>
-
-      {/* Popular Categories */}
-      <section id="categorias" className="py-6 sm:py-12 bg-slate-900/30">
-        <div className="container mx-auto px-4">
-          <h2 className="text-lg sm:text-2xl font-bold text-white mb-4 sm:mb-6 flex items-center gap-2">
-            <Gamepad2 className="text-red-500 w-5 h-5 sm:w-6 sm:h-6" /> Categorias Populares
-          </h2>
-          <div className="flex lg:grid lg:grid-cols-7 overflow-x-auto lg:overflow-x-visible gap-2 sm:gap-3 pb-4 lg:pb-0 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            {categories.map((cat) => (
-              <div 
-                key={cat.name}
-                onClick={() => navigate(`/digital?genre=${encodeURIComponent(cat.name)}`)}
-                className="bg-slate-900/80 border border-slate-800/80 hover:border-red-500/40 rounded-xl p-2.5 sm:p-4 flex flex-col items-center justify-center gap-1.5 sm:gap-2 cursor-pointer transition-all hover:bg-slate-800/60 group hover:shadow-[0_0_20px_rgba(220,38,38,0.12)] hover:-translate-y-1 min-w-[90px] sm:min-w-[110px] lg:min-w-0 shrink-0 snap-start"
+        {/* Quick Search Pills & Console Filter Pills */}
+        <div className="mt-2 lg:mt-2.5 lg:flex lg:flex-wrap lg:items-center lg:justify-between lg:gap-x-6 lg:gap-y-1.5">
+          <div className={`${scrollRow} lg:overflow-visible lg:flex-wrap items-center gap-1.5 -mx-4 px-4 lg:mx-0 lg:px-0`}>
+            <span className="flex-none text-xs font-bold text-zinc-400 mr-0.5 snap-start">Buscas populares:</span>
+            {[
+              { label: "Gift Cards PSN", url: "/digital?search=Gift+Card+PSN" },
+              { label: "PS Plus / Game Pass", url: "/digital?type=assinatura" },
+              { label: "Gift Cards Xbox", url: "/digital?search=Gift+Card+Xbox" },
+            ].map((pill) => (
+              <button
+                key={pill.label}
+                onClick={() => navigate(pill.url)}
+                className="flex-none snap-start h-11 lg:h-[30px] flex items-center active:scale-95 transition-transform"
               >
-                <div className={`w-8 h-8 sm:w-11 sm:h-11 rounded-full bg-gradient-to-br ${cat.color} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}>
-                  <cat.icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                </div>
-                <span className="text-[9px] sm:text-xs font-semibold text-slate-300 text-center">{cat.name}</span>
-              </div>
+                <span className="h-8 lg:h-[30px] px-2.5 lg:px-[11px] flex items-center gap-[5px] bg-[#1F1F26] hover:bg-[#2A2A33] rounded-full text-xs font-semibold text-zinc-100 whitespace-nowrap transition-colors">
+                  <Flame className="w-3 h-3 text-[#FF6B73]" /> {pill.label}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* Platform Console Pills — atalho direto para o catálogo já filtrado */}
+          <div className={`${scrollRow} lg:overflow-visible lg:flex-wrap items-center gap-1.5 -mx-4 px-4 lg:mx-0 lg:px-0`}>
+            <span className="flex-none text-xs font-bold text-zinc-400 mr-0.5 snap-start">Filtrar Console:</span>
+            {[
+              { id: null, label: "Todos Consoles" },
+              { id: "PS5", label: "PS5" },
+              { id: "PS4", label: "PS4" },
+              { id: "PS4/PS5", label: "Dual (PS4 & PS5)" },
+            ].map((plat) => (
+              <button
+                key={plat.label}
+                onClick={() => navigate(plat.id ? `/digital?platform=${plat.id}` : "/digital")}
+                className="flex-none snap-start h-11 lg:h-[30px] flex items-center active:scale-95 transition-transform"
+              >
+                <span className="h-8 lg:h-[30px] px-[11px] flex items-center bg-[#1F1F26] hover:bg-[#2A2A33] rounded-lg text-xs font-bold text-zinc-100 whitespace-nowrap transition-colors">
+                  {plat.label}
+                </span>
+              </button>
             ))}
           </div>
         </div>
-      </section>
 
-      {/* Banner Destaque Jogue com Economia */}
-      <section className="py-4 container mx-auto px-4">
-        <div 
-          onClick={() => navigate("/jogue-com-economia")}
-          className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-red-950/80 via-slate-900/90 to-slate-950 border border-red-500/30 p-5 sm:p-7 cursor-pointer group shadow-[0_0_25px_rgba(220,38,38,0.15)] hover:shadow-[0_0_35px_rgba(220,38,38,0.3)] transition-all hover:border-red-500/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-        >
-          <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-red-600/10 rounded-full blur-3xl pointer-events-none group-hover:bg-red-600/20 transition-all" />
-          <div className="space-y-1.5 max-w-xl relative z-10">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-600/20 border border-red-500/30 text-red-400 text-[10px] sm:text-xs font-black uppercase tracking-wider">
-              <Zap className="w-3.5 h-3.5 animate-pulse" /> Seção Especial
-            </div>
-            <h3 className="text-lg sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
-              Jogue com Economia <span className="text-red-500">— Até 70% OFF</span>
-            </h3>
-            <p className="text-xs sm:text-sm text-slate-300">
-              Quer jogar os melhores títulos pagando muito menos? Descubra nosso catálogo selecionado de contas secundárias verificadas com suporte e garantia.
-            </p>
-          </div>
-          <div className="relative z-10 shrink-0">
-            <Button className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-xl shadow-[0_0_15px_rgba(220,38,38,0.4)] group-hover:scale-105 transition-transform flex items-center gap-2">
-              <span>Explorar Ofertas</span>
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </Button>
-          </div>
-        </div>
-      </section>
+        {/* Trust Badges Bar */}
+        <ul className="mt-1.5 lg:mt-2.5 py-3 lg:py-2.5 grid grid-cols-2 lg:flex lg:flex-wrap lg:justify-between gap-3 lg:gap-x-6 lg:gap-y-2 border-y border-[#26262D]">
+          {trustItems.map((item) => (
+            <li key={item.title} className="min-w-0 flex items-start lg:items-center gap-[7px] lg:gap-2">
+              <item.icon className="w-4 h-4 mt-px lg:mt-0 text-[#FF4D57] shrink-0" />
+              <span className="min-w-0 lg:flex lg:items-center lg:gap-2">
+                <span className="block text-xs lg:text-[13px] font-bold leading-tight text-zinc-100">{item.title}</span>
+                <span className="block text-[11px] lg:text-[13px] leading-snug text-zinc-400">{item.text}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
 
-      {/* Recent Listings (Anúncios) */}
-      <section id="anuncios" className="py-8 sm:py-16">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-5 sm:mb-8 gap-4">
+        {/* Recent Listings (Anúncios) */}
+        <section id="anuncios" className="pt-[18px] lg:pt-4">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between lg:flex-wrap gap-2 lg:gap-x-5 lg:gap-y-2.5 mb-1.5 lg:mb-3">
             <div>
-              <h2 className="text-xl sm:text-3xl font-bold text-white mb-1 sm:mb-2 flex items-center gap-2 sm:gap-3">
-                <Tag className="text-red-500 w-5 h-5 sm:w-8 sm:h-8" /> Últimos Anúncios
-              </h2>
-              <p className="text-slate-400 text-xs sm:text-base">Filtre por tipo de produto para não misturar anúncios.</p>
+              <h2 className={`${sectionTitle} text-[26px] lg:text-[30px]`}>Últimos Anúncios</h2>
+              <p className="mt-[3px] lg:mt-0.5 text-xs lg:text-[13px] text-zinc-400">Filtre por tipo de produto para não misturar anúncios.</p>
             </div>
 
             {/* Tab Filter Control */}
-            <div className="flex items-center gap-1 sm:gap-2 bg-slate-900 p-1 rounded-xl border border-slate-800 self-stretch sm:self-auto overflow-x-auto">
+            <div className={`${scrollRow} lg:overflow-visible lg:flex-wrap gap-1.5 lg:gap-1 -mx-4 px-4 lg:mx-0 lg:p-1 lg:bg-[#141418] lg:border lg:border-[#26262D] lg:rounded-[10px]`}>
               {[
                 { id: "todos", label: "Todos os Digitais" },
-                { id: "digital", label: "🎮 Jogos Digitais" },
-                { id: "assinatura", label: "⭐ Assinaturas" },
-                { id: "primaria", label: "👤 Contas Primárias" },
-                { id: "secundaria", label: "👥 Contas Secundárias" },
-                { id: "fisico", label: "📦 Jogos Físicos" },
+                { id: "digital", label: "Jogos Digitais" },
+                { id: "assinatura", label: "Assinaturas" },
+                { id: "primaria", label: "Contas Primárias" },
+                { id: "secundaria", label: "Contas Secundárias" },
+                { id: "fisico", label: "Jogos Físicos" },
               ].map((tab) => (
                 <button
                   key={tab.id}
+                  aria-pressed={activeListingTab === tab.id}
                   onClick={() => setActiveListingTab(tab.id as any)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
-                    activeListingTab === tab.id
-                      ? "bg-red-600 text-white shadow-md"
-                      : "text-slate-400 hover:text-white hover:bg-slate-800"
-                  }`}
+                  className="flex-none snap-start h-11 lg:h-[34px] flex items-center"
                 >
-                  {tab.label}
+                  <span className={`h-[34px] px-3 flex items-center rounded-lg lg:rounded-[7px] text-xs lg:text-[13px] font-bold whitespace-nowrap transition-colors ${
+                    activeListingTab === tab.id
+                      ? "bg-zinc-100 text-[#0A0A0C]"
+                      : "bg-[#1F1F26] lg:bg-transparent text-zinc-300 hover:text-white lg:hover:bg-[#1F1F26]"
+                  }`}>
+                    {tab.label}
+                  </span>
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="flex lg:grid lg:grid-cols-4 xl:grid-cols-5 overflow-x-auto lg:overflow-x-visible gap-4 pb-4 lg:pb-0 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <div className={`${scrollRow} lg:grid lg:grid-cols-4 xl:grid-cols-6 lg:overflow-visible gap-2.5 lg:gap-3.5 -mx-4 px-4 lg:mx-0 lg:px-0 pb-0.5`}>
             {(() => {
               const visibleListings = allListings.filter((listing: any) => {
                 if (listing.showInEconomia === true) return false;
-                
+
                 if (activeListingTab === "digital") return listing._type === 'digital' && listing.type !== 'assinatura';
                 if (activeListingTab === "fisico") return listing._type === 'used';
                 if (activeListingTab === "assinatura") return listing.type === 'assinatura';
@@ -922,13 +868,20 @@ export default function Home() {
               const isExpired = isAnyDigital && !!listing.expiresAt && new Date(listing.expiresAt) < new Date();
               const isUnavailable = isOutOfStock || isExpired;
 
+              const priceValue = (value: number) => (
+                <span className="whitespace-nowrap">
+                  <span className="text-[11px] lg:text-xs font-semibold text-zinc-400">R$ </span>
+                  <span className="text-[19px] lg:text-[21px] font-extrabold tracking-[-0.02em] text-white">{value.toFixed(2).replace('.', ',')}</span>
+                </span>
+              );
+
               return (
                 <div
                   key={`${listing._type}-${listing.id}`}
-                  className={`bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-red-500/40 transition-all hover:-translate-y-1.5 hover:shadow-[0_8px_30px_rgba(220,38,38,0.2)] flex flex-col h-full cursor-pointer min-w-[160px] sm:min-w-[220px] lg:min-w-0 w-[45vw] sm:w-[35vw] lg:w-auto snap-start shrink-0 group game-card-shine ${isUnavailable ? 'opacity-70' : ''}`}
+                  className={`w-[170px] lg:w-auto shrink-0 lg:shrink min-w-0 snap-start flex flex-col overflow-hidden bg-[#141418] border border-[#26262D] hover:border-red-600 rounded-[10px] lg:rounded-xl lg:hover:-translate-y-[3px] transition-all cursor-pointer group game-card-shine ${isUnavailable ? 'opacity-70' : ''}`}
                   onClick={() => !isUnavailable && navigate(isFisico ? '/usados' : `/digital?search=${encodeURIComponent(listing.name)}&buy=${listing.id}`)}
                 >
-                  <div className="aspect-[16/9] w-full bg-slate-950 relative overflow-hidden flex items-center justify-center">
+                  <div className={`w-full bg-[#0A0A0C] relative overflow-hidden flex items-center justify-center ${isFisico ? 'aspect-square' : 'aspect-[460/215]'}`}>
                     {listing.imageUrl || (listing.images && listing.images.length > 0) ? (
                       <>
                         {/* Fundo ambiente suave apenas para contain */}
@@ -937,15 +890,15 @@ export default function Home() {
                             src={listing.imageUrl || listing.images[0]}
                             alt=""
                             aria-hidden="true"
+                            loading="lazy"
                             className="absolute inset-0 w-full h-full object-cover blur-xl opacity-35 scale-125 pointer-events-none"
                           />
                         )}
-                        {/* Gradiente sutil para legibilidade das tags */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 pointer-events-none z-10" />
-                        <img 
-                          src={listing.imageUrl || listing.images[0]} 
-                          alt={listing.name} 
-                          className={`w-full h-full ${listing.coverFit === 'contain' ? 'object-contain p-1.5 relative z-10' : 'object-cover'} group-hover:scale-105 transition-transform duration-500`} 
+                        <img
+                          src={listing.imageUrl || listing.images[0]}
+                          alt={listing.name}
+                          loading="lazy"
+                          className={`w-full h-full ${listing.coverFit === 'contain' ? 'object-contain p-1.5 relative z-10' : 'object-cover'} group-hover:scale-105 transition-transform duration-500`}
                           onError={(e) => {
                             const target = e.currentTarget as HTMLImageElement;
                             if (!target.dataset.fallbackApplied) {
@@ -956,28 +909,21 @@ export default function Home() {
                         />
                       </>
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-slate-600 bg-slate-800/50">
+                      <div className="w-full h-full flex items-center justify-center text-zinc-600 bg-[#1F1F26]">
                         <Gamepad2 className="w-8 h-8 sm:w-12 sm:h-12 opacity-50" />
                       </div>
                     )}
-                    <div className={`absolute top-1.5 left-1.5 sm:top-2 sm:left-2 z-20 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded text-[8px] sm:text-[10px] uppercase font-bold text-white shadow-md backdrop-blur-sm ${
-                      isAssinatura
-                        ? 'bg-amber-600 border border-amber-500/30'
-                        : isFisico
-                          ? 'bg-blue-600 border border-blue-500/30'
-                          : isDigital 
-                            ? 'bg-red-600 border border-red-500/30' 
-                            : 'bg-blue-600 border border-blue-500/30'
-                    }`}>
-                      {isAssinatura ? '⭐ Assinatura VIP' : isFisico ? '📦 Mídia Física' : '🎮 Mídia Digital'}
+                    <div className="absolute top-[5px] left-[5px] lg:top-1.5 lg:left-1.5 z-20 h-[19px] lg:h-5 px-1.5 lg:px-[7px] inline-flex items-center gap-1 bg-[#0A0A0C]/90 rounded-[5px] text-[9px] lg:text-[10px] uppercase font-extrabold tracking-[0.02em] text-white">
+                      <span className={`w-[5px] h-[5px] rounded-full ${isAssinatura ? 'bg-amber-400' : isFisico ? 'bg-blue-400' : 'bg-[#FF2B36]'}`} />
+                      {isAssinatura ? 'Assinatura VIP' : isFisico ? 'Mídia Física' : 'Mídia Digital'}
                     </div>
 
                     {isOutOfStock ? (
-                      <div className="absolute top-1.5 right-1.5 z-20 bg-red-600/95 border border-red-500 text-white text-[7px] sm:text-[9px] font-black px-1.5 sm:px-2 py-0.5 rounded-full uppercase tracking-wider shadow-md">
+                      <div className="absolute bottom-[5px] right-[5px] lg:bottom-1.5 lg:right-1.5 z-20 h-[19px] lg:h-5 px-1.5 lg:px-[7px] inline-flex items-center bg-red-600 rounded-[5px] text-[9px] lg:text-[10px] font-extrabold uppercase text-white">
                         Esgotado
                       </div>
                     ) : isExpired ? (
-                      <div className="absolute top-1.5 right-1.5 z-20 bg-red-600/95 border border-red-500 text-white text-[7px] sm:text-[9px] font-black px-1.5 sm:px-2 py-0.5 rounded-full uppercase tracking-wider shadow-md">
+                      <div className="absolute bottom-[5px] right-[5px] lg:bottom-1.5 lg:right-1.5 z-20 h-[19px] lg:h-5 px-1.5 lg:px-[7px] inline-flex items-center bg-red-600 rounded-[5px] text-[9px] lg:text-[10px] font-extrabold uppercase text-white">
                         Prazo Encerrado
                       </div>
                     ) : null}
@@ -987,77 +933,67 @@ export default function Home() {
                       </div>
                     )}
                   </div>
-                  <div className="p-3 sm:p-4 flex flex-col flex-grow">
-                    <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                      <span className="text-[9px] font-bold text-green-400 bg-green-950/60 px-1.5 py-0.5 rounded border border-green-800/40 flex items-center gap-1">
-                        <ShieldCheck className="w-2.5 h-2.5" /> Verificado
+                  <div className="flex-1 px-2.5 pt-[9px] pb-2.5 lg:px-3 lg:pt-2.5 lg:pb-3 flex flex-col gap-[5px] lg:gap-1.5">
+                    <div className="flex items-center justify-between gap-1 lg:gap-1.5 text-[10px] lg:text-[11px] font-bold">
+                      <span className="flex items-center gap-[3px] text-green-400">
+                        <ShieldCheck className="w-[11px] h-[11px] lg:w-3 lg:h-3" /> Verificado
                       </span>
                       {isDigital && (
-                        <span className="text-[9px] font-bold text-amber-400 bg-amber-950/50 px-1.5 py-0.5 rounded border border-amber-800/40 flex items-center gap-0.5">
-                          <Coins className="w-2.5 h-2.5 text-amber-400" /> +7 FC
-                        </span>
+                        <span className="flex items-center gap-0.5 text-amber-400">+7 FC</span>
                       )}
                     </div>
                     {(listing.sellerId || listing.seller_id || listing.sellerOpenId || listing.sellerName) ? (
-                      <div className="mb-1">
-                        <span className="text-[8px] sm:text-[9px] font-black bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-sm">
-                          🤝 Vendedor Parceiro
-                        </span>
-                      </div>
+                      <span className="flex items-center gap-1 text-[9px] lg:text-[10px] font-extrabold text-amber-400">
+                        <Handshake className="w-3 h-3" /> Vendedor Parceiro
+                      </span>
                     ) : null}
-                    <h3 className="text-white font-medium text-xs sm:text-base line-clamp-2 mb-1.5 sm:mb-2 group-hover:text-red-400 transition-colors">
+                    <h3 className="line-clamp-2 min-h-[34px] lg:min-h-[37px] text-[13px] lg:text-sm font-semibold leading-[1.3] text-zinc-100 group-hover:text-white transition-colors">
                       {listing.name}
                     </h3>
-                    
+
                     {/* Bloco de Exibição dos Valores */}
-                    <div className="mt-auto pt-2 space-y-1">
+                    <div className="mt-auto space-y-[5px] lg:space-y-1.5">
                       {isFisico ? (
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-base sm:text-2xl font-black text-white">
-                            {listing.price ? (
-                              <><span className="text-[10px] sm:text-sm text-slate-500 font-normal">R$</span> {parseFloat(listing.price).toFixed(2).replace('.', ',')}</>
-                            ) : (
-                              <span className="text-xs sm:text-lg font-bold text-red-500">Ver anúncio</span>
-                            )}
-                          </span>
+                        <div className="flex items-baseline justify-end gap-1">
+                          {listing.price ? (
+                            priceValue(parseFloat(listing.price))
+                          ) : (
+                            <span className="text-xs lg:text-sm font-bold text-[#FF4D57]">Ver anúncio</span>
+                          )}
                         </div>
                       ) : hasSec && hasPrim ? (
-                        <div className="bg-slate-950/70 p-2 rounded-lg border border-slate-800 space-y-1">
-                          <div className="flex justify-between items-center text-[10px] sm:text-xs">
-                            <span className="text-slate-400 font-bold">👤 Primária:</span>
-                            <span className="font-black text-red-500">R$ {primaryPrice.toFixed(2).replace('.', ',')}</span>
+                        <div className="space-y-0.5 text-[11px] lg:text-xs">
+                          <div className="flex justify-between items-center gap-1">
+                            <span className="font-bold text-zinc-400">Primária:</span>
+                            <span className="font-extrabold text-white">R$ {primaryPrice.toFixed(2).replace('.', ',')}</span>
                           </div>
-                          <div className="flex justify-between items-center text-[10px] sm:text-xs">
-                            <span className="text-slate-400 font-bold">👥 Secundária:</span>
-                            <span className="font-bold text-slate-300">R$ {secondaryPrice.toFixed(2).replace('.', ',')}</span>
+                          <div className="flex justify-between items-center gap-1">
+                            <span className="font-bold text-zinc-400">Secundária:</span>
+                            <span className="font-bold text-zinc-300">R$ {secondaryPrice.toFixed(2).replace('.', ',')}</span>
                           </div>
                         </div>
                       ) : hasSec && !hasPrim ? (
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-xs text-slate-400 font-bold">👥 Secundária:</span>
-                          <span className="text-base sm:text-2xl font-black text-white">
-                            <span className="text-[10px] sm:text-sm text-slate-500 font-normal">R$</span> {secondaryPrice.toFixed(2).replace('.', ',')}
-                          </span>
+                        <div className="flex items-baseline justify-between gap-1 lg:gap-1.5">
+                          <span className="text-[11px] lg:text-xs font-bold text-zinc-400">Secundária:</span>
+                          {priceValue(secondaryPrice)}
                         </div>
                       ) : (
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-xs text-slate-400 font-bold">👤 Primária:</span>
-                          <span className="text-base sm:text-2xl font-black text-white">
-                            {primaryPrice === 0 ? (
-                              <span className="text-xs sm:text-lg font-bold text-red-500">A definir</span>
-                            ) : (
-                              <><span className="text-[10px] sm:text-sm text-slate-500 font-normal">R$</span> {primaryPrice.toFixed(2).replace('.', ',')}</>
-                            )}
-                          </span>
+                        <div className="flex items-baseline justify-between gap-1 lg:gap-1.5">
+                          <span className="text-[11px] lg:text-xs font-bold text-zinc-400">Primária:</span>
+                          {primaryPrice === 0 ? (
+                            <span className="text-xs lg:text-sm font-bold text-[#FF4D57]">A definir</span>
+                          ) : (
+                            priceValue(primaryPrice)
+                          )}
                         </div>
                       )}
 
                       <Button
                         size="sm"
-                        className={`w-full rounded-lg px-2.5 py-1.5 text-[10px] sm:text-xs font-bold mt-2 ${
+                        className={`w-full h-11 lg:h-[38px] rounded-lg px-1 lg:px-1.5 text-[11px] lg:text-xs font-extrabold leading-tight whitespace-normal shrink ${
                           isUnavailable
-                            ? "bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed"
-                            : "bg-red-600 hover:bg-red-700 text-white btn-neon"
+                            ? "bg-[#26262D] text-zinc-400 cursor-not-allowed"
+                            : "bg-red-600 hover:bg-red-700 text-white"
                         }`}
                         disabled={isUnavailable}
                         onClick={(e: any) => {
@@ -1077,189 +1013,184 @@ export default function Home() {
                 </div>
               );
             }) : (
-              <div className="col-span-full py-16 text-center bg-slate-900/50 rounded-2xl border border-slate-800">
-                <Tag className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                <h3 className="text-lg font-bold text-slate-400">Nenhum anúncio nesta categoria.</h3>
+              <div className="w-full col-span-full py-16 text-center bg-[#141418] rounded-2xl border border-[#26262D]">
+                <Tag className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
+                <h3 className="text-lg font-bold text-zinc-400">Nenhum anúncio nesta categoria.</h3>
               </div>
             );
             })()}
           </div>
 
-          <Button variant="outline" className="border-slate-700 text-slate-300 w-full mt-6" onClick={() => navigate("/digital")}>
+          <Button variant="outline" className="w-full h-11 lg:h-[46px] mt-2.5 lg:mt-3.5 bg-transparent border-[#2E2E36] text-zinc-300 hover:text-white hover:bg-[#141418] text-[13px] lg:text-sm font-bold rounded-[10px]" onClick={() => navigate("/digital")}>
             Ver Catálogo Completo de Jogos Digitais →
+          </Button>
+        </section>
+      </div>
+
+      {/* Banner Destaque Jogue com Economia */}
+      <section className="mt-[22px] lg:mt-8 bg-[#15080A] border-y border-[#4A1218]">
+        <div
+          onClick={() => navigate("/jogue-com-economia")}
+          className="max-w-[1440px] mx-auto px-4 lg:px-10 pt-[18px] pb-5 lg:py-[26px] flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 lg:gap-8 cursor-pointer group"
+        >
+          <div className="flex flex-col gap-1.5 lg:flex-1 min-w-0">
+            <div className="text-[11px] lg:text-xs font-extrabold uppercase tracking-[0.08em] text-[#FF6B73]">Seção Especial</div>
+            <h3 className={`${sectionTitle} text-[26px] lg:text-[32px]`}>
+              Jogue com Economia <span className="text-[#FF4D57]">Até 70% OFF</span>
+            </h3>
+            <p className="text-[13px] lg:text-sm leading-[1.45] lg:leading-normal text-zinc-300 lg:max-w-[620px]">
+              Quer jogar os melhores títulos pagando muito menos? Descubra nosso catálogo selecionado de contas secundárias verificadas com suporte e garantia.
+            </p>
+            <Button className="hidden lg:flex mt-2 w-fit h-[46px] px-[18px] bg-red-600 hover:bg-red-700 text-white text-sm font-extrabold rounded-[10px] items-center gap-2">
+              <span>Explorar Ofertas</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </Button>
+          </div>
+          {economiaCovers.length > 0 && (
+            <div className="grid grid-cols-3 gap-2 lg:gap-2.5 lg:flex-1 min-w-0">
+              {economiaCovers.map((cover) => (
+                <img key={cover.name} src={cover.image ?? undefined} alt="" loading="lazy" className="w-full aspect-[16/10] lg:aspect-[460/215] object-cover rounded-md lg:rounded-lg block" />
+              ))}
+            </div>
+          )}
+          <Button className="lg:hidden w-full h-[46px] bg-red-600 hover:bg-red-700 text-white text-sm font-extrabold rounded-[10px] flex items-center justify-center gap-2">
+            <span>Explorar Ofertas</span>
+            <ArrowRight className="w-4 h-4" />
           </Button>
         </div>
       </section>
 
+      {/* Popular Categories */}
+      <section id="categorias" className="max-w-[1440px] mx-auto pt-5 lg:pt-8 lg:px-10">
+        <h2 className={`${sectionTitle} text-[26px] lg:text-[30px] px-4 lg:px-0 mb-2.5 lg:mb-3.5`}>Categorias Populares</h2>
+        <div className={`${scrollRow} lg:grid lg:grid-cols-8 lg:overflow-visible gap-2.5 lg:gap-3 px-4 lg:px-0`}>
+          {categories.map((cat) => {
+            const coverImage =
+              digitalProducts.find((game: any) => game.imageUrl && cat.cover.test(game.name))?.imageUrl ??
+              digitalProducts.find((game: any) => game.imageUrl && game.category === cat.name)?.imageUrl;
+            return (
+              <div
+                key={cat.name}
+                onClick={() => navigate(`/digital?genre=${encodeURIComponent(cat.name)}`)}
+                className={`flex-none snap-start relative overflow-hidden w-[136px] h-[90px] lg:w-auto lg:h-auto lg:aspect-[3/2] cursor-pointer bg-[#141418] border border-[#26262D] hover:border-red-600 rounded-[10px] lg:rounded-xl lg:hover:-translate-y-[3px] transition-all group`}
+              >
+                {coverImage ? (
+                  <img src={coverImage} alt="" loading="lazy" className="w-full h-full object-cover block group-hover:scale-105 transition-transform duration-500" />
+                ) : (
+                  <div className={`w-full h-full bg-gradient-to-br ${cat.color} flex items-center justify-center`}>
+                    <cat.icon className="w-6 h-6 text-white" />
+                  </div>
+                )}
+                <span className="absolute left-0 right-0 bottom-0 px-2.5 lg:px-3 pt-[22px] lg:pt-[26px] pb-2 lg:pb-2.5 bg-gradient-to-b from-[#0A0A0C]/0 to-[#0A0A0C]/95 text-[13px] lg:text-sm font-extrabold text-white">
+                  {cat.name}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
       {/* Guia Rápido: Como Funciona */}
-      <section className="py-8 sm:py-16 bg-slate-950 border-y border-red-700/10">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-8 sm:mb-12">
-            <h2 className="text-xl sm:text-3xl font-black text-white uppercase tracking-tight italic mb-2">
-              🎮 Guia Rápido: <span className="text-red-500">Como Funciona?</span>
+      <section className="mt-[22px] lg:mt-8 pt-[18px] pb-5 lg:pt-[30px] lg:pb-8 bg-[#101014] border-y border-[#26262D]">
+        <div className="max-w-[1440px] mx-auto lg:px-10">
+          <div className="px-4 lg:px-0 mb-3 lg:mb-[18px]">
+            <h2 className={`${sectionTitle} text-[26px] lg:text-[30px]`}>
+              Guia Rápido: <span className="text-[#FF4D57]">Como Funciona?</span>
             </h2>
-            <p className="text-slate-400 text-xs sm:text-base max-w-2xl mx-auto">
+            <p className="mt-[5px] lg:mt-1 text-[13px] lg:text-sm leading-[1.4] text-zinc-400">
               Entenda em poucos passos as principais funções e recursos de segurança da nossa plataforma.
             </p>
           </div>
 
-          <div className="flex lg:grid lg:grid-cols-4 overflow-x-auto lg:overflow-x-visible gap-4 pb-4 lg:pb-0 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            {/* Card 1: Moedas ForteCoins */}
-            <div className="bg-slate-900 border border-slate-800 hover:border-red-500/30 rounded-2xl p-6 transition-all hover:shadow-[0_0_15px_rgba(220,38,38,0.1)] flex flex-col justify-between group min-w-[280px] sm:min-w-[320px] lg:min-w-0 w-[85vw] lg:w-auto snap-start shrink-0">
-              <div>
-                <div className="w-12 h-12 bg-red-600/15 border border-red-500/30 rounded-xl flex items-center justify-center text-red-500 mb-4 group-hover:scale-110 transition-transform">
-                  <Coins className="w-6 h-6" />
-                </div>
-                <h3 className="text-lg font-bold text-white mb-2">ForteCoins (Fidelidade)</h3>
-                <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                  Nossas moedas de fidelidade! Ganhe comprando jogos ou indicando amigos (+15 FC por amigo). Acumule e troque por Gift Cards Steam, PSN e Xbox de graça na loja de resgates.
-                </p>
+          <div className={`${scrollRow} lg:grid lg:grid-cols-4 lg:overflow-visible gap-2.5 lg:gap-4 px-4 lg:px-0`}>
+            {guideCards.map((card) => (
+              <div key={card.title} className="flex-none snap-start w-[288px] lg:w-auto p-3.5 lg:p-0 flex flex-col gap-1.5 lg:gap-2 bg-[#17171C] lg:bg-transparent border border-[#26262D] lg:border-0 rounded-xl">
+                <card.icon className="w-[22px] h-[22px] lg:w-6 lg:h-6 text-[#FF4D57]" />
+                <h3 className="mt-0.5 text-[15px] lg:text-base font-bold text-white">{card.title}</h3>
+                <p className="text-[13px] lg:text-[13.5px] leading-[1.45] lg:leading-normal text-zinc-400">{card.text}</p>
+                <button
+                  type="button"
+                  className="mt-auto min-h-11 lg:min-h-8 text-left text-[13px] font-bold text-[#FF4D57] hover:text-[#FF6B73] transition-colors"
+                  onClick={() => navigate(card.path)}
+                >
+                  {card.link}
+                </button>
               </div>
-              <Button 
-                variant="ghost" 
-                className="text-red-500 hover:text-red-400 hover:bg-red-950/20 text-xs font-bold w-full justify-start p-0 h-auto"
-                onClick={() => navigate("/fortecoins")}
-              >
-                Ver prêmios & indicar amigo →
-              </Button>
-            </div>
-
-            {/* Card 2: Vender Contas / Jogos */}
-            <div className="bg-slate-900 border border-slate-800 hover:border-red-500/30 rounded-2xl p-6 transition-all hover:shadow-[0_0_15px_rgba(220,38,38,0.1)] flex flex-col justify-between group min-w-[280px] sm:min-w-[320px] lg:min-w-0 w-[85vw] lg:w-auto snap-start shrink-0">
-              <div>
-                <div className="w-12 h-12 bg-red-600/15 border border-red-500/30 rounded-xl flex items-center justify-center text-red-500 mb-4 group-hover:scale-110 transition-transform">
-                  <PlusCircle className="w-6 h-6" />
-                </div>
-                <h3 className="text-lg font-bold text-white mb-2">Venda seus Jogos e Contas</h3>
-                <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                  Deseja desapegar ou revender? Crie sua loja de revendedor, anuncie seus jogos físicos usados ou chaves digitais. Nós gerenciamos o processo e você recebe direto na sua conta.
-                </p>
-              </div>
-              <Button 
-                variant="ghost" 
-                className="text-red-500 hover:text-red-400 hover:bg-red-950/20 text-xs font-bold w-full justify-start p-0 h-auto"
-                onClick={() => navigate("/virar-vendedor")}
-              >
-                Seja um revendedor →
-              </Button>
-            </div>
-
-            {/* Card 3: Mídia Digital Rápida */}
-            <div className="bg-slate-900 border border-slate-800 hover:border-red-500/30 rounded-2xl p-6 transition-all hover:shadow-[0_0_15px_rgba(220,38,38,0.1)] flex flex-col justify-between group min-w-[280px] sm:min-w-[320px] lg:min-w-0 w-[85vw] lg:w-auto snap-start shrink-0">
-              <div>
-                <div className="w-12 h-12 bg-red-600/15 border border-red-500/30 rounded-xl flex items-center justify-center text-red-500 mb-4 group-hover:scale-110 transition-transform">
-                  <Sparkles className="w-6 h-6" />
-                </div>
-                <h3 className="text-lg font-bold text-white mb-2">Mídia Digital com Garantia</h3>
-                <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                  Compre jogos de PS4, PS5 e Gift Cards no menor preço com ativação garantida em até 24h úteis (ou reembolso). Além disso, todas as compras garantem cashback de 7 ForteCoins!
-                </p>
-              </div>
-              <Button 
-                variant="ghost" 
-                className="text-red-500 hover:text-red-400 hover:bg-red-950/20 text-xs font-bold w-full justify-start p-0 h-auto"
-                onClick={() => navigate("/digital")}
-              >
-                Explorar mídia digital →
-              </Button>
-            </div>
-
-            {/* Card 4: Sistema Escrow Protegido */}
-            <div className="bg-slate-900 border border-slate-800 hover:border-red-500/30 rounded-2xl p-6 transition-all hover:shadow-[0_0_15px_rgba(220,38,38,0.1)] flex flex-col justify-between group min-w-[280px] sm:min-w-[320px] lg:min-w-0 w-[85vw] lg:w-auto snap-start shrink-0">
-              <div>
-                <div className="w-12 h-12 bg-red-600/15 border border-red-500/30 rounded-xl flex items-center justify-center text-red-500 mb-4 group-hover:scale-110 transition-transform">
-                  <ShieldCheck className="w-6 h-6" />
-                </div>
-                <h3 className="text-lg font-bold text-white mb-2">Compra Segura (Escrow)</h3>
-                <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                  Aqui você está 100% protegido. O dinheiro do pagamento fica retido de forma segura na plataforma e só é liberado para o vendedor após você confirmar o recebimento do produto.
-                </p>
-              </div>
-              <Button 
-                variant="ghost" 
-                className="text-red-500 hover:text-red-400 hover:bg-red-950/20 text-xs font-bold w-full justify-start p-0 h-auto"
-                onClick={() => navigate("/faq")}
-              >
-                Tirar dúvidas no FAQ →
-              </Button>
-            </div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* Physical Products Prominent Banner (Requirement 9) */}
-      <section className="py-8 bg-slate-950">
-        <div className="container mx-auto px-4">
-          <div 
-            onClick={() => navigate("/usados")}
-            className="relative rounded-3xl overflow-hidden bg-gradient-to-r from-slate-900 via-red-950/40 to-slate-900 border border-red-600/30 p-6 sm:p-10 shadow-2xl cursor-pointer hover:border-red-500 transition-all group"
-          >
-            <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?q=80&w=1200')] bg-cover bg-center opacity-20 mix-blend-overlay group-hover:scale-105 transition-transform duration-700 pointer-events-none" />
-            <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-6">
-              <div className="space-y-2 text-center sm:text-left">
-                <span className="bg-red-600/30 text-red-400 border border-red-500/40 text-[10px] sm:text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full inline-block">
-                  📦 Espaço de Desapegos Físicos
-                </span>
-                <h2 className="text-xl sm:text-3xl font-black text-white uppercase tracking-tight">
-                  Revenda seus Jogos Físicos, Consoles e Acessórios!
-                </h2>
-                <p className="text-xs sm:text-sm text-slate-300 max-w-xl">
-                  Encontre e venda mídias físicas em disco de PS4/PS5, videogames, controles originais e colecionáveis com a <strong>Garantia Intermediada Eforte Games (8%)</strong>.
-                </p>
-              </div>
-
-              <Button className="bg-red-600 hover:bg-red-700 text-white font-black text-xs sm:text-sm px-6 py-3 rounded-xl shadow-lg shrink-0">
-                Ver Mídias Físicas & Consoles →
-              </Button>
-            </div>
+      <section className="max-w-[1440px] mx-auto px-4 lg:px-10 pt-5 lg:pt-8">
+        <div
+          onClick={() => navigate("/usados")}
+          className="p-4 lg:px-[30px] lg:py-[26px] flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 lg:gap-8 bg-[#141418] border border-[#26262D] hover:border-red-600 rounded-[14px] lg:rounded-2xl cursor-pointer transition-colors"
+        >
+          <div className="flex flex-col gap-1.5 lg:gap-2 lg:flex-1 min-w-0">
+            <span className="text-[11px] lg:text-xs font-extrabold uppercase tracking-[0.08em] text-[#FF6B73]">
+              Espaço de Desapegos Físicos
+            </span>
+            <h2 className={`${sectionTitle} text-[26px] lg:text-[34px] leading-[1.08] lg:leading-[1.05]`}>
+              Revenda seus Jogos Físicos, Consoles e Acessórios!
+            </h2>
+            <p className="text-[13px] lg:text-sm leading-[1.45] lg:leading-normal text-zinc-300 lg:max-w-[620px]">
+              Encontre e venda mídias físicas em disco de PS4/PS5, videogames, controles originais e colecionáveis com a <strong className="text-white">Garantia Intermediada Eforte Games (8%)</strong>.
+            </p>
+            <Button className="hidden lg:flex mt-2 w-fit h-[46px] px-[18px] bg-red-600 hover:bg-red-700 text-white text-sm font-extrabold rounded-[10px]">
+              Ver Mídias Físicas & Consoles →
+            </Button>
           </div>
+          {fisicosCovers.length > 0 && (
+            <div className="grid grid-cols-4 lg:flex gap-2 lg:gap-2.5 lg:shrink-0">
+              {fisicosCovers.map((cover) => (
+                <img key={cover.name} src={cover.image ?? undefined} alt="" loading="lazy" className="w-full h-[92px] lg:w-32 lg:h-[168px] object-cover rounded-md lg:rounded-lg block" />
+              ))}
+            </div>
+          )}
+          <Button className="lg:hidden w-full h-[46px] bg-red-600 hover:bg-red-700 text-white text-sm font-extrabold rounded-[10px]">
+            Ver Mídias Físicas & Consoles →
+          </Button>
         </div>
       </section>
 
-
       {/* Footer */}
-      <footer className="bg-slate-950 border-t border-slate-800/60 py-12 mt-10 pb-36 lg:pb-16 relative overflow-hidden">
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-red-600/30 to-transparent" />
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-px bg-gradient-to-r from-transparent via-red-500/50 to-transparent blur-sm" />
-        <div className="container mx-auto px-4 text-center">
-          <div className="flex items-center justify-center gap-2 mb-6">
-            <img src="/logo.png" alt="Eforte Games Logo" className="w-8 h-8 object-contain rounded-lg border border-slate-800 bg-slate-950" />
-            <span className="text-xl font-bold text-white">EFORTE<span className="text-red-500">GAMES</span></span>
+      <footer className="mt-7 lg:mt-9 lg:border-t border-[#26262D] pt-0 lg:pt-[30px] pb-28 lg:pb-[26px]">
+        <div className="max-w-[1440px] mx-auto px-4 lg:px-10 text-center">
+          <div className="flex items-center justify-center gap-2 lg:gap-2.5">
+            <img src="/logo.png" alt="Eforte Games Logo" className="w-7 h-7 lg:w-8 lg:h-8 object-contain rounded-md lg:rounded-lg" />
+            <span className="text-lg lg:text-xl font-black tracking-[-0.02em] text-white">EFORTE<span className="text-[#FF2B36]">GAMES</span></span>
           </div>
-          <p className="text-slate-500 mb-6 max-w-md mx-auto">
+          <p className="mt-2.5 lg:mt-3 mb-1 lg:mb-1.5 max-w-[480px] mx-auto text-[13px] lg:text-sm leading-[1.45] lg:leading-normal text-zinc-400">
             Plataforma segura para negociações de jogos, gift cards e produtos físicos. O dinheiro só é liberado após a confirmação do comprador.
           </p>
-          
-          <div className="flex justify-center gap-4 mb-6">
-            <a 
-              href="https://www.instagram.com/efortegamesdigitais_?igsh=dnl0NW56aHlna29m" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 text-slate-400 hover:text-red-500 transition-all duration-300 group bg-slate-900/60 border border-slate-800 hover:border-red-600/30 px-5 py-2.5 rounded-xl hover:shadow-[0_0_15px_rgba(239,68,68,0.15)]"
-            >
-              <Instagram className="w-5 h-5 text-red-500 group-hover:scale-110 transition-transform duration-300" />
-              <span className="text-sm font-semibold tracking-wide">@efortegamesdigitais_</span>
-            </a>
-          </div>
 
-          <div className="text-slate-600 text-sm flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6 mt-4">
+          <a
+            href="https://www.instagram.com/efortegamesdigitais_?igsh=dnl0NW56aHlna29m"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="min-h-11 inline-flex items-center gap-[7px] lg:gap-2 text-[13px] lg:text-sm font-semibold text-zinc-300 hover:text-white transition-colors"
+          >
+            <Instagram className="w-4 h-4" />
+            <span>@efortegamesdigitais_</span>
+          </a>
+
+          <div className="mt-0 lg:mt-1.5 flex flex-col lg:flex-row lg:flex-wrap items-center justify-center lg:gap-x-[18px] text-xs lg:text-[13px] text-[#8E8E99]">
             <p>&copy; 2026 EFORTE GAMES. Todos os direitos reservados.</p>
-            <span className="hidden sm:inline text-slate-800">|</span>
-            <a href="/termos" className="text-slate-500 hover:text-red-500 transition-all font-medium">Termos de Uso e Regulamentos</a>
+            <a href="/termos" className="min-h-10 lg:min-h-8 flex items-center text-[13px] font-semibold text-zinc-300 hover:text-white transition-colors">Termos de Uso e Regulamentos</a>
+            {/* Crédito de quem desenvolveu o site */}
+            <p>
+              Desenvolvido por{" "}
+              <a
+                href="https://www.instagram.com/lmtech_br/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-zinc-300 hover:text-white transition-colors"
+              >
+                @lmtech_br
+              </a>
+            </p>
           </div>
-
-          {/* Crédito de quem desenvolveu o site */}
-          <p className="text-slate-600 text-xs mt-5">
-            Desenvolvido por{" "}
-            <a
-              href="https://www.instagram.com/lmtech_br/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-slate-500 hover:text-red-500 transition-colors font-semibold align-middle"
-            >
-              <Instagram className="w-3.5 h-3.5" /> @lmtech_br
-            </a>
-          </p>
         </div>
       </footer>
     </div>

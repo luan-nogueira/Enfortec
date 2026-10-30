@@ -371,3 +371,25 @@
     transition: box-shadow 0.2s ease, border-color 0.2s ease;
   }
 }
+
+/* ── Home ─────────────────────────────────────────────────────────── */
+
+/* O overflow-x: hidden global transforma o body em contêiner de rolagem e o sticky deixa de
+   funcionar. clip corta o excesso igual, sem esse efeito. Só na home: nas outras páginas o
+   cabeçalho sempre rolou junto com o conteúdo e continua assim. */
+html:has(.home-page),
+body:has(.home-page) {
+  overflow-x: clip;
+}
+
+.font-display {
+  font-family: "Saira Condensed", Inter, system-ui, sans-serif;
+}
+
+/* Em telas largas a arte do banner principal se funde com o bloco de texto à esquerda. */
+@media (min-width: 1280px) {
+  .hero-art-fade {
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 90px);
+    mask-image: linear-gradient(90deg, transparent 0, #000 90px);
+  }
+}
